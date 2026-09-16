@@ -6,13 +6,15 @@ A Photopea-inspired visual editor with an integrated PDF toolkit. Editing and co
 
 ## Start on Windows
 
-1. Get the [prebuilt bide-browser.zip](https://github.com/AOSPAndroid/Bide/releases/download/v0.3.2/bide-browser.zip) and extract the entire ZIP into a writable local folder. The app and conversion engines are already included.
+1. Get the [prebuilt bide-browser.zip](https://github.com/AOSPAndroid/Bide/releases/download/v0.3.3/bide-browser.zip) and extract the entire ZIP into a **new writable folder**. The app and conversion engines are already included. You should see a `site` folder beside the BAT files.
 2. Use your existing **Node.js 22 or newer**. bide detects `C:\devhome\tools\node24\current\node.exe` or `node.exe` on PATH. With this ZIP, **Install Dependencies.bat is optional**: it only checks your installation and bundled files, with no downloads.
 3. Double-click **launch bide.bat**. It starts the local server in the background and opens the editor in your default browser (use Edge or Chrome).
 
 Keep the BAT files with their `scripts` and `site` folders. No Node runtime is downloaded or installed by bide. For a different Node location, set `BIDE_NODE` to the full path to `node.exe`; this overrides automatic detection. No administrator rights or system PATH changes are needed. The launcher reuses the running server, starting at port 8766 and choosing another local port if occupied. Logs and server state are in `.runtime`. The server runs until Windows shuts down; closing the browser does not stop it. No startup task or Windows service is installed.
 
-GitHub's **Code → Download ZIP** contains source code. Building that copy with **Install Dependencies.bat** still needs npm packages and the browser Office runtime, which may require network access. Use the prebuilt release ZIP on a PC where proxy authentication blocks dependency downloads. Its root launchers run offline using your existing Node; the `source` folder is only for rebuilding.
+The BAT files run directly through Node: **PowerShell and execution-policy changes are not needed.** Normal setup and launch never download dependencies. If the built app is missing, the launcher prints the ready-to-run ZIP link and stops.
+
+GitHub's **Code → Download ZIP** creates a source folder such as `Bide-main`. A source build must be explicitly requested with `"Install Dependencies.bat" --build-source`; it needs npm packages and the browser Office runtime, which may require network access. Use the prebuilt release ZIP on a PC where proxy authentication blocks dependency downloads. Its root launchers run offline using your existing Node; the `source` folder is only for rebuilding.
 
 The local edition works without internet after setup. A hosted edition needs only a browser and no Node runtime on the work PC; see [HOSTING.md](HOSTING.md). This build has not been published to an external host. The previous `Setup.cmd` and `start bide.cmd` now forward to these BAT files.
 

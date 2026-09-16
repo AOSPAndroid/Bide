@@ -13,7 +13,9 @@ set "BIDE_NODE=D:\Tools\Node\node.exe"
 
 The same variable works with **share bide.bat** and **Install Dependencies.bat**. An invalid override produces an error and never triggers a download. A missing or old Node version also stops with an explanatory message.
 
-The release's `source` folder and GitHub's source ZIP are for developers. Their installer uses your installed Node and npm to download any missing Office assets, install locked npm dependencies, and build the app. For a work PC with a `407 Proxy Authentication Required` error, use the prebuilt release's root BAT files: all app dependencies and conversion engines are included, so these launchers do not contact download servers. The earlier private `.runtime/node` installation is no longer used by new launches.
+The BAT launchers use Node directly. They do not invoke PowerShell, change execution policy, require signed `.ps1` files or install runtimes. Normal setup and launch never attempt dependency downloads. An incomplete app or a source-only folder produces a direct link to the ready-to-run ZIP.
+
+The release's `source` folder and GitHub's source ZIP (`Bide-main`) are for developers. Only an explicit `"Install Dependencies.bat" --build-source` uses your installed Node and npm to download missing Office assets, install locked npm dependencies and build the app. For a work PC with a `407 Proxy Authentication Required` or `fetch failed` error, extract the **prebuilt bide-browser.zip into a new folder** and use its root BAT files beside `site`. All app dependencies and conversion engines are included, so these launchers do not contact download servers. The earlier private `.runtime/node` installation is no longer used by new launches.
 
 ## Share from a Windows PC using IP:port
 

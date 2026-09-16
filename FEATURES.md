@@ -71,7 +71,7 @@ The catalogue includes [organization, conversion, editing, security and intellig
 - Automated PDF tests: source and accented overlay text, links (including rotated geometry), merge/ranges, rotation, split, PNG/JPEG/SVG, text/DOCX extraction, source integrity, rejection of external SVG resources, AES-256 export/unlock (including punctuation and Unicode passwords), and crop/reimport dimensions.
 - PSD tests: raster data, layer names/order/position/opacity/blending, unsupported-format guards and composite fallback detection. Fabric 7 coordinate-anchor regression check.
 - Browser checks: text editing, dragging and resizing, layer controls, signature placement, palette, project save/load, PDF merge/export, DOCX/XLSX/PPTX conversion and image compression.
-- Windows setup: existing Node detection on PATH, managed work-PC location or explicit override; prebuilt validation and launch without setup downloads; source dependency installation/build, server reuse and paths containing spaces.
+- Windows setup: direct Node launch without PowerShell; existing Node detection on PATH, managed work-PC location or explicit override; prebuilt validation and launch without setup downloads; explicit source build, server reuse and paths containing spaces. Source-only folders stop with a prebuilt download link before attempting any network access.
 
 These checks use representative fixtures. They do not establish identical behavior on every document, font, Photoshop feature, damaged PDF or Office version.
 
