@@ -3,7 +3,7 @@ import { uuid } from './browser/crypto';
 
 FabricObject.customProperties = ['id', 'name', 'diagramXml'];
 // The editor's coordinates use top-left anchors. Fabric 7 defaults to centered anchors.
-Object.assign(FabricObject.ownDefaults, { originX: 'left', originY: 'top', cornerColor: '#8ce4c5', cornerStrokeColor: '#183b31', borderColor: '#62dcb4', cornerSize: 9, transparentCorners: false, padding: 3 });
+Object.assign(FabricObject.ownDefaults, { originX: 'left', originY: 'top', cornerColor: '#ffffff', cornerStrokeColor: '#0076a8', borderColor: '#00aeef', cornerSize: 9, transparentCorners: false, padding: 3 });
 
 export type Page = { id: string; name: string; width: number; height: number; color: string; source?: string; index: number; canvas: Record<string, unknown>; thumb?: string };
 export type Project = { version: 1; name: string; pages: Page[]; sources: Record<string, string> };

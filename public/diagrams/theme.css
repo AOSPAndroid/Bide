@@ -1,0 +1,23 @@
+/* bide's white and Barclays-blue shell. Diagram artwork keeps its own colors. */
+:root {
+  color-scheme: light;
+  --ge-panel-color: #ffffff;
+  --workspace-color: #eef5f9;
+  --text-color: #00395d;
+  --primary-color: #00aeef;
+  --primary-hover-color: #b9eaff;
+  --accent-color: #e4f5fd;
+  --accent-hover-color: #d2effb;
+  --accent-text-color: #006b99;
+  --border-color: #d0e2ec;
+  --highlight-color: #e4f5fd;
+  --prop-accent-color: #e4f5fd;
+  --prop-accent-text-color: #00395d;
+}
+body.geEditor {font-family: 'Segoe UI', Arial, sans-serif; color:#00395d; background:#ffffff;}
+.geMenubar, .geToolbar, .geSidebarContainer, .geSidebar, .geFormatContainer, .geSidebarFooter {background-color:#ffffff; border-color:#d0e2ec;}
+.geDiagramContainer {background-color:#eef5f9;}
+.geSidebarContainer .geTitle {color:#00395d; background-color:#f5fafc; border-color:#d0e2ec;}
+.gePrimaryBtn {color:#00395d; border-color:#00aeef;}
+.geBtn:focus-visible, .geButton:focus-visible, input:focus-visible {outline:2px solid #0076a8;outline-offset:2px;}
+input[type=checkbox], input[type=range] {accent-color:#0076a8;}

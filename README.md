@@ -6,7 +6,7 @@ A Photopea-inspired visual editor, PDF toolkit, and bundled draw.io diagram edit
 
 ## Start on Windows
 
-1. Get the [prebuilt bide-browser.zip](https://github.com/AOSPAndroid/Bide/releases/download/v0.4.0/bide-browser.zip) and extract the entire ZIP into a **new writable folder**. The app and conversion engines are already included. You should see a `site` folder beside the BAT files.
+1. Get the [prebuilt bide-browser.zip](https://github.com/AOSPAndroid/Bide/releases/download/v0.4.1/bide-browser.zip) and extract the entire ZIP into a **new writable folder**. The app and conversion engines are already included. You should see a `site` folder beside the BAT files.
 2. Use your existing **Node.js 22 or newer**. bide detects `C:\devhome\tools\node24\current\node.exe` or `node.exe` on PATH. With this ZIP, **Install Dependencies.bat is optional**: it only checks your installation and bundled files, with no downloads.
 3. Double-click **launch bide.bat**. It starts the local server in the background and opens the editor in your default browser (use Edge or Chrome).
 
@@ -26,6 +26,12 @@ PDF and image editing runs over HTTP, but browsers may block downloads from HTTP
 
 Every visitor has an independent workspace stored in their own browser. Sharing the app does not share documents or provide live collaboration. This is an internal static server without user accounts; use it on your trusted LAN/VPN, with no router port forwarding.
 
+## Workspaces and dock
+
+The interface uses white panels, Barclays blue accents (`#00AEEF`) and navy text (`#00395D`). Move the pointer to the **Workspaces** tab at the bottom center to reveal the animated dock. Its three icons open **Photo editor**, **PDF MasterTool** and **Drawio**. Icons lift and show their labels on hover; the active workspace has a blue icon. Click/tap the tab to keep the dock open, or focus it with Tab and press Up to reach the icons. Escape dismisses keyboard access. Reduced-motion preferences disable the animations.
+
+Photo editor and PDF MasterTool share your current document, layers and undo history. The PDF home has searchable tools grouped under Organize, Convert, Edit and Security; **Continue editing** returns to the document. Drawio keeps its own diagram draft, and **Place in document** returns to the photo/PDF workspace you came from. Ctrl+K can also switch workspaces.
+
 ## Editor
 
 - Add text boxes; drag, resize and rotate using handles. Double-click to edit, or use the properties panel.
@@ -39,12 +45,12 @@ Basic 8-bit RGB PSD import preserves raster layer names, positions, opacity and 
 
 ## Diagrams
 
-Switch to **Diagrams** in the top bar. The bundled draw.io 31.4.5 editor supplies draggable/resizable shapes, attached connectors, labels, flowchart/UML/network shape libraries, layers, pages, alignment/layout tools, grouping, undo/redo, and its own zoom/pan controls. Start from a blank canvas, process flow, team structure, or system overview. The **More Shapes** button opens additional bundled libraries.
+Choose **Drawio** from the bottom dock. The bundled draw.io 31.4.5 editor supplies draggable/resizable shapes, attached connectors, labels, flowchart/UML/network shape libraries, layers, pages, alignment/layout tools, grouping, undo/redo, and its own zoom/pan controls. Start from a blank canvas, process flow, team structure, or system overview. The **More Shapes** button opens additional bundled libraries.
 
-- Open and save native `.drawio` / draw.io XML files, including multiple pages. The current diagram also autosaves locally, independently of your Design & PDF document.
+- Open and save native `.drawio` / draw.io XML files, including multiple pages. The current diagram also autosaves locally, independently of your photo/PDF document.
 - Export the current diagram page as SVG, PNG (with editable XML embedded), or PDF. The PDF button produces a high-resolution image PDF; text is not searchable. Use draw.io's File → Print for its browser printing workflow.
 - **Place in document** adds a diagram as an image layer to your current PDF/design. Select that layer and choose **Edit diagram** to reopen its source; placing it again updates that layer. `.bide` files retain this editable diagram source.
-- **Ctrl+K** opens bide's command palette in either workspace, including when the diagram iframe has keyboard focus.
+- **Ctrl+K** opens bide's command palette in all three workspaces, including when the diagram iframe has keyboard focus.
 
 The prebuilt ZIP includes the diagram editor, shape libraries and math renderer. It never loads the online diagrams.net editor. Remote storage, real-time collaboration, AI services, remote icon search, remote fonts/images and server-only conversion services are disabled or unavailable. Native `.drawio` files and local assets work offline. External images referenced by an imported file must be embedded locally to display/export. SVG exports can contain HTML labels (`foreignObject`), which some external viewers do not render; PNG/PDF preserve their appearance. Opening a new diagram replaces the current diagram draft; save a `.drawio` copy to keep separate files.
 

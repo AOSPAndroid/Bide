@@ -6,6 +6,11 @@ window.VSS_CONVERT_URL = null;
 window.REALTIME_URL = null;
 window.RT_WEBSOCKET_URL = null;
 window.EXPORT_URL = null;
+// Match the bide shell without changing any document colors.
+var bideTheme = document.createElement('link');
+bideTheme.rel = 'stylesheet';
+bideTheme.href = '../theme.css';
+document.head.appendChild(bideTheme);
 // Keep bide's command palette available while focus is inside the editor iframe.
 window.addEventListener('keydown', function(event) {
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {

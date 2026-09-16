@@ -4,5 +4,5 @@
   "sha256": "6ee1ce19242bbabf348c52e41e1fe17057d57236e731acf48d7a3710ca50c375",
   "source": "https://github.com/jgraph/drawio/tree/v31.4.5",
   "license": "Apache-2.0",
-  "modifications": "Static files only; bide config disables remote integrations. CSP added to index.html; local PreConfig.js and PostConfig.js overrides appended."
+  "modifications": "Static files only; bide config disables remote integrations. CSP added to index.html; local PreConfig.js and PostConfig.js overrides appended. Light theme selected; local white/blue theme.css loaded by PostConfig.js."
 }

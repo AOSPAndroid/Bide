@@ -1,6 +1,6 @@
 export type DiagramDraft = {name: string; xml: string};
 export type DiagramIntent = 'save' | 'png' | 'svg' | 'pdf' | 'place';
-export const DIAGRAM_URL = './diagrams/runtime/index.html?embed=1&proto=json&configure=1&libraries=1&ui=kennedy&dark=1&offline=1&local=1&noSaveBtn=1&noExitBtn=1&saveAndExit=0&lang=en';
+export const DIAGRAM_URL = './diagrams/runtime/index.html?embed=1&proto=json&configure=1&libraries=1&ui=kennedy&dark=0&offline=1&local=1&noSaveBtn=1&noExitBtn=1&saveAndExit=0&lang=en';
 
 const cell = (id: string, value: string, x: number, y: number, style = '', w = 160, h = 60) => `<mxCell id="${id}" value="${value}" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1f5eb;strokeColor=#397d64;fontColor=#173e33;${style}" vertex="1" parent="1"><mxGeometry x="${x}" y="${y}" width="${w}" height="${h}" as="geometry"/></mxCell>`;
 const edge = (id: string, from: string, to: string, label = '', style = '') => `<mxCell id="${id}" value="${label}" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;strokeColor=#52796b;${style}" edge="1" parent="1" source="${from}" target="${to}"><mxGeometry relative="1" as="geometry"/></mxCell>`;

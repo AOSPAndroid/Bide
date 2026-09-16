@@ -15,3 +15,4 @@ urlParams['gl'] = '0';
 urlParams['tr'] = '0';
 urlParams['plugins'] = '0';
 urlParams['pwa'] = '0'; // bide serves the complete editor; no service worker needed.
+urlParams['dark'] = '0';

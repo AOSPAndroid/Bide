@@ -8,7 +8,7 @@ Checked against the [Photopea manual](https://www.photopea.com/learn/) and [iLov
 
 | Feature family | bide status | Actual scope / remaining work |
 |---|---|---|
-| Local GUI, canvas navigation, command search | Implemented | Browser editor, zoom, pan, Ctrl+K palette and keyboard shortcuts |
+| Local GUI, canvas navigation, command search | Implemented | White/blue interface, animated three-workspace dock, searchable PDF tools, zoom, pan, Ctrl+K palette and keyboard shortcuts |
 | Draggable/resizable/rotatable text | Implemented | Text boxes, typography controls, color, alignment, property inspector |
 | Layers | Partial | Ordering, names, groups, visibility, lock, duplication and 16 blend modes on design pages; no Photoshop layer-effect stack |
 | Transform and alignment | Partial | Move, scale, rotate, flip, page alignment and snapping; no perspective/warp transform |
@@ -67,7 +67,7 @@ The catalogue includes [organization, conversion, editing, security and intellig
 
 ## Diagrams: bundled draw.io
 
-bide 0.4.0 includes the actual draw.io 31.4.5 browser editor, served locally from the release ZIP. It does not embed the hosted diagrams.net website. The design/PDF editor remains bide's separate Fabric.js implementation.
+bide 0.4.1 includes the actual draw.io 31.4.5 browser editor, served locally from the release ZIP. It does not embed the hosted diagrams.net website. The design/PDF editor remains bide's separate Fabric.js implementation.
 
 | Workflow | Status | Scope |
 |---|---|---|
@@ -82,6 +82,8 @@ bide 0.4.0 includes the actual draw.io 31.4.5 browser editor, served locally fro
 | Cloud / AI / remote integrations | Unavailable | No cloud storage, hosted collaboration, remote icon search, remote fonts/images or server-only converters; local diagram work requires no internet |
 
 ## Verified locally
+
+- v0.4.1: production build and 30 automated tests pass. Browser checks cover white/blue editor and draw.io themes, bottom-edge hover reveal/hide, keyboard dock navigation, all three workspace routes, PDF search/category filters and compression dialog, preserved document/layers, and the PDF tool grid at a narrower viewport.
 
 - v0.4.0: 30 automated tests pass. Curved translucent marker paths and embedded diagram source survive serialization; export replies are matched to their requests; source-folder/incomplete-bundle launchers stop without network requests. Production TypeScript/Vite build passes.
 - Browser: zoom buttons and exact percentage visibly resize the artboard; marker creates a Path layer; native `.drawio`, PNG, SVG and PDF exports produce files; a placed diagram reopens and updates its existing layer with an edited label. Diagram PDF was opened/rendered and its dimensions checked.
