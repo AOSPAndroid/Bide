@@ -7,12 +7,12 @@ out = root / 'release'
 out.mkdir(exist_ok=True)
 target = out / 'bide-browser.zip'
 with ZipFile(target, 'w', ZIP_DEFLATED, compresslevel=6) as archive:
-    for name in ['Install Dependencies.bat', 'launch bide.bat']:
+    for name in ['Install Dependencies.bat', 'launch bide.bat', 'share bide.bat', 'lan-settings.example.json']:
         archive.write(root / name, name)
         archive.write(root / name, 'source/' + name)
     for name in ['windows.ps1', 'serve.mjs']:
         archive.write(root / 'scripts' / name, 'scripts/' + name)
-    archive.writestr('START HERE.txt', 'Extract this entire ZIP into a writable local folder.\r\n1. Double-click Install Dependencies.bat once (internet needed for the private Node.js download).\r\n2. Double-click launch bide.bat to open the editor.\r\nNo admin rights, global Node.js, Python, or installed Office are required.\r\nKeep the scripts and site folders beside the BAT files.\r\nThe local launcher works offline after setup.\r\nSee HOSTING.md if you prefer a hosted website.\r\n')
+    archive.writestr('START HERE.txt', 'Extract this entire ZIP into a writable local folder.\r\n1. Double-click Install Dependencies.bat once (internet needed for the private Node.js download).\r\n2. Double-click launch bide.bat to open the editor locally.\r\n3. To share internally, double-click share bide.bat and give colleagues the displayed IP:8786 address. Keep the sharing window open.\r\nColleagues only need a browser. Each visitor has their own local workspace.\r\nUse trusted HTTPS for Office conversion on other PCs and reliable downloads; see HOSTING.md for setup.\r\nNo global Node.js, Python, or installed Office are required.\r\nKeep the scripts and site folders beside the BAT files.\r\nThe local launcher works offline after setup.\r\n')
     for path in (root / 'dist').rglob('*'):
         if path.is_file(): archive.write(path, 'site/' + path.relative_to(root / 'dist').as_posix())
     for folder in ['src', 'scripts', 'tests', 'vendor-source', 'public']:

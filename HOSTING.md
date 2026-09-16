@@ -4,6 +4,53 @@
 
 Extract the entire ZIP to a writable local folder. Run **Install Dependencies.bat** once, then **launch bide.bat**. Setup downloads a private, checksum-verified Node.js runtime into `.runtime`; it does not require admin rights or modify the system PATH. In a source checkout it also downloads and verifies the Office runtime, installs npm dependencies, and builds the editor; the prebuilt ZIP needs only the runtime download. Python and installed Office software are never needed. The launcher opens a localhost address, so no external website host is necessary for this mode. Local launch and conversion work offline after setup. Keep the `scripts` and `site` folders next to the BAT files.
 
+## Share from a Windows PC using IP:port
+
+1. Run **Install Dependencies.bat** once on the host, as above.
+2. Double-click **share bide.bat**. The server binds to all IPv4 interfaces on port **8786** and lists their addresses with adapter names.
+3. Give colleagues the address for the adapter connected to the same work network, for example `http://192.168.1.20:8786`. Avoid virtual-machine adapter addresses. Their PCs need only Edge or Chrome.
+4. Keep the sharing window open and the host awake. Ctrl+C or closing the sharing window stops the shared server. The local background server started by `launch bide.bat` is separate.
+
+Use `"share bide.bat" 9090` in Command Prompt to choose another port. For persistent settings, copy `lan-settings.example.json` to `.runtime/lan.json` and edit its `port` or `bind`. To listen on just the work adapter, set `bind` to that adapter's IPv4 address. A command-line port overrides the settings file. The server reports an occupied port rather than silently changing the shared URL.
+
+Windows Firewall or your company network may block incoming connections. If the Windows prompt appears, allow the server only on your trusted work network. For managed PCs, ask IT to allow inbound TCP on your chosen port, scoped to the work subnet and Domain/Private network profile. bide does not change firewall rules. Colleagues must be on a reachable LAN or company VPN; Wi-Fi client isolation can prevent access. No router port forwarding is needed. The server has no user accounts and is intended for a trusted internal network.
+
+**HTTP IP addresses support the PDF and image tools. Office conversion on another PC needs trusted HTTPS.** Browsers restrict shared memory to secure, cross-origin-isolated contexts. `http://localhost` is treated specially; `http://192.168.x.x` is not. See [MDN's SharedArrayBuffer requirements](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/SharedArrayBuffer). The app displays this limitation and explains it if an Office file is opened over LAN HTTP. The hosting PC can use `launch bide.bat` for local Office conversion.
+
+**Use HTTPS for routine team use.** Browsers can also warn about or block downloads initiated by an HTTP page, even when the app generates the file locally. During verification, PDF import and editing worked on the HTTP LAN address but the in-app browser left the PDF download unconfirmed. Configure trusted HTTPS instead of weakening browser download protections. See [Chrome's download guidance](https://support.google.com/chrome/answer/6261569).
+
+Each colleague gets their own workspace and processes documents on their own computer. Documents are not uploaded to the hosting PC. Autosaves belong to the exact browser origin (protocol, host and port), so save a `.bide` project before changing the address or moving to HTTPS. Share a saved project separately if you want another person to edit the same document.
+
+### Enable HTTPS for Office conversion on the LAN
+
+The included Node server supports TLS directly. No additional server software or installed Office is required. Obtain a server certificate and matching **unencrypted PEM private key** from work IT. Clients must trust the issuing certificate authority. The certificate must cover the hostname or IP address colleagues will use; an IP URL requires that IP in the certificate's subject alternative names. A company DNS hostname is usually easier to keep stable.
+
+Place the certificate chain and private key under `.runtime/tls/` (never under `site`, `dist` or `public`). Create `.runtime/lan.json`:
+
+```json
+{
+  "port": 8786,
+  "bind": "0.0.0.0",
+  "publicHost": "bide.your-company.example",
+  "tls": {
+    "cert": ".runtime/tls/fullchain.pem",
+    "key": ".runtime/tls/private-key.pem"
+  }
+}
+```
+
+Replace `publicHost` with your IT-configured hostname or certified IPv4 address. It controls the displayed URL; it does not create a DNS record. Relative certificate paths are resolved from the folder containing the BAT files. Restart **share bide.bat**, then use `https://bide.your-company.example:8786` (or your certified IP). The server adds the required isolation headers automatically. The private runtime folder is excluded from Git and distribution packages. Keep private keys local to the host; never commit them or send them with a project.
+
+The browser must accept the certificate normally. If it reports a certificate error, have IT correct the trust, validity or address mismatch. The test certificate under `tests/fixtures/tls` is only for automated tests and must not be used for hosting.
+
+### Connection checks
+
+- If the hosting PC cannot open its displayed address, check the sharing window for a startup error or occupied port.
+- If the host can open the address but another PC cannot, check the firewall, subnet/VPN routing and Wi-Fi client isolation with IT.
+- If the app opens but Office conversion is unavailable, check HTTPS certificate trust, the headers below and browser policy.
+- If an export is ready but no file appears, inspect the browser's Downloads panel. HTTP download restrictions are resolved by serving the app over trusted HTTPS; company download policies may also apply.
+- If the PC's IP changes, use the newly displayed address or ask IT for a DHCP reservation or DNS name. Keep the host awake while people use it.
+
 ## Hosted website
 
 The work PC only needs current Edge or Chrome and access to the website. No Python, Node.js, Office, LibreOffice, extension, administrator rights, conversion API, or account is required on that PC.
@@ -37,6 +84,6 @@ Open `http://127.0.0.1:8766`. Node is only a development file server; it is not 
 
 ## Package contents
 
-`bide-browser.zip` contains `site`, source code, dependency lockfile and hosting instructions. Publish the contents of `site` at the chosen website path. Source and dependency notices accompany the package. The local preview address is not reachable from another PC; a hosted URL still needs to be assigned.
+`bide-browser.zip` contains `site`, source code, dependency lockfile and hosting instructions. Publish the contents of `site` at the chosen website path, or run **share bide.bat** to serve them from this PC. Source and dependency notices accompany the package. **launch bide.bat** remains local-only; **share bide.bat** explicitly enables network access.
 
 The earlier Python prototype remains in the source project for reference. The new BAT launchers use the static server and browser engines. The ZIP includes these launchers and their helper scripts at its top level.

@@ -8,7 +8,7 @@ self.onmessage=(event:MessageEvent)=>{
       const engine=await engineReady;
       let result:unknown;
       switch(method){
-        case 'health':result={ok:true,office:true};break;
+        case 'health':result={ok:true,office:globalThis.isSecureContext&&globalThis.crossOriginIsolated};break;
         case 'import':result=await engine.importBytes(args.bytes,args.name,args.password);break;
         case 'restore':result=await engine.restore(args);break;
         case 'render':result=engine.render(args.source,args.index,args.scale);break;

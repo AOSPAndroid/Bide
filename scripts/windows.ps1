@@ -1,6 +1,7 @@
 param(
-    [Parameter(Mandatory = $true)][ValidateSet('Install', 'Launch')][string]$Action,
-    [switch]$NoBrowser
+    [Parameter(Mandatory = $true)][ValidateSet('Install', 'Launch', 'Share')][string]$Action,
+    [switch]$NoBrowser,
+    [string]$Port
 )
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
@@ -134,6 +135,16 @@ try {
     if (!(Test-Path -LiteralPath $nodeExe)) { throw 'Run Install Dependencies.bat once before launching bide.' }
     $siteRoot = Get-SiteRoot
     Assert-OfficeAssets $siteRoot
+    if ($Action -eq 'Share') {
+        $env:BIDE_ROOT = $siteRoot
+        $serverArgs = @((Join-Path $PSScriptRoot 'serve.mjs'), '--lan')
+        if ($Port) {
+            if ($Port -notmatch '^\d+$' -or [long]$Port -lt 1024 -or [long]$Port -gt 65535) { throw 'Choose a LAN port from 1024 to 65535.' }
+            $serverArgs += @('--port', $Port)
+        }
+        & $nodeExe @serverArgs
+        exit $LASTEXITCODE
+    }
     $statePath = Join-Path $runtimeRoot 'server.json'
     $ports = @(8766..8785)
     if (Test-Path -LiteralPath $statePath) {

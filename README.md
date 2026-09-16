@@ -6,13 +6,21 @@ A Photopea-inspired visual editor with an integrated PDF toolkit. Editing and co
 
 ## Start on Windows
 
-1. Download this repository using **Code → Download ZIP**, or [download the prebuilt bide-browser.zip](https://github.com/AOSPAndroid/Bide/releases/download/v0.3.0/bide-browser.zip). Extract it into a writable local folder.
+1. Download this repository using **Code → Download ZIP**, or [download the prebuilt bide-browser.zip](https://github.com/AOSPAndroid/Bide/releases/download/v0.3.1/bide-browser.zip). Extract it into a writable local folder.
 2. Double-click **Install Dependencies.bat** once. It downloads and verifies a private Node.js 24 runtime inside `.runtime`, then prepares the app. Internet is needed for setup; no administrator rights or system PATH changes are needed.
 3. Double-click **launch bide.bat**. It starts the local server in the background and opens the editor in your default browser (use Edge or Chrome).
 
 Keep the BAT files with their `scripts` and `site` folders. The prebuilt ZIP only needs the private runtime; installing from GitHub source also downloads and verifies the browser Office engine, installs the locked npm packages, and rebuilds the app. The large Office binaries are excluded from Git history and restored by `scripts/fetch-office.mjs`. The launcher reuses the running server, starting at port 8766 and choosing another local port if occupied. Logs and server state are in `.runtime`. The server runs until Windows shuts down; closing the browser does not stop it. No startup task or Windows service is installed.
 
 The local edition works without internet after setup. A hosted edition needs only a browser and no Node runtime on the work PC; see [HOSTING.md](HOSTING.md). This build has not been published to an external host. The previous `Setup.cmd` and `start bide.cmd` now forward to these BAT files.
+
+## Share internally using IP:port
+
+After setup, run **share bide.bat** on the hosting PC. It displays addresses such as `http://192.168.1.20:8786`. Send colleagues the address on your shared work network; their PCs only need Edge or Chrome. Keep the sharing window open and the host awake. Close the window or press Ctrl+C to stop sharing. For another port, run `"share bide.bat" 9090` from Command Prompt.
+
+PDF and image editing runs over HTTP, but browsers may block downloads from HTTP addresses. **Use trusted HTTPS for team use: Office-to-PDF conversion on other PCs requires it**, because the browser Office engine uses shared memory. The sharing server supports HTTPS with an IT-issued certificate; see [HOSTING.md](HOSTING.md) for configuration, firewall guidance and troubleshooting. `launch bide.bat` continues to support Office conversion locally through localhost.
+
+Every visitor has an independent workspace stored in their own browser. Sharing the app does not share documents or provide live collaboration. This is an internal static server without user accounts; use it on your trusted LAN/VPN, with no router port forwarding.
 
 ## Editor
 

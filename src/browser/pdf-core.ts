@@ -1,4 +1,5 @@
 import { selectPages } from '../page-range';
+import { digest } from './crypto';
 export { selectPages } from '../page-range';
 import * as mupdf from 'mupdf';
 
@@ -116,7 +117,7 @@ export async function register(bytes: Uint8Array) {
 
     if(!doc.countPages())throw new Error('This document has no pages.');
 
-    const hash=await crypto.subtle.digest('SHA-256',bytes.slice().buffer);
+    const hash=await digest(bytes);
 
     const id=[...new Uint8Array(hash)].map(b=>b.toString(16).padStart(2,'0')).join('');
 
@@ -138,7 +139,7 @@ export async function restore(data: Record<string,string>) {
 
     const bytes=toBytes(encoded);
 
-    const hash=await crypto.subtle.digest('SHA-256',bytes.slice().buffer);
+    const hash=await digest(bytes);
 
     if([...new Uint8Array(hash)].map(b=>b.toString(16).padStart(2,'0')).join('')!==id)throw new Error('A project source is corrupted.');
 

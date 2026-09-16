@@ -1,4 +1,5 @@
 import { Circle, Rect, Textbox, FabricObject } from 'fabric';
+import { uuid } from './browser/crypto';
 
 FabricObject.customProperties = ['id', 'name'];
 // The editor's coordinates use top-left anchors. Fabric 7 defaults to centered anchors.
@@ -6,7 +7,7 @@ Object.assign(FabricObject.ownDefaults, { originX: 'left', originY: 'top', corne
 
 export type Page = { id: string; name: string; width: number; height: number; color: string; source?: string; index: number; canvas: Record<string, unknown>; thumb?: string };
 export type Project = { version: 1; name: string; pages: Page[]; sources: Record<string, string> };
-export const uid = () => crypto.randomUUID();
+export const uid = uuid;
 export const blankPage = (width = 595, height = 842): Page => ({ id: uid(), name: 'Untitled page', width, height, color: '#ffffff', index: 0, canvas: { objects: [] } });
 export function demoProject(): Project {
   const objects: FabricObject[] = [];

@@ -1,6 +1,6 @@
 {
   "name": "bide",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": true,
   "type": "module",
   "scripts": {
@@ -12,6 +12,7 @@
     "assets:office": "node scripts/fetch-office.mjs"
   },
   "dependencies": {
+    "@noble/hashes": "1.8.0",
     "ag-psd": "31.0.2",
     "docx": "^9.7.1",
     "fabric": "^7.4.0",

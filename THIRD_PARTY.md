@@ -8,6 +8,7 @@ This browser edition includes dependencies with their own licenses. License copi
 - Liberation Sans, Serif and Mono: SIL Open Font License 1.1. Unmodified fonts extracted from the bundled Office runtime. Source: https://github.com/liberationfonts/liberation-fonts
 - ag-psd 31.0.2: MIT, from https://github.com/Agamnentzar/ag-psd . PSD read/write is limited by bide's raster-layer implementation; it is not Photoshop feature parity. pako and base64-js license copies are included.
 - Fabric.js, React, React DOM, PDFKit, SVG-to-PDFKit, fflate, docx and Lucide: see the package lockfile and bundled license copies.
+- @noble/hashes 1.8.0: MIT, from https://github.com/paulmillr/noble-hashes . SHA-256 fallback for PDF source integrity on HTTP intranet addresses; license included in `public/licenses`.
 
 `public/office/manifest.json` records exact hashes and sizes of the Office runtime and wrapper files used by this build. The runtime's upstream `latest` URL can change; the delivered files are pinned by that manifest. Keep the matching runtime and metadata together when updating.
 

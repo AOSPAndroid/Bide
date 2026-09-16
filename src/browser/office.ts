@@ -4,7 +4,8 @@ let sequence=0;
 const jobs=new Map<number,{resolve:(bytes:Uint8Array<ArrayBuffer>)=>void;reject:(e:Error)=>void;timer:ReturnType<typeof setTimeout>}>();
 function init(){
  if(ready)return ready;
- if(!crossOriginIsolated)throw new Error('Office conversion requires the hosted browser edition with isolation headers. No installed Office software is used.');
+ if(!globalThis.isSecureContext)throw new Error('Office conversion on another PC needs a trusted HTTPS address. Ask the host to configure HTTPS using HOSTING.md. On the hosting PC, launch bide.bat supports Office conversion locally. PDF and image tools still work at this HTTP address.');
+ if(!crossOriginIsolated)throw new Error('Office conversion needs browser isolation enabled by the website host. Use the bide sharing launcher with HTTPS, or ask your host to apply the response headers in HOSTING.md.');
  ready=new Promise<void>((resolve,reject)=>{
   iframe=document.createElement('iframe');iframe.src=new URL('office/index.html',document.baseURI).href;iframe.hidden=true;iframe.title='Local Office conversion engine';
   const timer=setTimeout(()=>reject(new Error('The Office engine did not finish loading. Check the connection and reload the workspace.')),240000);

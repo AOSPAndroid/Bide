@@ -67,6 +67,7 @@ The catalogue includes [organization, conversion, editing, security and intellig
 
 ## Verified locally
 
+- LAN sharing: `share bide.bat`, configurable IP/port, HTTP editing/import/autosave restoration, static HTTPS with a trusted test client, isolation headers, blocked uploads and private-path protection. Browser DOCX conversion and PDF download verified through the sharing server's localhost address. LAN HTTP downloads may be blocked by the browser; use trusted HTTPS for team use. A second work PC and company-issued certificate have not been available for verification.
 - Automated PDF tests: source and accented overlay text, links (including rotated geometry), merge/ranges, rotation, split, PNG/JPEG/SVG, text/DOCX extraction, source integrity, rejection of external SVG resources, AES-256 export/unlock (including punctuation and Unicode passwords), and crop/reimport dimensions.
 - PSD tests: raster data, layer names/order/position/opacity/blending, unsupported-format guards and composite fallback detection. Fabric 7 coordinate-anchor regression check.
 - Browser checks: text editing, dragging and resizing, layer controls, signature placement, palette, project save/load, PDF merge/export, DOCX/XLSX/PPTX conversion and image compression.
