@@ -3,3 +3,26 @@
 
 .crop-preview{width:130px;max-height:190px;background:#39433f;margin:14px auto;position:relative;border:1px solid #697b70}.crop-preview>div{position:absolute;background:#c7e8d4;border:1px dashed #315e45}.crop-preview+.fine-print{text-align:center;margin-bottom:15px}
 .hosting-notice{flex-shrink:0;padding:8px 16px;background:#373224;border-bottom:1px solid #665c3f;color:#e1d2a9;font-size:11px;line-height:1.5}
+.editor-shell{flex:1;min-height:0;flex-direction:column}
+.workspace-switch{display:flex;gap:2px;border:1px solid #414b48;border-radius:6px;padding:2px;margin:0 8px}
+.workspace-switch button{font-size:11px;padding:6px 10px;border-radius:4px;white-space:nowrap;color:#b4bfbb}
+.workspace-switch button.active{background:#3a544a;color:#c0f4de}
+.header-zoom{display:flex;align-items:center;gap:3px;flex-shrink:0}
+.header-zoom input{width:52px;height:27px;text-align:center;padding:3px;appearance:textfield}
+.header-zoom input::-webkit-inner-spin-button{appearance:none}
+.marker-setting{display:flex;align-items:center;gap:5px;white-space:nowrap;font-size:10px}
+.canvas-workspace{min-height:0;overscroll-behavior:contain}
+.diagrams-workspace{flex:1;min-height:0;flex-direction:column;background:#1e2229}
+.diagram-header{min-height:50px;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;padding:8px 15px;border-bottom:1px solid #3c444e}
+.diagram-header .document-name input{width:180px}
+.diagram-actions{display:flex;align-items:center;gap:5px}
+.diagram-actions button{display:flex;align-items:center;gap:6px;padding:7px 9px;font-size:11px;border-radius:4px;white-space:nowrap}
+.diagram-actions button:hover{background:#36483f}
+.diagram-stage{position:relative;flex:1;min-height:0;display:flex}
+.diagram-stage iframe{border:0;width:100%;height:100%;position:absolute;inset:0;color-scheme:normal;background:#1e2229}
+.diagram-loading{position:absolute;inset:0;z-index:2;background:#1e2229dc;display:flex;align-items:center;justify-content:center;gap:14px;font-size:13px}
+.diagram-footer{display:flex;justify-content:space-between;gap:12px;flex-shrink:0;padding:7px 15px;font-size:10px;color:#98a7a0;border-top:1px solid #364139}
+.diagram-notice{display:flex;align-items:center;justify-content:space-between;padding:9px 15px;color:#ffe0a3;background:#493e28;font-size:12px;gap:12px}
+.diagrams-workspace .dialog{width:min(620px,90vw);background:#252b32;border:1px solid #4a535d;border-radius:12px;padding:24px;box-shadow:0 20px 80px #0008}
+.diagram-header .document-name{gap:8px}
+@media(max-width:1100px){.topbar .local-status{display:none}.workspace-switch{margin:0 4px}.workspace-switch button{padding:6px}.marker-setting{font-size:9px}.diagram-footer{font-size:9px}.options-bar .tool-caption{min-width:0}}

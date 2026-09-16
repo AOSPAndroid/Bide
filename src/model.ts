@@ -1,7 +1,7 @@
 import { Circle, Rect, Textbox, FabricObject } from 'fabric';
 import { uuid } from './browser/crypto';
 
-FabricObject.customProperties = ['id', 'name'];
+FabricObject.customProperties = ['id', 'name', 'diagramXml'];
 // The editor's coordinates use top-left anchors. Fabric 7 defaults to centered anchors.
 Object.assign(FabricObject.ownDefaults, { originX: 'left', originY: 'top', cornerColor: '#8ce4c5', cornerStrokeColor: '#183b31', borderColor: '#62dcb4', cornerSize: 9, transparentCorners: false, padding: 3 });
 
@@ -51,18 +51,24 @@ function db(): Promise<IDBDatabase> {
   });
 }
 export async function autosave(project: Project) {
+  return saveLocal('current', project);
+}
+export async function saveLocal(key: string, value: unknown) {
   const database = await db();
   return new Promise<void>((resolve, reject) => {
     const tx = database.transaction('projects', 'readwrite');
-    tx.objectStore('projects').put(project, 'current');
+    tx.objectStore('projects').put(value, key);
     tx.oncomplete = () => { database.close(); resolve(); };
     tx.onerror = () => { database.close(); reject(tx.error); };
   });
 }
 export async function restoreLocal(): Promise<Project | undefined> {
+  return loadLocal<Project>('current');
+}
+export async function loadLocal<T>(key: string): Promise<T | undefined> {
   const database = await db();
   return new Promise((resolve, reject) => {
-    const read = database.transaction('projects').objectStore('projects').get('current');
+    const read = database.transaction('projects').objectStore('projects').get(key);
     read.onsuccess = () => { database.close(); resolve(read.result); };
     read.onerror = () => { database.close(); reject(read.error); };
   });

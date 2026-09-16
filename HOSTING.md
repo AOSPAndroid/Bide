@@ -100,3 +100,7 @@ Open `http://127.0.0.1:8766`. Node is only a development file server; it is not 
 `bide-browser.zip` contains `site`, source code, dependency lockfile and hosting instructions. Publish the contents of `site` at the chosen website path, or run **share bide.bat** to serve them from this PC. Source and dependency notices accompany the package. **launch bide.bat** remains local-only; **share bide.bat** explicitly enables network access.
 
 The earlier Python prototype remains in the source project for reference. The new BAT launchers use the static server and browser engines. The ZIP includes these launchers and their helper scripts at its top level.
+
+## Bundled diagram workspace
+
+The prebuilt package includes draw.io static assets under `site/diagrams/runtime`, including shapes, stencils and the math renderer. Keep the full directory. No Java, draw.io desktop, online diagrams.net service, npm installation or runtime download is required. The embedded editor is configured for local assets; its content policy prevents external services and image/font requests. It uses the same host and port as bide. Every visitor has an independent diagram draft in their browser. For local exports and file downloads, the same HTTPS guidance above applies.

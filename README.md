@@ -1,12 +1,12 @@
 # bide — Browser Edition
 
-A Photopea-inspired visual editor with an integrated PDF toolkit. Editing and conversion run locally inside the browser. It needs no installed Office, LibreOffice, Python, extensions or conversion service.
+A Photopea-inspired visual editor, PDF toolkit, and bundled draw.io diagram editor in one browser app. Editing and conversion run locally inside the browser. It needs no installed Office, LibreOffice, Python, draw.io desktop, extensions or conversion service.
 
-**This is not full Photopea or iLovePDF feature parity.** See [FEATURES.md](FEATURES.md) for the checked feature matrix and remaining work across both areas.
+**This is not full Photopea or iLovePDF feature parity.** Diagrams use the actual open-source draw.io editor with its remote integrations disabled. See [FEATURES.md](FEATURES.md) for supported features and remaining work.
 
 ## Start on Windows
 
-1. Get the [prebuilt bide-browser.zip](https://github.com/AOSPAndroid/Bide/releases/download/v0.3.3/bide-browser.zip) and extract the entire ZIP into a **new writable folder**. The app and conversion engines are already included. You should see a `site` folder beside the BAT files.
+1. Get the [prebuilt bide-browser.zip](https://github.com/AOSPAndroid/Bide/releases/download/v0.4.0/bide-browser.zip) and extract the entire ZIP into a **new writable folder**. The app and conversion engines are already included. You should see a `site` folder beside the BAT files.
 2. Use your existing **Node.js 22 or newer**. bide detects `C:\devhome\tools\node24\current\node.exe` or `node.exe` on PATH. With this ZIP, **Install Dependencies.bat is optional**: it only checks your installation and bundled files, with no downloads.
 3. Double-click **launch bide.bat**. It starts the local server in the background and opens the editor in your default browser (use Edge or Chrome).
 
@@ -14,7 +14,7 @@ Keep the BAT files with their `scripts` and `site` folders. No Node runtime is d
 
 The BAT files run directly through Node: **PowerShell and execution-policy changes are not needed.** Normal setup and launch never download dependencies. If the built app is missing, the launcher prints the ready-to-run ZIP link and stops.
 
-GitHub's **Code → Download ZIP** creates a source folder such as `Bide-main`. A source build must be explicitly requested with `"Install Dependencies.bat" --build-source`; it needs npm packages and the browser Office runtime, which may require network access. Use the prebuilt release ZIP on a PC where proxy authentication blocks dependency downloads. Its root launchers run offline using your existing Node; the `source` folder is only for rebuilding.
+GitHub's **Code → Download ZIP** creates a source folder such as `Bide-main`. A source build must be explicitly requested with `"Install Dependencies.bat" --build-source`; it needs npm packages and the browser Office/diagram runtimes, which may require network access. Use the prebuilt release ZIP on a PC where proxy authentication blocks dependency downloads. Its root launchers run offline using your existing Node; the `source` folder is only for rebuilding.
 
 The local edition works without internet after setup. A hosted edition needs only a browser and no Node runtime on the work PC; see [HOSTING.md](HOSTING.md). This build has not been published to an external host. The previous `Setup.cmd` and `start bide.cmd` now forward to these BAT files.
 
@@ -29,13 +29,24 @@ Every visitor has an independent workspace stored in their own browser. Sharing 
 ## Editor
 
 - Add text boxes; drag, resize and rotate using handles. Double-click to edit, or use the properties panel.
-- Add images, rectangles, ellipses, lines, highlights, brush strokes and drawn/typed visual signatures.
+- Add images, rectangles, ellipses, lines, brush strokes and drawn/typed visual signatures. The **H** highlighter draws freehand curves with separate color, width and opacity controls; each stroke is an editable layer.
 - Style text, colors, opacity, strokes and alignment. Crop images; adjust brightness, contrast and saturation; apply grayscale, sepia or invert.
 - Order, rename, hide, lock, duplicate and group layers. Apply 16 blend modes on design pages, ellipse/rounded-rectangle shape masks, and image blur. Shift-click for multiple selection.
-- Zoom, pan with Space, snap to page edges/center and undo/redo. Drag page thumbnails to reorder.
+- Zoom from 10% to 800% using the toolbar percentage (type a value and press Enter), plus/minus buttons, Ctrl +/−, or Ctrl/Alt + mouse wheel. Ctrl+1 resets to 100%, Ctrl+0 fits the page. Wheel zoom keeps the pointer position anchored. Pan with Space, snap to page edges/center and undo/redo. Drag page thumbnails to reorder.
 - Ctrl+K opens the command palette; Ctrl+O opens files; Ctrl+S saves a project; Ctrl+E exports; Ctrl+0 fits the page.
 
 Basic 8-bit RGB PSD import preserves raster layer names, positions, opacity and supported blend modes. Complex documents use their saved composite preview with an explicit notice. PSD export writes the current design page as raster layers; text, groups and shapes are not native Photoshop objects. `.bide` retains the editable editor objects. PSB and 16/32-bit or non-RGB PSD files are not supported.
+
+## Diagrams
+
+Switch to **Diagrams** in the top bar. The bundled draw.io 31.4.5 editor supplies draggable/resizable shapes, attached connectors, labels, flowchart/UML/network shape libraries, layers, pages, alignment/layout tools, grouping, undo/redo, and its own zoom/pan controls. Start from a blank canvas, process flow, team structure, or system overview. The **More Shapes** button opens additional bundled libraries.
+
+- Open and save native `.drawio` / draw.io XML files, including multiple pages. The current diagram also autosaves locally, independently of your Design & PDF document.
+- Export the current diagram page as SVG, PNG (with editable XML embedded), or PDF. The PDF button produces a high-resolution image PDF; text is not searchable. Use draw.io's File → Print for its browser printing workflow.
+- **Place in document** adds a diagram as an image layer to your current PDF/design. Select that layer and choose **Edit diagram** to reopen its source; placing it again updates that layer. `.bide` files retain this editable diagram source.
+- **Ctrl+K** opens bide's command palette in either workspace, including when the diagram iframe has keyboard focus.
+
+The prebuilt ZIP includes the diagram editor, shape libraries and math renderer. It never loads the online diagrams.net editor. Remote storage, real-time collaboration, AI services, remote icon search, remote fonts/images and server-only conversion services are disabled or unavailable. Native `.drawio` files and local assets work offline. External images referenced by an imported file must be embedded locally to display/export. SVG exports can contain HTML labels (`foreignObject`), which some external viewers do not render; PNG/PDF preserve their appearance. Opening a new diagram replaces the current diagram draft; save a `.drawio` copy to keep separate files.
 
 ## Conversions
 
@@ -75,6 +86,7 @@ Office conversion needs HTTPS (or localhost) and cross-origin isolation response
 ```powershell
 npm ci --ignore-scripts
 npm run assets:office
+npm run assets:diagrams
 npm run build
 npm run serve
 npm test
@@ -84,4 +96,4 @@ React, TypeScript and Fabric.js provide the editor. MuPDF WebAssembly handles PD
 
 The tests cover import/render, source and accented overlay text, links, merge order, rotation, ranges, split, image/SVG/DOCX/TXT output, project integrity and blocked external SVG resources. Browser verification covers Word/Excel/PowerPoint conversion, text dragging/resizing, downloads and image compression. `THIRD_PARTY.md` records engine provenance and license locations.
 
-bide is independent and is not affiliated with Photopea or iLovePDF. The repository retains its existing Apache-2.0 LICENSE; bundled components retain their own licenses, documented in THIRD_PARTY.md.
+bide is independent and is not affiliated with Photopea, iLovePDF or draw.io. The repository retains its existing Apache-2.0 LICENSE; bundled components retain their own licenses, documented in THIRD_PARTY.md.

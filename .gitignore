@@ -9,3 +9,4 @@ tmp/
 release/
 .runtime/
 public/office/runtime/
+public/diagrams/runtime/

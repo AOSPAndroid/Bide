@@ -1,6 +1,6 @@
 {
   "name": "bide",
-  "version": "0.3.3",
+  "version": "0.4.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -9,7 +9,9 @@
     "preview": "vite preview --host 127.0.0.1",
     "serve": "node scripts/serve.mjs",
     "test": "node scripts/test-browser.mjs",
-    "assets:office": "node scripts/fetch-office.mjs"
+    "assets:office": "node scripts/fetch-office.mjs",
+    "assets:diagrams": "node scripts/fetch-diagrams.mjs",
+    "prebuild": "node scripts/check-assets.mjs"
   },
   "dependencies": {
     "@noble/hashes": "1.8.0",

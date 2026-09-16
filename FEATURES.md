@@ -2,7 +2,7 @@
 
 Checked against the [Photopea manual](https://www.photopea.com/learn/) and [iLovePDF tool catalogue](https://www.ilovepdf.com/) on 2026-09-16, and against the actual bide code and verification results.
 
-**bide is a local visual editor with integrated PDF tools. It does not currently provide full feature parity with Photopea or iLovePDF.** This is a capability audit, not a promise that all file variants or workflows work identically. “Implemented” means the described bide operation exists; it does not mean the entire competitor subsystem has been reproduced. “Missing” means there is no finished, supported workflow. Nothing marked missing is represented as a working tool in the UI.
+**bide is a local visual editor with integrated PDF tools and a bundled draw.io workspace. It does not currently provide full feature parity with Photopea or iLovePDF.** This is a capability audit, not a promise that all file variants or workflows work identically. “Implemented” means the described bide operation exists; it does not mean the entire competitor subsystem has been reproduced. “Missing” means there is no finished, supported workflow. Nothing marked missing is represented as a working tool in the UI.
 
 ## Visual editor compared with Photopea
 
@@ -65,7 +65,26 @@ The catalogue includes [organization, conversion, editing, security and intellig
 | PDF to Markdown | Missing | Plain text export does not reconstruct Markdown structure |
 | Reusable workflows | Missing | No saved multi-step or folder-batch conversion pipelines |
 
+## Diagrams: bundled draw.io
+
+bide 0.4.0 includes the actual draw.io 31.4.5 browser editor, served locally from the release ZIP. It does not embed the hosted diagrams.net website. The design/PDF editor remains bide's separate Fabric.js implementation.
+
+| Workflow | Status | Scope |
+|---|---|---|
+| Shape editing and connectors | Bundled draw.io | Drag, resize, rotate, connect shapes, edit labels, group, align, arrange and undo/redo |
+| Flowchart / UML / network libraries | Bundled draw.io | Local shape libraries and More Shapes panel; specialized libraries are not each individually tested |
+| Pages and layers | Bundled draw.io | Native diagram pages/layers retained in `.drawio` |
+| Templates | Implemented | Blank, process flow, team structure and system overview starters; not a clone of the entire online template gallery |
+| Native files and autosave | Implemented | Open/save `.drawio` or XML, independent IndexedDB draft; PNG exports also embed diagram XML |
+| SVG / PNG / PDF | Implemented | Current-page exports; SVG with HTML labels, PNG at 2x scale, PDF with rasterized diagram (not searchable text) |
+| Place diagram into PDF/design | Implemented | Image layer carrying editable source; Edit diagram reopens it and updates the layer on placement; `.bide` preserves the source |
+| Command palette | Implemented | Context-specific commands, including Ctrl+K from the diagram iframe |
+| Cloud / AI / remote integrations | Unavailable | No cloud storage, hosted collaboration, remote icon search, remote fonts/images or server-only converters; local diagram work requires no internet |
+
 ## Verified locally
+
+- v0.4.0: 30 automated tests pass. Curved translucent marker paths and embedded diagram source survive serialization; export replies are matched to their requests; source-folder/incomplete-bundle launchers stop without network requests. Production TypeScript/Vite build passes.
+- Browser: zoom buttons and exact percentage visibly resize the artboard; marker creates a Path layer; native `.drawio`, PNG, SVG and PDF exports produce files; a placed diagram reopens and updates its existing layer with an edited label. Diagram PDF was opened/rendered and its dimensions checked.
 
 - LAN sharing: `share bide.bat`, configurable IP/port, HTTP editing/import/autosave restoration, static HTTPS with a trusted test client, isolation headers, blocked uploads and private-path protection. Browser DOCX conversion and PDF download verified through the sharing server's localhost address. LAN HTTP downloads may be blocked by the browser; use trusted HTTPS for team use. A second work PC and company-issued certificate have not been available for verification.
 - Automated PDF tests: source and accented overlay text, links (including rotated geometry), merge/ranges, rotation, split, PNG/JPEG/SVG, text/DOCX extraction, source integrity, rejection of external SVG resources, AES-256 export/unlock (including punctuation and Unicode passwords), and crop/reimport dimensions.

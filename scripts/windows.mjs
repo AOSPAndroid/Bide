@@ -10,7 +10,7 @@ import {setTimeout as delay} from 'node:timers/promises';
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const runtime = join(projectRoot, '.runtime');
-const releaseUrl = 'https://github.com/AOSPAndroid/Bide/releases/download/v0.3.3/bide-browser.zip';
+const releaseUrl = 'https://github.com/AOSPAndroid/Bide/releases/download/v0.4.0/bide-browser.zip';
 const officeFiles = ['soffice.js', 'soffice.wasm', 'soffice.data', 'soffice.data.js.metadata'];
 const exists = async path => { try { return (await stat(path)).isFile(); } catch { return false; } };
 const jsonFile = async path => JSON.parse((await readFile(path, 'utf8')).replace(/^\uFEFF/, ''));
@@ -22,6 +22,9 @@ async function siteRoot() {
     if (!await exists(join(root, 'index.html'))) continue;
     for (const file of officeFiles) if (!await exists(join(root, 'office', 'runtime', file))) {
       throw new Error(`The bundled Office engine is incomplete (${file} missing). Extract the complete bide-browser.zip.\n${releaseUrl}\nNo downloads were attempted.`);
+    }
+    for (const file of ['index.html','js/app.min.js','js/bootstrap.js','bide-build.json']) if (!await exists(join(root,'diagrams','runtime',file))) {
+      throw new Error(`The bundled diagram editor is incomplete (${file} missing). Extract the complete bide-browser.zip.\n${releaseUrl}\nNo downloads were attempted.`);
     }
     return root;
   }
@@ -44,7 +47,7 @@ async function buildSource() {
   let npm;
   for (const path of candidates) if (await exists(path)) { npm = path; break; }
   if (!npm) throw new Error('A source build needs installed npm next to Node or on PATH. Use the prebuilt ZIP to launch without npm.');
-  console.log('Source build explicitly requested. Missing Office assets and npm packages may be downloaded.');
+  console.log('Source build explicitly requested. Missing Office/diagram assets and npm packages may be downloaded.');
   const target = join(projectRoot, 'public', 'office', 'runtime');
   const bundled = join(projectRoot, '..', 'site', 'office', 'runtime');
   for (const name of officeFiles) if (!await exists(join(target, name)) && await exists(join(bundled, name))) {
@@ -53,6 +56,7 @@ async function buildSource() {
   const env = {...process.env, PATH:dirname(process.execPath) + delimiter + (process.env.PATH || ''), npm_config_cache:join(runtime, 'npm-cache'), npm_config_update_notifier:'false'};
   await run(process.execPath, [join(projectRoot, 'scripts', 'fetch-office.mjs')], {env});
   await run(process.execPath, [npm, 'ci', '--ignore-scripts', '--no-audit', '--no-fund'], {env});
+  await run(process.execPath, [join(projectRoot, 'scripts', 'fetch-diagrams.mjs')], {env});
   await run(process.execPath, [npm, 'run', 'build'], {env});
 }
 
