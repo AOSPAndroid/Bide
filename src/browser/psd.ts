@@ -1,5 +1,5 @@
 import { readPsd, writePsd, type Layer, type Psd } from 'ag-psd';
-import { FabricImage, FabricObject, StaticCanvas } from 'fabric';
+import { FabricImage, FabricObject, Group, StaticCanvas } from 'fabric';
 import { blankPage, uid, type Page } from '../model';
 
 import { blendModes } from './layer-utils';
@@ -15,8 +15,15 @@ export function validatePsdHeader(bytes: Uint8Array) {
 }
 
 export function requiresComposite(psd: Psd): boolean {
-  const advanced = (layer: Layer): boolean => !!(layer.children || layer.mask || layer.realMask || layer.vectorMask || layer.clipping || layer.effects || layer.adjustment || layer.placedLayer || (layer.blendMode && !blendModes[layer.blendMode]));
+  const blended = (layer:Layer):boolean => !!(layer.blendMode && !['normal','pass through'].includes(layer.blendMode)) || !!layer.children?.some(blended);
+  const advanced = (layer: Layer): boolean => !!(layer.mask || layer.realMask || layer.vectorMask || layer.clipping || layer.effects || layer.adjustment || layer.placedLayer
+    || (layer.blendMode && !blendModes[layer.blendMode] && !(layer.children && layer.blendMode==='pass through'))
+    || (layer.children && (!layer.blendMode || layer.blendMode==='pass through') && layer.children.some(blended))
+    || layer.children?.some(advanced));
   return !!psd.children?.some(advanced);
+}
+export function needsFlattenedPsd(objects:FabricObject[]):boolean {
+  return objects.some(o=>!Object.values(blendModes).includes(o.globalCompositeOperation)||(o instanceof Group&&needsFlattenedPsd(o.getObjects())));
 }
 
 export async function importPsd(file: File): Promise<{ page: Page; notice: string }> {
@@ -30,15 +37,18 @@ export async function importPsd(file: File): Promise<{ page: Page; notice: strin
     if (!psd.canvas) throw new Error('This PSD needs a saved composite preview. In Photoshop, save it with “Maximize Compatibility” enabled.');
     const image = new FabricImage(psd.canvas, { left: 0, top: 0 }); Object.assign(image, { id: uid(), name: 'PSD composite (flattened)' }); objects.push(image);
   } else {
-    for (const layer of psd.children!) {
-      if (!layer.canvas) continue;
-      const image = new FabricImage(layer.canvas, { left: layer.left || 0, top: layer.top || 0, opacity: layer.opacity ?? 1, visible: !layer.hidden, globalCompositeOperation: blendModes[layer.blendMode || 'normal'] });
-      Object.assign(image, { id: uid(), name: layer.name || 'PSD layer' }); objects.push(image);
-    }
+    const convert=(layer:Layer):FabricObject|null=>{
+      let object:FabricObject;
+      if(layer.children){const children=layer.children.map(convert).filter((o):o is FabricObject=>!!o);if(!children.length)return null;object=new Group(children);}
+      else {if(!layer.canvas)return null;object=new FabricImage(layer.canvas,{left:layer.left||0,top:layer.top||0});}
+      object.set({opacity:layer.opacity??1,visible:!layer.hidden,globalCompositeOperation:blendModes[layer.blendMode||'normal']||'source-over'});
+      Object.assign(object,{id:uid(),name:layer.name||(layer.children?'PSD group':'PSD layer')});return object;
+    };
+    objects.push(...psd.children!.map(convert).filter((o):o is FabricObject=>!!o));
     if (!objects.length) throw new Error('No raster layer previews were found in this PSD. Save it with compatibility previews enabled.');
   }
   page.canvas = { objects: objects.map(o => o.toObject()) };
-  return { page, notice: flattened ? 'Complex PSD opened as its flattened composite preview. Photoshop masks, effects and smart objects are not editable.' : `PSD opened with ${objects.length} raster layers. Text and vector layers use their saved pixel previews.` };
+  return { page, notice: flattened ? 'Complex PSD opened as its flattened composite preview. Photoshop masks, effects and smart objects are not editable.' : `PSD opened with ${objects.length} top-level layers/groups. Text and vector layers use their saved pixel previews.` };
 }
 
 export async function exportPsd(page: Page): Promise<Blob> {
@@ -48,17 +58,26 @@ export async function exportPsd(page: Page): Promise<Blob> {
   try {
     await canvas.loadFromJSON(page.canvas); canvas.backgroundColor = page.color; canvas.renderAll();
     const objects = canvas.getObjects();
-    if (width * height * (objects.length + 2) > 64000000) throw new Error('This layered PSD would use too much memory. Reduce canvas size or merge layers first.');
+    const all:FabricObject[]=[];const collect=(o:FabricObject)=>{all.push(o);if(o instanceof Group)o.getObjects().forEach(collect);};objects.forEach(collect);
+    if (width * height * (all.length + 2) > 64000000) throw new Error('This layered PSD would use too much memory. Reduce canvas size or merge layers first.');
     const composite = canvas.toCanvasElement(1);
-    const state = objects.map(o => ({ visible: o.visible, opacity: o.opacity, blend: o.globalCompositeOperation }));
-    objects.forEach(o => o.set({ visible: false })); canvas.renderAll();
-    const children: Layer[] = [{ name: 'Page background', canvas: canvas.toCanvasElement(1), top: 0, left: 0 }];
-    canvas.backgroundColor = '';
-    for (let i = 0; i < objects.length; i++) {
-      const o = objects[i], prior = state[i]; o.set({ visible: true, opacity: 1, globalCompositeOperation: 'source-over' }); canvas.renderAll();
-      children.push({ name: (o as FabricObject & { name?: string }).name || `Layer ${i + 1}`, top: 0, left: 0, canvas: canvas.toCanvasElement(1), hidden: !prior.visible, opacity: prior.opacity, blendMode: (Object.keys(blendModes).find(key => blendModes[key] === prior.blend) || 'normal') as Layer['blendMode'] });
-      o.set({ visible: false });
-    }
+    if(needsFlattenedPsd(objects))return new Blob([writePsd({width,height,canvas:composite,children:[{name:'Merged appearance (eraser/compositing)',canvas:composite,top:0,left:0}]},{trimImageData:true,noBackground:true})],{type:'image/vnd.adobe.photoshop'});
+    const state=new Map(all.map(o=>[o,{visible:o.visible,opacity:o.opacity,globalCompositeOperation:o.globalCompositeOperation}]));
+    objects.forEach(o=>o.set({visible:false}));canvas.renderAll();
+    const background:Layer={name:'Page background',canvas:canvas.toCanvasElement(1),top:0,left:0};canvas.backgroundColor='';
+    const renderLayer=(path:FabricObject[])=>{
+      all.forEach(o=>o.set(state.get(o)!));objects.forEach(o=>o.set({visible:false}));
+      for(let i=0;i<path.length;i++){const o=path[i];o.set({visible:true,opacity:1,globalCompositeOperation:'source-over'});if(i<path.length-1&&o instanceof Group)o.getObjects().forEach(child=>child.set({visible:child===path[i+1]}));}
+      canvas.renderAll();return canvas.toCanvasElement(1);
+    };
+    const exportLayer=(o:FabricObject,parents:FabricObject[]):Layer=>{
+      const prior=state.get(o)!,path=[...parents,o];
+      const layer:Layer={name:(o as FabricObject&{name?:string}).name||'Layer',hidden:!prior.visible,opacity:prior.opacity,blendMode:(Object.keys(blendModes).find(key=>blendModes[key]===prior.globalCompositeOperation)||'normal') as Layer['blendMode']};
+      if(o instanceof Group&&!o.clipPath)layer.children=o.getObjects().map(child=>exportLayer(child,path));
+      else Object.assign(layer,{top:0,left:0,canvas:renderLayer(path)});
+      return layer;
+    };
+    const children=[background,...objects.map(o=>exportLayer(o,[]))];
     return new Blob([writePsd({ width, height, children, canvas: composite }, { trimImageData: true, noBackground: true })], { type: 'image/vnd.adobe.photoshop' });
   } finally { await canvas.dispose(); }
 }

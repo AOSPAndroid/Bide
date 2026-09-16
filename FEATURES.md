@@ -15,11 +15,11 @@ Checked against the [Photopea manual](https://www.photopea.com/learn/) and [iLov
 | Shapes and paths | Partial | Rectangles, ellipses, lines, brush strokes; no Pen tool, node editing or Boolean operations |
 | Raster image import, resizing and crop | Partial | Common image formats; object crop/resize; no full raster editing engine |
 | Adjustments and filters | Partial | Brightness, contrast, saturation, blur, grayscale, sepia, invert; no curves, levels, adjustment layers or full filter gallery |
-| Selections | Missing | No marquee, lasso, magic wand, subject selection, edge refinement or selection masks |
-| Masks and clipping masks | Partial | Ellipse and rounded-rectangle object masks; no painted masks or Photoshop-compatible mask stacks |
+| Selections | Partial | Rectangular and freehand lasso selections create reversible masks or copied cutouts on a selected layer; no magic wand, subject selection, edge refinement or multi-selection Boolean operations |
+| Masks and clipping masks | Partial | Ellipse, rounded-rectangle and selection-path masks, including inverse masks; no feathering, painted masks or Photoshop-compatible mask stacks |
 | Smart objects | Missing | No linked/embedded smart-object editing |
 | Retouching | Missing | No clone stamp, healing, content-aware fill, liquify, dodge/burn or advanced brush engine |
-| PSD / PSB workflows | Partial | 8-bit RGB PSD raster layers import/export, positions, names, opacity and supported blend modes; complex PSDs use saved composites; no PSB, native text/vector/Photoshop effect round-trip |
+| PSD / PSB workflows | Partial | 8-bit RGB PSD raster layers and supported group hierarchy import/export, positions, names, opacity and supported blend modes; complex PSDs use saved composites; no PSB, native text/vector/Photoshop effect round-trip |
 | RAW, advanced design formats | Missing | No RAW development, AI/CDR/XD/Sketch compatibility guarantee |
 | Color management | Missing | No editable ICC/CMYK/Lab workflow, channels, or 16/32-bit editing |
 | Text layout | Partial | Basic multiline boxes; no advanced OpenType, text-on-path or font import workflow |
@@ -120,3 +120,15 @@ There is no full-parity completion claim or committed delivery date. The checkli
 - Round, square, spray and dotted brushes have adjustable 1–200 size and 5–100% opacity. B selects Brush; E selects Eraser; [ and ] adjust drawing-tool size.
 - The freehand eraser removes parts of overlay artwork beneath it, with a 1–200 size. Erasures are undoable compositing layers, preserved in .bide projects and PDF/image export. A pale stroke previews the gesture; the erased result appears on release. Original imported PDF/image backgrounds are not erased. This is not PDF redaction.
 - Verified all four brushes in the browser, partial-stroke erasure, exported PDF pixels retaining the erased gap, PDF-home and embedded-diagram Ctrl+O, and 31 automated tests including brush configuration and eraser serialization.
+
+### v0.4.4 — Branding and selection masks
+
+- Barclays eagle logo stored locally, with “Barclays Image & Document Editor” beneath bide.
+- M selects rectangular selection; Q selects freehand lasso. Select an unlocked layer first, then draw on the canvas. Keep inside / Hide inside apply a reversible mask; Copy to layer creates an independently editable cutout without changing the source layer. Each action replaces that layer's previous mask. Choose Shape mask → None to recover the original pixels, or Undo.
+- Masks follow layer rotation, scale and flipping and persist in .bide projects. This is a foundation for photo compositing, not Photoshop feature parity. Original PDF page content is not a selectable image layer.
+- Browser verified mask placement, mask removal, copying a cutout and hiding the source. Automated geometry checks cover rotated, scaled and flipped layers and serialized inverse masks.
+- A file opened while local autosave restoration is finishing takes priority over the restored project.
+
+PSD focus for v0.4.4: normal groups and simple pass-through groups retain their editable hierarchy on import, and supported groups retain hierarchy on export. Unsupported effects, masks, smart objects, or pass-through groups with interacting blend modes still use the saved PSD composite. Eraser/compositing operations unsupported by PSD now export a merged appearance rather than becoming visible black strokes; save .bide for full editability.
+
+Verified a real browser import/export of the generated grouped PSD: hierarchy, two named layers, exact position and pixel colors, multiply blend and opacity retained. Verified an erased pixel remains transparent in the exported merged PSD. 33 automated tests pass.

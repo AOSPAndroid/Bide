@@ -62,3 +62,16 @@ test('brush styles, bounds and eraser compositing survive editable project resto
   const restored=await erase.constructor.fromObject(JSON.parse(JSON.stringify(erase.toObject())));
   assert.equal(restored.globalCompositeOperation,'destination-out');assert.equal(restored.stroke,'#000000');assert.equal(restored.strokeWidth,24);
 });
+
+
+test('selection masks follow transformed layers and survive serialization', async()=>{
+  const {selectionMask,rectanglePoints}=await import('../tmp/selection-mask.mjs');
+  const {util}=await import('fabric');
+  const object=new Rect({left:80,top:120,width:200,height:100,scaleX:1.7,scaleY:.8,angle:35,flipX:true,originX:'left',originY:'top',strokeWidth:0});
+  const local=rectanglePoints({x:-70,y:-30},{x:30,y:20});
+  const world=local.map(p=>util.transformPoint(new Point(p.x,p.y),object.calcTransformMatrix()));
+  const mask=selectionMask(object,world,true);
+  assert.ok(Math.abs(mask.left+70)<1e-8);assert.ok(Math.abs(mask.top+30)<1e-8);assert.ok(Math.abs(mask.width-100)<1e-8);assert.ok(Math.abs(mask.height-50)<1e-8);
+  object.clipPath=mask;const restored=await object.clone();assert.equal(restored.clipPath.inverted,true);assert.deepEqual(restored.clipPath.path,mask.path);
+  assert.throws(()=>selectionMask(object,[{x:0,y:0},{x:1,y:1},{x:2,y:2}]),/too small/);
+});

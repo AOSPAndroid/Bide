@@ -6,7 +6,7 @@ export default defineConfig(({mode}) => ({
   base: './', publicDir: mode === 'demo' ? false : 'public',
   plugins: [react(), ...(mode === 'demo' ? [{name:'bide-demo-assets', async closeBundle() {
     await mkdir('out', {recursive:true});
-    for (const name of ['diagrams','licenses','favicon.svg','_headers']) await cp(`public/${name}`, `out/${name}`, {recursive:true});
+    for (const name of ['diagrams','licenses','favicon.svg','barclays-eagle.svg','_headers']) await cp(`public/${name}`, `out/${name}`, {recursive:true});
   }}] : [])],
   build: {target:'esnext',outDir:mode === 'demo' ? 'out' : 'dist'},
   worker: {format:'es'}, server:{headers}, preview:{headers},
