@@ -1,3 +1,4 @@
+import {importVisio} from './browser/visio';
 import {useEffect, useRef, useState, type RefObject} from 'react';
 import {Download, FilePlus2, FolderOpen, ImagePlus, Network, Save, X} from 'lucide-react';
 import {download, loadLocal, saveLocal, safeName, uid} from './model';
@@ -111,15 +112,18 @@ export default function Diagrams({active, commands, onPlace, onNew, onPalette}: 
 
   async function open(file: File) {
     try {
-      if (file.size > 30 * 1024 * 1024) throw new Error('Choose a .drawio file smaller than 30 MB.');
-      const xml = await file.text();
+      if (file.size > 30 * 1024 * 1024) throw new Error('Choose a diagram smaller than 30 MB.');
+      const visio = /\.vsdx$/i.test(file.name);
+      if(visio)setBusy('Importing Visio locally…');
+      const xml = visio ? await importVisio(file) : await file.text();
       const parsed = new DOMParser().parseFromString(xml, 'application/xml');
-      if (parsed.querySelector('parsererror') || !['mxfile','mxGraphModel'].includes(parsed.documentElement.tagName)) throw new Error('Choose an editable .drawio or draw.io XML file.');
-      onNew(); load({name:file.name.replace(/\.(drawio|xml)$/i,''), xml});
-    } catch (error) {setError(error instanceof Error ? error.message : String(error));}
+      if (parsed.querySelector('parsererror') || !['mxfile','mxGraphModel'].includes(parsed.documentElement.tagName)) throw new Error('Choose a .vsdx, .drawio or draw.io XML file. Older .vsd files must first be saved as .vsdx in Visio.');
+      if(visio)setNotice('Visio imported as editable draw.io shapes. Check formatting, fonts and connectors. Save as .drawio to keep editing; Visio export is not supported.');
+      onNew(); load({name:file.name.replace(/\.(drawio|xml|vsdx)$/i,''), xml});
+    } catch (error) {setError(error instanceof Error ? error.message : String(error));} finally {setBusy('');}
   }
   return <section className="diagrams-workspace" style={{display:active ? 'flex' : 'none'}} aria-label="Diagram workspace">
-    <input type="file" ref={fileInput} accept=".drawio,.xml" hidden onChange={e=>{if(e.target.files?.[0])void open(e.target.files[0]); e.target.value='';}}/>
+    <input type="file" ref={fileInput} accept=".drawio,.xml,.vsdx" hidden onChange={e=>{if(e.target.files?.[0])void open(e.target.files[0]); e.target.value='';}}/>
     <div className="diagram-header">
       <div className="document-name"><Network size={16}/><input aria-label="Diagram name" value={draft.name} onChange={e=>update({...draft,name:e.target.value})}/><span className="save-state">{saved?'Saved locally':'Editing'}</span></div>
       <div className="diagram-actions"><button onClick={()=>setTemplates(true)} disabled={!ready||!!busy}><FilePlus2 size={14}/>New</button><button onClick={()=>fileInput.current?.click()} disabled={!ready||!!busy}><FolderOpen size={14}/>Open</button><button onClick={()=>request('save')} disabled={!ready||!!busy}><Save size={14}/>Save .drawio</button><span className="divider"/><button onClick={()=>request('svg')} disabled={!ready||!!busy}>SVG</button><button onClick={()=>request('png')} disabled={!ready||!!busy}>PNG</button><button onClick={()=>request('pdf')} disabled={!ready||!!busy}><Download size={14}/>PDF</button><button className="primary" onClick={()=>request('place')} disabled={!ready||!!busy}><ImagePlus size={14}/>Place in document</button></div>

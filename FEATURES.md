@@ -107,3 +107,9 @@ Both the visual editor and PDF toolkit have equal priority. The numbered groups 
 5. Separate decisions for cloud collaboration, remote signature requests and AI tools, which need services or substantial local models beyond the current offline editor.
 
 There is no full-parity completion claim or committed delivery date. The checklist should be updated only when each workflow is implemented and verified.
+
+### v0.4.2 — Visio and page actions
+
+- Diagram workspace Open accepts modern `.vsdx` files and converts them locally using the bundled draw.io importer. Imported shapes and text are editable; save as `.drawio`. No Visio export. Older `.vsd`, `.vdx` and stencil formats are not supported by this import path. Complex formatting, fonts and connectors may differ.
+- Right-click a photo/PDF page thumbnail, or use its three-dot button, to duplicate, rotate clockwise/counterclockwise, move to beginning/end, or remove it. Actions target the clicked page; the last page cannot be removed. Undo restores changes. Rotation flattens current overlay layers into the PDF background; Undo restores editable layers.
+- Verified local import, text editing and .drawio saving with the Microsoft 365 PnP react-visio sample Drawing1.vsdx. Verified inactive-page rotation, dimensions, Undo restoring 14 layers, and inactive-page removal.
