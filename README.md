@@ -6,7 +6,7 @@ A Photopea-inspired visual editor with an integrated PDF toolkit. Editing and co
 
 ## Start on Windows
 
-1. Download this repository using **Code → Download ZIP**, or use the prebuilt `bide-browser.zip`. Extract it into a writable local folder.
+1. Download this repository using **Code → Download ZIP**, or [download the prebuilt bide-browser.zip](https://github.com/AOSPAndroid/Bide/releases/download/v0.3.0/bide-browser.zip). Extract it into a writable local folder.
 2. Double-click **Install Dependencies.bat** once. It downloads and verifies a private Node.js 24 runtime inside `.runtime`, then prepares the app. Internet is needed for setup; no administrator rights or system PATH changes are needed.
 3. Double-click **launch bide.bat**. It starts the local server in the background and opens the editor in your default browser (use Edge or Chrome).
 
