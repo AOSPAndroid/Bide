@@ -3,9 +3,9 @@ import {ChevronUp, FileText, Image, Network} from 'lucide-react';
 
 export type Workspace = 'photo' | 'pdf' | 'diagrams';
 export const workspaces = [
-  {id:'photo' as const, label:'Photo editor', detail:'Photopea / Photoshop tools', icon:Image, short:'PHOTO'},
+  {id:'photo' as const, label:'Photo editor', detail:'Layers, text & image design', icon:Image, short:'PHOTO'},
   {id:'pdf' as const, label:'PDF MasterTool', detail:'Edit, organize & convert', icon:FileText, short:'PDF'},
-  {id:'diagrams' as const, label:'Drawio', detail:'Shapes, flows & diagrams', icon:Network, short:'DRAW'},
+  {id:'diagrams' as const, label:'Diagrams', detail:'Shapes, flows & diagrams', icon:Network, short:'DRAW'},
 ];
 
 export default function WorkspaceDock({active, onSelect}: {active:Workspace; onSelect:(view:Workspace)=>void}) {

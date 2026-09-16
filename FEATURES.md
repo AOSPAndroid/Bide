@@ -1,3 +1,12 @@
+## v0.4.6 — Clearer workspace layout
+
+- Visible Photo editor, PDF MasterTool and Diagrams navigation, alongside the animated workspace dock.
+- Labeled Select, Create, Draw and Insert tools with active states and shortcut hints.
+- Direct Open files, Save project and Export file actions; clearer diagram export labels.
+- PDF tools grouped by task, with category counts, search and filter reset.
+- More readable properties and layers; page/property drawers on small screens.
+- Existing editing and conversion capabilities are unchanged.
+
 # bide feature coverage
 
 Checked against the [Photopea manual](https://www.photopea.com/learn/) and [iLovePDF tool catalogue](https://www.ilovepdf.com/) on 2026-09-16, and against the actual bide code and verification results.
