@@ -1,0 +1,32 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Folio Office engine</title></head>
+<body><canvas id="qtcanvas" width="800" height="600"></canvas>
+<script type="module">
+import { ZetaHelperMain } from './vendor/zetaHelper.js';
+const send = data => parent.postMessage(data, location.origin);
+const engine = new ZetaHelperMain('./office_thread.js', {threadJsType:'module',wasmPkg:'url:'+new URL('./runtime/',location.href),blockPageScroll:false});
+engine.Module.onAbort = () => send({type:'bide-office-error',error:'The browser Office engine stopped. Reload the workspace and try again.'});
+window.addEventListener('error', () => send({type:'bide-office-error',error:'Unable to load the browser Office engine. Check that all Office assets are hosted.'}));
+engine.start(() => {
+ engine.thrPort.onmessage = event => {
+  const msg=event.data;
+  if(msg.cmd==='start') { send({type:'bide-office-ready'}); return; }
+  if(msg.cmd==='converted') {
+   try {
+    if(msg.error) throw new Error(msg.error);
+    const bytes=engine.FS.readFile(msg.to).slice().buffer;
+    parent.postMessage({type:'bide-office-result',id:msg.id,bytes},location.origin,[bytes]);
+   } catch(e) { send({type:'bide-office-result',id:msg.id,error:e.message}); }
+   finally { for(const path of [msg.from,msg.to])try{engine.FS.unlink(path);}catch{} }
+  }
+ };
+ window.addEventListener('message',event=>{
+  if(event.source!==parent||event.origin!==location.origin||event.data?.type!=='bide-office-convert')return;
+  const {id,name,bytes}=event.data, extension=String(name).split('.').at(-1).toLowerCase();
+  if(!/^(docx?|xlsx?|pptx?|odt|ods|odp|rtf)$/.test(extension)){send({type:'bide-office-result',id,error:'Unsupported Office format.'});return;}
+  const from=`/tmp/folio-${id}.${extension}`,to=`/tmp/folio-${id}.pdf`;
+  try{engine.FS.writeFile(from,new Uint8Array(bytes));engine.thrPort.postMessage({cmd:'convert',id,from,to});}
+  catch(e){send({type:'bide-office-result',id,error:e.message});}
+ });
+});
+</script></body></html>

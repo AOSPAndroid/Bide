@@ -1,0 +1,43 @@
+{
+  "retrieved": "2026-09-16",
+  "runtimeSource": "https://cdn.zetaoffice.net/zetaoffice_latest/",
+  "wrapperSource": "https://github.com/allotropia/zetajs",
+  "files": {
+    "index.html": {
+      "bytes": 1998,
+      "sha256": "91a973b0d62ddfcb5fadc92f846de94ef054ac375bfdbe74548e246fe3a04b41"
+    },
+    "office_thread.js": {
+      "bytes": 1210,
+      "sha256": "1683445752a591d193478c5bd6808f5ca2448652cf910379093b6fc68c532d84"
+    },
+    "runtime/soffice.data": {
+      "bytes": 99520604,
+      "sha256": "3dab0a5448e599dccc1b1e69f4f86ea9eb30777c3f1ed7b9c386a5f4163e361c"
+    },
+    "runtime/soffice.data.js.metadata": {
+      "bytes": 215180,
+      "sha256": "5d9d909d0b9b38443c0f19704032d0fc12d654f6c9c24c2c3b237739c4848ae3"
+    },
+    "runtime/soffice.js": {
+      "bytes": 858124,
+      "sha256": "5143e5354f470b87f86ba272bcfef857bd13e6f07b59666e48a7ccb89643cd77"
+    },
+    "runtime/soffice.wasm": {
+      "bytes": 161667499,
+      "sha256": "9ebd9a487e849a24b9c69f843ebdb451709c27b7722c010e36846433474a5bd4"
+    },
+    "vendor/LICENSE": {
+      "bytes": 1098,
+      "sha256": "a8c9b7d037ed112c3b9f85d5a1122aedd218947b21cf3f2c4200d13d7fe1a7d9"
+    },
+    "vendor/zeta.js": {
+      "bytes": 42951,
+      "sha256": "ee633709bfa1de3221e8f68beb395f68fd5ff00cab9e33ba22e97e8271b348b4"
+    },
+    "vendor/zetaHelper.js": {
+      "bytes": 7322,
+      "sha256": "0c61cc984f6f6771295044d480a2194f9717fb293df637ef652158a356435c36"
+    }
+  }
+}

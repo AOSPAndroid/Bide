@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.venv/
+__pycache__/
+.pytest_cache/
+*.log
+tmp/
+*.tsbuildinfo
+release/
+.runtime/
+public/office/runtime/
