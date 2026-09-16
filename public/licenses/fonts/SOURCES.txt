@@ -1,0 +1,4 @@
+Fonts from the Google Fonts repository, bundled for offline use.
+Revision: 92345ac0dbb28d27dbd32f3a782e84c55eaac214
+https://github.com/google/fonts/tree/92345ac0dbb28d27dbd32f3a782e84c55eaac214/ofl
+Each family includes its own SIL Open Font License.
