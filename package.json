@@ -1,6 +1,6 @@
 {
   "name": "bide",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "private": true,
   "type": "module",
   "scripts": {
@@ -32,5 +32,8 @@
     "@vitejs/plugin-react": "^4.3.4",
     "typescript": "~5.7.3",
     "vite": "^6.1.0"
+  },
+  "engines": {
+    "node": ">=22"
   }
 }

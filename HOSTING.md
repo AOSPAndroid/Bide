@@ -2,11 +2,22 @@
 
 ## Local Windows launch
 
-Extract the entire ZIP to a writable local folder. Run **Install Dependencies.bat** once, then **launch bide.bat**. Setup downloads a private, checksum-verified Node.js runtime into `.runtime`; it does not require admin rights or modify the system PATH. In a source checkout it also downloads and verifies the Office runtime, installs npm dependencies, and builds the editor; the prebuilt ZIP needs only the runtime download. Python and installed Office software are never needed. The launcher opens a localhost address, so no external website host is necessary for this mode. Local launch and conversion work offline after setup. Keep the `scripts` and `site` folders next to the BAT files.
+Extract the entire prebuilt **bide-browser.zip** to a writable local folder and run **launch bide.bat**. The launcher uses your existing **Node.js 22 or newer**; it detects `C:\devhome\tools\node24\current\node.exe` first, then `node.exe` on PATH. **Install Dependencies.bat is optional for the prebuilt ZIP** and checks the installation without downloading anything. Python and installed Office software are never needed. There are no administrator requirements or system PATH changes. The launcher opens a localhost address, so no external website host is necessary. Local launch and conversion work offline. Keep the `scripts` and `site` folders next to the BAT files.
+
+For an existing Node installation in another folder, launch from Command Prompt with:
+
+```bat
+set "BIDE_NODE=D:\Tools\Node\node.exe"
+"launch bide.bat"
+```
+
+The same variable works with **share bide.bat** and **Install Dependencies.bat**. An invalid override produces an error and never triggers a download. A missing or old Node version also stops with an explanatory message.
+
+The release's `source` folder and GitHub's source ZIP are for developers. Their installer uses your installed Node and npm to download any missing Office assets, install locked npm dependencies, and build the app. For a work PC with a `407 Proxy Authentication Required` error, use the prebuilt release's root BAT files: all app dependencies and conversion engines are included, so these launchers do not contact download servers. The earlier private `.runtime/node` installation is no longer used by new launches.
 
 ## Share from a Windows PC using IP:port
 
-1. Run **Install Dependencies.bat** once on the host, as above.
+1. Extract the prebuilt ZIP on the host and ensure Node.js 22 or newer is installed, as above.
 2. Double-click **share bide.bat**. The server binds to all IPv4 interfaces on port **8786** and lists their addresses with adapter names.
 3. Give colleagues the address for the adapter connected to the same work network, for example `http://192.168.1.20:8786`. Avoid virtual-machine adapter addresses. Their PCs need only Edge or Chrome.
 4. Keep the sharing window open and the host awake. Ctrl+C or closing the sharing window stops the shared server. The local background server started by `launch bide.bat` is separate.

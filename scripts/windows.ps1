@@ -7,8 +7,6 @@ $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $runtimeRoot = Join-Path $projectRoot '.runtime'
-$nodeFolder = Join-Path $runtimeRoot 'node'
-$nodeExe = Join-Path $nodeFolder 'node.exe'
 Set-Location -LiteralPath $projectRoot
 
 function Get-SiteRoot {
@@ -27,54 +25,25 @@ function Assert-OfficeAssets([string]$SiteRoot) {
     }
 }
 
-function Get-DownloadHash([string]$Path) {
-    $stream = [IO.File]::OpenRead($Path)
-    $sha = [Security.Cryptography.SHA256]::Create()
-    try { return [BitConverter]::ToString($sha.ComputeHash($stream)).Replace('-', '') }
-    finally { $sha.Dispose(); $stream.Dispose() }
-}
-
-function Install-PrivateNode {
-    if ((Test-Path -LiteralPath $nodeExe) -and (Test-Path -LiteralPath (Join-Path $nodeFolder 'node_modules\npm\bin\npm-cli.js'))) {
-        $version = & $nodeExe --version
-        if ($LASTEXITCODE -eq 0 -and $version -match '^v24\.') {
-            Write-Host "Using private Node.js $version."
-            return
-        }
+function Find-InstalledNode {
+    if ($env:BIDE_NODE) { $candidates = @($env:BIDE_NODE) }
+    else {
+        # The managed work-PC installation may not be on PATH.
+        $candidates = @('C:\devhome\tools\node24\current\node.exe')
+        $command = Get-Command node.exe -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($command) { $candidates += $command.Source }
     }
-    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-    $architecture = $env:PROCESSOR_ARCHITECTURE
-    if ($env:PROCESSOR_ARCHITEW6432) { $architecture = $env:PROCESSOR_ARCHITEW6432 }
-    if ($architecture -eq 'ARM64') { $platform = 'arm64' }
-    elseif ($architecture -eq 'AMD64') { $platform = 'x64' }
-    else { throw 'This version requires 64-bit Windows (x64 or ARM64).' }
-    Write-Host 'Downloading private Node.js from nodejs.org (no administrator rights needed)...'
-    $releases = Invoke-RestMethod -Uri 'https://nodejs.org/dist/index.json' -TimeoutSec 60
-    $release = $releases | Where-Object { $_.version -match '^v24\.\d+\.\d+$' -and $_.lts } | Select-Object -First 1
-    if (!$release) { throw 'Could not find a supported Node.js 24 LTS release.' }
-    $baseName = "node-$($release.version)-win-$platform"
-    $archiveName = "$baseName.zip"
-    $downloadRoot = Join-Path $runtimeRoot 'downloads'
-    New-Item -ItemType Directory -Path $downloadRoot -Force | Out-Null
-    $archivePath = Join-Path $downloadRoot $archiveName
-    $baseUrl = "https://nodejs.org/dist/$($release.version)"
-    $checksums = (Invoke-WebRequest -UseBasicParsing -Uri "$baseUrl/SHASUMS256.txt" -TimeoutSec 60).Content
-    $checksumLine = $checksums -split "`n" | Where-Object { $_.Trim().EndsWith(" $archiveName") } | Select-Object -First 1
-    if (!$checksumLine) { throw 'The official Node.js checksum is missing. Nothing was installed.' }
-    $expectedHash = ($checksumLine.Trim() -split '\s+')[0]
-    if ($expectedHash -notmatch '^[a-fA-F0-9]{64}$') { throw 'Invalid Node.js checksum response.' }
-    $cached = (Test-Path -LiteralPath $archivePath) -and ((Get-DownloadHash $archivePath) -eq $expectedHash)
-    if (!$cached) { Invoke-WebRequest -UseBasicParsing -Uri "$baseUrl/$archiveName" -OutFile $archivePath -TimeoutSec 300 }
-    if ((Get-DownloadHash $archivePath) -ne $expectedHash) { throw 'Node.js download verification failed. Run the installer again.' }
-    $extractRoot = Join-Path $downloadRoot ([Guid]::NewGuid().ToString('N'))
-    Add-Type -AssemblyName System.IO.Compression.FileSystem
-    [IO.Compression.ZipFile]::ExtractToDirectory($archivePath, $extractRoot)
-    $extractedNode = Join-Path $extractRoot $baseName
-    New-Item -ItemType Directory -Path $nodeFolder -Force | Out-Null
-    Get-ChildItem -LiteralPath $extractedNode | ForEach-Object { Copy-Item -LiteralPath $_.FullName -Destination $nodeFolder -Recurse -Force }
-    $version = & $nodeExe --version
-    if ($LASTEXITCODE -ne 0 -or $version -notmatch '^v24\.') { throw 'The private Node.js runtime could not start.' }
-    Write-Host "Installed private Node.js $version in .runtime\node."
+    $problem = 'No installed Node.js was found.'
+    foreach ($candidate in ($candidates | Select-Object -Unique)) {
+        if (!(Test-Path -LiteralPath $candidate -PathType Leaf)) { continue }
+        $version = & $candidate --version
+        if ($LASTEXITCODE -ne 0 -or $version -notmatch '^v(\d+)\.') { $problem = "Node.js could not start at $candidate."; continue }
+        if ([int]$Matches[1] -lt 22) { $problem = "Found Node.js $version; bide requires version 22 or newer."; continue }
+        $nodePath = (Resolve-Path -LiteralPath $candidate).ProviderPath
+        Write-Host "Using installed Node.js $version ($nodePath)."
+        return $nodePath
+    }
+    throw "$problem Use Node.js 22 or newer on PATH, in C:\devhome\tools\node24\current, or set BIDE_NODE to the full path to node.exe. Nothing was downloaded."
 }
 
 function Read-ServerStatus([int]$Port) {
@@ -98,11 +67,18 @@ function Test-PortBusy([int]$Port) {
 }
 
 try {
+    $nodeExe = Find-InstalledNode
+    $nodeFolder = Split-Path -Parent $nodeExe
     New-Item -ItemType Directory -Path $runtimeRoot -Force | Out-Null
     if ($Action -eq 'Install') {
         Write-Host 'bide - install local dependencies'
-        Install-PrivateNode
         if (Test-Path -LiteralPath (Join-Path $projectRoot 'package.json')) {
+            $npmExe = Join-Path $nodeFolder 'npm.cmd'
+            if (!(Test-Path -LiteralPath $npmExe -PathType Leaf)) {
+                $npmCommand = Get-Command npm.cmd -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+                if (!$npmCommand) { throw 'Building from source requires npm next to node.exe or on PATH. The prebuilt ZIP launches directly with Node.js and needs no npm packages.' }
+                $npmExe = $npmCommand.Source
+            }
             # The distribution stores its large Office runtime once, in ../site.
             $officeTarget = Join-Path $projectRoot 'public\office\runtime'
             if (!(Test-Path -LiteralPath (Join-Path $officeTarget 'soffice.wasm'))) {
@@ -119,11 +95,11 @@ try {
             $env:npm_config_update_notifier = 'false'
             Write-Host 'Installing locked browser dependencies...'
             # Native addon install scripts are unnecessary for the browser build.
-            & $nodeExe (Join-Path $nodeFolder 'node_modules\npm\bin\npm-cli.js') ci --ignore-scripts --no-audit --no-fund
+            & $npmExe ci --ignore-scripts --no-audit --no-fund
             if ($LASTEXITCODE -ne 0) { throw 'Dependency installation failed. Check your connection to registry.npmjs.org and run this file again.' }
-            & $nodeExe (Join-Path $nodeFolder 'node_modules\npm\bin\npm-cli.js') run build
+            & $npmExe run build
             if ($LASTEXITCODE -ne 0) { throw 'The editor build failed. See the build message above.' }
-        } else { Write-Host 'Using the prebuilt editor. No npm packages need to be installed.' }
+        } else { Write-Host 'Checking the prebuilt editor. No downloads or npm installation are needed.' }
         $siteRoot = Get-SiteRoot
         Assert-OfficeAssets $siteRoot
         Write-Host ''
@@ -132,7 +108,6 @@ try {
         exit 0
     }
 
-    if (!(Test-Path -LiteralPath $nodeExe)) { throw 'Run Install Dependencies.bat once before launching bide.' }
     $siteRoot = Get-SiteRoot
     Assert-OfficeAssets $siteRoot
     if ($Action -eq 'Share') {
