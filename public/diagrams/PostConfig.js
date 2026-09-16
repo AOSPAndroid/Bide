@@ -18,3 +18,11 @@ window.addEventListener('keydown', function(event) {
     parent.postMessage(JSON.stringify({event:'bide-command-palette'}), location.origin);
   }
 }, true);
+
+// Route the standard Open shortcut to bide's local file picker.
+window.addEventListener('keydown', function(event) {
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'o') {
+    event.preventDefault(); event.stopImmediatePropagation();
+    parent.postMessage(JSON.stringify({event:'bide-open-file'}), location.origin);
+  }
+}, true);

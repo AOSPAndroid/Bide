@@ -113,3 +113,10 @@ There is no full-parity completion claim or committed delivery date. The checkli
 - Diagram workspace Open accepts modern `.vsdx` files and converts them locally using the bundled draw.io importer. Imported shapes and text are editable; save as `.drawio`. No Visio export. Older `.vsd`, `.vdx` and stencil formats are not supported by this import path. Complex formatting, fonts and connectors may differ.
 - Right-click a photo/PDF page thumbnail, or use its three-dot button, to duplicate, rotate clockwise/counterclockwise, move to beginning/end, or remove it. Actions target the clicked page; the last page cannot be removed. Undo restores changes. Rotation flattens current overlay layers into the PDF background; Undo restores editable layers.
 - Verified local import, text editing and .drawio saving with the Microsoft 365 PnP react-visio sample Drawing1.vsdx. Verified inactive-page rotation, dimensions, Undo restoring 14 layers, and inactive-page removal.
+
+### v0.4.3 — Drawing and Open shortcut
+
+- Ctrl+O (Cmd+O on Mac) opens the appropriate local file picker in the photo editor, PDF home/editor and diagram workspace, including focus inside the draw.io iframe. Successful document imports show the editor.
+- Round, square, spray and dotted brushes have adjustable 1–200 size and 5–100% opacity. B selects Brush; E selects Eraser; [ and ] adjust drawing-tool size.
+- The freehand eraser removes parts of overlay artwork beneath it, with a 1–200 size. Erasures are undoable compositing layers, preserved in .bide projects and PDF/image export. A pale stroke previews the gesture; the erased result appears on release. Original imported PDF/image backgrounds are not erased. This is not PDF redaction.
+- Verified all four brushes in the browser, partial-stroke erasure, exported PDF pixels retaining the erased gap, PDF-home and embedded-diagram Ctrl+O, and 31 automated tests including brush configuration and eraser serialization.

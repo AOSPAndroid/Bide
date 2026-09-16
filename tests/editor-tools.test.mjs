@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {PencilBrush, Point, Rect} from 'fabric';
+import {PencilBrush, Point, Rect, SprayBrush, CircleBrush} from 'fabric';
 import {clampZoom, fitZoom, markerColor} from '../tmp/editor-tools.mjs';
 import {exportRequestId, imageDataBlob, DIAGRAM_URL} from '../tmp/diagram-data.mjs';
 import '../tmp/psd-core.mjs'; // Registers the editor's serialized custom properties.
@@ -46,4 +46,19 @@ test('diagram exports accept embedded images and never fetch arbitrary URLs', as
   assert.equal(await imageDataBlob('data:image/svg+xml,'+encodeURIComponent(svg),'svg').text(),svg);
   assert.deepEqual([...new Uint8Array(await imageDataBlob('data:image/png;base64,iVBORw==','png').arrayBuffer())],[137,80,78,71]);
   for (const value of ['https://example.com/diagram.png','data:text/html,<script>bad</script>','data:image/svg+xml,<svg/>']) assert.throws(()=>imageDataBlob(value,'png'),/invalid image/);
+});
+
+
+test('brush styles, bounds and eraser compositing survive editable project restoration', async () => {
+  const {makeBrush,makeEraserStroke,brushWidth}=await import('../tmp/brushes.mjs');
+  const round=makeBrush(null,'round','#00395d',24,50);
+  assert.equal(round.width,24);assert.equal(round.strokeLineCap,'round');assert.equal(round.color,'rgba(0,57,93,0.5)');
+  assert.equal(makeBrush(null,'square','#00395d',24,100).strokeLineCap,'square');
+  assert.ok(makeBrush(null,'spray','#00395d',24,100) instanceof SprayBrush);
+  assert.ok(makeBrush(null,'dots','#00395d',24,100) instanceof CircleBrush);
+  assert.equal(brushWidth(Infinity),1);assert.equal(brushWidth(-2),1);assert.equal(brushWidth(999),200);
+  const erase=round.createPath(round.convertPointsToSVGPath([new Point(10,10),new Point(30,50)]));
+  makeEraserStroke(erase);
+  const restored=await erase.constructor.fromObject(JSON.parse(JSON.stringify(erase.toObject())));
+  assert.equal(restored.globalCompositeOperation,'destination-out');assert.equal(restored.stroke,'#000000');assert.equal(restored.strokeWidth,24);
 });

@@ -73,7 +73,8 @@ export default function Diagrams({active, commands, onPlace, onNew, onPalette}: 
       if (event.source !== frame.current?.contentWindow || event.origin !== location.origin || typeof event.data !== 'string') return;
       let data;
       try {data = JSON.parse(event.data);} catch {return;}
-      if (data.event === 'bide-command-palette') {onPaletteRef.current();}
+      if (data.event === 'bide-open-file') {fileInput.current?.click();}
+      else if (data.event === 'bide-command-palette') {onPaletteRef.current();}
       else if (data.event === 'configure') {
         send({action:'configure', config:{defaultFonts:['Arial','Verdana','Times New Roman','Georgia','Courier New'], enableAi:false}});
       } else if (data.event === 'init') {
