@@ -5,11 +5,12 @@ import {download, loadLocal, saveLocal, safeName, uid} from './model';
 import {exportInBrowser, importDocument} from './browser/engine';
 import {DIAGRAM_URL, diagramTemplates, exportRequestId, imageDataBlob, type DiagramDraft, type DiagramIntent} from './diagram-data';
 
-export type DiagramCommands = {save: () => void; open: () => void; newDiagram: () => void; export: (format: DiagramIntent) => void; edit: (draft: DiagramDraft) => void};
-type Props = {active: boolean; commands: RefObject<DiagramCommands | null>; onPlace: (data: string, xml: string, name: string) => Promise<void>; onNew: () => void; onPalette: () => void};
+export type NativeDiagramCommand = {id:string;label:string;enabled:boolean;hint:string};
+export type DiagramCommands = {ready:()=>boolean;list:()=>void;run:(id:string)=>void;save: () => void; open: () => void; newDiagram: () => void; export: (format: DiagramIntent) => void; edit: (draft: DiagramDraft) => void};
+type Props = {onCommands:(commands:NativeDiagramCommand[])=>void;active: boolean; commands: RefObject<DiagramCommands | null>; onPlace: (data: string, xml: string, name: string) => Promise<void>; onNew: () => void; onPalette: () => void};
 type Pending = {id: string; intent: DiagramIntent; timer: ReturnType<typeof setTimeout>};
 
-export default function Diagrams({active, commands, onPlace, onNew, onPalette}: Props) {
+export default function Diagrams({active, commands, onPlace, onNew, onPalette, onCommands}: Props) {
   const frame = useRef<HTMLIFrameElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const [draft, setDraft] = useState(diagramTemplates.flowchart);
@@ -25,6 +26,7 @@ export default function Diagrams({active, commands, onPlace, onNew, onPalette}: 
   const incoming = useRef<DiagramDraft | null>(null);
   const onPlaceRef = useRef(onPlace); onPlaceRef.current = onPlace;
   const onPaletteRef = useRef(onPalette); onPaletteRef.current = onPalette;
+  const onCommandsRef=useRef(onCommands);onCommandsRef.current=onCommands;
   const send = (message: object) => frame.current?.contentWindow?.postMessage(JSON.stringify(message), location.origin);
   const update = (next: DiagramDraft) => {draftRef.current = next; setDraft(next); setSaved(false);};
 
@@ -66,14 +68,16 @@ export default function Diagrams({active, commands, onPlace, onNew, onPalette}: 
     }, 45000)};
     send({action:'export', requestId:id, format:intent === 'save' ? 'xml' : intent === 'svg' ? 'svg' : 'xmlpng', currentPage:true, scale:2, border:16, embedImages:true, embedFonts:false, theme:'light'});
   };
-  commands.current = {save:()=>request('save'), open:()=>fileInput.current?.click(), newDiagram:()=>setTemplates(true), export:request, edit:load};
+  commands.current = {ready:()=>ready,list:()=>send({action:'bide-list-commands'}),run:(id)=>send({action:'bide-run-command',id}),save:()=>request('save'), open:()=>fileInput.current?.click(), newDiagram:()=>setTemplates(true), export:request, edit:load};
 
   useEffect(() => {
     const receive = async (event: MessageEvent) => {
       if (event.source !== frame.current?.contentWindow || event.origin !== location.origin || typeof event.data !== 'string') return;
       let data;
       try {data = JSON.parse(event.data);} catch {return;}
-      if (data.event === 'bide-open-file') {fileInput.current?.click();}
+      if(data.event==='bide-commands'&&Array.isArray(data.commands)){onCommandsRef.current(data.commands.filter((c:NativeDiagramCommand)=>typeof c.id==='string'&&typeof c.label==='string'&&typeof c.enabled==='boolean'&&typeof c.hint==='string'));}
+      else if(data.event==='bide-command-error'){setError(String(data.message));}
+      else if (data.event === 'bide-open-file') {fileInput.current?.click();}
       else if (data.event === 'bide-command-palette') {onPaletteRef.current();}
       else if (data.event === 'configure') {
         send({action:'configure', config:{defaultFonts:['Arial','Verdana','Times New Roman','Georgia','Courier New'], enableAi:false}});
@@ -81,6 +85,7 @@ export default function Diagrams({active, commands, onPlace, onNew, onPalette}: 
         setReady(true); setError('');
         const value = incoming.current || draftRef.current; incoming.current = null; update(value);
         send({action:'load', xml:value.xml, title:value.name, autosave:1, saveAndExit:0, noSaveBtn:1, noExitBtn:1});
+        send({action:'bide-list-commands'});
       } else if ((data.event === 'autosave' || data.event === 'save') && typeof data.xml === 'string') {
         update({...draftRef.current, xml:data.xml});
         if (data.event === 'save') download(new Blob([data.xml], {type:'application/xml'}), safeName(draftRef.current.name) + '.drawio');

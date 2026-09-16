@@ -1,3 +1,11 @@
+## v0.4.7 — Searchable command palette
+
+- Workspace aliases: visio/draw/diagram/drawio/flowchart, photoshop/photopea, PDF/ilovepdf. Exact aliases rank first; search accepts multiple words and punctuation.
+- Expanded document commands: pages, layers, selection, masks, alignment, fonts, brushes, filters, blend modes, settings and every supported export format. Dynamic page/layer names are searchable.
+- Native local draw.io actions: undo/redo, selection, grouping, alignment, ordering, zoom, fit, grid, guides, sizing and properties, alongside its file/export commands.
+- Commands reflect the active workspace. Unavailable commands explain the required selection or state and cannot execute. Draw.io validates availability again at execution. Specialized draw.io dialogs retain their own controls.
+- 37 automated tests, including alias ranking and diagram command origin/availability checks.
+
 ## v0.4.6 — Clearer workspace layout
 
 - Visible Photo editor, PDF MasterTool and Diagrams navigation, alongside the animated workspace dock.

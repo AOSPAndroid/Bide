@@ -8,8 +8,9 @@ import PDFPreview from './browser/PDFPreview';
 import { StampForm, CropForm, PasswordForm, type StampOptions, type CropMargins } from './DocumentTools';
 import { selectPages } from './page-range';
 import { blendModes, hasBlending } from './browser/layer-utils';
-import Diagrams, {type DiagramCommands} from './Diagrams';
+import Diagrams, {type DiagramCommands, type NativeDiagramCommand} from './Diagrams';
 import {clampZoom, fitZoom, markerColor} from './editor-tools';
+import {searchCommands, commandMetadata, type SearchableCommand} from './command-search';
 import WorkspaceNav from './WorkspaceNav';
 import WorkspaceDock, {type Workspace} from './WorkspaceDock';
 import PdfWorkspace, {type PdfTool} from './PdfWorkspace';
@@ -23,6 +24,7 @@ import {useWorkspaceTools} from './workspace-tools';
 
 type Obj = FabricObject & { id?: string; name?: string; diagramXml?: string; text?: string; fontSize?: number; fontFamily?: string; fontWeight?: string | number; fontStyle?: string; underline?: boolean; textAlign?: string; isEditing?: boolean };
 type Tool = 'select' | 'text' | 'rect' | 'ellipse' | 'line' | 'brush' | 'highlight' | 'eraser' | 'marquee' | 'lasso' | 'hand';
+type PaletteAction = SearchableCommand & {hint:string;icon:typeof Type;run:()=>void};
 type Modal = 'new' | 'export' | 'signature' | 'shortcuts' | 'resize' | 'watermark' | 'numbers' | 'crop' | null;
 const TOOLS: { id: Tool; label: string; key: string; icon: typeof Type }[] = [
   { id: 'select', label: 'Move & select', key: 'V', icon: MousePointer2 }, { id: 'text', label: 'Text box', key: 'T', icon: Type },
@@ -60,6 +62,7 @@ export default function App() {
   const [view, setView] = useState<Workspace>(()=>PUBLIC_DEMO && window.innerWidth<700 ? 'pdf' : 'photo');
   const [pdfHome, setPdfHome] = useState(true);
   const documentView = useRef<'photo'|'pdf'>(view==='pdf'?'pdf':'photo');
+  const [nativeDiagramCommands,setNativeDiagramCommands]=useState<NativeDiagramCommand[]>([]);
   const [diagramsVisited, setDiagramsVisited] = useState(false);
   const diagramCommands = useRef<DiagramCommands | null>(null);
   const diagramTarget = useRef<string | undefined>(undefined);
@@ -578,7 +581,7 @@ export default function App() {
     const common = { originX: 'center' as const, originY: 'center' as const, left: 0, top: 0 };
     updateObject({ clipPath: kind === 'ellipse' ? new Ellipse({ ...common, rx: o.width / 2, ry: o.height / 2 }) : kind === 'rounded' ? new Rect({ ...common, width: o.width, height: o.height, rx: Math.min(o.width, o.height) * .16, ry: Math.min(o.width, o.height) * .16 }) : undefined });
   }
-  const actions = [
+  const actions: PaletteAction[] = [
     { label:'Open photo editor', hint:'', icon:FileImage, run:()=>selectWorkspace('photo') },
     { label:'Open PDF MasterTool', hint:'', icon:FileText, run:()=>selectWorkspace('pdf') },
     { label:'Open diagram workspace', hint:'', icon:Layers, run:openDiagrams },
@@ -595,7 +598,7 @@ export default function App() {
     { label:'Export pages as PNG', hint:'', icon:FileImage, run:()=>exportDialog('png') }, { label:'Export pages as JPEG', hint:'', icon:FileImage, run:()=>exportDialog('jpg') },
     { label:'Extract text to Word', hint:'', icon:FileText, run:()=>exportDialog('docx') }, { label:'Extract plain text', hint:'', icon:FileText, run:()=>exportDialog('txt') },
     { label:'Add blank page', hint:'', icon:Plus, run:addPage }, { label:'Duplicate current page', hint:'', icon:Copy, run:()=>duplicatePage() },
-    { label:'Rotate current page clockwise', hint:'', icon:RotateCw, run:()=>runExport({ format:'pdf', rotation:90, range:String(project.pages.findIndex(p=>p.id===pageId)+1), reimport:true }) },
+    { label:'Rotate current page clockwise', hint:'', icon:RotateCw, run:()=>pageAction('right',pageId) },
     { label:'Undo', hint:'Ctrl Z', icon:Undo2, run:()=>undo() }, { label:'Redo', hint:'Ctrl Shift Z', icon:Redo2, run:()=>undo(true) },
     { label:'Duplicate selection', hint:'Ctrl D', icon:Copy, run:duplicate }, { label:'Group selection', hint:'Ctrl G', icon:Layers, run:groupLayers },
     { label:'Ungroup selection', hint:'Ctrl Shift G', icon:Layers, run:ungroupLayers }, { label:'Fit page to window', hint:'Ctrl 0', icon:Maximize, run:fit },
@@ -611,18 +614,92 @@ export default function App() {
     { label:'Erase artwork', hint:'E', icon:Eraser, run:()=>setTool('eraser') },
     { label:'Keyboard shortcuts', hint:'?', icon:Command, run:()=>setModal('shortcuts') },
   ];
-  const diagramActions = [
-    {label:'Open photo editor',hint:'',icon:FileImage,run:()=>selectWorkspace('photo')},
-    {label:'Open PDF MasterTool',hint:'',icon:FileText,run:()=>selectWorkspace('pdf')},
+  useEffect(()=>{if(palette&&view==='diagrams')diagramCommands.current?.list();},[palette,view]);
+  const currentIndex=project.pages.findIndex(p=>p.id===pageId);
+  const requireLayer=!selected?'Select a layer first':selected.lockMovementX?'Unlock the layer first':undefined;
+  const requireImage=!(selected instanceof FabricImage)?'Select an image layer first':requireLayer;
+  const requireText=!(selected instanceof Textbox)?'Select a text layer first':requireLayer;
+  const selectAllLayers=()=>{const c=canvas.current;if(!c)return;c.setActiveObject(new ActiveSelection(c.getObjects().filter(o=>!o.lockMovementX&&o.visible),{canvas:c}));c.requestRenderAll();syncSelection();};
+  const clearSelection=()=>{setRegion(null);canvas.current?.discardActiveObject();canvas.current?.requestRenderAll();syncSelection();setTool('select');};
+  const copyLayers=()=>{const o=canvas.current?.getActiveObject();if(o)void o.clone().then(clone=>{clipboard.current=clone as Obj;notify('Selection copied');});};
+  const pasteLayers=()=>{if(clipboard.current)void clipboard.current.clone().then(clone=>{clone.set({left:clone.left+20,top:clone.top+20});addObject(clone as Obj,'Pasted layer');});};
+  const focusSetting=(label:string)=>{setMobilePanel('properties');requestAnimationFrame(()=>{const input=document.querySelector<HTMLElement>(`[aria-label="${label}"]`);input?.scrollIntoView({block:'nearest'});input?.focus();});};
+  const moreActions:PaletteAction[] = [
+    ...Object.keys(blendModes).map(name=>({label:`Set blend mode: ${name}`,hint:'',icon:Layers,disabled:page.source?'Blend modes require a design page':requireLayer,run:()=>updateObject({globalCompositeOperation:blendModes[name as keyof typeof blendModes]})})),
+    ...['Font size','Font family','Text content','Object fill','Stroke color','Layer blend mode','Shape mask'].map(setting=>({label:`Edit ${setting.toLowerCase()}`,hint:'',icon:Settings2,disabled:setting.startsWith('Font')||setting==='Text content'?requireText:requireLayer,run:()=>focusSetting(setting)})),
+    ...['brightness','contrast','saturation','blur','Crop X','Crop Y','Crop width','Crop height'].map(setting=>({label:`Adjust image ${setting.toLowerCase()}`,hint:'',icon:SlidersHorizontal,disabled:requireImage,run:()=>{setMobilePanel('properties');requestAnimationFrame(()=>{document.querySelectorAll<HTMLDetailsElement>('.properties-content details').forEach(d=>{d.open=true;});focusSetting(setting);});}})),
+    {label:'Change drawing color',hint:'',icon:PenLine,run:()=>focusSetting('Drawing color')},
+    {label:'Change page background',hint:'',icon:Square,run:()=>{clearSelection();focusSetting('Page background');}},
+    {label:'Return to document editor',hint:'',icon:FileText,run:()=>{setView(documentView.current);setPdfHome(false);}},
+    {label:'Show pages',hint:'',icon:Layers,run:()=>{setLeftOpen(true);setMobilePanel('pages');}},
+    {label:'Hide pages',hint:'',icon:PanelLeftClose,run:()=>{setLeftOpen(false);setMobilePanel(null);}},
+    {label:'Show properties and layers',hint:'',icon:Settings2,run:()=>setMobilePanel('properties')},
+    {label:'Previous page',hint:'',icon:ChevronLeft,disabled:currentIndex===0?'Already on the first page':undefined,run:()=>setPageId(project.pages[currentIndex-1].id)},
+    {label:'Next page',hint:'',icon:ChevronRight,disabled:currentIndex===project.pages.length-1?'Already on the last page':undefined,run:()=>setPageId(project.pages[currentIndex+1].id)},
+    ...project.pages.map((p,i)=>({label:`Go to page ${i+1}: ${p.name}`,hint:'',icon:FileText,keywords:`jump navigate page ${i+1}`,run:()=>setPageId(p.id)})),
+    {label:'Remove current page',hint:'',icon:Trash2,disabled:project.pages.length===1?'Keep at least one page':undefined,run:()=>deletePage()},
+    {label:'Rotate page counterclockwise',hint:'',icon:RotateCw,run:()=>pageAction('left',pageId)},
+    {label:'Move page to beginning',hint:'',icon:ArrowUp,disabled:currentIndex===0?'Already first':undefined,run:()=>pageAction('first',pageId)},
+    {label:'Move page to end',hint:'',icon:ArrowDown,disabled:currentIndex===project.pages.length-1?'Already last':undefined,run:()=>pageAction('last',pageId)},
+    {label:'Resize page',hint:'',icon:Scaling,run:()=>setModal('resize')},
+    {label:'Export pages as SVG',hint:'',icon:FileImage,run:()=>exportDialog('svg')},
+    {label:'Select all layers',hint:'Ctrl A',icon:Layers,run:selectAllLayers},
+    {label:'Deselect everything',hint:'Esc',icon:MousePointer2,run:clearSelection},
+    {label:'Copy selected layers',hint:'Ctrl C',icon:Copy,disabled:!selected?'Select a layer first':undefined,run:copyLayers},
+    {label:'Paste copied layers',hint:'Ctrl V',icon:Copy,disabled:!clipboard.current?'Copy a layer first':undefined,run:pasteLayers},
+    {label:'Delete selected layers',hint:'Delete',icon:Trash2,disabled:requireLayer,run:removeSelected},
+    {label:'Bring layer forward',hint:'',icon:ArrowUp,disabled:requireLayer,run:()=>moveLayer('up')},
+    {label:'Send layer backward',hint:'',icon:ArrowDown,disabled:requireLayer,run:()=>moveLayer('down')},
+    {label:'Toggle layer lock',hint:'',icon:LockKeyhole,disabled:!selected?'Select a layer first':undefined,run:()=>{if(selected)toggleLock(selected);}},
+    {label:'Toggle layer visibility',hint:'',icon:Eye,disabled:!selected?'Select a layer first':undefined,run:()=>{if(selected){selected.set({visible:!selected.visible});canvas.current?.requestRenderAll();saveCanvas();}}},
+    ...(['left','center','right'] as const).map(where=>({label:`Align layer ${where} on page`,hint:'',icon:Scaling,disabled:requireLayer,run:()=>align(where)})),
+    {label:'Flip layer horizontally',hint:'',icon:Scaling,disabled:requireLayer,run:()=>updateObject({flipX:!selected?.flipX})},
+    {label:'Flip layer vertically',hint:'',icon:Scaling,disabled:requireLayer,run:()=>updateObject({flipY:!selected?.flipY})},
+    ...(['keep','hide','copy'] as const).map(mode=>({label:mode==='keep'?'Keep artwork inside selection':mode==='hide'?'Hide artwork inside selection':'Copy selection to new layer',hint:'',icon:SquareDashed,disabled:!region?'Draw a rectangular or lasso selection first':undefined,run:()=>void applySelection(mode)})),
+    ...(['none','ellipse','rounded'] as const).map(kind=>({label:kind==='none'?'Remove layer mask':`Apply ${kind} layer mask`,hint:'',icon:Circle,disabled:requireLayer,run:()=>setClip(kind)})),
+    ...(['grayscale','sepia','invert','reset'] as const).map(kind=>({label:kind==='reset'?'Reset image filters':`Apply ${kind} image filter`,hint:'',icon:SlidersHorizontal,disabled:requireImage,run:()=>setImageFilter(kind)})),
+    {label:'Toggle bold text',hint:'',icon:Bold,disabled:requireText,run:()=>updateObject({fontWeight:selected?.fontWeight==='bold'?'normal':'bold'})},
+    {label:'Toggle italic text',hint:'',icon:Italic,disabled:requireText,run:()=>updateObject({fontStyle:selected?.fontStyle==='italic'?'normal':'italic'})},
+    {label:'Toggle underline text',hint:'',icon:Underline,disabled:requireText,run:()=>updateObject({underline:!selected?.underline})},
+    ...(['left','center','right','justify'] as const).map(where=>({label:`Align text ${where}`,hint:'',icon:Type,disabled:requireText,run:()=>updateObject({textAlign:where})})),
+    ...[...bundledFonts.map(f=>f.family),...systemFonts].map(family=>({label:`Set font: ${family}`,hint:'',icon:Type,disabled:requireText,run:()=>void changeTextFont(family)})),
+    ...Object.entries(brushNames).map(([kind,name])=>({label:`Use ${name.toLowerCase()} brush`,hint:'',icon:PenLine,run:()=>{setBrushKind(kind as BrushKind);setTool('brush');}})),
+    {label:'Increase drawing size',hint:']',icon:Plus,run:()=>{if(tool==='eraser')setEraserSize(v=>brushWidth(v+2));else if(tool==='highlight')setHighlightSize(v=>Math.min(120,v+2));else {setTool('brush');setBrushSize(v=>brushWidth(v+2));}}},
+    {label:'Decrease drawing size',hint:'[',icon:Minus,run:()=>{if(tool==='eraser')setEraserSize(v=>brushWidth(v-2));else if(tool==='highlight')setHighlightSize(v=>Math.max(1,v-2));else {setTool('brush');setBrushSize(v=>brushWidth(v-2));}}},
+    {label:'Toggle snapping to page',hint:'',icon:Maximize,run:()=>setSnap(v=>!v)},
+    {label:'Edit selected diagram',hint:'',icon:Layers,disabled:!selected?.diagramXml?'Select a placed diagram first':undefined,run:editDiagram},
+    ...TOOLS.filter(t=>['select','text','rect','ellipse','line','hand'].includes(t.id)).map(t=>({label:`Use ${t.label.toLowerCase()} tool`,hint:t.key,icon:t.icon,run:()=>setTool(t.id)})),
+    ...layers.map(layer=>({label:`Select layer: ${layer.name||layer.type}`,hint:'',category:'Layers',icon:Layers,run:()=>{canvas.current?.setActiveObject(layer);canvas.current?.requestRenderAll();syncSelection();setTool('select');}})),
+  ];
+  const diagramActions:PaletteAction[] = [
+    ...actions.filter(a=>['Open photo editor','Open PDF MasterTool','Open diagram workspace'].includes(a.label)),
+    ...nativeDiagramCommands.map(c=>({label:`Diagram: ${c.label}`,hint:c.hint,icon:Layers,keywords:c.id.replace(/([A-Z])/g,' $1'),disabled:c.enabled?undefined:'Unavailable for the current diagram selection',run:()=>diagramCommands.current?.run(c.id)})),
     {label:'New diagram',hint:'',icon:FilePlus2,run:()=>diagramCommands.current?.newDiagram()},
-    {label:'Open .drawio file',hint:'',icon:FolderOpen,run:()=>diagramCommands.current?.open()},
-    {label:'Save editable diagram',hint:'',icon:Save,run:()=>diagramCommands.current?.save()},
+    {label:'Open Visio or draw.io file',hint:'Ctrl O',aliases:['open vsdx','import visio'],icon:FolderOpen,run:()=>diagramCommands.current?.open()},
+    {label:'Save editable diagram',hint:'.drawio',icon:Save,run:()=>diagramCommands.current?.save()},
     {label:'Export diagram as PNG',hint:'',icon:FileImage,run:()=>diagramCommands.current?.export('png')},
     {label:'Export diagram as SVG',hint:'',icon:FileImage,run:()=>diagramCommands.current?.export('svg')},
     {label:'Export diagram as PDF',hint:'',icon:Download,run:()=>diagramCommands.current?.export('pdf')},
     {label:'Place diagram in document',hint:'',icon:ImagePlus,run:()=>diagramCommands.current?.export('place')},
   ];
-  const filteredActions = (view==='diagrams'?diagramActions:actions).filter(a=>a.label.toLowerCase().includes(query.toLowerCase()));
+  const availableActions=(view==='diagrams'?diagramActions:[...actions,...moreActions]).map(a=>{
+    let disabled=a.disabled;
+    if(a.label==='Undo'&&!history.current.past.length)disabled='Nothing to undo';
+    if(a.label==='Redo'&&!history.current.future.length)disabled='Nothing to redo';
+    if(a.label==='Duplicate selection')disabled=requireLayer;
+    if(a.label==='Group selection'&&(canvas.current?.getActiveObjects().length||0)<2)disabled='Select at least two layers';
+    if(a.label==='Ungroup selection'&&(!(selected instanceof Group)||selected instanceof ActiveSelection))disabled='Select a group first';
+    if(a.label==='Export current design as PSD'&&page.source)disabled='Open a design page first';
+    if(view==='diagrams'&&!a.label.startsWith('Open photo')&&!a.label.startsWith('Open PDF')&&a.label!=='Open diagram workspace'&&!diagramCommands.current?.ready())disabled='Wait for the diagram editor to load';
+    if(busy||loading.current)disabled='Wait for the current operation to finish';
+    return {...commandMetadata(a.label),...a,disabled};
+  });
+  const filteredActions=searchCommands(availableActions,query);
+  function runCommand(action:PaletteAction|undefined) {
+    if(!action||action.disabled)return;
+    setPalette(false);setPdfHome(false);action.run();
+  }
+  useEffect(()=>{document.querySelector('.command-list>button.active')?.scrollIntoView({block:'nearest'});},[commandIndex,palette]);
   const actionRef = useRef(actions); actionRef.current=actions;
 
   useEffect(() => {
@@ -693,7 +770,7 @@ export default function App() {
     </div>
     {view==='pdf'&&pdfHome&&<PdfWorkspace tools={pdfTools} name={project.name} pages={project.pages.length} onOpen={()=>openFiles()} onEdit={()=>setPdfHome(false)} onRun={tool=>{setPdfHome(false);tool.run();}}/>}
     <WorkspaceDock active={view} onSelect={selectWorkspace}/>
-    {diagramsVisited&&<Diagrams active={view==='diagrams'} commands={diagramCommands} onPlace={placeDiagram} onNew={()=>{diagramTarget.current=undefined;}} onPalette={()=>{setPalette(true);setQuery('');setCommandIndex(0);}}/>}
+    {diagramsVisited&&<Diagrams onCommands={setNativeDiagramCommands} active={view==='diagrams'} commands={diagramCommands} onPlace={placeDiagram} onNew={()=>{diagramTarget.current=undefined;}} onPalette={()=>{setPalette(true);setQuery('');setCommandIndex(0);}}/>}
     {toast&&<div className="toast" role="status"><Check size={16}/>{toast}</div>}
     {error&&<ModalShell title="Something needs your attention" close={()=>setError('')}><p className="error-message">{error}</p><div className="dialog-actions"><button className="primary" onClick={()=>setError('')}>Got it</button></div></ModalShell>}
     {importNotice&&<ModalShell title="PSD import details" close={()=>setImportNotice('')}><p className="notice">{importNotice}</p><div className="dialog-actions"><button className="primary" onClick={()=>setImportNotice('')}>Continue editing</button></div></ModalShell>}
@@ -706,6 +783,6 @@ export default function App() {
     {modal==='new'&&<ModalShell title="Start with a blank canvas" close={()=>setModal(null)}><p className="muted">Create a document, a design, or something in between. Your previous workspace remains available with Undo.</p><label className="stacked-label">Document name<input value={newName} onChange={e=>setNewName(e.target.value)}/></label><div className="preset-grid">{[{name:'A4 document',w:595,h:842,detail:'210 × 297 mm'},{name:'US Letter',w:612,h:792,detail:'8.5 × 11 in'},{name:'Square canvas',w:1080,h:1080,detail:'1080 × 1080'},{name:'Presentation',w:1280,h:720,detail:'16:9 landscape'}].map(p=><button className={newWidth===p.w&&newHeight===p.h?'active':''} key={p.name} onClick={()=>{setNewWidth(p.w);setNewHeight(p.h);}}><FileText size={22}/><strong>{p.name}</strong><span>{p.detail}</span></button>)}</div><div className="field-grid"><Field label="Width" value={newWidth} min={50} max={5000} onChange={setNewWidth}/><Field label="Height" value={newHeight} min={50} max={5000} onChange={setNewHeight}/></div><p className="fine-print">PDF dimensions use points (72 points = 1 inch).</p><div className="dialog-actions"><button className="secondary" onClick={()=>setModal(null)}>Cancel</button><button className="primary" onClick={()=>{const p=blankPage(newWidth,newHeight);p.name='Page 1';commit({version:1,name:newName||'Untitled',pages:[p],sources:{}},true);setPageId(p.id);setModal(null);}}>Create document<ArrowUpRight size={15}/></button></div></ModalShell>}
     {modal==='export'&&<ModalShell title="Export document" close={()=>setModal(null)}><p className="muted">Export your work with the settings that fit.</p><label className="stacked-label">Format<select value={format} onChange={e=>setFormat(e.target.value)}><option value="pdf">PDF document</option><option value="psd">Photoshop PSD · current design page</option><option value="png">PNG images · ZIP</option><option value="jpg">JPEG images · ZIP</option><option value="svg">SVG pages · ZIP</option><option value="split">Separate PDF pages · ZIP</option><option value="txt">Plain text · TXT</option><option value="docx">Editable text · Word DOCX</option></select></label>{format!=='psd'&&<label className="stacked-label">Pages<input placeholder={`All ${project.pages.length} pages (or 1-3, 5)`} value={range} onChange={e=>setRange(e.target.value)}/></label>}{['pdf','split'].includes(format)&&<label className="stacked-label">Compression<select value={compression} onChange={e=>setCompression(e.target.value)}><option value="lossless">Original quality · lossless optimization</option><option value="balanced">Balanced · optimize large images</option><option value="small">Smaller file · reduce image quality</option></select></label>}{['png','jpg'].includes(format)&&<label className="stacked-label">Resolution<select value={dpi} onChange={e=>setDpi(Number(e.target.value))}><option value={72}>72 DPI · screen</option><option value={144}>144 DPI · standard</option><option value={300}>300 DPI · high resolution</option></select></label>}{format==='psd'&&<p className="notice">Exports the current design page as named raster layers, with opacity, visibility and blend modes. Supported groups retain their hierarchy. Text, vectors and masks are rasterized within each layer. Pages containing eraser strokes export as one merged layer to preserve appearance. Original PDF pages must first be exported as an image and reopened.</p>}{format==='pdf'&&<><label className="check-label"><input type="checkbox" checked={protect} onChange={e=>setProtect(e.target.checked)}/>Require a password to open the exported PDF</label>{protect&&<><label className="stacked-label">PDF password<input type="password" autoComplete="new-password" value={exportPassword} onChange={e=>setExportPassword(e.target.value)}/></label><label className="stacked-label">Confirm PDF password<input type="password" autoComplete="new-password" value={passwordConfirmation} onChange={e=>setPasswordConfirmation(e.target.value)}/></label><p className="fine-print">AES-256 encryption applies to the exported PDF. Workspace autosaves and .bide projects stay unencrypted.</p></>}</>}{format==='docx'&&<p className="notice">Extracts text in reading order. Page breaks are retained; complex layouts and images are not reconstructed. Scans require OCR before text can be extracted.</p>}{format==='pdf'&&<div className="export-note"><ShieldCheck size={18}/><span>Normal layers keep text and vectors. Blend effects rasterize design pages; forms are flattened.<br/><small>Save a .bide project to keep added layers editable.</small></span></div>}<div className="dialog-actions"><button className="secondary" onClick={saveProject}><Save size={14}/>Save project</button><button className="primary" onClick={()=>runExport()} disabled={!health.ok||(format==='psd'&&!!page.source)||(format==='pdf'&&protect&&(!exportPassword||exportPassword!==passwordConfirmation))}><Download size={15}/>Export {format==='split'?'pages':format.toUpperCase()}</button></div></ModalShell>}
     {modal==='shortcuts'&&<ModalShell title="Stay in your flow" close={()=>setModal(null)}><p className="muted">A few shortcuts that make a big difference.</p><div className="shortcut-list">{[['Command palette','Ctrl K'],['Open document','Ctrl O'],['Save editable project','Ctrl S'],['Export','Ctrl E'],['Undo / Redo','Ctrl Z / Ctrl Shift Z'],['Duplicate selection','Ctrl D'],['Group / Ungroup','Ctrl G / Ctrl Shift G'],['Select / Text / Rectangle','V / T / R'],['Ellipse / Line / Brush','O / L / B'],['Pan workspace','Hold Space'],['Fit page / Actual size','Ctrl 0 / Ctrl 1'],['Zoom in / out','Ctrl + / Ctrl -'],['Zoom at pointer','Ctrl or Alt + wheel'],['Freehand highlighter','H'],['Eraser (overlay artwork)','E'],['Rectangle / lasso selection','M / Q'],['Brush / eraser size','[ / ]'],['Nudge / Larger nudge','Arrows / Shift + Arrows'],['Delete selection','Delete']].map(([name,key])=><div key={name}><span>{name}</span><kbd>{key}</kbd></div>)}</div></ModalShell>}
-    {palette&&<ModalShell title="What would you like to do?" close={()=>setPalette(false)}><div className="palette-search"><Search size={20}/><input aria-label="Search commands" placeholder="Search tools, actions, and exports…" value={query} onChange={e=>{setQuery(e.target.value);setCommandIndex(0);}} autoFocus onKeyDown={e=>{if(e.key==='ArrowDown'){e.preventDefault();setCommandIndex(i=>Math.min(filteredActions.length-1,i+1));}if(e.key==='ArrowUp'){e.preventDefault();setCommandIndex(i=>Math.max(0,i-1));}if(e.key==='Enter'&&filteredActions[commandIndex]){e.preventDefault();setPalette(false);setPdfHome(false);filteredActions[commandIndex].run();}}}/><kbd>Esc</kbd></div><div className="command-list">{filteredActions.map((a,i)=><button key={a.label} className={i===commandIndex?'active':''} onMouseEnter={()=>setCommandIndex(i)} onClick={()=>{setPalette(false);setPdfHome(false);a.run();}}><a.icon size={17}/><span>{a.label}</span><kbd>{a.hint}</kbd></button>)}{!filteredActions.length&&<p className="muted">No matching commands. Try “PDF”, “text”, or “export”.</p>}</div><div className="palette-footer"><span>↑ ↓ Navigate</span><span>↵ Select</span></div></ModalShell>}
+    {palette&&<ModalShell title="What would you like to do?" close={()=>setPalette(false)}><div className="palette-search"><Search size={20}/><input aria-label="Search commands" placeholder="Try visio, draw, PDF, font, page or export…" value={query} onChange={e=>{setQuery(e.target.value);setCommandIndex(0);}} autoFocus onKeyDown={e=>{if(e.key==='ArrowDown'){e.preventDefault();setCommandIndex(i=>Math.min(Math.max(0,filteredActions.length-1),i+1));}if(e.key==='ArrowUp'){e.preventDefault();setCommandIndex(i=>Math.max(0,i-1));}if(e.key==='Enter'){e.preventDefault();runCommand(filteredActions[commandIndex]);}}}/><kbd>Esc</kbd></div><div className="palette-count" role="status">{filteredActions.length} commands · {view==='diagrams'?'Diagrams':'Document editor'}</div><div className="command-list">{filteredActions.map((a,i)=><button key={a.label} className={i===commandIndex?'active':''} onMouseEnter={()=>setCommandIndex(i)} aria-disabled={!!a.disabled} onClick={()=>runCommand(a)}><a.icon size={17}/><span><strong>{a.label}</strong><small>{a.disabled||a.category}</small></span><kbd>{a.hint}</kbd></button>)}{!filteredActions.length&&<p className="muted">No matching commands. Try “visio”, “text”, “page”, or “export”.</p>}</div><div className="palette-footer"><span>↑ ↓ Navigate</span><span>↵ Select</span></div></ModalShell>}
   </div>;
 }
