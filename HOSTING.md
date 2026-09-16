@@ -104,3 +104,11 @@ The earlier Python prototype remains in the source project for reference. The ne
 ## Bundled diagram workspace
 
 The prebuilt package includes draw.io static assets under `site/diagrams/runtime`, including shapes, stencils and the math renderer. Keep the full directory. No Java, draw.io desktop, online diagrams.net service, npm installation or runtime download is required. The embedded editor is configured for local assets; its content policy prevents external services and image/font requests. It uses the same host and port as bide. Every visitor has an independent diagram draft in their browser. For local exports and file downloads, the same HTTPS guidance above applies.
+
+## Public Sites demo
+
+The demo at https://bide-demo.dalilooksk.chatgpt.site serves `out/`, built with Vite mode `demo`. `npm run build` produces both the full local `dist/` and the hosted `out/`; `npm run build:demo` rebuilds only the demo. The `.openai/hosting.json` manifest identifies this Site.
+
+The demo bundles PDF/image tools and draw.io. It excludes the Office runtime: soffice.wasm and soffice.data exceed Cloudflare Static Assets' 25 MiB per-file limit. Office imports show an immediate local-edition explanation rather than attempting a missing download. The regular local build keeps Office support. Static isolation headers are in `_headers`. No documents, credentials, autosaves or local runtime state are deployed. Public access lets anyone visit the app, not other visitors' documents.
+
+On narrow phones the demo starts on the PDF tools home. Tap Workspaces to switch sections; landscape or desktop gives more room for detailed editing. Supported browsers can also use the optional WebMCP get_workspace/open_workspace navigation tools.

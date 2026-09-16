@@ -1,8 +1,10 @@
+import {PUBLIC_DEMO} from '../build-flags';
 let iframe:HTMLIFrameElement|undefined;
 let ready:Promise<void>|undefined;
 let sequence=0;
 const jobs=new Map<number,{resolve:(bytes:Uint8Array<ArrayBuffer>)=>void;reject:(e:Error)=>void;timer:ReturnType<typeof setTimeout>}>();
 function init(){
+ if(PUBLIC_DEMO)throw new Error('Office conversion is available in the local bide download. This public demo supports PDF, image, text and diagram tools.');
  if(ready)return ready;
  if(!globalThis.isSecureContext)throw new Error('Office conversion on another PC needs a trusted HTTPS address. Ask the host to configure HTTPS using HOSTING.md. On the hosting PC, launch bide.bat supports Office conversion locally. PDF and image tools still work at this HTTP address.');
  if(!crossOriginIsolated)throw new Error('Office conversion needs browser isolation enabled by the website host. Use the bide sharing launcher with HTTPS, or ask your host to apply the response headers in HOSTING.md.');

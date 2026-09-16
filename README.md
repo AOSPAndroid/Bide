@@ -16,7 +16,7 @@ The BAT files run directly through Node: **PowerShell and execution-policy chang
 
 GitHub's **Code → Download ZIP** creates a source folder such as `Bide-main`. A source build must be explicitly requested with `"Install Dependencies.bat" --build-source`; it needs npm packages and the browser Office/diagram runtimes, which may require network access. Use the prebuilt release ZIP on a PC where proxy authentication blocks dependency downloads. Its root launchers run offline using your existing Node; the `source` folder is only for rebuilding.
 
-The local edition works without internet after setup. A hosted edition needs only a browser and no Node runtime on the work PC; see [HOSTING.md](HOSTING.md). This build has not been published to an external host. The previous `Setup.cmd` and `start bide.cmd` now forward to these BAT files.
+The local edition works without internet after setup. A hosted edition needs only a browser and no Node runtime on the work PC; see [HOSTING.md](HOSTING.md). A public [bide demo](https://bide-demo.dalilooksk.chatgpt.site) is hosted with Sites. The demo includes the photo editor, PDF tools and draw.io; Office-to-PDF conversion is available only in the local download because the Office assets exceed the host's 25 MiB file limit. Files and drafts stay in each visitor's browser. The previous `Setup.cmd` and `start bide.cmd` now forward to these BAT files.
 
 ## Share internally using IP:port
 
@@ -94,6 +94,7 @@ npm ci --ignore-scripts
 npm run assets:office
 npm run assets:diagrams
 npm run build
+# dist/ is the complete local app; out/ is the public demo.
 npm run serve
 npm test
 ```

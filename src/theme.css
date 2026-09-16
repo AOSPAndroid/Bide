@@ -142,6 +142,9 @@ h1,h2,.brand {color:var(--navy)}
 .diagram-footer {color:var(--muted)}
 
 /* A dedicated PDF tools home, sharing the existing document canvas. */
+.demo-notice {display:flex;align-items:center;gap:14px;flex-shrink:0;padding:9px 18px;background:#e9f7fe;border-bottom:1px solid var(--line);color:var(--navy);font-size:12px;line-height:1.5}
+.demo-notice>span {flex:1}
+.demo-notice a {color:#00638e;white-space:nowrap;text-underline-offset:3px}
 .pdf-home {flex:1;min-height:0;overflow:auto;background:linear-gradient(160deg,#f0f9fd 0%,#f8fbfd 42%,#ffffff 100%)}
 .pdf-home-content {max-width:1230px;margin:0 auto;padding:44px 40px 95px}
 .pdf-home-heading {display:flex;justify-content:space-between;align-items:center;gap:35px;margin-bottom:34px}
@@ -209,4 +212,35 @@ h1,h2,.brand {color:var(--navy)}
 }
 @media(prefers-reduced-motion:reduce) {
   .workspace-dock,.dock-icon,.dock-tooltip,.dock-handle svg,.pdf-tool-card,.pdf-tool-arrow{transition:none!important;animation:none!important}.dock-item:hover .dock-icon,.dock-item:focus-visible .dock-icon,.pdf-tool-card:not(:disabled):hover{transform:none}
+}
+@media(max-width:600px) {
+  .app {min-height:0}
+  .topbar {gap:10px}
+  .current-workspace {font-size:11px;flex:1;min-width:0}
+  .current-workspace span {overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .menubar .menu-wrapper:not(:first-child) {display:none}
+  .topbar-right {display:flex;margin-left:0}
+  .command-button {width:34px;height:34px;padding:0}
+  .command-button span {position:absolute;width:1px;height:1px;min-width:0;overflow:hidden;clip-path:inset(50%)}
+  .command-button kbd {display:none}
+  .demo-notice {padding:8px 12px;gap:10px;font-size:12px;flex-wrap:wrap}
+  .demo-notice>span {flex-basis:100%}
+  .pdf-home-heading p,.pdf-tool-card p {font-size:14px}
+  .pdf-tool-card strong {font-size:15px}
+  .pdf-tool-category {display:none}
+  .pdf-categories button,.pdf-tool-search input {font-size:14px}
+  .pdf-categories button {min-height:38px}
+  .pdf-tool-search input {min-height:40px}
+  .pdf-home-note {font-size:12px;align-items:flex-start}
+  .current-document strong {font-size:14px}
+  .current-document>span>span {font-size:12px}
+  .document-name>input {width:120px}
+  .diagram-header {height:auto;flex-direction:column;flex-wrap:nowrap;flex-shrink:0;align-items:stretch;width:100%;min-width:0;padding:8px;gap:8px}
+  .diagram-header .document-name>input {width:220px;max-width:70vw}
+  .diagram-actions {width:100%;min-width:0;overflow-x:auto;flex-shrink:0;padding-bottom:4px}
+  .diagram-actions>button {min-height:34px;flex-shrink:0}
+  .diagram-footer {padding-right:8px;padding-left:8px}
+  .statusbar {padding-right:8px;padding-left:8px}
+  .canvas-area {min-width:0}
+  .tool-rail {overflow-y:auto}
 }

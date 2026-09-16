@@ -5,13 +5,14 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
-    "build": "tsc -b && vite build",
+    "build": "tsc -b && vite build && vite build --mode demo",
     "preview": "vite preview --host 127.0.0.1",
     "serve": "node scripts/serve.mjs",
     "test": "node scripts/test-browser.mjs",
     "assets:office": "node scripts/fetch-office.mjs",
     "assets:diagrams": "node scripts/fetch-diagrams.mjs",
-    "prebuild": "node scripts/check-assets.mjs"
+    "prebuild": "node scripts/check-assets.mjs",
+    "build:demo": "tsc -b && vite build --mode demo"
   },
   "dependencies": {
     "@noble/hashes": "1.8.0",
