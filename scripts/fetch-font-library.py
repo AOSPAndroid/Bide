@@ -5,6 +5,7 @@ from pathlib import Path
 import json,re,urllib.request,hashlib,concurrent.futures,sys,io
 sys.path.insert(0,str(Path('tmp/font-build').resolve()))
 from fontTools.ttLib import TTFont
+from fontTools import subset
 from fontTools.varLib.instancer import instantiateVariableFont
 ROOT=Path(__file__).resolve().parent.parent
 families=json.loads((ROOT/'scripts/font-families.json').read_text())
@@ -38,6 +39,13 @@ def build(family):
    internal='bide '+family
    for ident,value in [(1,internal),(2,style),(3,internal+' '+style),(4,internal+' '+style),(6,'bide-'+slug+'-'+style),(16,internal),(17,style)]:
     font['name'].setName(value,ident,3,1,0x409)
+  options=subset.Options();options.name_IDs=['*'];options.name_legacy=True;options.name_languages=['*']
+  subsetter=subset.Subsetter(options=options);subsetter.populate(unicodes=list(range(0x250))+list(range(0x1e00,0x1f00))+list(range(0x2000,0x2070))+list(range(0x20a0,0x20d0))+list(range(0x2100,0x2300)));subsetter.subset(font)
+  internal='bide '+family
+  for ident,value in [(1,internal),(2,style),(3,internal+' '+style),(4,internal+' '+style),(6,'bide-'+slug+'-'+style),(16,internal),(17,style)]:
+   for record in list(font['name'].names):
+    if record.nameID==ident:font['name'].names.remove(record)
+   font['name'].setName(value,ident,3,1,0x409)
   target=folder/(slug+'-'+style+'.ttf');font.save(target);font.close()
   faces.append({'style':style,'file':target.name,'source':url+urllib.parse.quote(filename),'sha256':hashlib.sha256(target.read_bytes()).hexdigest()})
  if not any(f['style']=='Regular' for f in faces):raise ValueError('Missing regular '+family)

@@ -166,3 +166,6 @@ English + French offline OCR, including accented and mixed-language text. Five a
 
 ## 0.7.0
 80 bundled offline font families, alphabetically listed throughout the editor and OCR selector and searchable in the command palette. Available regular/bold/italic faces are embedded on PDF export.
+
+## 0.7.1
+Reduce the extended font library to Latin/Latin Extended characters and common symbols, retaining English/French coverage while fitting the public demo hosting limit.

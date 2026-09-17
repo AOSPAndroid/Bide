@@ -9,25 +9,25 @@
           "style": "Regular",
           "file": "roboto-Regular.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/roboto/Roboto%5Bwdth%2Cwght%5D.ttf",
-          "sha256": "e634fc17fa63dd30981ac7486a06a9f416f79e66d2a262929c9bda6c97e36974"
+          "sha256": "ea8c7b2aaf217192b45b8a1d1f8e62bc44b106b210dfe85e50ed692a6efb0ec3"
         },
         {
           "style": "Bold",
           "file": "roboto-Bold.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/roboto/Roboto%5Bwdth%2Cwght%5D.ttf",
-          "sha256": "b4efe95b51af06c28550e943bd2615264eefca320036c16dfff48fc94432cac5"
+          "sha256": "270de221cbb42250acb20675d0f55d806cdccf413c4e783112707831e14f7fc3"
         },
         {
           "style": "Italic",
           "file": "roboto-Italic.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/roboto/Roboto-Italic%5Bwdth%2Cwght%5D.ttf",
-          "sha256": "b09d9629327f8b6f3c4c67b696604a34602b7522ac36707fabc6750e950b8d73"
+          "sha256": "cb87be6a05b7d9c6266ddaf84a7923c000c74173b57293a0c5b0b6d9a5343ff9"
         },
         {
           "style": "BoldItalic",
           "file": "roboto-BoldItalic.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/roboto/Roboto-Italic%5Bwdth%2Cwght%5D.ttf",
-          "sha256": "d1f1f9875ef10c90becb29a29c36620a078489b0982e8268bcd4482bbe61a7b5"
+          "sha256": "be3861271ace7de6d18a1bb5c3e9a197b1339c7f59f82e93a9ab983d3a71f7c2"
         }
       ]
     },
@@ -39,25 +39,25 @@
           "style": "Regular",
           "file": "opensans-Regular.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/opensans/OpenSans%5Bwdth%2Cwght%5D.ttf",
-          "sha256": "64afa7030cb428449facf1304c2b4f9fb5d32a6d937ff2cdf2b1128f2c291657"
+          "sha256": "e56c3f21b65702db6d40cff372751b71ea59a7c7629dd3d650d5d57a9e469be0"
         },
         {
           "style": "Bold",
           "file": "opensans-Bold.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/opensans/OpenSans%5Bwdth%2Cwght%5D.ttf",
-          "sha256": "27572945cd90589b332d8babf754d4dcf036c983970db890775cc95de374c8a7"
+          "sha256": "e06af31d8871861f7e55dc4fdf035862cc0437d521fa2c11f6746c89728093ce"
         },
         {
           "style": "Italic",
           "file": "opensans-Italic.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/opensans/OpenSans-Italic%5Bwdth%2Cwght%5D.ttf",
-          "sha256": "c1523dca11f63a59ff24eb380663802405737b2e1f78e3f2e7bfce12b24d49eb"
+          "sha256": "8bc58ab964c9eaaea0bb16d57c8f6ec0f9eb82a46f78a48b8d4c6e8c1e99aed4"
         },
         {
           "style": "BoldItalic",
           "file": "opensans-BoldItalic.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/opensans/OpenSans-Italic%5Bwdth%2Cwght%5D.ttf",
-          "sha256": "20f443a6856d5c67e88ffb071d1bba61d023c52c9dcd1b269b86e856df9b6f08"
+          "sha256": "5a14527ee31a0d5a4cd3ddf5bf7a67f31651c6c90c496be3b39318d3d19b3717"
         }
       ]
     },
@@ -69,25 +69,25 @@
           "style": "Regular",
           "file": "montserrat-Regular.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/montserrat/Montserrat%5Bwght%5D.ttf",
-          "sha256": "002d0fd4ce1274b09e21bd738520ec9437b9a5974fd717dfb3b69ccdcd9f4f99"
+          "sha256": "5a88d8eb047fe72db8011eff5ecb7aa7ccf60e51b9a45d9897da7bc233ab40fa"
         },
         {
           "style": "Bold",
           "file": "montserrat-Bold.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/montserrat/Montserrat%5Bwght%5D.ttf",
-          "sha256": "a60e6ec762f9669cfb7ba4ff29057c8cbff9cc7f0b0bb997829e6cbc7656f091"
+          "sha256": "e25ce76cee502a77c31ff8d3fb75e433574364cb30ae732a62974c472c238a44"
         },
         {
           "style": "Italic",
           "file": "montserrat-Italic.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/montserrat/Montserrat-Italic%5Bwght%5D.ttf",
-          "sha256": "243bb1ff5033e9cbc7739b846c67cecbf9df545c931a2cfd06e879206b86be82"
+          "sha256": "e76080c4164e1efb73b1b35a18e258c8435f4278240d79777ba5412c0e8a9315"
         },
         {
           "style": "BoldItalic",
           "file": "montserrat-BoldItalic.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/montserrat/Montserrat-Italic%5Bwght%5D.ttf",
-          "sha256": "c914a9c5d71d8cf77a50c13c3be5c1cdc8132abce3dcf336abfd816bcd75446f"
+          "sha256": "b2b1d07b5237ac93748a12fe877de17866e7defaa284aa8b0116454920d07530"
         }
       ]
     },
@@ -99,25 +99,25 @@
           "style": "Regular",
           "file": "inter-Regular.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/inter/Inter%5Bopsz%2Cwght%5D.ttf",
-          "sha256": "54dd699074df4810490794756a1164376c15cd466cb0d5c7a46cafaf04bfe380"
+          "sha256": "257d2721b7a6bb757350552c66ac175b03d0ae9a45f1c07f9bc4e270c09d0282"
         },
         {
           "style": "Bold",
           "file": "inter-Bold.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/inter/Inter%5Bopsz%2Cwght%5D.ttf",
-          "sha256": "a3d43ab2c8219bbaa4ebfe58207f12898e8a736f8e64f61aa65d1da15109aabb"
+          "sha256": "7bdafc77e5ae30810bd20358ca15be7ebb09776bd93c4f942a5c362858d887c2"
         },
         {
           "style": "Italic",
           "file": "inter-Italic.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/inter/Inter-Italic%5Bopsz%2Cwght%5D.ttf",
-          "sha256": "84ca39ea0d90aefd83a3e031e0d41587bb30586ec8883d0a53474c47234f031a"
+          "sha256": "02fb887f9d10c8c7de5c6fa0b4648b099a948f4a7ad7f36d308d5a7125bb9851"
         },
         {
           "style": "BoldItalic",
           "file": "inter-BoldItalic.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/inter/Inter-Italic%5Bopsz%2Cwght%5D.ttf",
-          "sha256": "ea64e3e0a8ed8097e5bcc394d9bf26620543440bd6070ccabc2cab6de4cf6168"
+          "sha256": "343cf52b02fbe0cb125813b079a71194e63981ef934691c510fa5012290548f2"
         }
       ]
     },
@@ -129,25 +129,25 @@
           "style": "Regular",
           "file": "nunito-Regular.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/nunito/Nunito%5Bwght%5D.ttf",
-          "sha256": "0e664bbbe40a113ac2f032825abdd72584f834ffdbbc8d923876b5760449555b"
+          "sha256": "36ae7028c20ff12ed267982031ffca3d7609ea6211b23b125299dc74324e22ca"
         },
         {
           "style": "Bold",
           "file": "nunito-Bold.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/nunito/Nunito%5Bwght%5D.ttf",
-          "sha256": "7c49181faf2f829256e00db7cc09de4d254f80315024cdf7d7be8b46641294b5"
+          "sha256": "ee3d1d6d750c7705f22263bdad52f4f6e50087f6fb47d23c2a67e7516d05b9fd"
         },
         {
           "style": "Italic",
           "file": "nunito-Italic.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/nunito/Nunito-Italic%5Bwght%5D.ttf",
-          "sha256": "64b0a69c7a3f1412e829cdc954fa0e4fac49e7e595a012fb30cce28a39585cbf"
+          "sha256": "bafe5f655b52d975fa1886f78bd0f0e3508f0c3b8b241301713217452b9e22f3"
         },
         {
           "style": "BoldItalic",
           "file": "nunito-BoldItalic.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/nunito/Nunito-Italic%5Bwght%5D.ttf",
-          "sha256": "bb45680aeda27e72a0391cfc118d56fbe8cac63e5288684a4599273898d6de9b"
+          "sha256": "13969bafac663268d7360115ab4072a6a1d0e30ca08963509ea36b548ec29116"
         }
       ]
     },
@@ -159,25 +159,25 @@
           "style": "Regular",
           "file": "raleway-Regular.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/raleway/Raleway%5Bwght%5D.ttf",
-          "sha256": "f4b166a7e0f386ea2a3fade5919cfeb14c1351417d3b5aac7a20dfbf14ab5a8a"
+          "sha256": "8abfc3fc3b77ad30d579625aef1691de4ee6867c80294e6aa501338476d1ea42"
         },
         {
           "style": "Bold",
           "file": "raleway-Bold.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/raleway/Raleway%5Bwght%5D.ttf",
-          "sha256": "ac7f0357630cf2073f268b5bab9b30b8dd83e537ff70dda07a82548cfa39a09f"
+          "sha256": "caac2bc1434087be5ab3c0702981b70e1c9d77fc38addf0f1c1ddd61c28576a5"
         },
         {
           "style": "Italic",
           "file": "raleway-Italic.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/raleway/Raleway-Italic%5Bwght%5D.ttf",
-          "sha256": "faacaffa8bbaf4a9962c28eb94a85bcb5249eb373aea9c3ad042901a6e73e2a1"
+          "sha256": "a71e7dc5d6b7017c83e1db5cd697298542a2d2b5afc13eaf3256ec656e02b304"
         },
         {
           "style": "BoldItalic",
           "file": "raleway-BoldItalic.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/raleway/Raleway-Italic%5Bwght%5D.ttf",
-          "sha256": "e63f4be2a75223310b3b9a0ae550dd0193e4e8784c72590a88434049dfd1f591"
+          "sha256": "13c43905aa95e0cea9fc0be2253ab3832b9136806ea5af0918f7fbe731c59243"
         }
       ]
     },
@@ -189,25 +189,25 @@
           "style": "Regular",
           "file": "notosans-Regular.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/notosans/NotoSans%5Bwdth%2Cwght%5D.ttf",
-          "sha256": "8b02789a29605522326330e967a880b256b0b4d40d30c80aa494844c25cd1553"
+          "sha256": "200b07459ddaf0e1907815580255e33902e26bcb5f85bb58473b34d6d61c4b69"
         },
         {
           "style": "Bold",
           "file": "notosans-Bold.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/notosans/NotoSans%5Bwdth%2Cwght%5D.ttf",
-          "sha256": "265259ad73f95fc3d946eb4fab1faad36b7888dcfb77188ee6b47990636e4edd"
+          "sha256": "f678a0ebdfe519f6324f90be011edd5619b3341c6079be58b62fc7a176599846"
         },
         {
           "style": "Italic",
           "file": "notosans-Italic.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/notosans/NotoSans-Italic%5Bwdth%2Cwght%5D.ttf",
-          "sha256": "03b1395bb7dd634bf0325cd75a288ce0fa2b031e6afcf151abccff13216979ed"
+          "sha256": "f0efd3205e4c6a1e64f49eaabf0aa2cfa142f19b7397fb805b24bfc3144c41c1"
         },
         {
           "style": "BoldItalic",
           "file": "notosans-BoldItalic.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/notosans/NotoSans-Italic%5Bwdth%2Cwght%5D.ttf",
-          "sha256": "5e3c3960bd91f28d7513ad2cb0299ad3f3e7e0584868a870bb1f07857754fc2f"
+          "sha256": "76227f6f47d2b42992292ebaaf055c7f1e2f50f3cc58deec2379b1ba5c8ebe02"
         }
       ]
     },
@@ -219,13 +219,13 @@
           "style": "Regular",
           "file": "oswald-Regular.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/oswald/Oswald%5Bwght%5D.ttf",
-          "sha256": "acba2454c39718c0684fbecae497dc9ae584539e520f74c996532a455815195e"
+          "sha256": "116aca8a08eb53305fee81c33afa7473dbd8e6ddb73144cce3932d86d8b49268"
         },
         {
           "style": "Bold",
           "file": "oswald-Bold.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/oswald/Oswald%5Bwght%5D.ttf",
-          "sha256": "e7b62e02bee3d460da64e4391b21a957f18a5e43879018a686086e3a59b1a7f5"
+          "sha256": "0b5ea55b11df35b8df8989bc63aea33554e0c49aea16fa39dc91fe95e3ae9977"
         }
       ]
     },
@@ -237,25 +237,25 @@
           "style": "Regular",
           "file": "sourcesans3-Regular.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/sourcesans3/SourceSans3%5Bwght%5D.ttf",
-          "sha256": "83010b5fb0941161e1350042e6f63098716d360c666bbaf41821ae73b707c43c"
+          "sha256": "9f57c97145dcf4940549dbb5cf95195faa168004545e9e631abeb7dea6d760ad"
         },
         {
           "style": "Bold",
           "file": "sourcesans3-Bold.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/sourcesans3/SourceSans3%5Bwght%5D.ttf",
-          "sha256": "13d20942f0e3c021a8fd5d750e4a5a2e275bf66651f15b396c739d0d55d76739"
+          "sha256": "e8692ecada89f73783f796c1a682b7283a28ef8889aec579f79b59182c632ea4"
         },
         {
           "style": "Italic",
           "file": "sourcesans3-Italic.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/sourcesans3/SourceSans3-Italic%5Bwght%5D.ttf",
-          "sha256": "0b2b45b0f95621ae4e658b3289f34acd817da35706a7b9e3de6b259cbf148a72"
+          "sha256": "5c55b88b29f5eb2e8eff414fd0921665a39cdd8774b8b005d483c813451b70e5"
         },
         {
           "style": "BoldItalic",
           "file": "sourcesans3-BoldItalic.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/sourcesans3/SourceSans3-Italic%5Bwght%5D.ttf",
-          "sha256": "a1ce613c560cc28fc640dcee1308de280fcdcc8ee00f42fe5c25e249d0906199"
+          "sha256": "1bcf76cf96d1c11064c4459b5c55625bc11b59dd1fcefcdfc4666c9d2956fc6b"
         }
       ]
     },
@@ -267,25 +267,25 @@
           "style": "Regular",
           "file": "worksans-Regular.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/worksans/WorkSans%5Bwght%5D.ttf",
-          "sha256": "89eee9bb6295fd3898be42806c31bb3f6990ef9b6fd9cd97718993f96d75cadf"
+          "sha256": "cbdc78d1cbb32cf90a89976905c9a5b8068bcdaf7ec4463596f85f780d76c1cd"
         },
         {
           "style": "Bold",
           "file": "worksans-Bold.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/worksans/WorkSans%5Bwght%5D.ttf",
-          "sha256": "e268e57b42c2e0e5e32058a3cf1c1a95649bc898dbd6319f263dc5b0c96c1bbb"
+          "sha256": "48c5d382ddf2ccc9677e44387d42295cef5601b0d5ebf89a67243394c702215a"
         },
         {
           "style": "Italic",
           "file": "worksans-Italic.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/worksans/WorkSans-Italic%5Bwght%5D.ttf",
-          "sha256": "6db733aca0f09123e946e3594f6509d7cc2da1ca21946066050c75ff8351d9fd"
+          "sha256": "e2f1951a95b3978a579956cc0837593ddb25045f378b2b58520be5acccc12d7d"
         },
         {
           "style": "BoldItalic",
           "file": "worksans-BoldItalic.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/worksans/WorkSans-Italic%5Bwght%5D.ttf",
-          "sha256": "ad87fedfba0ec3e5b642835a5e70d51fdd81fd8530d105dffe40f4756967758c"
+          "sha256": "2f71747b954d3d1642c6b08af50421709d194085e43140f2e7e9e44292d3b1e6"
         }
       ]
     },
@@ -297,25 +297,25 @@
           "style": "Regular",
           "file": "firasans-Regular.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/firasans/FiraSans-Regular.ttf",
-          "sha256": "730c04822e816cc9b51e56845083500f23317a028c6034f1ea14c300f429b315"
+          "sha256": "a267adbc2ba7020ef292f914e17fb57048a2984181bece84e65723f8fa95fc9d"
         },
         {
           "style": "Bold",
           "file": "firasans-Bold.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/firasans/FiraSans-Bold.ttf",
-          "sha256": "e40b57113ca23c25c9ec8cd96df713c57b02b8c1844e40a2c48d222b66b116ed"
+          "sha256": "ac5f3a9cc28a84367a0e33b8ce8057da40849f75f67f4848e3843feec7814640"
         },
         {
           "style": "Italic",
           "file": "firasans-Italic.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/firasans/FiraSans-Italic.ttf",
-          "sha256": "d29b8611b27092126b23f7fa41dd3443bdc3fa1b8dbd92ceba67caacb989d653"
+          "sha256": "cf9e3c9974982180982e7832c4d373c3bb3887a8148085d56a8972852900d266"
         },
         {
           "style": "BoldItalic",
           "file": "firasans-BoldItalic.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/firasans/FiraSans-BoldItalic.ttf",
-          "sha256": "34a07322043c42e18667968eef5b797c5ffd304ab68b5f5dc86da38c2fe076bb"
+          "sha256": "c8f3cf238a0bec016bfd77ba7e6e81b08b6cc5f385956e74c63087a1b5a5a8d4"
         }
       ]
     },
@@ -327,25 +327,25 @@
           "style": "Regular",
           "file": "barlow-Regular.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/barlow/Barlow-Regular.ttf",
-          "sha256": "b16bfbe68a5f50d96ab2924f5d3116ab570ab6dcb4c0e542755a4c121cfb7381"
+          "sha256": "4e1daea6d2224b84213f638e5f77f7496ec6c62990412d883a9b1bef4bc3c0c1"
         },
         {
           "style": "Bold",
           "file": "barlow-Bold.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/barlow/Barlow-Bold.ttf",
-          "sha256": "8dd85506958f7e9381e1928ef7809003190a429a88d7217fbe8bfdeb863e402a"
+          "sha256": "5aef43dc237cc276b8199889a868ad79709e6044467c85ff165c297b3b813361"
         },
         {
           "style": "Italic",
           "file": "barlow-Italic.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/barlow/Barlow-Italic.ttf",
-          "sha256": "9bb27fd0161e56287981b7d6382f4b1774966082536dc6289be480de3004cb95"
+          "sha256": "4f9acf479d87f7adc87bf0dfbe46cc3ac7855b71830744fd60e4e64ddace69c1"
         },
         {
           "style": "BoldItalic",
           "file": "barlow-BoldItalic.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/barlow/Barlow-BoldItalic.ttf",
-          "sha256": "4ca99e7dec02ab8623f881fe6ba5f4d22002a2e43d0c298221f36a56b89648d4"
+          "sha256": "956ae744be9254165acad5a7eac73e5fd1772ab009646b184da37af230654ea2"
         }
       ]
     },
@@ -357,25 +357,25 @@
           "style": "Regular",
           "file": "rubik-Regular.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/rubik/Rubik%5Bwght%5D.ttf",
-          "sha256": "65653592fd0f42dac13b8aa46b8bf110cdfbddb20057438cf0b41a0c10b3dc94"
+          "sha256": "73851f311ed8bb2fc0fb7a3ee7afdbbaa3c00e4fc1cf775d127ec88df6d624ce"
         },
         {
           "style": "Bold",
           "file": "rubik-Bold.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/rubik/Rubik%5Bwght%5D.ttf",
-          "sha256": "230c850098dcbd79376c72ceca92ba7f06cf7c457252913f9bcd65690e1a62e3"
+          "sha256": "3466e0647f2d8dda313ed7cefd176d4ce8f6955031cb709f5a2459b54fb2b75d"
         },
         {
           "style": "Italic",
           "file": "rubik-Italic.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/rubik/Rubik-Italic%5Bwght%5D.ttf",
-          "sha256": "8a73206b306c83d4f2ce7413d916950c99062ae02fb690b0db9d3e4e829a99d8"
+          "sha256": "d2abd3bc0d0af57aed75d25b7c22985d3e59854e3e7fb80805e62e7c58abeae6"
         },
         {
           "style": "BoldItalic",
           "file": "rubik-BoldItalic.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/rubik/Rubik-Italic%5Bwght%5D.ttf",
-          "sha256": "6dcc6f50dfffe33aed593e3ccf3d21bf5f66926e9462fca0f1f857647d9c0a31"
+          "sha256": "f18e22a4dfbacd624f5b8f7a370d7a6869af64ed2e5caee54048ccda02a12717"
         }
       ]
     },
@@ -387,13 +387,13 @@
           "style": "Regular",
           "file": "quicksand-Regular.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/quicksand/Quicksand%5Bwght%5D.ttf",
-          "sha256": "8684bedfaa7979c77d573769334286759de3d2a6317b615bfeffb3f440bc1031"
+          "sha256": "ce7aa572a4c149a6d5c706f169b35a5d3a89ec6fdfb69b9ff0d920ba4305f61e"
         },
         {
           "style": "Bold",
           "file": "quicksand-Bold.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/quicksand/Quicksand%5Bwght%5D.ttf",
-          "sha256": "02cd45e90279b827b02e526b2d3485bfc7d794d8043d45a418053a3dc6560178"
+          "sha256": "dbfc7c28de1a6c414659499940462779385e245401f06cffd701d94080093d32"
         }
       ]
     },
@@ -405,25 +405,25 @@
           "style": "Regular",
           "file": "karla-Regular.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/karla/Karla%5Bwght%5D.ttf",
-          "sha256": "e29df896936279e9eceb5ad10f4016422c03f7f63ba8afd6d50ee67d3e566567"
+          "sha256": "8d3f5b6bae3825b8d691885a28f1b8ea2bd7410cf0f8124c7bf822098b6e5770"
         },
         {
           "style": "Bold",
           "file": "karla-Bold.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/karla/Karla%5Bwght%5D.ttf",
-          "sha256": "167371846737a80a4c6a4ce37cf14b476335c8ff57ec8f5bec8b16d41db8533f"
+          "sha256": "54cc4446b33fb30c923bf1fdb86b4890c7cd3703af64198f65c9f26f38b7cba8"
         },
         {
           "style": "Italic",
           "file": "karla-Italic.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/karla/Karla-Italic%5Bwght%5D.ttf",
-          "sha256": "02ce1bb665d015fc36a4e95a230d5201c9b1d01435852bd02888e71df0f686e3"
+          "sha256": "ba3b5f04089fca0e2bfe022fcbab0eb7169ffbc29f9e399a39269781d4214520"
         },
         {
           "style": "BoldItalic",
           "file": "karla-BoldItalic.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/karla/Karla-Italic%5Bwght%5D.ttf",
-          "sha256": "755623a30ad0946286da23b6048f72b8be5003af07b94cae03fd9d257e21de38"
+          "sha256": "becc95034b0b0e49fe364c1b08baa76102793f2539c69990c01cddc0681c6e3c"
         }
       ]
     },
@@ -435,13 +435,13 @@
           "style": "Regular",
           "file": "manrope-Regular.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/manrope/Manrope%5Bwght%5D.ttf",
-          "sha256": "1058df8f6b39395a1389a8a12253973c00d735f345b4a3e0cc2340f448b65f5c"
+          "sha256": "eb2e81741214d1307783a7fffe746786c43798c98df90d278ef04f92f65fde23"
         },
         {
           "style": "Bold",
           "file": "manrope-Bold.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/manrope/Manrope%5Bwght%5D.ttf",
-          "sha256": "ce2b1e8bb63961cd67ba4ac74f0857c84abc53f4acddd029e0749acfbf5daa19"
+          "sha256": "997f942cc0129e276229b10d3955731714da992b2b595ccff7359d5697e23080"
         }
       ]
     },
@@ -453,25 +453,25 @@
           "style": "Regular",
           "file": "mulish-Regular.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/mulish/Mulish%5Bwght%5D.ttf",
-          "sha256": "03463eeef2e64b8323ff21470bac2d3d57fde97d9f0bd0eacee4415062ee16ba"
+          "sha256": "f837d77fcd0c82c715e767220c1ad7695705866f1e18aea5971b33cf1a12cc63"
         },
         {
           "style": "Bold",
           "file": "mulish-Bold.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/mulish/Mulish%5Bwght%5D.ttf",
-          "sha256": "a496b9c0a9b64b39ebbee57719fb97bd0cb354ded328dbe47db28be98213265f"
+          "sha256": "8ea1b841cdc23b0120216a2cf0d7a139398e623910daf9655c403ef013b23a4d"
         },
         {
           "style": "Italic",
           "file": "mulish-Italic.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/mulish/Mulish-Italic%5Bwght%5D.ttf",
-          "sha256": "6653eaef45a519be37a65977cb42148b2325261395b7d7ffc8550d60af46406f"
+          "sha256": "b89d3d19b5259f5afec30d0ed0b967dcb5b394b0de06c19b7be045e547245968"
         },
         {
           "style": "BoldItalic",
           "file": "mulish-BoldItalic.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/mulish/Mulish-Italic%5Bwght%5D.ttf",
-          "sha256": "13ea1c8aec978b0e458d8299f22a97050fd023b5166081f4f64148b1a6c91bd8"
+          "sha256": "b6a5fa51d3133f4e35ace2821713259900de0b64e2674b042c8355ea19e612f9"
         }
       ]
     },
@@ -483,13 +483,13 @@
           "style": "Regular",
           "file": "hind-Regular.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/hind/Hind-Regular.ttf",
-          "sha256": "6ca484b974747b9f879c0a4253075398bb4fb318aea1de5668310ff000e93521"
+          "sha256": "716df4b5b574a1f6be0a3789621a34f85a46f94ac545c61afe05297967938ee5"
         },
         {
           "style": "Bold",
           "file": "hind-Bold.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/hind/Hind-Bold.ttf",
-          "sha256": "43ee5583d9525b3acc4833ba2e02b76e8de3d21f75f02137eb15272497079a37"
+          "sha256": "875dad8371c116f8a8b5ca72d793000f7a20db0eca261d0878a68b12af6560d8"
         }
       ]
     },
@@ -501,25 +501,25 @@
           "style": "Regular",
           "file": "cabin-Regular.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/cabin/Cabin%5Bwdth%2Cwght%5D.ttf",
-          "sha256": "8f92143f7006d2d724c6f274ba0b9ac29544318d22e42a1367203fd78d7a4432"
+          "sha256": "461da2c8ece954efe49cd500b7a9c0a85d5f10411094619e6cafea264932d3e8"
         },
         {
           "style": "Bold",
           "file": "cabin-Bold.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/cabin/Cabin%5Bwdth%2Cwght%5D.ttf",
-          "sha256": "ece47184dfae68019d7276d5713179bf0744c3950f22a094c693d5a03956daf0"
+          "sha256": "f291515d7b077e152599060afa2e54f6344cfa453c36a86f6fa23d77beea928b"
         },
         {
           "style": "Italic",
           "file": "cabin-Italic.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/cabin/Cabin-Italic%5Bwdth%2Cwght%5D.ttf",
-          "sha256": "5e17352e5bb2deab25eb80b5c62518cd917899363b94fd0a27505f6a151e2fef"
+          "sha256": "ade1e71514f969502d4fa4ff6ac9785323ed90e2ac4906465d47147c74b20727"
         },
         {
           "style": "BoldItalic",
           "file": "cabin-BoldItalic.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/cabin/Cabin-Italic%5Bwdth%2Cwght%5D.ttf",
-          "sha256": "dbd1157754e98e8348051df4701b91336796fcb1f53596b106a89da98b5713a8"
+          "sha256": "2023ec73508da2eda95db6e6064e90dabaf842fb5cd48acd0ae89e6574e512ab"
         }
       ]
     },
@@ -531,13 +531,13 @@
           "style": "Regular",
           "file": "assistant-Regular.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/assistant/Assistant%5Bwght%5D.ttf",
-          "sha256": "27d5971dab6b6cc4aced5dc20829f2b4bcfe50971695b87191f5cee4cbc50530"
+          "sha256": "2f9d8277391483e3a65395c4772e41c5178b350039f0910c4fdc164b727078c9"
         },
         {
           "style": "Bold",
           "file": "assistant-Bold.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/assistant/Assistant%5Bwght%5D.ttf",
-          "sha256": "9ebdb9c30e770ffa4c8b48322a010c919242e7b942395eaf1203c26904bf4ca0"
+          "sha256": "f0341849ddca41a3452f2c9d542f135fdb501f647dfabce0d560e29669b3d3f3"
         }
       ]
     },
@@ -549,7 +549,7 @@
           "style": "Regular",
           "file": "abel-Regular.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/abel/Abel-Regular.ttf",
-          "sha256": "ec9e6d565a787a6b9f874c9be34ff7bdbe13e14a60d6cd3d2d78f83ad8b82268"
+          "sha256": "6322e036212e389ccd7bc9c07238bca723ac8d689754d25fd1603277835fe2d7"
         }
       ]
     },
@@ -561,25 +561,25 @@
           "style": "Regular",
           "file": "asap-Regular.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/asap/Asap%5Bwdth%2Cwght%5D.ttf",
-          "sha256": "fbf9b5e2a3a1d04bacd29a97b57fb06842ef6c1c889cd034fcb18ddbf2728008"
+          "sha256": "dc51ace8990c0d4bac4755b1ea3216fa581b743583b1b9dd426482d3f9ad2979"
         },
         {
           "style": "Bold",
           "file": "asap-Bold.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/asap/Asap%5Bwdth%2Cwght%5D.ttf",
-          "sha256": "e11e876b7594b6b4b6903087c4d6d575a8865a7f844c1beb0760f008a28daa2c"
+          "sha256": "9667a2122fbb192f225094a363b971df2a0e5c86f74565b03880e6b88f230be9"
         },
         {
           "style": "Italic",
           "file": "asap-Italic.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/asap/Asap-Italic%5Bwdth%2Cwght%5D.ttf",
-          "sha256": "7bf6ad50b414e23a293d5f86a6651a605d020686fe8b27b5a6f85b43059f4e28"
+          "sha256": "e09d37a729e5a83c789da672ad2cb61a3ab805169a0cfef39b58b15d7142ab6b"
         },
         {
           "style": "BoldItalic",
           "file": "asap-BoldItalic.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/asap/Asap-Italic%5Bwdth%2Cwght%5D.ttf",
-          "sha256": "4a7854c527a5e756a63ff0a9948102c7aaa8fd2249781a3f2b74d8f6ebb59f14"
+          "sha256": "709bd585dae7ec1dddb62a652cbf676f19396cd2ee5f1229ab804fdb3ddb0e66"
         }
       ]
     },
@@ -591,25 +591,25 @@
           "style": "Regular",
           "file": "exo2-Regular.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/exo2/Exo2%5Bwght%5D.ttf",
-          "sha256": "4e5b44491412505b1e7a0c90c9c29591d2a8abaa6a0835c18a73b18bc6038f40"
+          "sha256": "00cd149ec699649d24d10cb326e00959375240416d02c7a7973f8816b2ec15a4"
         },
         {
           "style": "Bold",
           "file": "exo2-Bold.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/exo2/Exo2%5Bwght%5D.ttf",
-          "sha256": "9d7a97d876239037594aca981106884cc7d0e42d49e2332b5b2ba19165661176"
+          "sha256": "6fe5f20a46cd3d8a7a508432b7880ec2680c10e86f98ef0dd9b0b23fe28da850"
         },
         {
           "style": "Italic",
           "file": "exo2-Italic.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/exo2/Exo2-Italic%5Bwght%5D.ttf",
-          "sha256": "119b627456543f9347b45ffca8a92a83c126ebfdb10df02ba847b7654d407e45"
+          "sha256": "946253fa8e902360bffb544ebf8d90a825575565066c5a9388e802da9d7fd1e5"
         },
         {
           "style": "BoldItalic",
           "file": "exo2-BoldItalic.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/exo2/Exo2-Italic%5Bwght%5D.ttf",
-          "sha256": "bb74410f17658f21b247843cd5ff67487c421b53ef173a8658b673c43e1e0b3e"
+          "sha256": "32c5fcdc2de58a9775875da1ed50549c2631bab547361128e71be71fd1c46167"
         }
       ]
     },
@@ -621,25 +621,25 @@
           "style": "Regular",
           "file": "titilliumweb-Regular.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/titilliumweb/TitilliumWeb-Regular.ttf",
-          "sha256": "4c8fc3d79e4e4d74c3c073f8cb130aa789c369e16ccc6218c6c9f3f4b69f2e8f"
+          "sha256": "6fcb8e1f0d9427deebd6e9db09a92d46d70f2d96e7d743cdbed26c49cb91a5eb"
         },
         {
           "style": "Bold",
           "file": "titilliumweb-Bold.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/titilliumweb/TitilliumWeb-Bold.ttf",
-          "sha256": "c8e365596e1a7be64ad8dc99a5093e070df763c14141ef4a33fe10884ca502b8"
+          "sha256": "56f92e58dca1bb32505f288240267d549995a743ae51970c73f66adc8d6388b6"
         },
         {
           "style": "Italic",
           "file": "titilliumweb-Italic.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/titilliumweb/TitilliumWeb-Italic.ttf",
-          "sha256": "a090f3f03962c765af409226339f7c971a1d817a5a3f0f54afb049e567be35f2"
+          "sha256": "0a332add4ef63d5212da472e5afe6fc8cb4e62575ca7dc1bc16f7b043ed94d39"
         },
         {
           "style": "BoldItalic",
           "file": "titilliumweb-BoldItalic.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/titilliumweb/TitilliumWeb-BoldItalic.ttf",
-          "sha256": "8f61c2dd8c235aca0b8590b69beb9a54e6cc55f345ef432b5466a92774e3ab8c"
+          "sha256": "89f02bd0cbb9894fa11a28f0d22a48b56230ca043dc8eb1c878e43c4047ada16"
         }
       ]
     },
@@ -651,25 +651,25 @@
           "style": "Regular",
           "file": "merriweather-Regular.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/merriweather/Merriweather%5Bopsz%2Cwdth%2Cwght%5D.ttf",
-          "sha256": "63eb7dd15e9e27ab455340c06d98f10fcc5d39d4d70d8bf66c512c1fa2d9df48"
+          "sha256": "47c85a843a9ca0b2f34a47f1b67613a076e5b6d1c140071a958dae62fa02cff9"
         },
         {
           "style": "Bold",
           "file": "merriweather-Bold.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/merriweather/Merriweather%5Bopsz%2Cwdth%2Cwght%5D.ttf",
-          "sha256": "cf7dc7ff9a668c991145cbf3b3c87f97e33cb41cd1f14e6ea2365d8a4926a21d"
+          "sha256": "fb7d4822fa1e3ac158d00938758ab0d2976e550702eeb515492c83fd949c1fc8"
         },
         {
           "style": "Italic",
           "file": "merriweather-Italic.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/merriweather/Merriweather-Italic%5Bopsz%2Cwdth%2Cwght%5D.ttf",
-          "sha256": "dc03efef09dc71c441e67d11119250bbbddc53e90e73cdfd1eb3b0b9e0aba761"
+          "sha256": "df5ca164ba27787f2af73d8fd597d1b01eaa7f2c12bbe4a5b619dfae12a49f5e"
         },
         {
           "style": "BoldItalic",
           "file": "merriweather-BoldItalic.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/merriweather/Merriweather-Italic%5Bopsz%2Cwdth%2Cwght%5D.ttf",
-          "sha256": "c784665a3347b7da65450955be55ba88b4709da2f9e2b04fbe390a45b1d4cde1"
+          "sha256": "21ed1dcf59d01013a8091d7d773ae2bcec8232dae36b2e034b1b4f916bc1dfd5"
         }
       ]
     },
@@ -681,25 +681,25 @@
           "style": "Regular",
           "file": "playfairdisplay-Regular.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/playfairdisplay/PlayfairDisplay%5Bwght%5D.ttf",
-          "sha256": "51d2336f5f1375049c79932afe0e0e0b93beed6012843829c5cd695359b6dd62"
+          "sha256": "5bfad7ae16cc079ac92dd1c82ad4b57cda23f22e6b3ce5320f268f5956968f9f"
         },
         {
           "style": "Bold",
           "file": "playfairdisplay-Bold.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/playfairdisplay/PlayfairDisplay%5Bwght%5D.ttf",
-          "sha256": "42fe86344a08e820418eb1508db6adb84fa39b9362c8660468410ca1a95db0f0"
+          "sha256": "f57d972b3062e5ff6b0c1686f5ab0b7f7e05899af84c0b4de4b14ac3efcab95f"
         },
         {
           "style": "Italic",
           "file": "playfairdisplay-Italic.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/playfairdisplay/PlayfairDisplay-Italic%5Bwght%5D.ttf",
-          "sha256": "537e7617e9cd6d9001a8f42f751af9eab9fed28c1b3f90d710ce079fddbebbf0"
+          "sha256": "fff9eceff1408e70d1159c69ea181946a58725e1e62e12891d9ad4ba9928ed50"
         },
         {
           "style": "BoldItalic",
           "file": "playfairdisplay-BoldItalic.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/playfairdisplay/PlayfairDisplay-Italic%5Bwght%5D.ttf",
-          "sha256": "63603fe43e30adf1e290e6cefe890bf600f7cf451112b1adcce4bdf8e3643880"
+          "sha256": "d3b6a909b78285ab54a7c27c7ed99eb8a66335777d4be5b3d9d83f1801cc6542"
         }
       ]
     },
@@ -711,25 +711,25 @@
           "style": "Regular",
           "file": "lora-Regular.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/lora/Lora%5Bwght%5D.ttf",
-          "sha256": "2aebce1e2c7d2e8b5f6d409284696ce63f507edbd277f898742e021753ad9070"
+          "sha256": "0d9d68df7f95fb2c3ff575833702ded7dcdd2374f13c42067a230b286470e486"
         },
         {
           "style": "Bold",
           "file": "lora-Bold.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/lora/Lora%5Bwght%5D.ttf",
-          "sha256": "f8a8a20dba653e7d112a9796a82ae62fd207527992f38ca21f612ba5b47ef6d5"
+          "sha256": "7cc293341c66e72be9814e98b867d84d7ca0182e7e2876f9c88da80070e51d15"
         },
         {
           "style": "Italic",
           "file": "lora-Italic.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/lora/Lora-Italic%5Bwght%5D.ttf",
-          "sha256": "2627ef011e4667a904a061cc6d6a237d016dc2cbe353d9f2cf4b341cd8ce52d2"
+          "sha256": "593bdef82bf7d969343731e6a75060d23e5edcd12b1fdc8124fa5832f326e1ac"
         },
         {
           "style": "BoldItalic",
           "file": "lora-BoldItalic.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/lora/Lora-Italic%5Bwght%5D.ttf",
-          "sha256": "a8f82391609cd76315dbeb00de57844e4a2fc7cb693da66af8c0509267f5c8cf"
+          "sha256": "33247833e5cbc7d3ae15b42f37888e73f57efc99120fd11fddff14a364627c48"
         }
       ]
     },
@@ -741,25 +741,25 @@
           "style": "Regular",
           "file": "zillaslab-Regular.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/zillaslab/ZillaSlab-Regular.ttf",
-          "sha256": "dd481fac5e29a0ec48f76e264cf151049e45d758cf4c341a2f1ce1f7a8dded6e"
+          "sha256": "553b83df1208aff824bbe66f836270192868a334461600671ed1b0b798696c04"
         },
         {
           "style": "Bold",
           "file": "zillaslab-Bold.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/zillaslab/ZillaSlab-Bold.ttf",
-          "sha256": "68f92a7bd2ba01417578077ba65ac7f7aeb2e0ca7941f9beb64667977db4bad1"
+          "sha256": "a93fe06d8abd901657f60b41a1e531830f9e3f4086a6241dd94cead9ae34c25d"
         },
         {
           "style": "Italic",
           "file": "zillaslab-Italic.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/zillaslab/ZillaSlab-Italic.ttf",
-          "sha256": "5d12b758080511bdaa5a3d2988af2ff998f6a0ecb74b24d17906c49696f138db"
+          "sha256": "450757a31b5aae1064c6316ad5f93feed3e0f974637ff2ea842012e496912c00"
         },
         {
           "style": "BoldItalic",
           "file": "zillaslab-BoldItalic.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/zillaslab/ZillaSlab-BoldItalic.ttf",
-          "sha256": "a92a48342f1d0a53ab2d3cdaf1ff6e080a6a31f2298cdf1da2827a99eac7688b"
+          "sha256": "506dbd16ec3391f5603aa1b6c7c036f8f13fb0d319bbc96c9f9f3fdcd8a7e929"
         }
       ]
     },
@@ -771,25 +771,25 @@
           "style": "Regular",
           "file": "sourceserif4-Regular.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/sourceserif4/SourceSerif4%5Bopsz%2Cwght%5D.ttf",
-          "sha256": "ada7ea79ea2d6ae5ceb493802706c55eadd1bc11d6e818cea950ca4dd9873033"
+          "sha256": "9d925895303f5add51ca579d86a053d0a3d8e2e39433e2215568a0b4d400c3fc"
         },
         {
           "style": "Bold",
           "file": "sourceserif4-Bold.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/sourceserif4/SourceSerif4%5Bopsz%2Cwght%5D.ttf",
-          "sha256": "a46a88d1473e6fa66ad0284d21b9ce61cb69bb0eba2c1b13c05f6b4d572de7ee"
+          "sha256": "4f708c12cff9bf02353155e2fac05a413437a31f7202b2eee1d67f95c6b4255e"
         },
         {
           "style": "Italic",
           "file": "sourceserif4-Italic.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/sourceserif4/SourceSerif4-Italic%5Bopsz%2Cwght%5D.ttf",
-          "sha256": "65e18b407c91bab972e828be887fd62a52e7b774b051cf642f5d6964b5bd5ed1"
+          "sha256": "713d3c05573301635c814301270162bbd2c98a0c0bf0661c454b40fb43404cb3"
         },
         {
           "style": "BoldItalic",
           "file": "sourceserif4-BoldItalic.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/sourceserif4/SourceSerif4-Italic%5Bopsz%2Cwght%5D.ttf",
-          "sha256": "f0d8d30573a3e567b36b2b93452b06a6466334c7e5d29223911ef0e3de150536"
+          "sha256": "d31a554b0a6e0f76195a66f611a2a7d31237eb7119288942496656ae63433030"
         }
       ]
     },
@@ -801,25 +801,25 @@
           "style": "Regular",
           "file": "librebaskerville-Regular.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/librebaskerville/LibreBaskerville%5Bwght%5D.ttf",
-          "sha256": "16ae2d8ad553e9b7da68ba17abcd96a8e13a192cc5c499c6f3ccc5b39c505ee8"
+          "sha256": "68bce2a7d728cf9b7579141753cbbab316c268ed1a0588b0efb1dcd9bea3858e"
         },
         {
           "style": "Bold",
           "file": "librebaskerville-Bold.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/librebaskerville/LibreBaskerville%5Bwght%5D.ttf",
-          "sha256": "d8960589f2a51269e04a220f92be89b9a3892bc0b5776e663f61b4d439e9cadd"
+          "sha256": "c35e25c63e579b40428a051f36a1f92fe507ae2f539ff3bd0151f86cf576ff65"
         },
         {
           "style": "Italic",
           "file": "librebaskerville-Italic.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/librebaskerville/LibreBaskerville-Italic%5Bwght%5D.ttf",
-          "sha256": "87e258599180391a178f3037f25d781b76833bbd014d12787b4850160daec60b"
+          "sha256": "2a8599b11d2d40f3a640a0a698d8327cafede8319f212d10180cc64117ab8b6d"
         },
         {
           "style": "BoldItalic",
           "file": "librebaskerville-BoldItalic.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/librebaskerville/LibreBaskerville-Italic%5Bwght%5D.ttf",
-          "sha256": "dc8ca9f49668b03fbce7e7c5b1840dde16ef5900c155e5796cdce87152de918e"
+          "sha256": "1d1d57147279278bf189cfc8f86e0c27d783e5ff9a2af914982695ebe8d8959b"
         }
       ]
     },
@@ -831,25 +831,25 @@
           "style": "Regular",
           "file": "ebgaramond-Regular.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/ebgaramond/EBGaramond%5Bwght%5D.ttf",
-          "sha256": "f99720db7f701cd48c197543a18ee5ed1b0c8ba8157f2fce8a3856a31347b208"
+          "sha256": "f068794eb5b94375fbc83ff95439b874ac1f97271ab47794948da137f66d9bf0"
         },
         {
           "style": "Bold",
           "file": "ebgaramond-Bold.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/ebgaramond/EBGaramond%5Bwght%5D.ttf",
-          "sha256": "994aaf1b8bb9afc849efe013d6deb974bd8329eec5c4159159db09aee0d2ae62"
+          "sha256": "dc67c1194b316f9ffa23ba7b4ccc87325acc86661dfd2985a507ac8a9f3106da"
         },
         {
           "style": "Italic",
           "file": "ebgaramond-Italic.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/ebgaramond/EBGaramond-Italic%5Bwght%5D.ttf",
-          "sha256": "0af0cc0cf693133c647f0ed0e11983b805db3611797a400c84fe81dc0c99c0c7"
+          "sha256": "2ed7beafba3e0f55406b20eb2f1acc1a434bdd14cd3f6890d014a8e2ac499c9c"
         },
         {
           "style": "BoldItalic",
           "file": "ebgaramond-BoldItalic.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/ebgaramond/EBGaramond-Italic%5Bwght%5D.ttf",
-          "sha256": "3f0a7faa0f8608b1e2c0224da84348001a105d4240dd89ce6e13131817876e8a"
+          "sha256": "28b72628b668ea4ef76bcaaaa7e06b2ebb0626ed915411910282bd343b081460"
         }
       ]
     },
@@ -861,25 +861,25 @@
           "style": "Regular",
           "file": "bitter-Regular.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/bitter/Bitter%5Bwght%5D.ttf",
-          "sha256": "e1c5ccde257f1dbc15a8862e66302f5a73365a33fd54e2734de30a6a8b692d3f"
+          "sha256": "c051b11ae02c5170aa64e658d3a052011f7fae52cf384285510f8566b321d094"
         },
         {
           "style": "Bold",
           "file": "bitter-Bold.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/bitter/Bitter%5Bwght%5D.ttf",
-          "sha256": "32c9d63a55c3c7cf7d46157cb07e25011086004f353786ae540df4ad7ca41ef1"
+          "sha256": "435564a70ad0a5d4903ff1a21d6d67a0aa2fcba451e88a6946704dbe84f2954f"
         },
         {
           "style": "Italic",
           "file": "bitter-Italic.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/bitter/Bitter-Italic%5Bwght%5D.ttf",
-          "sha256": "8bc0783fdf7e7050fce97efa46e21fcad8df3b288f888c80ecc6f0abf8b3af51"
+          "sha256": "e71604d866fdaedd683a4e1a4bd383bb6c5f2a2e1fb3cb1899e7de7d9654dfa6"
         },
         {
           "style": "BoldItalic",
           "file": "bitter-BoldItalic.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/bitter/Bitter-Italic%5Bwght%5D.ttf",
-          "sha256": "56dde7cd717757da418625d4592be7a43ee957d00e5bf5731823a2fe9611d8b2"
+          "sha256": "55eec0d0ce2711c7934a98d0c1f4b79582340c7bab4bcbf1d6ae2c2aed32d35b"
         }
       ]
     },
@@ -891,25 +891,25 @@
           "style": "Regular",
           "file": "cormorantgaramond-Regular.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/cormorantgaramond/CormorantGaramond%5Bwght%5D.ttf",
-          "sha256": "d4cb74d7b389f9f8699c3d281908a7422925c3b9fddb8e1ca1b47331982a8a96"
+          "sha256": "68a62722b019957b5c4c2ca165ea5db59aee95d7a9e100d808c6288bcde98bc0"
         },
         {
           "style": "Bold",
           "file": "cormorantgaramond-Bold.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/cormorantgaramond/CormorantGaramond%5Bwght%5D.ttf",
-          "sha256": "d0d65cc7aa3a1c89f613085bda194f1a7360a7ed34b34dcc1de02b1b1b3f815a"
+          "sha256": "b5bdefe24a97cc8d733c2257dd70843cb1801e2d606060cf0cd08a7ccde2de20"
         },
         {
           "style": "Italic",
           "file": "cormorantgaramond-Italic.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/cormorantgaramond/CormorantGaramond-Italic%5Bwght%5D.ttf",
-          "sha256": "e7a2d1942944c6645d5455261df251c91bce61533866282fd3973177357b6e55"
+          "sha256": "a18a29d8ac62dce5cfd027607180c1d7d461f4955e4c2e1bae06ff82609cfa97"
         },
         {
           "style": "BoldItalic",
           "file": "cormorantgaramond-BoldItalic.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/cormorantgaramond/CormorantGaramond-Italic%5Bwght%5D.ttf",
-          "sha256": "f208ff8b5c16ce3a94876b385a7f436ba3841d7b440592d75960c8aa8f033a36"
+          "sha256": "49e3bb50e92a95feaee9d26bb7df895501b82cc013cdc5e60065ae38c5f6c57f"
         }
       ]
     },
@@ -921,25 +921,25 @@
           "style": "Regular",
           "file": "alegreya-Regular.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/alegreya/Alegreya%5Bwght%5D.ttf",
-          "sha256": "10693dd396aa3a4f11eea9bd6c0b5f12379c93fb9585064d7cbbe187fcfed537"
+          "sha256": "6e4700e75cb3bd88d1df6761d19534d0842f719113edd3509fe9fe788cdeae09"
         },
         {
           "style": "Bold",
           "file": "alegreya-Bold.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/alegreya/Alegreya%5Bwght%5D.ttf",
-          "sha256": "77b1c7f77c8e7bd398562199ac979dde0d29f8a510631b5e40aaaea601b2fbe0"
+          "sha256": "2e413527522d8141421df68105c3c09fb734bc968c7409f8b4e1a57e40770a7d"
         },
         {
           "style": "Italic",
           "file": "alegreya-Italic.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/alegreya/Alegreya-Italic%5Bwght%5D.ttf",
-          "sha256": "e13d4f4d9d364486b95dc22ad2e0276bce3d731409730a7fabcdc3ed328584c6"
+          "sha256": "8e751be17f5271bfde35ed05bbfe030575aa364217ab5b4b0822518b480f0b8d"
         },
         {
           "style": "BoldItalic",
           "file": "alegreya-BoldItalic.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/alegreya/Alegreya-Italic%5Bwght%5D.ttf",
-          "sha256": "903598581750c808386166ceb9adc52b2c51bd8291668351efb9c5770903c8fa"
+          "sha256": "ca87620f90e9d53fa3f5333aa22214278ee0c8e2ea96cd45e21eaac9105447d2"
         }
       ]
     },
@@ -951,13 +951,13 @@
           "style": "Regular",
           "file": "enriqueta-Regular.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/enriqueta/Enriqueta-Regular.ttf",
-          "sha256": "aaaa216a435e3c44d47dc07cfb87f112ce402003e695c9f5eb3fde40ab6c9c07"
+          "sha256": "c216d81f4caeffcdc26a5581042459b5464aec9e5a0c20e7812471f112c3f201"
         },
         {
           "style": "Bold",
           "file": "enriqueta-Bold.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/enriqueta/Enriqueta-Bold.ttf",
-          "sha256": "72e2c636c231397ed898b6de251a1052daca14728b86ed5182766a09d927c16b"
+          "sha256": "7a1e18c96d13bf0c81764b4dcd4d68b4c98438176ed9d24d96ffac6bfef5194c"
         }
       ]
     },
@@ -969,25 +969,25 @@
           "style": "Regular",
           "file": "vollkorn-Regular.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/vollkorn/Vollkorn%5Bwght%5D.ttf",
-          "sha256": "592b0ccc952a52f3e8dcc7ea4b338460f9d6a7b29daa466831c8baa595f65e35"
+          "sha256": "81817282d52ef56e199d83658a43de6d0f030adfc968861718e3442d8684bb21"
         },
         {
           "style": "Bold",
           "file": "vollkorn-Bold.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/vollkorn/Vollkorn%5Bwght%5D.ttf",
-          "sha256": "2ac06e2466a7bc2ad4e01b53431577ec3d7da835f55e84449f54618f981452f3"
+          "sha256": "776f3c57791a24f5148b54b86fa8f6c6b28d14760d45cac26d1095dad7c10a87"
         },
         {
           "style": "Italic",
           "file": "vollkorn-Italic.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/vollkorn/Vollkorn-Italic%5Bwght%5D.ttf",
-          "sha256": "f956945ac81388a8ccbbb1c5e0a33613442cf8ef014d7ec96368a21524377e18"
+          "sha256": "1635848cb8b96a25deefcbd11626d75839c43ef78eaf14e668b958ede3eca38f"
         },
         {
           "style": "BoldItalic",
           "file": "vollkorn-BoldItalic.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/vollkorn/Vollkorn-Italic%5Bwght%5D.ttf",
-          "sha256": "50ec034316cf00a2ddcd0118204fca35f25a0d0222d112436a73a5a0b4303232"
+          "sha256": "0d63d000f3aaeedd66d7623affe88e8ac3c5b4121bb390b35a86fba2f86fee99"
         }
       ]
     },
@@ -999,7 +999,7 @@
           "style": "Regular",
           "file": "breeserif-Regular.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/breeserif/BreeSerif-Regular.ttf",
-          "sha256": "fa72eef0bd23c376e80629fa4ca2a9d23c3ad2f483c6cbdbfe5aa2ccea3c8c6a"
+          "sha256": "d7aa87a0fdfef45a4059b633c25c271436432522da18d24ba86ae76998dbca3e"
         }
       ]
     },
@@ -1011,13 +1011,13 @@
           "style": "Regular",
           "file": "domine-Regular.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/domine/Domine%5Bwght%5D.ttf",
-          "sha256": "fa3feb5e80a0650ee8e11baf3cdcf3fb27c4cd9d35b56b320f6b7055f72ae19e"
+          "sha256": "f49dc1cd4d56b6dc8789a18a47e0a073d403422b3df1e5550645a5592bf007b0"
         },
         {
           "style": "Bold",
           "file": "domine-Bold.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/domine/Domine%5Bwght%5D.ttf",
-          "sha256": "f6cb32a3885b4865c915b3dc0327ab6416efb76dec599dc0cab25882a1e6337c"
+          "sha256": "51f80ce1865ebea7d21585afdb106781f057d884abe0a9c7a92673d68bd97a41"
         }
       ]
     },
@@ -1029,19 +1029,19 @@
           "style": "Regular",
           "file": "cardo-Regular.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/cardo/Cardo-Regular.ttf",
-          "sha256": "80188a01ab0fb988b19392423b3405f6295724c39af6c1a419bc2a3964289e0e"
+          "sha256": "6e88205da729aa0a6ab119680c7c061f68c8ef827aa483a50acf99cf617bbd05"
         },
         {
           "style": "Bold",
           "file": "cardo-Bold.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/cardo/Cardo-Bold.ttf",
-          "sha256": "562334928cbd5cee2c803fdcbc8236591645679748181568861665508508564a"
+          "sha256": "c5e2b3f180f67833f62415ab3241e06b0375d260db3853af53d3515df54ebfec"
         },
         {
           "style": "Italic",
           "file": "cardo-Italic.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/cardo/Cardo-Italic.ttf",
-          "sha256": "2d699245eb32b1914b83573227959d6090622494d92c8f876e407cc6162431b1"
+          "sha256": "2c9c13ec14fe86cb7fb31e2a8b95462dbc7925030b23651e4c0f0aa5fcefb6f8"
         }
       ]
     },
@@ -1053,19 +1053,19 @@
           "style": "Regular",
           "file": "oldstandardtt-Regular.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/oldstandardtt/OldStandard-Regular.ttf",
-          "sha256": "76f8c017f985c9b73a034e6a24dd13e36bc2d2f6b1abce1fb7a2b8104dabf273"
+          "sha256": "6079f5514f3efeabdc3700b6f8d031e972ff70e5d8c237fbbfe9e00e1c825404"
         },
         {
           "style": "Bold",
           "file": "oldstandardtt-Bold.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/oldstandardtt/OldStandard-Bold.ttf",
-          "sha256": "82d66e6b40490340e09f88fb0d785b1988206a8b46bd7ebbc28be9e177cf6074"
+          "sha256": "bd5a9294f93a195df24ec45b03a9c60182286dfe0591878329bf081ed27f644d"
         },
         {
           "style": "Italic",
           "file": "oldstandardtt-Italic.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/oldstandardtt/OldStandard-Italic.ttf",
-          "sha256": "3a0b8597f82c7eb0b3b395e2776212ff94746cff6101db151204d86f50564311"
+          "sha256": "3786cf8de2b86fc1176390deca2e304811f16e00c6024bd88e3457baf3657462"
         }
       ]
     },
@@ -1077,13 +1077,13 @@
           "style": "Regular",
           "file": "dmserifdisplay-Regular.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/dmserifdisplay/DMSerifDisplay-Regular.ttf",
-          "sha256": "240e3058813b341d3a69a23f1fdf6b99599f89835dca0431f66526d242c9af41"
+          "sha256": "4dfac0dbc452fe0ac8dac736d39cf21cdf316f0340c2fbb3441ffefd92f9a156"
         },
         {
           "style": "Italic",
           "file": "dmserifdisplay-Italic.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/dmserifdisplay/DMSerifDisplay-Italic.ttf",
-          "sha256": "835c9d7a56ac5e515a87b702d8a5701682bdc98ec69bf1cf310f8887efef19d8"
+          "sha256": "a5535bfd2797e34fbe7caa1cd83717ed511e8e67582be4397dc3a8a1ab54ef04"
         }
       ]
     },
@@ -1095,25 +1095,25 @@
           "style": "Regular",
           "file": "ibmplexserif-Regular.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/ibmplexserif/IBMPlexSerif-Regular.ttf",
-          "sha256": "8744aba30cc075988ef677e342e6f5dd218df502d07ab68e3f53d7dac76f3eb9"
+          "sha256": "53fd06e22910a17b993618107561f26e4d8089a229632925fbc67d7e213a4cbe"
         },
         {
           "style": "Bold",
           "file": "ibmplexserif-Bold.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/ibmplexserif/IBMPlexSerif-Bold.ttf",
-          "sha256": "f399eb824a859e0a0225062b5c20f356585ff3fbf75aef7b57f3a9630d4095ed"
+          "sha256": "7a80fd3f33313833f9b5206d86f49e1957abd2942484e3d6fb43968f770e480a"
         },
         {
           "style": "Italic",
           "file": "ibmplexserif-Italic.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/ibmplexserif/IBMPlexSerif-Italic.ttf",
-          "sha256": "7795f3be722aef82ceda57da6c5b651a447a5872125b9e1472230fd97f428c95"
+          "sha256": "0192b0cd79a29d2d136f860e56a1e4292d58144b1d3759dea653bb6f1f15b359"
         },
         {
           "style": "BoldItalic",
           "file": "ibmplexserif-BoldItalic.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/ibmplexserif/IBMPlexSerif-BoldItalic.ttf",
-          "sha256": "04ac730858d381a24f126b0fc36d131898d6fea3b7b555bcbf786c4770e103f6"
+          "sha256": "f7c4c2ed17473c82f9180e46e2d5c9276526f70299a390fceb38864e7cf1d4a5"
         }
       ]
     },
@@ -1125,25 +1125,25 @@
           "style": "Regular",
           "file": "robotomono-Regular.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/robotomono/RobotoMono%5Bwght%5D.ttf",
-          "sha256": "764d2d3a2788534375d937d94c7538f3ecffbedae24edad7d5880c32d22bd5ff"
+          "sha256": "ab8badc742c2ef6f6bc7640879cf023dc584a013e306ebd3f97923eb40ed318b"
         },
         {
           "style": "Bold",
           "file": "robotomono-Bold.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/robotomono/RobotoMono%5Bwght%5D.ttf",
-          "sha256": "679322f81863b8efd0fa0979c2ed72cf72d253c62c085f5577fcaefd51321cb0"
+          "sha256": "4cdca98e71d86e7e5c536f4310e64cde9e298b3d544a21813ccbe03aa9662d65"
         },
         {
           "style": "Italic",
           "file": "robotomono-Italic.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/robotomono/RobotoMono-Italic%5Bwght%5D.ttf",
-          "sha256": "c54f512a8105399259969f46cb11101d4d93be72f0a41680785fff1473ed8063"
+          "sha256": "d8aba3371d610ab956cd90a399ecaa171837210af0ad50938357043d080fbfeb"
         },
         {
           "style": "BoldItalic",
           "file": "robotomono-BoldItalic.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/robotomono/RobotoMono-Italic%5Bwght%5D.ttf",
-          "sha256": "a8af19e588c79b69ce177a40b7e424e0acae1d4d84125a73c99a50942c4c0cd5"
+          "sha256": "f39f273a331e6ec07dbb7a6d222b35f31a4c5299c743fd252b45c5a20a44312f"
         }
       ]
     },
@@ -1155,25 +1155,25 @@
           "style": "Regular",
           "file": "sourcecodepro-Regular.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/sourcecodepro/SourceCodePro%5Bwght%5D.ttf",
-          "sha256": "349d8d752b3c76d65e76492ed12eb5f851e1dc812146d12cc69817a9acc1bab2"
+          "sha256": "48caee5b82a680c95d5e1d4cefe5899e007e6f6d42f83c230728632330cf3d65"
         },
         {
           "style": "Bold",
           "file": "sourcecodepro-Bold.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/sourcecodepro/SourceCodePro%5Bwght%5D.ttf",
-          "sha256": "35a3d4cc897838412a1de067ce1df6b2e55f0c2618a4a46fb98425203a3d53ba"
+          "sha256": "7ec91cda2d5b543a05999d5680607b9c85fd4003cf8440742bd5404842713b2b"
         },
         {
           "style": "Italic",
           "file": "sourcecodepro-Italic.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/sourcecodepro/SourceCodePro-Italic%5Bwght%5D.ttf",
-          "sha256": "f526d75b19749579fb44ff18d163bae7b69170e613bf0f12aed93c3f1a3da303"
+          "sha256": "45231fc4ffb48703cb93da22d913cd3bca7f873af3e70e62442b541f06f40ec1"
         },
         {
           "style": "BoldItalic",
           "file": "sourcecodepro-BoldItalic.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/sourcecodepro/SourceCodePro-Italic%5Bwght%5D.ttf",
-          "sha256": "ee773065101d82b403ccf83120f1a26956c6c8d14ae0f6f0f336932a2745585c"
+          "sha256": "b56512387d51291059809b1ee4d97558065db5673ba2ca29ae99a877d70f67ee"
         }
       ]
     },
@@ -1185,25 +1185,25 @@
           "style": "Regular",
           "file": "ibmplexmono-Regular.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/ibmplexmono/IBMPlexMono-Regular.ttf",
-          "sha256": "d2550200c7eea902092c867fa4521f0e4b6ae6823d601f6829475f87b359e8a1"
+          "sha256": "78d3e138102aad3342b26a522e21ca6f99cb043cde1b660c5f91d5f725a815d2"
         },
         {
           "style": "Bold",
           "file": "ibmplexmono-Bold.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/ibmplexmono/IBMPlexMono-Bold.ttf",
-          "sha256": "8b17b80742f636c40e7ea88355dc562b37ca46e907d73695cd01bf77e2a48b05"
+          "sha256": "e13a8d662ffd897561b5ec1a845bb1b1e858c8725c07d46ed96e5151ea3a1e23"
         },
         {
           "style": "Italic",
           "file": "ibmplexmono-Italic.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/ibmplexmono/IBMPlexMono-Italic.ttf",
-          "sha256": "149cda9808cea1833084d178c2cc3cc6f1088e8dd10f96573264f6560c857b80"
+          "sha256": "3ef622da06ed7fd27ddf6c17f09c21dcb57acbdb35b4ec25681245de7b0d34ac"
         },
         {
           "style": "BoldItalic",
           "file": "ibmplexmono-BoldItalic.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/ibmplexmono/IBMPlexMono-BoldItalic.ttf",
-          "sha256": "e31ab9e6c30ffb0523db66328f8534aa9a71ed6098612f9d79955684765b38b1"
+          "sha256": "f6a7f97485ae572745ed3b6479bc66ac3fdf3aee3602c6558d7879f938857b9c"
         }
       ]
     },
@@ -1215,13 +1215,13 @@
           "style": "Regular",
           "file": "firacode-Regular.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/firacode/FiraCode%5Bwght%5D.ttf",
-          "sha256": "9a42826ce23093fc3721c8318847ebce61a2fab83c56595ecd1f3c228d56a82b"
+          "sha256": "bf9fd9993561c3201283ce486c4b6f75c6c9c558dd7a6d847e9e9711c8b5be7c"
         },
         {
           "style": "Bold",
           "file": "firacode-Bold.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/firacode/FiraCode%5Bwght%5D.ttf",
-          "sha256": "45fb9c9685c5d933a37f8841e99d2d4bcab2c737637cb1b25dfe87e93dbf70b2"
+          "sha256": "949d063ac2553ec67b742fa7e15c1286a2bb5df9a781f61f6536bf448aa5295c"
         }
       ]
     },
@@ -1233,13 +1233,13 @@
           "style": "Regular",
           "file": "inconsolata-Regular.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/inconsolata/Inconsolata%5Bwdth%2Cwght%5D.ttf",
-          "sha256": "6ce1192c8aade03516e02567d2d106567a1cd690528291da41aaea50b92f1c01"
+          "sha256": "6e01e13247759880dbc1ebf4081dc735fc3b01fc1e0e22eed0f003dba4f32e9f"
         },
         {
           "style": "Bold",
           "file": "inconsolata-Bold.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/inconsolata/Inconsolata%5Bwdth%2Cwght%5D.ttf",
-          "sha256": "7aa2ce64bcccb4894e8e187f541c5b66eff7be1bda73b020ec187f4fb34fabc5"
+          "sha256": "36da30da6ab5449609dbcbfdda7452ad31cc2a73b3f56498999d5863aebd553d"
         }
       ]
     },
@@ -1251,25 +1251,25 @@
           "style": "Regular",
           "file": "spacemono-Regular.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/spacemono/SpaceMono-Regular.ttf",
-          "sha256": "f5865679bb880f21d8a452138ad62714c3cf595de40ad8c980d2a19f0ded780f"
+          "sha256": "1cc54770c29c56845c1613b18e21bbf9a34523230e6cbb83a095b41c33dbefe6"
         },
         {
           "style": "Bold",
           "file": "spacemono-Bold.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/spacemono/SpaceMono-Bold.ttf",
-          "sha256": "39ad8abce80e01517b798df92182f9b858edc902aaf26a3e861122ed23e7c53a"
+          "sha256": "1ef5315ba1ba6d7eab9c9047f928f0cb6e9e12e4414adb544d72b068d96eb8ff"
         },
         {
           "style": "Italic",
           "file": "spacemono-Italic.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/spacemono/SpaceMono-Italic.ttf",
-          "sha256": "471c197e1b33d19de3b45b7cd4b4dd9ec2cc5cb8c34457f7b0c97747356a8c60"
+          "sha256": "b6eb05175c8822cc0e1be47809d380703faf29e31fc45e687fe24ce6703822e1"
         },
         {
           "style": "BoldItalic",
           "file": "spacemono-BoldItalic.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/spacemono/SpaceMono-BoldItalic.ttf",
-          "sha256": "2efea703fafc3c3777af73cbb7cfab25c0c022192e6272a7b682aeaffa262349"
+          "sha256": "5285a8a4caafecee85e031834982b0cf5e8fcfd8ec557dfd71325f6a6c45a81f"
         }
       ]
     },
@@ -1281,25 +1281,25 @@
           "style": "Regular",
           "file": "jetbrainsmono-Regular.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/jetbrainsmono/JetBrainsMono%5Bwght%5D.ttf",
-          "sha256": "ecc8c1e4b9af5695ea9e65c5c75866d5f4fb0dce87d048373d3ef2cb207745d8"
+          "sha256": "46297516a46c089914e48396ecc32404442edec33f5a079031fad2eb2a80a897"
         },
         {
           "style": "Bold",
           "file": "jetbrainsmono-Bold.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/jetbrainsmono/JetBrainsMono%5Bwght%5D.ttf",
-          "sha256": "539b97b5977bbc7ba62c816534557b102cfd0c722a7f2c65270fce50e5919317"
+          "sha256": "253e47a743583ad86244ad8d4d366f01b2bc3fd61db821a3179f0cb3e0e3f51f"
         },
         {
           "style": "Italic",
           "file": "jetbrainsmono-Italic.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/jetbrainsmono/JetBrainsMono-Italic%5Bwght%5D.ttf",
-          "sha256": "5d2a810184f419bd59088f87a5582fb749e3bbdc69a3c1e3b131792e2bc04b00"
+          "sha256": "0c3a2d557ca6393a590dfcf9459257a876d64bb7fc7050cc64f396869b277d7e"
         },
         {
           "style": "BoldItalic",
           "file": "jetbrainsmono-BoldItalic.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/jetbrainsmono/JetBrainsMono-Italic%5Bwght%5D.ttf",
-          "sha256": "d7961427235dcf94d5c8de3f8090aa0bc5291746912552a42e981fbd9abf95a4"
+          "sha256": "f7264acfc0967b2d0ee88bbb16cd64823979873e4e85ee2230aa7b1f1c28c2cc"
         }
       ]
     },
@@ -1311,13 +1311,13 @@
           "style": "Regular",
           "file": "dancingscript-Regular.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/dancingscript/DancingScript%5Bwght%5D.ttf",
-          "sha256": "7850c32dce87d2920de490230d3374a2d03b168e0cff6a0fbaf98cb73bb026fb"
+          "sha256": "e4930e9f77732b7e10fca5a57cc8f4af81383dfb19140daf3b97861aeed84db9"
         },
         {
           "style": "Bold",
           "file": "dancingscript-Bold.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/dancingscript/DancingScript%5Bwght%5D.ttf",
-          "sha256": "df366d635a44673a4e5219200b3ed6a126126631906cd135d6c77db334b86ed3"
+          "sha256": "79fc4392db2a09eca88f69248fc4a4f9d99c6ecbfbeca7021230dbd25218b040"
         }
       ]
     },
@@ -1329,13 +1329,13 @@
           "style": "Regular",
           "file": "caveat-Regular.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/caveat/Caveat%5Bwght%5D.ttf",
-          "sha256": "12c3213ad90afd279ef47b5ba380b4562f712f66c80df8669bfc1cdd85d70f45"
+          "sha256": "551dc10088236087bfcd869289bce8c219353fd7e796234810ef894772e75957"
         },
         {
           "style": "Bold",
           "file": "caveat-Bold.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/caveat/Caveat%5Bwght%5D.ttf",
-          "sha256": "0ba8281309348e14b4c9ff72be8b2983f592cd433f25f6dc1f1d5307b8f01df0"
+          "sha256": "b91a66e301d60b3ef5df515ecc11e07e7c0047029fe8d7546e9c372d883612c9"
         }
       ]
     },
@@ -1347,7 +1347,7 @@
           "style": "Regular",
           "file": "allura-Regular.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/allura/Allura-Regular.ttf",
-          "sha256": "7f844a683ac0a26232156056e03be3b596c4014f9a88c63892dcb2328f7a9406"
+          "sha256": "8c2e781ef0bed3cf78ca7ee08c62080ae3b694dbcb79b4c655dd0e32f363ceaa"
         }
       ]
     },
@@ -1359,7 +1359,7 @@
           "style": "Regular",
           "file": "courgette-Regular.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/courgette/Courgette-Regular.ttf",
-          "sha256": "037d7fd9a7628bf84efe0b6b7226950d49447f813016a2fce5e8df3bd4925ab8"
+          "sha256": "b115cffe5c0de71b4189e73f32738d0e7e63ee013cd3ee38fb79526390de7c28"
         }
       ]
     },
@@ -1371,13 +1371,13 @@
           "style": "Regular",
           "file": "kalam-Regular.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/kalam/Kalam-Regular.ttf",
-          "sha256": "33e6800328e0f317a10710ec87358421c7511a7f2b121cbd17a123714416610c"
+          "sha256": "bbd97549fe9c811e9dbbc8c570e3993a860e037168bd362736bbeb99878fb8de"
         },
         {
           "style": "Bold",
           "file": "kalam-Bold.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/kalam/Kalam-Bold.ttf",
-          "sha256": "c41ead82dd6c01a095bb331d710f9331ec2ca5d6dc91849e933a69689674cee7"
+          "sha256": "adc5e0f55d79805e012d98d3b5e70286cb050603628c3f368c0ef5e424977f9c"
         }
       ]
     },
@@ -1389,7 +1389,7 @@
           "style": "Regular",
           "file": "patrickhand-Regular.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/patrickhand/PatrickHand-Regular.ttf",
-          "sha256": "7e185967ce75231836b37dcea58cecafe7ce7f488662f77994f82eab7f034f2a"
+          "sha256": "e00c07daaaf735ab1c8d61f2d809d0bd918974f2d9aa2a36fe8257afa117e4ab"
         }
       ]
     },
@@ -1401,7 +1401,7 @@
           "style": "Regular",
           "file": "indieflower-Regular.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/indieflower/IndieFlower-Regular.ttf",
-          "sha256": "79b0a22496a4a5e4bd5cea333726cd4de7d1a009f97664097d7d02cdf62af204"
+          "sha256": "1e14c665cbdd5b5987605516dc26fb08626d9f1c1d6416077d44ce60132b9fd5"
         }
       ]
     },
@@ -1413,7 +1413,7 @@
           "style": "Regular",
           "file": "shadowsintolight-Regular.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/shadowsintolight/ShadowsIntoLight.ttf",
-          "sha256": "b330b2e8e10a6668aed816a5ec58ceb49d02b16bdd361f2d75bf9de67dfc48b9"
+          "sha256": "485f86ef7cc5c315ca220e965926bdd9d2d2f8285cdca46fb0a6affa1b3d1e7e"
         }
       ]
     },
@@ -1425,13 +1425,13 @@
           "style": "Regular",
           "file": "amaticsc-Regular.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/amaticsc/AmaticSC-Regular.ttf",
-          "sha256": "55ce1f23f3d723a591ac50037a9bd3bddf69e8be2a0c6aa198c1d09b060f8814"
+          "sha256": "08da12a6c006fa963e5e47bcd92becf0e027e85586d81203d62b62e374e3a3fd"
         },
         {
           "style": "Bold",
           "file": "amaticsc-Bold.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/amaticsc/AmaticSC-Bold.ttf",
-          "sha256": "a3113a62aec3c10b9f0fe7e369e0e4b08e931bc52d53e8840d5bfccefb758ab7"
+          "sha256": "dd6538c78d5a3cfa596cb7b89d4e79df4181da9b5267267a0ddfe92934aa4059"
         }
       ]
     },
@@ -1443,7 +1443,7 @@
           "style": "Regular",
           "file": "anton-Regular.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/anton/Anton-Regular.ttf",
-          "sha256": "b231dea1eac4ebd281767bf2c411de754c4026d3b0c80472f542c818139f665f"
+          "sha256": "c00b3a36d924d539065266df4c3e9389f8d73a256edf781ed080ac6f8dbc3933"
         }
       ]
     },
@@ -1455,7 +1455,7 @@
           "style": "Regular",
           "file": "archivoblack-Regular.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/archivoblack/ArchivoBlack-Regular.ttf",
-          "sha256": "a53be4edbe87692a205b76d6a0a23c7bafd8392827c4cbd30fcf436c986f5d0a"
+          "sha256": "ffd6995e1e527ca469f1bdbfd501776c0baea6eebede5bd27834e87479bc43ff"
         }
       ]
     },
@@ -1467,7 +1467,7 @@
           "style": "Regular",
           "file": "righteous-Regular.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/righteous/Righteous-Regular.ttf",
-          "sha256": "42c71e96e923161eea73bf33061a77de0abf39fa66e3545c99c7937e9107abae"
+          "sha256": "8b08b7ecc12a20294c00d5350c5042ce555c9aa2f0b83f6ff184af81339adab2"
         }
       ]
     },
@@ -1479,13 +1479,13 @@
           "style": "Regular",
           "file": "comfortaa-Regular.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/comfortaa/Comfortaa%5Bwght%5D.ttf",
-          "sha256": "d9a54a796e94a07f454640230affb5847a16e3b3d98603e10da709f0459daf6a"
+          "sha256": "365bc01b56d2e6fc246c5255fbfefbb2b62b49dbb327f5b903e8788331735025"
         },
         {
           "style": "Bold",
           "file": "comfortaa-Bold.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/comfortaa/Comfortaa%5Bwght%5D.ttf",
-          "sha256": "7743c63acb2517ab6c3d73384813a81358c80e1813df479a95f1a9e4f2e2741a"
+          "sha256": "bc15633087e36bcaaeb18290122fe78178fb8d8ba579d551791d759e06abfc8c"
         }
       ]
     },
@@ -1497,15 +1497,16 @@
           "style": "Regular",
           "file": "cinzel-Regular.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/cinzel/Cinzel%5Bwght%5D.ttf",
-          "sha256": "541a3253165d7cb34fdc1a0de1a6eef9a3f94787779c434143484d8b61121dca"
+          "sha256": "d633fb444377be38113118fc9291369ba125b1222b5ae98ae3d90a531205f42a"
         },
         {
           "style": "Bold",
           "file": "cinzel-Bold.ttf",
           "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/cinzel/Cinzel%5Bwght%5D.ttf",
-          "sha256": "b4ced7e62d0dbb451246df997a9561e34c39217376c1c391ae7bc738acb08f5e"
+          "sha256": "c03301c53a6e18116025bc31babeb598a15edd256145e27a74fcd1de3fefd618"
         }
       ]
     }
-  ]
+  ],
+  "subset": "Latin and Latin Extended, punctuation, currency, arrows and mathematical symbols"
 }
