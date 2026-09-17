@@ -24,3 +24,7 @@ export async function importDocument(file:File,password?:string){
 export async function exportInBrowser(spec:ExportSpec){const result=await rpc<{bytes:Uint8Array<ArrayBuffer>;mime:string}>('export',spec);return new Blob([result.bytes],{type:result.mime});}
 const previews=new Map<string,Promise<string>>();
 export function pagePreview(source:string,index:number,scale:number){const key=`${source}/${index}/${scale}`;let p=previews.get(key);if(!p){p=rpc<Uint8Array<ArrayBuffer>>('render',{source,index,scale}).then(data=>URL.createObjectURL(new Blob([data],{type:'image/png'}))).catch(e=>{previews.delete(key);throw e;});previews.set(key,p);}return p;}
+
+export const detectPdfText=(source:string,index:number)=>rpc<{regions:import('../text-regions').TextRegion[];skipped:number}>('detectText',{source,index});
+export const removePdfText=(source:string,index:number,regionId:string)=>rpc<{id:string;data:string}>('removeText',{source,index,regionId});
+export const fontSupportsText=(data:string,text:string)=>rpc<boolean>('fontSupports',{data,text});

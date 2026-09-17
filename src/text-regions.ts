@@ -1,0 +1,2 @@
+export type TextRegion={id:string;text:string;left:number;top:number;width:number;height:number;size:number;baseline:number;fontName:string;bold:boolean;italic:boolean;color:string;kind:'pdf'|'ocr';quads?:number[][];fontId?:string;fontData?:string;confidence?:number;background?:string};
+export function fallbackFont(name:string){return /courier|mono|consolas/i.test(name)?'Cousine':/times|serif|georgia|garamond/i.test(name)?'PT Serif':/poppins/i.test(name)?'Poppins':'Lato';}

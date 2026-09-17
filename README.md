@@ -6,7 +6,7 @@ A Photopea-inspired visual editor, PDF toolkit, and bundled draw.io diagram edit
 
 ## Start on Windows
 
-1. Get the [prebuilt bide-browser.zip](https://github.com/AOSPAndroid/Bide/releases/download/v0.5.1/bide-browser.zip) and extract the entire ZIP into a **new writable folder**. The app and conversion engines are already included. You should see a `site` folder beside the BAT files.
+1. Get the [prebuilt bide-browser.zip](https://github.com/AOSPAndroid/Bide/releases/download/v0.6.0/bide-browser.zip) and extract the entire ZIP into a **new writable folder**. The app and conversion engines are already included. You should see a `site` folder beside the BAT files.
 2. Use your existing **Node.js 22 or newer**. bide detects `C:\devhome\tools\node24\current\node.exe` or `node.exe` on PATH. With this ZIP, **Install Dependencies.bat is optional**: it only checks your installation and bundled files, with no downloads.
 3. Double-click **launch bide.bat**. It starts the local server in the background and opens the editor in your default browser (use Edge or Chrome).
 
@@ -124,3 +124,9 @@ A configurable layout grid provides non-exporting guides. Named color swatches c
 Double-click **Stop bide.bat** beside the launch BAT. It stops local and LAN-sharing servers started by this version from that same folder, including custom ports and HTTPS, without stopping other Node applications. Save your work and finish conversions/downloads first. Browser tabs remain open. Run `"Stop bide.bat" --no-pause` from scripts. It needs only the same installed Node used to launch bide; there are no downloads or PowerShell commands.
 
 Servers already running from older versions have no stop control channel and must be closed separately (Ctrl+C in their sharing window, or restart Windows for an older detached local server). Install the updated ZIP in a new folder and use its launch/stop pair.
+
+### Edit existing PDF and image text
+
+When a page opens, bide automatically detects native horizontal PDF text. Hover over a detected text region and click it to start typing directly in the workspace. The selected original PDF text is removed from the working copy and replaced by a movable editable text layer. Other PDF content is preserved; Undo restores the source. Embedded TrueType/OpenType fonts with usable Unicode mappings are reused in the browser, .bide project and searchable PDF export. Missing/unusable fonts and unsupported new characters use a bundled substitute with an explicit notice. Font metrics, line wrapping, rotated text and complex PDF layouts may require manual adjustment. Exact font matching is not guaranteed for every PDF.
+
+Images and scanned PDFs use bundled local English OCR automatically on the active page. Click a detected line to create editable text plus a separate background patch. Review OCR wording, suggested font, size, color and patch. Image files contain no original font metadata; textured backgrounds may require Clone/Healing tools. Use Rescan after changing the image, or Ctrl+K → Recognize text on current page. Turn off Edit detected text to work with artwork underneath. Esc deselects a text layer so other detected regions can be clicked. OCR assets are already included in the prebuilt ZIP; there are no runtime downloads or external OCR services.

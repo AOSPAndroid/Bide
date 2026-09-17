@@ -24,6 +24,7 @@ async function fixture(t, built = true) {
     syncBuiltinESMExports();
   `);
   if (built) {
+    for(const file of ['ocr/worker.min.js','ocr/lang/eng.traineddata.gz',...['','-simd','-lstm','-simd-lstm'].flatMap(s=>[`ocr/core/tesseract-core${s}.wasm.js`,`ocr/core/tesseract-core${s}.wasm`])]){await mkdir(join(base,'site',file,'..'),{recursive:true});await writeFile(join(base,'site',file),'test fixture');}
     await mkdir(join(base,'site','office','runtime'),{recursive:true});
     await writeFile(join(base,'site','index.html'),'<title>bide launcher fixture</title>');
     for (const name of ['soffice.js','soffice.wasm','soffice.data','soffice.data.js.metadata']) await writeFile(join(base,'site','office','runtime',name),'test fixture');

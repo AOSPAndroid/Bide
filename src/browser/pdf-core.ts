@@ -3,11 +3,12 @@ import { digest } from './crypto';
 export { selectPages } from '../page-range';
 import * as mupdf from 'mupdf';
 
+import type {TextRegion} from '../text-regions';
 import { svgToPdf } from './svg-pdf';
 
 
 
-export type PageSpec = { width: number; height: number; source?: string; index: number; svg: string };
+export type PageSpec = { width: number; height: number; source?: string; index: number; svg: string; fonts?:Record<string,string> };
 
 export type ExportSpec = { pages: PageSpec[]; title: string; format: string; compression: string; range: string; dpi: number; rotation?: number; password?: string; crop?: { left: number; top: number; right: number; bottom: number } };
 
@@ -245,7 +246,7 @@ export async function compose(spec: ExportSpec) {
 
    if(entry.source){const data=sources.get(entry.source);if(!data)throw new Error('A source PDF is missing. Reopen your project.');add(data,entry.index,'Source');}
 
-   if(entry.svg){validateArtwork(entry.svg);add(await svgToPdf(entry.svg,entry.width,entry.height),0,'Artwork');}
+   if(entry.svg){validateArtwork(entry.svg);add(await svgToPdf(entry.svg,entry.width,entry.height,entry.fonts),0,'Artwork');}
 
    const rotation=(((spec.rotation||0)%360+360)%360) as mupdf.Rotate;
 
@@ -399,4 +400,19 @@ export async function exportDocument(spec: ExportSpec) {
 
   }finally{doc.destroy();mupdf.shrinkStore(20);}
 
+}
+
+const cleanFontName=(name:string)=>name.replace(/^[A-Z]{6}\+/,'').replace(/[^a-z0-9]/gi,'').toLowerCase();
+export function fontSupportsText(data:string,text:string){let font:mupdf.Font|undefined;try{font=new mupdf.Font('embedded',toBytes(data));return [...text].every(c=>/\s/.test(c)||font!.encodeCharacter(c)>0);}catch{return false;}finally{font?.destroy();}}
+export function detectPdfText(source:string,index:number){
+ const data=sources.get(source);if(!data)throw new Error('PDF source unavailable');const doc=open(data) as mupdf.PDFDocument;const page=doc.loadPage(index);const bounds=page.getBounds();const structured=page.toStructuredText('preserve-whitespace');
+ const fonts=new Map<string,{id:string;data:string}>();let budget=0,visited=0;const seen=new Set<number>();
+ const resources=(res:mupdf.PDFObject,depth=0)=>{if(depth>8||++visited>128||res.isNull())return;res.get('Font').forEach((font)=>{try{const base=font.get('BaseFont').asName();let descriptor=font.get('FontDescriptor');if(descriptor.isNull())descriptor=font.get('DescendantFonts',0,'FontDescriptor');let stream=descriptor.get('FontFile2');if(stream.isNull()){stream=descriptor.get('FontFile3');if(stream.get('Subtype').asName()!=='OpenType')return;}if(!stream.isStream())return;const buffer=stream.readStream();try{const bytes=buffer.asUint8Array();if(bytes.length>4e6||budget+bytes.length>16e6)return;budget+=bytes.length;fonts.set(cleanFontName(base),{id:'PDFfont-'+source.slice(0,12)+'-'+font.asIndirect(),data:toBase64(bytes)});}finally{buffer.destroy();}}catch{}});res.get('XObject').forEach(obj=>{const id=obj.asIndirect();if(id&&seen.has(id))return;if(id)seen.add(id);resources(obj.get('Resources'),depth+1);});};
+ const regions:TextRegion[]=[];let current:TextRegion|undefined,horizontal=true,skipped=0;
+ const flush=()=>{if(current?.text.trim()){current.id='text-'+regions.length;const embedded=fonts.get(cleanFontName(current.fontName));if(embedded&&fontSupportsText(embedded.data,current.text)){current.fontId=embedded.id;current.fontData=embedded.data;}regions.push(current);}current=undefined;};
+ try{resources(page.getObject().getInheritable('Resources'));structured.walk({beginLine(_bbox,wmode,dir){flush();horizontal=wmode===0&&Math.abs(dir[0]-1)<.01&&Math.abs(dir[1])<.01;if(!horizontal)skipped++;},onChar(char,origin,font,size,quad,color){if(!horizontal||regions.length>=2000)return;const name=font.getName();const rgb=color.length===1?[color[0],color[0],color[0]]:color;const fill='#'+rgb.slice(0,3).map(v=>Math.round(Math.max(0,Math.min(1,v))*255).toString(16).padStart(2,'0')).join('');if(current&&(current.fontName!==name||Math.abs(current.size-size)>.1||current.color!==fill))flush();const xs=[quad[0],quad[2],quad[4],quad[6]],ys=[quad[1],quad[3],quad[5],quad[7]],left=Math.min(...xs)-bounds[0],top=Math.min(...ys)-bounds[1],right=Math.max(...xs)-bounds[0],bottom=Math.max(...ys)-bounds[1];if(!current)current={id:'',text:'',left,top,width:right-left,height:bottom-top,size,baseline:origin[1]-bounds[1],fontName:name,bold:font.isBold(),italic:font.isItalic(),color:fill,kind:'pdf',quads:[]};const r=Math.max(current.left+current.width,right),b=Math.max(current.top+current.height,bottom);current.left=Math.min(current.left,left);current.top=Math.min(current.top,top);current.width=r-current.left;current.height=b-current.top;current.text+=char;current.quads!.push([...quad]);},endLine:flush});flush();return {regions,skipped};}finally{structured.destroy();page.destroy();doc.destroy();}
+}
+export async function removePdfText(source:string,index:number,regionId:string){
+ const region=detectPdfText(source,index).regions.find(r=>r.id===regionId);if(!region)throw new Error('Text changed. Select the detected text again.');const data=sources.get(source)!;const doc=open(data) as mupdf.PDFDocument;const page=doc.loadPage(index);
+ try{if(page.getAnnotations().some(a=>a.getType()==='Redact'))throw new Error('This page has pending redactions. Resolve them before editing text.');const links=page.getLinks().map(link=>({bounds:link.getBounds(),uri:link.getURI()}));const annotation=page.createAnnotation('Redact');annotation.setQuadPoints(region.quads as mupdf.Quad[]);page.applyRedactions(false,mupdf.PDFPage.REDACT_IMAGE_NONE,mupdf.PDFPage.REDACT_LINE_ART_NONE,mupdf.PDFPage.REDACT_TEXT_REMOVE);const remaining=page.getLinks().map(link=>({bounds:link.getBounds(),uri:link.getURI()}));for(const link of links)if(!remaining.some(other=>other.uri===link.uri&&other.bounds.every((v,i)=>v===link.bounds[i])))page.createLink(link.bounds,link.uri).destroy();return await register(bytesOf(doc.saveToBuffer(opts)));}finally{page.destroy();doc.destroy();}
 }

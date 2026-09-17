@@ -156,3 +156,7 @@ Verified a real browser import/export of the generated grouped PSD: hierarchy, t
 - All font files and their SIL Open Font Licenses ship in the app. No internet or font installation is needed at runtime. Six body-text families include real regular, bold, italic and bold-italic faces; display/script families use regular faces with synthesized bold/italic when requested. Existing system fonts still depend on the device.
 - Font selection waits for loading before measuring canvas text; project restoration and multipage exports load fonts before rendering. New text boxes use the last font selected in that session.
 - PDF export embeds the selected bundled fonts and retains searchable text on pages without rasterizing effects. 34 tests pass, including font identity and searchable accented text in exported PDFs.
+
+## 0.6.0 text recognition and editing
+
+Automatic native PDF text regions and local English OCR for image/scanned pages; click a region to create a directly editable layer. Usable embedded TrueType/OpenType fonts survive project save and PDF export. Unsupported fonts or missing glyphs use a stated fallback. Native PDF replacements remove source text while retaining surrounding artwork; image replacements use adjustable background patches. Rotated/native complex layouts and exact image font recognition are not fully supported.

@@ -1,6 +1,6 @@
 {
   "name": "bide",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -11,8 +11,9 @@
     "test": "node scripts/test-browser.mjs",
     "assets:office": "node scripts/fetch-office.mjs",
     "assets:diagrams": "node scripts/fetch-diagrams.mjs",
-    "prebuild": "node scripts/check-assets.mjs",
-    "build:demo": "tsc -b && vite build --mode demo"
+    "prebuild": "node scripts/prepare-ocr.mjs && node scripts/check-assets.mjs",
+    "build:demo": "tsc -b && vite build --mode demo",
+    "assets:ocr": "node scripts/prepare-ocr.mjs"
   },
   "dependencies": {
     "@noble/hashes": "1.8.0",
@@ -25,9 +26,11 @@
     "pdfkit": "^0.20.2",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "svg-to-pdfkit": "^0.1.8"
+    "svg-to-pdfkit": "^0.1.8",
+    "tesseract.js": "6.0.1"
   },
   "devDependencies": {
+    "@tesseract.js-data/eng": "1.0.0",
     "@types/pdfkit": "^0.17.6",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",

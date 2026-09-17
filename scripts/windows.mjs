@@ -11,7 +11,7 @@ import {setTimeout as delay} from 'node:timers/promises';
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const runtime = join(projectRoot, '.runtime');
-const releaseUrl = 'https://github.com/AOSPAndroid/Bide/releases/download/v0.5.1/bide-browser.zip';
+const releaseUrl = 'https://github.com/AOSPAndroid/Bide/releases/download/v0.6.0/bide-browser.zip';
 const officeFiles = ['soffice.js', 'soffice.wasm', 'soffice.data', 'soffice.data.js.metadata'];
 const exists = async path => { try { return (await stat(path)).isFile(); } catch { return false; } };
 const jsonFile = async path => JSON.parse((await readFile(path, 'utf8')).replace(/^\uFEFF/, ''));
@@ -27,6 +27,7 @@ async function siteRoot() {
     for (const file of ['index.html','js/app.min.js','js/bootstrap.js','bide-build.json']) if (!await exists(join(root,'diagrams','runtime',file))) {
       throw new Error(`The bundled diagram editor is incomplete (${file} missing). Extract the complete bide-browser.zip.\n${releaseUrl}\nNo downloads were attempted.`);
     }
+    for(const file of ['ocr/worker.min.js','ocr/lang/eng.traineddata.gz',...['','-simd','-lstm','-simd-lstm'].flatMap(s=>[`ocr/core/tesseract-core${s}.wasm.js`,`ocr/core/tesseract-core${s}.wasm`])])if(!await exists(join(root,file)))throw new Error('The bundled OCR engine is incomplete. Extract the complete bide-browser.zip. No downloads were attempted.');
     return root;
   }
   throw new Error(`This folder contains source code or an incomplete app. It is not the ready-to-run package.\nGet bide-browser.zip from:\n${releaseUrl}\nExtract the entire ZIP into a new folder and run the BAT files beside the site folder.\nNo downloads were attempted. Developers can explicitly run Install Dependencies.bat --build-source to build from source (network access may be needed).`);
