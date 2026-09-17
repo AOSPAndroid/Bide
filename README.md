@@ -6,7 +6,7 @@ A Photopea-inspired visual editor, PDF toolkit, and bundled draw.io diagram edit
 
 ## Start on Windows
 
-1. Get the [prebuilt bide-browser.zip](https://github.com/AOSPAndroid/Bide/releases/download/v0.5.0/bide-browser.zip) and extract the entire ZIP into a **new writable folder**. The app and conversion engines are already included. You should see a `site` folder beside the BAT files.
+1. Get the [prebuilt bide-browser.zip](https://github.com/AOSPAndroid/Bide/releases/download/v0.5.1/bide-browser.zip) and extract the entire ZIP into a **new writable folder**. The app and conversion engines are already included. You should see a `site` folder beside the BAT files.
 2. Use your existing **Node.js 22 or newer**. bide detects `C:\devhome\tools\node24\current\node.exe` or `node.exe` on PATH. With this ZIP, **Install Dependencies.bat is optional**: it only checks your installation and bundled files, with no downloads.
 3. Double-click **launch bide.bat**. It starts the local server in the background and opens the editor in your default browser (use Edge or Chrome).
 
@@ -118,3 +118,9 @@ The **Zoom tool (Z)** magnifies around the clicked point. **Alt-click** reverses
 The Properties panel includes **Design & layout**: Phone, Tablet, Desktop, Presentation and Social artboard presets (each creates a page), six alignment controls, equal horizontal/vertical spacing, and one-click row/column arrangement with a chosen gap. Aligning one layer uses the page; multiple layers align within their combined bounds. Distribution needs three unlocked layers. Arrangement needs two. Changes support Undo. Rectangles have editable corner radius.
 
 A configurable layout grid provides non-exporting guides. Named color swatches can be saved in the browser and applied to selected layers; they set fills without creating linked styles. Commands are searchable through Ctrl+K. This is a set of Figma-inspired design helpers, not Figma file import, nested frames, responsive Auto Layout, linked components or multiplayer editing.
+
+### Stop bide
+
+Double-click **Stop bide.bat** beside the launch BAT. It stops local and LAN-sharing servers started by this version from that same folder, including custom ports and HTTPS, without stopping other Node applications. Save your work and finish conversions/downloads first. Browser tabs remain open. Run `"Stop bide.bat" --no-pause` from scripts. It needs only the same installed Node used to launch bide; there are no downloads or PowerShell commands.
+
+Servers already running from older versions have no stop control channel and must be closed separately (Ctrl+C in their sharing window, or restart Windows for an older detached local server). Install the updated ZIP in a new folder and use its launch/stop pair.

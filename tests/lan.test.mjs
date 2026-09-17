@@ -60,7 +60,7 @@ test('HTTP serves streaming assets and isolation headers, supports HEAD, rejects
   assert.equal(wasm.headers.get('content-type'),'application/wasm'); assert.equal(wasm.headers.get('content-length'),'4'); assert.equal(await wasm.text(),'');
   assert.equal((await fetch(origin,{method:'POST',body:'a document'})).status,405);
   for (const path of ['/linked/secret.txt','/.runtime/secret.txt','/%2e%2e%5c.runtime/secret.txt','/%00','/missing']) assert.equal((await fetch(origin+path)).status,404,path);
-  assert.deepEqual(await (await fetch(origin+'/__bide/status')).json(), {application:'bide-browser',root});
+  assert.deepEqual(await (await fetch(origin+'/__bide/status')).json(), {application:'bide-browser',root,stopSupported:false});
 });
 
 test('LAN configuration has explicit defaults and validated custom ports', async t => {

@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {spawnSync} from 'node:child_process';
+import {spawn,spawnSync} from 'node:child_process';
 import {mkdtemp, mkdir, writeFile, copyFile, readdir, rm} from 'node:fs/promises';
 import {join, resolve} from 'node:path';
 import {tmpdir} from 'node:os';
@@ -14,7 +14,7 @@ async function fixture(t, built = true) {
   assert.ok(resolve(base).startsWith(resolve(tmpdir(),'bide installed node test-')));
   t.after(() => rm(base,{recursive:true,force:true}));
   await mkdir(join(base,'scripts'));
-  for (const name of ['scripts/windows.mjs','scripts/bide.cmd','Install Dependencies.bat','launch bide.bat','share bide.bat']) await copyFile(new URL('../'+name,import.meta.url),join(base,name));
+  for (const name of ['scripts/windows.mjs','scripts/server-control.mjs','scripts/serve.mjs','scripts/bide.cmd','Install Dependencies.bat','launch bide.bat','share bide.bat','Stop bide.bat']) await copyFile(new URL('../'+name,import.meta.url),join(base,name));
   // Any download attempt is an error. Node/npm/PowerShell are absent from PATH.
   await writeFile(join(base,'no-network.mjs'), `
     import http from 'node:http'; import https from 'node:https'; import net from 'node:net';
@@ -76,4 +76,12 @@ test('source checkout install and launch give the prebuilt link without attempti
     assert.doesNotMatch(result.stderr,/network request forbidden/);
   }
   assert.equal((await readdir(base)).includes('.runtime'),false);
+});
+
+test('Stop BAT works without built assets or a running server and never downloads', {skip:!windows}, async t=>{const base=await fixture(t,false);const result=check(base,process.execPath,'call "Stop bide.bat" --no-pause');assert.equal(result.status,0,result.stdout+result.stderr);assert.match(result.stdout,/No running bide servers registered/);});
+
+test('Stop BAT shuts down an actual locally launched server', {skip:!windows}, async t=>{
+ const base=await fixture(t);const child=spawn(process.execPath,[join(base,'scripts','serve.mjs')],{cwd:base,env:{...process.env,BIDE_ROOT:join(base,'site'),BIDE_PORT:'0'},windowsHide:true,stdio:'ignore'});t.after(()=>child.kill());
+ let ready=false;for(let i=0;i<100;i++){try{if((await readdir(join(base,'.runtime','servers'))).length){ready=true;break;}}catch{}await new Promise(r=>setTimeout(r,30));}assert.ok(ready,'Server registered its control endpoint');
+ const env={...process.env,BIDE_NODE:process.execPath};delete env.NODE_OPTIONS;const result=spawnSync(commandPrompt,['/d','/s','/c','call "Stop bide.bat" --no-pause'],{cwd:base,env,encoding:'utf8',timeout:15000,windowsHide:true,windowsVerbatimArguments:true});assert.equal(result.status,0,result.stdout+result.stderr);assert.match(result.stdout,/Stopped 1 bide server/);for(let i=0;i<50&&child.exitCode===null;i++)await new Promise(r=>setTimeout(r,20));assert.equal(child.exitCode,0);
 });

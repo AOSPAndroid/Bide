@@ -1,4 +1,5 @@
 // Windows launcher using the installed Node runtime; no PowerShell or policy changes.
+import {stopRegisteredServers} from './server-control.mjs';
 import {spawn, spawnSync} from 'node:child_process';
 import {openSync, closeSync} from 'node:fs';
 import {mkdir, readFile, writeFile, stat, copyFile} from 'node:fs/promises';
@@ -10,7 +11,7 @@ import {setTimeout as delay} from 'node:timers/promises';
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const runtime = join(projectRoot, '.runtime');
-const releaseUrl = 'https://github.com/AOSPAndroid/Bide/releases/download/v0.5.0/bide-browser.zip';
+const releaseUrl = 'https://github.com/AOSPAndroid/Bide/releases/download/v0.5.1/bide-browser.zip';
 const officeFiles = ['soffice.js', 'soffice.wasm', 'soffice.data', 'soffice.data.js.metadata'];
 const exists = async path => { try { return (await stat(path)).isFile(); } catch { return false; } };
 const jsonFile = async path => JSON.parse((await readFile(path, 'utf8')).replace(/^\uFEFF/, ''));
@@ -92,7 +93,7 @@ async function launch(root, noBrowser) {
   for (const candidate of ports) {
     if (!await busy(candidate)) { port = candidate; break; }
     const info = await status(candidate) || await status(candidate, '/__folio/status');
-    if (['bide-browser', 'folio-studio-browser'].includes(info?.application) && samePath(info.root, root)) { port = candidate; reuse = true; break; }
+    if (['bide-browser', 'folio-studio-browser'].includes(info?.application) && samePath(info.root, root) && info.stopSupported) { port = candidate; reuse = true; break; }
   }
   if (!port) throw new Error('All local ports 8766-8785 are busy. Close another local preview and try again.');
   if (!reuse) {
@@ -106,7 +107,7 @@ async function launch(root, noBrowser) {
     for (let attempt = 0; attempt < 40; attempt++) {
       if (failed || child.exitCode !== null) break;
       const info = await status(port);
-      if (info?.application === 'bide-browser' && samePath(info.root, root)) { ready = true; break; }
+      if (info?.application === 'bide-browser' && samePath(info.root, root) && info.stopSupported) { ready = true; break; }
       await delay(250);
     }
     if (!ready) { child.kill(); child.unref(); throw new Error('The local server did not start. See .runtime/server-error.log.'); }
@@ -115,7 +116,7 @@ async function launch(root, noBrowser) {
   }
   const url = `http://127.0.0.1:${port}`;
   console.log(`bide is running at ${url}`);
-  console.log('The launcher can close. The local server keeps running until Windows shuts down.');
+  console.log('The launcher can close. Run Stop bide.bat to stop local and shared servers from this folder.');
   if (!noBrowser && process.platform === 'win32') {
     const opener = spawn(join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'rundll32.exe'), ['url.dll,FileProtocolHandler', url], {windowsHide:true, detached:true, stdio:'ignore'});
     opener.on('error', () => console.log(`Open ${url} in your browser.`)); opener.unref();
@@ -127,7 +128,8 @@ async function main() {
   console.log(`Using installed Node.js ${process.version} (${process.execPath}).`);
   process.chdir(projectRoot);
   const [action, ...args] = process.argv.slice(2);
-  if (!['install', 'launch', 'share'].includes(action)) throw new Error('Use Install Dependencies.bat, launch bide.bat or share bide.bat.');
+  if (!['install', 'launch', 'share', 'stop'].includes(action)) throw new Error('Use Install Dependencies.bat, launch bide.bat, share bide.bat or Stop bide.bat.');
+  if(action==='stop'){const result=await stopRegisteredServers(projectRoot);console.log(result.stopped?`Stopped ${result.stopped} bide server(s) from this folder.`:'No running bide servers registered by this version in this folder.');if(result.stale)console.log('Removed stale server records.');if(result.failed)throw new Error('Some servers could not be stopped. Close their sharing windows and try again.');console.log('Other Node applications were not stopped. Servers started by older versions must be closed separately.');return;}
   if (action === 'install' && args.includes('--build-source')) { await mkdir(runtime, {recursive:true}); await buildSource(); }
   const root = await siteRoot();
   if (action === 'install') { console.log('Ready. No downloads or npm installation are needed for this built app.\nRun launch bide.bat or share bide.bat.'); return; }

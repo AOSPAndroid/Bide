@@ -5,6 +5,7 @@ import {createReadStream} from 'node:fs';
 import {readFile, realpath, stat} from 'node:fs/promises';
 import {resolve, extname, sep, isAbsolute} from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {registerServerControl} from './server-control.mjs';
 import {networkInterfaces} from 'node:os';
 
 const types = {'.html':'text/html; charset=utf-8', '.js':'application/javascript', '.css':'text/css', '.svg':'image/svg+xml', '.wasm':'application/wasm', '.json':'application/json', '.png':'image/png', '.jpg':'image/jpeg', '.jpeg':'image/jpeg', '.gif':'image/gif', '.webp':'image/webp', '.ico':'image/x-icon', '.ttf':'font/ttf', '.woff':'font/woff', '.woff2':'font/woff2', '.xml':'application/xml; charset=utf-8', '.txt':'text/plain; charset=utf-8', '.properties':'text/plain; charset=utf-8'};
@@ -27,7 +28,7 @@ export async function createBideServer({root, tls}) {
       if (pathname === '/__bide/status') {
         res.writeHead(200, {'Content-Type':'application/json', 'Cache-Control':'no-store'});
         // Local launchers need the root to identify their server; LAN visitors do not.
-        res.end(req.method === 'HEAD' ? undefined : JSON.stringify({application:'bide-browser', ...(loopback(req.socket.remoteAddress) ? {root} : {})}));
+        res.end(req.method === 'HEAD' ? undefined : JSON.stringify({application:'bide-browser', ...(loopback(req.socket.remoteAddress) ? {root,stopSupported:server.bideStopSupported===true} : {})}));
         return;
       }
       const parts = pathname.split(/[\\/]/);
@@ -50,7 +51,8 @@ export async function createBideServer({root, tls}) {
       res.writeHead(404, {'Content-Type':'text/plain; charset=utf-8'}); res.end(req.method === 'HEAD' ? undefined : 'Not found');
     }
   };
-  return tls ? createHttpsServer(tls, handler) : createHttpServer(handler);
+  const server=tls ? createHttpsServer(tls, handler) : createHttpServer(handler);
+  return server;
 }
 
 export async function readLanSettings(projectRoot, root, portOverride) {
@@ -92,6 +94,8 @@ async function main() {
     : {host:'127.0.0.1', port:Number(process.env.BIDE_PORT || 8766)};
   const server = await createBideServer({root, tls:settings.tls});
   await new Promise((ready, reject) => { server.once('error', reject); server.listen(settings.port, settings.host, ready); });
+  let stop;try{stop=await registerServerControl(server,process.cwd());server.bideStopSupported=true;}catch(error){server.closeAllConnections();server.close();throw error;}
+  for(const signal of ['SIGINT','SIGTERM'])process.once(signal,()=>{stop().catch(error=>{console.error(error.message);process.exitCode=1;});});
   const scheme = settings.tls ? 'https' : 'http';
   if (lan) {
     console.log('\nbide is available on your internal network. Keep this window open; Ctrl+C stops sharing.');

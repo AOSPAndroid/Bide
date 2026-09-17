@@ -112,3 +112,5 @@ The demo at https://bide-demo.dalilooksk.chatgpt.site serves `out/`, built with 
 The demo bundles PDF/image tools and draw.io. It excludes the Office runtime: soffice.wasm and soffice.data exceed Cloudflare Static Assets' 25 MiB per-file limit. Office imports show an immediate local-edition explanation rather than attempting a missing download. The regular local build keeps Office support. Static isolation headers are in `_headers`. No documents, credentials, autosaves or local runtime state are deployed. Public access lets anyone visit the app, not other visitors' documents.
 
 On narrow phones the demo starts on the PDF tools home. Tap Workspaces to switch sections; landscape or desktop gives more room for detailed editing. Supported browsers can also use the optional WebMCP get_workspace/open_workspace navigation tools.
+
+To end local or LAN hosting, run **Stop bide.bat** in the same installation folder. It stops only servers registered by this version from that folder, including HTTPS/custom-port servers. It does not close browser tabs or stop unrelated Node applications. Older running versions must be closed separately.
