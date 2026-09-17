@@ -6,7 +6,7 @@ A Photopea-inspired visual editor, PDF toolkit, and bundled draw.io diagram edit
 
 ## Start on Windows
 
-1. Get the [prebuilt bide-browser.zip](https://github.com/AOSPAndroid/Bide/releases/download/v0.4.8/bide-browser.zip) and extract the entire ZIP into a **new writable folder**. The app and conversion engines are already included. You should see a `site` folder beside the BAT files.
+1. Get the [prebuilt bide-browser.zip](https://github.com/AOSPAndroid/Bide/releases/download/v0.4.9/bide-browser.zip) and extract the entire ZIP into a **new writable folder**. The app and conversion engines are already included. You should see a `site` folder beside the BAT files.
 2. Use your existing **Node.js 22 or newer**. bide detects `C:\devhome\tools\node24\current\node.exe` or `node.exe` on PATH. With this ZIP, **Install Dependencies.bat is optional**: it only checks your installation and bundled files, with no downloads.
 3. Double-click **launch bide.bat**. It starts the local server in the background and opens the editor in your default browser (use Edge or Chrome).
 
@@ -110,3 +110,5 @@ bide is independent and is not affiliated with Photopea, iLovePDF or draw.io. Th
 Select an image layer and use **M** (rectangle) or **L** (lasso), then **Ctrl+C / Ctrl+V** to paste the cropped pixels as a new layer. Move it with **V**, adjust Layers opacity, and use **Warp** for a nine-point grid deformation. **E** soft-erases the selected layer with configurable size and edge softness. Right-click a layer and choose **Merge Down**, or press **Ctrl+E**. PDF export is now **Ctrl+Shift+E**.
 
 Use **S** for Clone Stamp or **J** for Healing Brush. **Alt-click** samples visible image/design artwork; drag to paint a separate patch layer. Healing preserves sampled texture while matching local destination color. It is basic color-matched healing, not content-aware reconstruction. Warp, erasing and merging rasterize the affected layers; Undo restores the originals. Merge Down requires two visible, unlocked Normal-blend layers. Clone/heal require an image/design page; PDF annotation layers can still be erased. Raster retouching is limited to 16 megapixels and warp to 4 megapixels.
+
+The **Zoom tool (Z)** magnifies around the clicked point. **Alt-click** reverses its direction; drag right/left for smooth zoom. Choose + or - in its options bar, **100%** for actual size, or **Fit page**. Zoom stays between 10% and 800% and never changes the artwork.
