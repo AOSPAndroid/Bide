@@ -1,3 +1,4 @@
+import {extendedFonts} from './font-library';
 import addedLiberationSansRegular from './browser/fonts/LiberationSans-Regular.ttf';
 import addedLiberationSansBold from './browser/fonts/LiberationSans-Bold.ttf';
 import addedLiberationSansItalic from './browser/fonts/LiberationSans-Italic.ttf';
@@ -49,6 +50,7 @@ import font27 from './browser/fonts/extra/AbrilFatface-Regular.ttf';
 import font28 from './browser/fonts/extra/GreatVibes-Regular.ttf';
 import font29 from './browser/fonts/extra/Sacramento-Regular.ttf';
 export const bundledFonts=[
+...extendedFonts,
 {family:"Liberation Sans",category:"sans",faces:[{style:"Regular",url:addedLiberationSansRegular},{style:"Bold",url:addedLiberationSansBold},{style:"Italic",url:addedLiberationSansItalic},{style:"BoldItalic",url:addedLiberationSansBoldItalic}]},
 {family:"Liberation Serif",category:"serif",faces:[{style:"Regular",url:addedLiberationSerifRegular},{style:"Bold",url:addedLiberationSerifBold},{style:"Italic",url:addedLiberationSerifItalic},{style:"BoldItalic",url:addedLiberationSerifBoldItalic}]},
 {family:"Liberation Mono",category:"mono",faces:[{style:"Regular",url:addedLiberationMonoRegular},{style:"Bold",url:addedLiberationMonoBold},{style:"Italic",url:addedLiberationMonoItalic},{style:"BoldItalic",url:addedLiberationMonoBoldItalic}]},
@@ -66,5 +68,5 @@ export const bundledFonts=[
 {family:"Abril Fatface",category:"display",faces:[{style:"Regular",url:font27}]},
 {family:"Great Vibes",category:"script",faces:[{style:"Regular",url:font28}]},
 {family:"Sacramento",category:"script",faces:[{style:"Regular",url:font29}]}
-];
+].sort((a,b)=>a.family.localeCompare(b.family));
 export const systemFonts=['Arial','Georgia','Times New Roman','Courier New','Verdana','Trebuchet MS','cursive'];

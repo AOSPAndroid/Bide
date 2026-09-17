@@ -18,3 +18,5 @@ The source bundle accompanies this local handoff. Public or commercial redistrib
 - Tesseract.js 6.0.1 and tesseract.js-core: Apache-2.0; bundled local OCR worker and WASM. See public/licenses/tesseract-LICENSE.txt and tesseract-core-LICENSE.txt. English and French tessdata is packaged from @tesseract.js-data/eng and @tesseract.js-data/fra 1.0.0 (package MIT; trained data from the Tesseract project). OCR runs locally; no third-party OCR service receives documents.
 
 - Carlito and Caladea: SIL Open Font License 1.1, unmodified static TTFs from https://github.com/google/fonts/tree/main/ofl/carlito and https://github.com/google/fonts/tree/main/ofl/caladea . License copies are bundled in public/licenses.
+
+- Extended font library: 63 additional families from Google Fonts, SIL Open Font License 1.1. Per-family licenses are in public/licenses/fonts. scripts/font-library-manifest.json records the upstream revision, source URLs and output hashes. Variable fonts are instantiated into static faces at build preparation time with fontTools; derivatives have internal bide-prefixed names. End users need no font installation or downloads.

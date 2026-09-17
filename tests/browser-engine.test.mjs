@@ -67,7 +67,7 @@ test('crop changes visible dimensions, retains searchable content and survives r
 
 
 test('bundled text fonts embed in PDFs instead of substituting Liberation Sans',async()=>{
- for(const [family,psName,style] of [['Lato','Lato-BoldItalic','font-weight="bold" font-style="italic"'],['Poppins','Poppins-Regular',''],['PT Serif','PTSerif-Regular',''],['Cousine','Cousine-Regular',''],['Pacifico','Pacifico-Regular',''],['Carlito','Carlito-BoldItalic','font-weight="bold" font-style="italic"'],['Caladea','Caladea-Regular',''],['Liberation Serif','LiberationSerif',''],['Liberation Mono','LiberationMono',''],['Liberation Sans','LiberationSans','']]){
+ for(const [family,psName,style] of [['Lato','Lato-BoldItalic','font-weight="bold" font-style="italic"'],['Poppins','Poppins-Regular',''],['PT Serif','PTSerif-Regular',''],['Cousine','Cousine-Regular',''],['Pacifico','Pacifico-Regular',''],['Inter','bide-inter-Regular',''],['Montserrat','bide-montserrat-BoldItalic','font-weight="bold" font-style="italic"'],['Dancing Script','bide-dancingscript-Regular',''],['Carlito','Carlito-BoldItalic','font-weight="bold" font-style="italic"'],['Caladea','Caladea-Regular',''],['Liberation Serif','LiberationSerif',''],['Liberation Mono','LiberationMono',''],['Liberation Sans','LiberationSans','']]){
   const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="500" height="150"><text x="10" y="70" font-size="28" font-family="${family}" ${style}>Font sample café</text></svg>`;
   const {bytes}=await exportDocument({...spec,pages:[{width:500,height:150,index:0,svg}]});
   const d=mupdf.Document.openDocument(bytes,'pdf'),p=d.loadPage(0),t=p.toStructuredText('');

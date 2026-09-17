@@ -6,7 +6,7 @@ A Photopea-inspired visual editor, PDF toolkit, and bundled draw.io diagram edit
 
 ## Start on Windows
 
-1. Get the [prebuilt bide-browser.zip](https://github.com/AOSPAndroid/Bide/releases/download/v0.6.1/bide-browser.zip) and extract the entire ZIP into a **new writable folder**. The app and conversion engines are already included. You should see a `site` folder beside the BAT files.
+1. Get the [prebuilt bide-browser.zip](https://github.com/AOSPAndroid/Bide/releases/download/v0.7.0/bide-browser.zip) and extract the entire ZIP into a **new writable folder**. The app and conversion engines are already included. You should see a `site` folder beside the BAT files.
 2. Use your existing **Node.js 22 or newer**. bide detects `C:\devhome\tools\node24\current\node.exe` or `node.exe` on PATH. With this ZIP, **Install Dependencies.bat is optional**: it only checks your installation and bundled files, with no downloads.
 3. Double-click **launch bide.bat**. It starts the local server in the background and opens the editor in your default browser (use Edge or Chrome).
 
@@ -131,4 +131,6 @@ When a page opens, bide automatically detects native horizontal PDF text. Hover 
 
 Images and scanned PDFs use bundled local English and French OCR automatically on the active page. Click a detected line to create editable text plus a separate background patch. Review OCR wording, suggested font, size, color and patch. Image files contain no original font metadata; textured backgrounds may require Clone/Healing tools. Use Rescan after changing the image, or Ctrl+K → Recognize text on current page. Turn off Edit detected text to work with artwork underneath. Esc deselects a text layer so other detected regions can be clicked. OCR assets are already included in the prebuilt ZIP; there are no runtime downloads or external OCR services.
 
-OCR recognizes English and French together, including mixed-language pages. Before converting an image text region, choose **OCR font** in the detection bar; afterward use **Font family**. There are 17 offline font families, including Liberation Sans/Serif/Mono, Carlito and Caladea. Exact image font identification is not automatic.
+OCR recognizes English and French together, including mixed-language pages. Before converting an image text region, choose **OCR font** in the detection bar; afterward use **Font family**. There are 80 offline font families, including Liberation Sans/Serif/Mono, Carlito and Caladea. Exact image font identification is not automatic.
+
+The 80 offline families include Inter, Roboto, Open Sans, Montserrat, Merriweather, Playfair Display, EB Garamond, Source Code Pro, Dancing Script and many more. Font menus are alphabetical. Use Ctrl+K and search a font name to apply it to selected text. The same fonts are available for OCR replacements and embedded PDF exports. Fonts load locally when selected. Available bold/italic faces are included; decorative families without those faces use synthetic styling.

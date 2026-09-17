@@ -1,3 +1,3 @@
 /// <reference types="vite/client" />
 export const PUBLIC_DEMO = import.meta.env.MODE === 'demo';
-export const DOWNLOAD_URL = 'https://github.com/AOSPAndroid/Bide/releases/download/v0.6.1/bide-browser.zip';
+export const DOWNLOAD_URL = 'https://github.com/AOSPAndroid/Bide/releases/download/v0.7.0/bide-browser.zip';

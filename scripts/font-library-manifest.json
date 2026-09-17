@@ -1,0 +1,1511 @@
+{
+  "revision": "ea9bc40cb0323afec81e7f1005453eea36f51708",
+  "families": [
+    {
+      "family": "Roboto",
+      "category": "sans",
+      "faces": [
+        {
+          "style": "Regular",
+          "file": "roboto-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/roboto/Roboto%5Bwdth%2Cwght%5D.ttf",
+          "sha256": "e634fc17fa63dd30981ac7486a06a9f416f79e66d2a262929c9bda6c97e36974"
+        },
+        {
+          "style": "Bold",
+          "file": "roboto-Bold.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/roboto/Roboto%5Bwdth%2Cwght%5D.ttf",
+          "sha256": "b4efe95b51af06c28550e943bd2615264eefca320036c16dfff48fc94432cac5"
+        },
+        {
+          "style": "Italic",
+          "file": "roboto-Italic.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/roboto/Roboto-Italic%5Bwdth%2Cwght%5D.ttf",
+          "sha256": "b09d9629327f8b6f3c4c67b696604a34602b7522ac36707fabc6750e950b8d73"
+        },
+        {
+          "style": "BoldItalic",
+          "file": "roboto-BoldItalic.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/roboto/Roboto-Italic%5Bwdth%2Cwght%5D.ttf",
+          "sha256": "d1f1f9875ef10c90becb29a29c36620a078489b0982e8268bcd4482bbe61a7b5"
+        }
+      ]
+    },
+    {
+      "family": "Open Sans",
+      "category": "sans",
+      "faces": [
+        {
+          "style": "Regular",
+          "file": "opensans-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/opensans/OpenSans%5Bwdth%2Cwght%5D.ttf",
+          "sha256": "64afa7030cb428449facf1304c2b4f9fb5d32a6d937ff2cdf2b1128f2c291657"
+        },
+        {
+          "style": "Bold",
+          "file": "opensans-Bold.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/opensans/OpenSans%5Bwdth%2Cwght%5D.ttf",
+          "sha256": "27572945cd90589b332d8babf754d4dcf036c983970db890775cc95de374c8a7"
+        },
+        {
+          "style": "Italic",
+          "file": "opensans-Italic.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/opensans/OpenSans-Italic%5Bwdth%2Cwght%5D.ttf",
+          "sha256": "c1523dca11f63a59ff24eb380663802405737b2e1f78e3f2e7bfce12b24d49eb"
+        },
+        {
+          "style": "BoldItalic",
+          "file": "opensans-BoldItalic.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/opensans/OpenSans-Italic%5Bwdth%2Cwght%5D.ttf",
+          "sha256": "20f443a6856d5c67e88ffb071d1bba61d023c52c9dcd1b269b86e856df9b6f08"
+        }
+      ]
+    },
+    {
+      "family": "Montserrat",
+      "category": "sans",
+      "faces": [
+        {
+          "style": "Regular",
+          "file": "montserrat-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/montserrat/Montserrat%5Bwght%5D.ttf",
+          "sha256": "002d0fd4ce1274b09e21bd738520ec9437b9a5974fd717dfb3b69ccdcd9f4f99"
+        },
+        {
+          "style": "Bold",
+          "file": "montserrat-Bold.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/montserrat/Montserrat%5Bwght%5D.ttf",
+          "sha256": "a60e6ec762f9669cfb7ba4ff29057c8cbff9cc7f0b0bb997829e6cbc7656f091"
+        },
+        {
+          "style": "Italic",
+          "file": "montserrat-Italic.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/montserrat/Montserrat-Italic%5Bwght%5D.ttf",
+          "sha256": "243bb1ff5033e9cbc7739b846c67cecbf9df545c931a2cfd06e879206b86be82"
+        },
+        {
+          "style": "BoldItalic",
+          "file": "montserrat-BoldItalic.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/montserrat/Montserrat-Italic%5Bwght%5D.ttf",
+          "sha256": "c914a9c5d71d8cf77a50c13c3be5c1cdc8132abce3dcf336abfd816bcd75446f"
+        }
+      ]
+    },
+    {
+      "family": "Inter",
+      "category": "sans",
+      "faces": [
+        {
+          "style": "Regular",
+          "file": "inter-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/inter/Inter%5Bopsz%2Cwght%5D.ttf",
+          "sha256": "54dd699074df4810490794756a1164376c15cd466cb0d5c7a46cafaf04bfe380"
+        },
+        {
+          "style": "Bold",
+          "file": "inter-Bold.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/inter/Inter%5Bopsz%2Cwght%5D.ttf",
+          "sha256": "a3d43ab2c8219bbaa4ebfe58207f12898e8a736f8e64f61aa65d1da15109aabb"
+        },
+        {
+          "style": "Italic",
+          "file": "inter-Italic.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/inter/Inter-Italic%5Bopsz%2Cwght%5D.ttf",
+          "sha256": "84ca39ea0d90aefd83a3e031e0d41587bb30586ec8883d0a53474c47234f031a"
+        },
+        {
+          "style": "BoldItalic",
+          "file": "inter-BoldItalic.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/inter/Inter-Italic%5Bopsz%2Cwght%5D.ttf",
+          "sha256": "ea64e3e0a8ed8097e5bcc394d9bf26620543440bd6070ccabc2cab6de4cf6168"
+        }
+      ]
+    },
+    {
+      "family": "Nunito",
+      "category": "sans",
+      "faces": [
+        {
+          "style": "Regular",
+          "file": "nunito-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/nunito/Nunito%5Bwght%5D.ttf",
+          "sha256": "0e664bbbe40a113ac2f032825abdd72584f834ffdbbc8d923876b5760449555b"
+        },
+        {
+          "style": "Bold",
+          "file": "nunito-Bold.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/nunito/Nunito%5Bwght%5D.ttf",
+          "sha256": "7c49181faf2f829256e00db7cc09de4d254f80315024cdf7d7be8b46641294b5"
+        },
+        {
+          "style": "Italic",
+          "file": "nunito-Italic.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/nunito/Nunito-Italic%5Bwght%5D.ttf",
+          "sha256": "64b0a69c7a3f1412e829cdc954fa0e4fac49e7e595a012fb30cce28a39585cbf"
+        },
+        {
+          "style": "BoldItalic",
+          "file": "nunito-BoldItalic.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/nunito/Nunito-Italic%5Bwght%5D.ttf",
+          "sha256": "bb45680aeda27e72a0391cfc118d56fbe8cac63e5288684a4599273898d6de9b"
+        }
+      ]
+    },
+    {
+      "family": "Raleway",
+      "category": "sans",
+      "faces": [
+        {
+          "style": "Regular",
+          "file": "raleway-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/raleway/Raleway%5Bwght%5D.ttf",
+          "sha256": "f4b166a7e0f386ea2a3fade5919cfeb14c1351417d3b5aac7a20dfbf14ab5a8a"
+        },
+        {
+          "style": "Bold",
+          "file": "raleway-Bold.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/raleway/Raleway%5Bwght%5D.ttf",
+          "sha256": "ac7f0357630cf2073f268b5bab9b30b8dd83e537ff70dda07a82548cfa39a09f"
+        },
+        {
+          "style": "Italic",
+          "file": "raleway-Italic.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/raleway/Raleway-Italic%5Bwght%5D.ttf",
+          "sha256": "faacaffa8bbaf4a9962c28eb94a85bcb5249eb373aea9c3ad042901a6e73e2a1"
+        },
+        {
+          "style": "BoldItalic",
+          "file": "raleway-BoldItalic.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/raleway/Raleway-Italic%5Bwght%5D.ttf",
+          "sha256": "e63f4be2a75223310b3b9a0ae550dd0193e4e8784c72590a88434049dfd1f591"
+        }
+      ]
+    },
+    {
+      "family": "Noto Sans",
+      "category": "sans",
+      "faces": [
+        {
+          "style": "Regular",
+          "file": "notosans-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/notosans/NotoSans%5Bwdth%2Cwght%5D.ttf",
+          "sha256": "8b02789a29605522326330e967a880b256b0b4d40d30c80aa494844c25cd1553"
+        },
+        {
+          "style": "Bold",
+          "file": "notosans-Bold.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/notosans/NotoSans%5Bwdth%2Cwght%5D.ttf",
+          "sha256": "265259ad73f95fc3d946eb4fab1faad36b7888dcfb77188ee6b47990636e4edd"
+        },
+        {
+          "style": "Italic",
+          "file": "notosans-Italic.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/notosans/NotoSans-Italic%5Bwdth%2Cwght%5D.ttf",
+          "sha256": "03b1395bb7dd634bf0325cd75a288ce0fa2b031e6afcf151abccff13216979ed"
+        },
+        {
+          "style": "BoldItalic",
+          "file": "notosans-BoldItalic.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/notosans/NotoSans-Italic%5Bwdth%2Cwght%5D.ttf",
+          "sha256": "5e3c3960bd91f28d7513ad2cb0299ad3f3e7e0584868a870bb1f07857754fc2f"
+        }
+      ]
+    },
+    {
+      "family": "Oswald",
+      "category": "sans",
+      "faces": [
+        {
+          "style": "Regular",
+          "file": "oswald-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/oswald/Oswald%5Bwght%5D.ttf",
+          "sha256": "acba2454c39718c0684fbecae497dc9ae584539e520f74c996532a455815195e"
+        },
+        {
+          "style": "Bold",
+          "file": "oswald-Bold.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/oswald/Oswald%5Bwght%5D.ttf",
+          "sha256": "e7b62e02bee3d460da64e4391b21a957f18a5e43879018a686086e3a59b1a7f5"
+        }
+      ]
+    },
+    {
+      "family": "Source Sans 3",
+      "category": "sans",
+      "faces": [
+        {
+          "style": "Regular",
+          "file": "sourcesans3-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/sourcesans3/SourceSans3%5Bwght%5D.ttf",
+          "sha256": "83010b5fb0941161e1350042e6f63098716d360c666bbaf41821ae73b707c43c"
+        },
+        {
+          "style": "Bold",
+          "file": "sourcesans3-Bold.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/sourcesans3/SourceSans3%5Bwght%5D.ttf",
+          "sha256": "13d20942f0e3c021a8fd5d750e4a5a2e275bf66651f15b396c739d0d55d76739"
+        },
+        {
+          "style": "Italic",
+          "file": "sourcesans3-Italic.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/sourcesans3/SourceSans3-Italic%5Bwght%5D.ttf",
+          "sha256": "0b2b45b0f95621ae4e658b3289f34acd817da35706a7b9e3de6b259cbf148a72"
+        },
+        {
+          "style": "BoldItalic",
+          "file": "sourcesans3-BoldItalic.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/sourcesans3/SourceSans3-Italic%5Bwght%5D.ttf",
+          "sha256": "a1ce613c560cc28fc640dcee1308de280fcdcc8ee00f42fe5c25e249d0906199"
+        }
+      ]
+    },
+    {
+      "family": "Work Sans",
+      "category": "sans",
+      "faces": [
+        {
+          "style": "Regular",
+          "file": "worksans-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/worksans/WorkSans%5Bwght%5D.ttf",
+          "sha256": "89eee9bb6295fd3898be42806c31bb3f6990ef9b6fd9cd97718993f96d75cadf"
+        },
+        {
+          "style": "Bold",
+          "file": "worksans-Bold.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/worksans/WorkSans%5Bwght%5D.ttf",
+          "sha256": "e268e57b42c2e0e5e32058a3cf1c1a95649bc898dbd6319f263dc5b0c96c1bbb"
+        },
+        {
+          "style": "Italic",
+          "file": "worksans-Italic.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/worksans/WorkSans-Italic%5Bwght%5D.ttf",
+          "sha256": "6db733aca0f09123e946e3594f6509d7cc2da1ca21946066050c75ff8351d9fd"
+        },
+        {
+          "style": "BoldItalic",
+          "file": "worksans-BoldItalic.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/worksans/WorkSans-Italic%5Bwght%5D.ttf",
+          "sha256": "ad87fedfba0ec3e5b642835a5e70d51fdd81fd8530d105dffe40f4756967758c"
+        }
+      ]
+    },
+    {
+      "family": "Fira Sans",
+      "category": "sans",
+      "faces": [
+        {
+          "style": "Regular",
+          "file": "firasans-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/firasans/FiraSans-Regular.ttf",
+          "sha256": "730c04822e816cc9b51e56845083500f23317a028c6034f1ea14c300f429b315"
+        },
+        {
+          "style": "Bold",
+          "file": "firasans-Bold.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/firasans/FiraSans-Bold.ttf",
+          "sha256": "e40b57113ca23c25c9ec8cd96df713c57b02b8c1844e40a2c48d222b66b116ed"
+        },
+        {
+          "style": "Italic",
+          "file": "firasans-Italic.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/firasans/FiraSans-Italic.ttf",
+          "sha256": "d29b8611b27092126b23f7fa41dd3443bdc3fa1b8dbd92ceba67caacb989d653"
+        },
+        {
+          "style": "BoldItalic",
+          "file": "firasans-BoldItalic.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/firasans/FiraSans-BoldItalic.ttf",
+          "sha256": "34a07322043c42e18667968eef5b797c5ffd304ab68b5f5dc86da38c2fe076bb"
+        }
+      ]
+    },
+    {
+      "family": "Barlow",
+      "category": "sans",
+      "faces": [
+        {
+          "style": "Regular",
+          "file": "barlow-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/barlow/Barlow-Regular.ttf",
+          "sha256": "b16bfbe68a5f50d96ab2924f5d3116ab570ab6dcb4c0e542755a4c121cfb7381"
+        },
+        {
+          "style": "Bold",
+          "file": "barlow-Bold.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/barlow/Barlow-Bold.ttf",
+          "sha256": "8dd85506958f7e9381e1928ef7809003190a429a88d7217fbe8bfdeb863e402a"
+        },
+        {
+          "style": "Italic",
+          "file": "barlow-Italic.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/barlow/Barlow-Italic.ttf",
+          "sha256": "9bb27fd0161e56287981b7d6382f4b1774966082536dc6289be480de3004cb95"
+        },
+        {
+          "style": "BoldItalic",
+          "file": "barlow-BoldItalic.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/barlow/Barlow-BoldItalic.ttf",
+          "sha256": "4ca99e7dec02ab8623f881fe6ba5f4d22002a2e43d0c298221f36a56b89648d4"
+        }
+      ]
+    },
+    {
+      "family": "Rubik",
+      "category": "sans",
+      "faces": [
+        {
+          "style": "Regular",
+          "file": "rubik-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/rubik/Rubik%5Bwght%5D.ttf",
+          "sha256": "65653592fd0f42dac13b8aa46b8bf110cdfbddb20057438cf0b41a0c10b3dc94"
+        },
+        {
+          "style": "Bold",
+          "file": "rubik-Bold.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/rubik/Rubik%5Bwght%5D.ttf",
+          "sha256": "230c850098dcbd79376c72ceca92ba7f06cf7c457252913f9bcd65690e1a62e3"
+        },
+        {
+          "style": "Italic",
+          "file": "rubik-Italic.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/rubik/Rubik-Italic%5Bwght%5D.ttf",
+          "sha256": "8a73206b306c83d4f2ce7413d916950c99062ae02fb690b0db9d3e4e829a99d8"
+        },
+        {
+          "style": "BoldItalic",
+          "file": "rubik-BoldItalic.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/rubik/Rubik-Italic%5Bwght%5D.ttf",
+          "sha256": "6dcc6f50dfffe33aed593e3ccf3d21bf5f66926e9462fca0f1f857647d9c0a31"
+        }
+      ]
+    },
+    {
+      "family": "Quicksand",
+      "category": "sans",
+      "faces": [
+        {
+          "style": "Regular",
+          "file": "quicksand-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/quicksand/Quicksand%5Bwght%5D.ttf",
+          "sha256": "8684bedfaa7979c77d573769334286759de3d2a6317b615bfeffb3f440bc1031"
+        },
+        {
+          "style": "Bold",
+          "file": "quicksand-Bold.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/quicksand/Quicksand%5Bwght%5D.ttf",
+          "sha256": "02cd45e90279b827b02e526b2d3485bfc7d794d8043d45a418053a3dc6560178"
+        }
+      ]
+    },
+    {
+      "family": "Karla",
+      "category": "sans",
+      "faces": [
+        {
+          "style": "Regular",
+          "file": "karla-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/karla/Karla%5Bwght%5D.ttf",
+          "sha256": "e29df896936279e9eceb5ad10f4016422c03f7f63ba8afd6d50ee67d3e566567"
+        },
+        {
+          "style": "Bold",
+          "file": "karla-Bold.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/karla/Karla%5Bwght%5D.ttf",
+          "sha256": "167371846737a80a4c6a4ce37cf14b476335c8ff57ec8f5bec8b16d41db8533f"
+        },
+        {
+          "style": "Italic",
+          "file": "karla-Italic.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/karla/Karla-Italic%5Bwght%5D.ttf",
+          "sha256": "02ce1bb665d015fc36a4e95a230d5201c9b1d01435852bd02888e71df0f686e3"
+        },
+        {
+          "style": "BoldItalic",
+          "file": "karla-BoldItalic.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/karla/Karla-Italic%5Bwght%5D.ttf",
+          "sha256": "755623a30ad0946286da23b6048f72b8be5003af07b94cae03fd9d257e21de38"
+        }
+      ]
+    },
+    {
+      "family": "Manrope",
+      "category": "sans",
+      "faces": [
+        {
+          "style": "Regular",
+          "file": "manrope-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/manrope/Manrope%5Bwght%5D.ttf",
+          "sha256": "1058df8f6b39395a1389a8a12253973c00d735f345b4a3e0cc2340f448b65f5c"
+        },
+        {
+          "style": "Bold",
+          "file": "manrope-Bold.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/manrope/Manrope%5Bwght%5D.ttf",
+          "sha256": "ce2b1e8bb63961cd67ba4ac74f0857c84abc53f4acddd029e0749acfbf5daa19"
+        }
+      ]
+    },
+    {
+      "family": "Mulish",
+      "category": "sans",
+      "faces": [
+        {
+          "style": "Regular",
+          "file": "mulish-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/mulish/Mulish%5Bwght%5D.ttf",
+          "sha256": "03463eeef2e64b8323ff21470bac2d3d57fde97d9f0bd0eacee4415062ee16ba"
+        },
+        {
+          "style": "Bold",
+          "file": "mulish-Bold.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/mulish/Mulish%5Bwght%5D.ttf",
+          "sha256": "a496b9c0a9b64b39ebbee57719fb97bd0cb354ded328dbe47db28be98213265f"
+        },
+        {
+          "style": "Italic",
+          "file": "mulish-Italic.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/mulish/Mulish-Italic%5Bwght%5D.ttf",
+          "sha256": "6653eaef45a519be37a65977cb42148b2325261395b7d7ffc8550d60af46406f"
+        },
+        {
+          "style": "BoldItalic",
+          "file": "mulish-BoldItalic.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/mulish/Mulish-Italic%5Bwght%5D.ttf",
+          "sha256": "13ea1c8aec978b0e458d8299f22a97050fd023b5166081f4f64148b1a6c91bd8"
+        }
+      ]
+    },
+    {
+      "family": "Hind",
+      "category": "sans",
+      "faces": [
+        {
+          "style": "Regular",
+          "file": "hind-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/hind/Hind-Regular.ttf",
+          "sha256": "6ca484b974747b9f879c0a4253075398bb4fb318aea1de5668310ff000e93521"
+        },
+        {
+          "style": "Bold",
+          "file": "hind-Bold.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/hind/Hind-Bold.ttf",
+          "sha256": "43ee5583d9525b3acc4833ba2e02b76e8de3d21f75f02137eb15272497079a37"
+        }
+      ]
+    },
+    {
+      "family": "Cabin",
+      "category": "sans",
+      "faces": [
+        {
+          "style": "Regular",
+          "file": "cabin-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/cabin/Cabin%5Bwdth%2Cwght%5D.ttf",
+          "sha256": "8f92143f7006d2d724c6f274ba0b9ac29544318d22e42a1367203fd78d7a4432"
+        },
+        {
+          "style": "Bold",
+          "file": "cabin-Bold.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/cabin/Cabin%5Bwdth%2Cwght%5D.ttf",
+          "sha256": "ece47184dfae68019d7276d5713179bf0744c3950f22a094c693d5a03956daf0"
+        },
+        {
+          "style": "Italic",
+          "file": "cabin-Italic.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/cabin/Cabin-Italic%5Bwdth%2Cwght%5D.ttf",
+          "sha256": "5e17352e5bb2deab25eb80b5c62518cd917899363b94fd0a27505f6a151e2fef"
+        },
+        {
+          "style": "BoldItalic",
+          "file": "cabin-BoldItalic.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/cabin/Cabin-Italic%5Bwdth%2Cwght%5D.ttf",
+          "sha256": "dbd1157754e98e8348051df4701b91336796fcb1f53596b106a89da98b5713a8"
+        }
+      ]
+    },
+    {
+      "family": "Assistant",
+      "category": "sans",
+      "faces": [
+        {
+          "style": "Regular",
+          "file": "assistant-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/assistant/Assistant%5Bwght%5D.ttf",
+          "sha256": "27d5971dab6b6cc4aced5dc20829f2b4bcfe50971695b87191f5cee4cbc50530"
+        },
+        {
+          "style": "Bold",
+          "file": "assistant-Bold.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/assistant/Assistant%5Bwght%5D.ttf",
+          "sha256": "9ebdb9c30e770ffa4c8b48322a010c919242e7b942395eaf1203c26904bf4ca0"
+        }
+      ]
+    },
+    {
+      "family": "Abel",
+      "category": "sans",
+      "faces": [
+        {
+          "style": "Regular",
+          "file": "abel-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/abel/Abel-Regular.ttf",
+          "sha256": "ec9e6d565a787a6b9f874c9be34ff7bdbe13e14a60d6cd3d2d78f83ad8b82268"
+        }
+      ]
+    },
+    {
+      "family": "Asap",
+      "category": "sans",
+      "faces": [
+        {
+          "style": "Regular",
+          "file": "asap-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/asap/Asap%5Bwdth%2Cwght%5D.ttf",
+          "sha256": "fbf9b5e2a3a1d04bacd29a97b57fb06842ef6c1c889cd034fcb18ddbf2728008"
+        },
+        {
+          "style": "Bold",
+          "file": "asap-Bold.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/asap/Asap%5Bwdth%2Cwght%5D.ttf",
+          "sha256": "e11e876b7594b6b4b6903087c4d6d575a8865a7f844c1beb0760f008a28daa2c"
+        },
+        {
+          "style": "Italic",
+          "file": "asap-Italic.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/asap/Asap-Italic%5Bwdth%2Cwght%5D.ttf",
+          "sha256": "7bf6ad50b414e23a293d5f86a6651a605d020686fe8b27b5a6f85b43059f4e28"
+        },
+        {
+          "style": "BoldItalic",
+          "file": "asap-BoldItalic.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/asap/Asap-Italic%5Bwdth%2Cwght%5D.ttf",
+          "sha256": "4a7854c527a5e756a63ff0a9948102c7aaa8fd2249781a3f2b74d8f6ebb59f14"
+        }
+      ]
+    },
+    {
+      "family": "Exo 2",
+      "category": "sans",
+      "faces": [
+        {
+          "style": "Regular",
+          "file": "exo2-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/exo2/Exo2%5Bwght%5D.ttf",
+          "sha256": "4e5b44491412505b1e7a0c90c9c29591d2a8abaa6a0835c18a73b18bc6038f40"
+        },
+        {
+          "style": "Bold",
+          "file": "exo2-Bold.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/exo2/Exo2%5Bwght%5D.ttf",
+          "sha256": "9d7a97d876239037594aca981106884cc7d0e42d49e2332b5b2ba19165661176"
+        },
+        {
+          "style": "Italic",
+          "file": "exo2-Italic.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/exo2/Exo2-Italic%5Bwght%5D.ttf",
+          "sha256": "119b627456543f9347b45ffca8a92a83c126ebfdb10df02ba847b7654d407e45"
+        },
+        {
+          "style": "BoldItalic",
+          "file": "exo2-BoldItalic.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/exo2/Exo2-Italic%5Bwght%5D.ttf",
+          "sha256": "bb74410f17658f21b247843cd5ff67487c421b53ef173a8658b673c43e1e0b3e"
+        }
+      ]
+    },
+    {
+      "family": "Titillium Web",
+      "category": "sans",
+      "faces": [
+        {
+          "style": "Regular",
+          "file": "titilliumweb-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/titilliumweb/TitilliumWeb-Regular.ttf",
+          "sha256": "4c8fc3d79e4e4d74c3c073f8cb130aa789c369e16ccc6218c6c9f3f4b69f2e8f"
+        },
+        {
+          "style": "Bold",
+          "file": "titilliumweb-Bold.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/titilliumweb/TitilliumWeb-Bold.ttf",
+          "sha256": "c8e365596e1a7be64ad8dc99a5093e070df763c14141ef4a33fe10884ca502b8"
+        },
+        {
+          "style": "Italic",
+          "file": "titilliumweb-Italic.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/titilliumweb/TitilliumWeb-Italic.ttf",
+          "sha256": "a090f3f03962c765af409226339f7c971a1d817a5a3f0f54afb049e567be35f2"
+        },
+        {
+          "style": "BoldItalic",
+          "file": "titilliumweb-BoldItalic.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/titilliumweb/TitilliumWeb-BoldItalic.ttf",
+          "sha256": "8f61c2dd8c235aca0b8590b69beb9a54e6cc55f345ef432b5466a92774e3ab8c"
+        }
+      ]
+    },
+    {
+      "family": "Merriweather",
+      "category": "serif",
+      "faces": [
+        {
+          "style": "Regular",
+          "file": "merriweather-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/merriweather/Merriweather%5Bopsz%2Cwdth%2Cwght%5D.ttf",
+          "sha256": "63eb7dd15e9e27ab455340c06d98f10fcc5d39d4d70d8bf66c512c1fa2d9df48"
+        },
+        {
+          "style": "Bold",
+          "file": "merriweather-Bold.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/merriweather/Merriweather%5Bopsz%2Cwdth%2Cwght%5D.ttf",
+          "sha256": "cf7dc7ff9a668c991145cbf3b3c87f97e33cb41cd1f14e6ea2365d8a4926a21d"
+        },
+        {
+          "style": "Italic",
+          "file": "merriweather-Italic.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/merriweather/Merriweather-Italic%5Bopsz%2Cwdth%2Cwght%5D.ttf",
+          "sha256": "dc03efef09dc71c441e67d11119250bbbddc53e90e73cdfd1eb3b0b9e0aba761"
+        },
+        {
+          "style": "BoldItalic",
+          "file": "merriweather-BoldItalic.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/merriweather/Merriweather-Italic%5Bopsz%2Cwdth%2Cwght%5D.ttf",
+          "sha256": "c784665a3347b7da65450955be55ba88b4709da2f9e2b04fbe390a45b1d4cde1"
+        }
+      ]
+    },
+    {
+      "family": "Playfair Display",
+      "category": "serif",
+      "faces": [
+        {
+          "style": "Regular",
+          "file": "playfairdisplay-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/playfairdisplay/PlayfairDisplay%5Bwght%5D.ttf",
+          "sha256": "51d2336f5f1375049c79932afe0e0e0b93beed6012843829c5cd695359b6dd62"
+        },
+        {
+          "style": "Bold",
+          "file": "playfairdisplay-Bold.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/playfairdisplay/PlayfairDisplay%5Bwght%5D.ttf",
+          "sha256": "42fe86344a08e820418eb1508db6adb84fa39b9362c8660468410ca1a95db0f0"
+        },
+        {
+          "style": "Italic",
+          "file": "playfairdisplay-Italic.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/playfairdisplay/PlayfairDisplay-Italic%5Bwght%5D.ttf",
+          "sha256": "537e7617e9cd6d9001a8f42f751af9eab9fed28c1b3f90d710ce079fddbebbf0"
+        },
+        {
+          "style": "BoldItalic",
+          "file": "playfairdisplay-BoldItalic.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/playfairdisplay/PlayfairDisplay-Italic%5Bwght%5D.ttf",
+          "sha256": "63603fe43e30adf1e290e6cefe890bf600f7cf451112b1adcce4bdf8e3643880"
+        }
+      ]
+    },
+    {
+      "family": "Lora",
+      "category": "serif",
+      "faces": [
+        {
+          "style": "Regular",
+          "file": "lora-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/lora/Lora%5Bwght%5D.ttf",
+          "sha256": "2aebce1e2c7d2e8b5f6d409284696ce63f507edbd277f898742e021753ad9070"
+        },
+        {
+          "style": "Bold",
+          "file": "lora-Bold.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/lora/Lora%5Bwght%5D.ttf",
+          "sha256": "f8a8a20dba653e7d112a9796a82ae62fd207527992f38ca21f612ba5b47ef6d5"
+        },
+        {
+          "style": "Italic",
+          "file": "lora-Italic.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/lora/Lora-Italic%5Bwght%5D.ttf",
+          "sha256": "2627ef011e4667a904a061cc6d6a237d016dc2cbe353d9f2cf4b341cd8ce52d2"
+        },
+        {
+          "style": "BoldItalic",
+          "file": "lora-BoldItalic.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/lora/Lora-Italic%5Bwght%5D.ttf",
+          "sha256": "a8f82391609cd76315dbeb00de57844e4a2fc7cb693da66af8c0509267f5c8cf"
+        }
+      ]
+    },
+    {
+      "family": "Zilla Slab",
+      "category": "serif",
+      "faces": [
+        {
+          "style": "Regular",
+          "file": "zillaslab-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/zillaslab/ZillaSlab-Regular.ttf",
+          "sha256": "dd481fac5e29a0ec48f76e264cf151049e45d758cf4c341a2f1ce1f7a8dded6e"
+        },
+        {
+          "style": "Bold",
+          "file": "zillaslab-Bold.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/zillaslab/ZillaSlab-Bold.ttf",
+          "sha256": "68f92a7bd2ba01417578077ba65ac7f7aeb2e0ca7941f9beb64667977db4bad1"
+        },
+        {
+          "style": "Italic",
+          "file": "zillaslab-Italic.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/zillaslab/ZillaSlab-Italic.ttf",
+          "sha256": "5d12b758080511bdaa5a3d2988af2ff998f6a0ecb74b24d17906c49696f138db"
+        },
+        {
+          "style": "BoldItalic",
+          "file": "zillaslab-BoldItalic.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/zillaslab/ZillaSlab-BoldItalic.ttf",
+          "sha256": "a92a48342f1d0a53ab2d3cdaf1ff6e080a6a31f2298cdf1da2827a99eac7688b"
+        }
+      ]
+    },
+    {
+      "family": "Source Serif 4",
+      "category": "serif",
+      "faces": [
+        {
+          "style": "Regular",
+          "file": "sourceserif4-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/sourceserif4/SourceSerif4%5Bopsz%2Cwght%5D.ttf",
+          "sha256": "ada7ea79ea2d6ae5ceb493802706c55eadd1bc11d6e818cea950ca4dd9873033"
+        },
+        {
+          "style": "Bold",
+          "file": "sourceserif4-Bold.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/sourceserif4/SourceSerif4%5Bopsz%2Cwght%5D.ttf",
+          "sha256": "a46a88d1473e6fa66ad0284d21b9ce61cb69bb0eba2c1b13c05f6b4d572de7ee"
+        },
+        {
+          "style": "Italic",
+          "file": "sourceserif4-Italic.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/sourceserif4/SourceSerif4-Italic%5Bopsz%2Cwght%5D.ttf",
+          "sha256": "65e18b407c91bab972e828be887fd62a52e7b774b051cf642f5d6964b5bd5ed1"
+        },
+        {
+          "style": "BoldItalic",
+          "file": "sourceserif4-BoldItalic.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/sourceserif4/SourceSerif4-Italic%5Bopsz%2Cwght%5D.ttf",
+          "sha256": "f0d8d30573a3e567b36b2b93452b06a6466334c7e5d29223911ef0e3de150536"
+        }
+      ]
+    },
+    {
+      "family": "Libre Baskerville",
+      "category": "serif",
+      "faces": [
+        {
+          "style": "Regular",
+          "file": "librebaskerville-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/librebaskerville/LibreBaskerville%5Bwght%5D.ttf",
+          "sha256": "16ae2d8ad553e9b7da68ba17abcd96a8e13a192cc5c499c6f3ccc5b39c505ee8"
+        },
+        {
+          "style": "Bold",
+          "file": "librebaskerville-Bold.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/librebaskerville/LibreBaskerville%5Bwght%5D.ttf",
+          "sha256": "d8960589f2a51269e04a220f92be89b9a3892bc0b5776e663f61b4d439e9cadd"
+        },
+        {
+          "style": "Italic",
+          "file": "librebaskerville-Italic.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/librebaskerville/LibreBaskerville-Italic%5Bwght%5D.ttf",
+          "sha256": "87e258599180391a178f3037f25d781b76833bbd014d12787b4850160daec60b"
+        },
+        {
+          "style": "BoldItalic",
+          "file": "librebaskerville-BoldItalic.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/librebaskerville/LibreBaskerville-Italic%5Bwght%5D.ttf",
+          "sha256": "dc8ca9f49668b03fbce7e7c5b1840dde16ef5900c155e5796cdce87152de918e"
+        }
+      ]
+    },
+    {
+      "family": "EB Garamond",
+      "category": "serif",
+      "faces": [
+        {
+          "style": "Regular",
+          "file": "ebgaramond-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/ebgaramond/EBGaramond%5Bwght%5D.ttf",
+          "sha256": "f99720db7f701cd48c197543a18ee5ed1b0c8ba8157f2fce8a3856a31347b208"
+        },
+        {
+          "style": "Bold",
+          "file": "ebgaramond-Bold.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/ebgaramond/EBGaramond%5Bwght%5D.ttf",
+          "sha256": "994aaf1b8bb9afc849efe013d6deb974bd8329eec5c4159159db09aee0d2ae62"
+        },
+        {
+          "style": "Italic",
+          "file": "ebgaramond-Italic.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/ebgaramond/EBGaramond-Italic%5Bwght%5D.ttf",
+          "sha256": "0af0cc0cf693133c647f0ed0e11983b805db3611797a400c84fe81dc0c99c0c7"
+        },
+        {
+          "style": "BoldItalic",
+          "file": "ebgaramond-BoldItalic.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/ebgaramond/EBGaramond-Italic%5Bwght%5D.ttf",
+          "sha256": "3f0a7faa0f8608b1e2c0224da84348001a105d4240dd89ce6e13131817876e8a"
+        }
+      ]
+    },
+    {
+      "family": "Bitter",
+      "category": "serif",
+      "faces": [
+        {
+          "style": "Regular",
+          "file": "bitter-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/bitter/Bitter%5Bwght%5D.ttf",
+          "sha256": "e1c5ccde257f1dbc15a8862e66302f5a73365a33fd54e2734de30a6a8b692d3f"
+        },
+        {
+          "style": "Bold",
+          "file": "bitter-Bold.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/bitter/Bitter%5Bwght%5D.ttf",
+          "sha256": "32c9d63a55c3c7cf7d46157cb07e25011086004f353786ae540df4ad7ca41ef1"
+        },
+        {
+          "style": "Italic",
+          "file": "bitter-Italic.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/bitter/Bitter-Italic%5Bwght%5D.ttf",
+          "sha256": "8bc0783fdf7e7050fce97efa46e21fcad8df3b288f888c80ecc6f0abf8b3af51"
+        },
+        {
+          "style": "BoldItalic",
+          "file": "bitter-BoldItalic.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/bitter/Bitter-Italic%5Bwght%5D.ttf",
+          "sha256": "56dde7cd717757da418625d4592be7a43ee957d00e5bf5731823a2fe9611d8b2"
+        }
+      ]
+    },
+    {
+      "family": "Cormorant Garamond",
+      "category": "serif",
+      "faces": [
+        {
+          "style": "Regular",
+          "file": "cormorantgaramond-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/cormorantgaramond/CormorantGaramond%5Bwght%5D.ttf",
+          "sha256": "d4cb74d7b389f9f8699c3d281908a7422925c3b9fddb8e1ca1b47331982a8a96"
+        },
+        {
+          "style": "Bold",
+          "file": "cormorantgaramond-Bold.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/cormorantgaramond/CormorantGaramond%5Bwght%5D.ttf",
+          "sha256": "d0d65cc7aa3a1c89f613085bda194f1a7360a7ed34b34dcc1de02b1b1b3f815a"
+        },
+        {
+          "style": "Italic",
+          "file": "cormorantgaramond-Italic.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/cormorantgaramond/CormorantGaramond-Italic%5Bwght%5D.ttf",
+          "sha256": "e7a2d1942944c6645d5455261df251c91bce61533866282fd3973177357b6e55"
+        },
+        {
+          "style": "BoldItalic",
+          "file": "cormorantgaramond-BoldItalic.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/cormorantgaramond/CormorantGaramond-Italic%5Bwght%5D.ttf",
+          "sha256": "f208ff8b5c16ce3a94876b385a7f436ba3841d7b440592d75960c8aa8f033a36"
+        }
+      ]
+    },
+    {
+      "family": "Alegreya",
+      "category": "serif",
+      "faces": [
+        {
+          "style": "Regular",
+          "file": "alegreya-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/alegreya/Alegreya%5Bwght%5D.ttf",
+          "sha256": "10693dd396aa3a4f11eea9bd6c0b5f12379c93fb9585064d7cbbe187fcfed537"
+        },
+        {
+          "style": "Bold",
+          "file": "alegreya-Bold.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/alegreya/Alegreya%5Bwght%5D.ttf",
+          "sha256": "77b1c7f77c8e7bd398562199ac979dde0d29f8a510631b5e40aaaea601b2fbe0"
+        },
+        {
+          "style": "Italic",
+          "file": "alegreya-Italic.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/alegreya/Alegreya-Italic%5Bwght%5D.ttf",
+          "sha256": "e13d4f4d9d364486b95dc22ad2e0276bce3d731409730a7fabcdc3ed328584c6"
+        },
+        {
+          "style": "BoldItalic",
+          "file": "alegreya-BoldItalic.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/alegreya/Alegreya-Italic%5Bwght%5D.ttf",
+          "sha256": "903598581750c808386166ceb9adc52b2c51bd8291668351efb9c5770903c8fa"
+        }
+      ]
+    },
+    {
+      "family": "Enriqueta",
+      "category": "serif",
+      "faces": [
+        {
+          "style": "Regular",
+          "file": "enriqueta-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/enriqueta/Enriqueta-Regular.ttf",
+          "sha256": "aaaa216a435e3c44d47dc07cfb87f112ce402003e695c9f5eb3fde40ab6c9c07"
+        },
+        {
+          "style": "Bold",
+          "file": "enriqueta-Bold.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/enriqueta/Enriqueta-Bold.ttf",
+          "sha256": "72e2c636c231397ed898b6de251a1052daca14728b86ed5182766a09d927c16b"
+        }
+      ]
+    },
+    {
+      "family": "Vollkorn",
+      "category": "serif",
+      "faces": [
+        {
+          "style": "Regular",
+          "file": "vollkorn-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/vollkorn/Vollkorn%5Bwght%5D.ttf",
+          "sha256": "592b0ccc952a52f3e8dcc7ea4b338460f9d6a7b29daa466831c8baa595f65e35"
+        },
+        {
+          "style": "Bold",
+          "file": "vollkorn-Bold.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/vollkorn/Vollkorn%5Bwght%5D.ttf",
+          "sha256": "2ac06e2466a7bc2ad4e01b53431577ec3d7da835f55e84449f54618f981452f3"
+        },
+        {
+          "style": "Italic",
+          "file": "vollkorn-Italic.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/vollkorn/Vollkorn-Italic%5Bwght%5D.ttf",
+          "sha256": "f956945ac81388a8ccbbb1c5e0a33613442cf8ef014d7ec96368a21524377e18"
+        },
+        {
+          "style": "BoldItalic",
+          "file": "vollkorn-BoldItalic.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/vollkorn/Vollkorn-Italic%5Bwght%5D.ttf",
+          "sha256": "50ec034316cf00a2ddcd0118204fca35f25a0d0222d112436a73a5a0b4303232"
+        }
+      ]
+    },
+    {
+      "family": "Bree Serif",
+      "category": "serif",
+      "faces": [
+        {
+          "style": "Regular",
+          "file": "breeserif-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/breeserif/BreeSerif-Regular.ttf",
+          "sha256": "fa72eef0bd23c376e80629fa4ca2a9d23c3ad2f483c6cbdbfe5aa2ccea3c8c6a"
+        }
+      ]
+    },
+    {
+      "family": "Domine",
+      "category": "serif",
+      "faces": [
+        {
+          "style": "Regular",
+          "file": "domine-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/domine/Domine%5Bwght%5D.ttf",
+          "sha256": "fa3feb5e80a0650ee8e11baf3cdcf3fb27c4cd9d35b56b320f6b7055f72ae19e"
+        },
+        {
+          "style": "Bold",
+          "file": "domine-Bold.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/domine/Domine%5Bwght%5D.ttf",
+          "sha256": "f6cb32a3885b4865c915b3dc0327ab6416efb76dec599dc0cab25882a1e6337c"
+        }
+      ]
+    },
+    {
+      "family": "Cardo",
+      "category": "serif",
+      "faces": [
+        {
+          "style": "Regular",
+          "file": "cardo-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/cardo/Cardo-Regular.ttf",
+          "sha256": "80188a01ab0fb988b19392423b3405f6295724c39af6c1a419bc2a3964289e0e"
+        },
+        {
+          "style": "Bold",
+          "file": "cardo-Bold.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/cardo/Cardo-Bold.ttf",
+          "sha256": "562334928cbd5cee2c803fdcbc8236591645679748181568861665508508564a"
+        },
+        {
+          "style": "Italic",
+          "file": "cardo-Italic.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/cardo/Cardo-Italic.ttf",
+          "sha256": "2d699245eb32b1914b83573227959d6090622494d92c8f876e407cc6162431b1"
+        }
+      ]
+    },
+    {
+      "family": "Old Standard TT",
+      "category": "serif",
+      "faces": [
+        {
+          "style": "Regular",
+          "file": "oldstandardtt-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/oldstandardtt/OldStandard-Regular.ttf",
+          "sha256": "76f8c017f985c9b73a034e6a24dd13e36bc2d2f6b1abce1fb7a2b8104dabf273"
+        },
+        {
+          "style": "Bold",
+          "file": "oldstandardtt-Bold.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/oldstandardtt/OldStandard-Bold.ttf",
+          "sha256": "82d66e6b40490340e09f88fb0d785b1988206a8b46bd7ebbc28be9e177cf6074"
+        },
+        {
+          "style": "Italic",
+          "file": "oldstandardtt-Italic.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/oldstandardtt/OldStandard-Italic.ttf",
+          "sha256": "3a0b8597f82c7eb0b3b395e2776212ff94746cff6101db151204d86f50564311"
+        }
+      ]
+    },
+    {
+      "family": "DM Serif Display",
+      "category": "serif",
+      "faces": [
+        {
+          "style": "Regular",
+          "file": "dmserifdisplay-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/dmserifdisplay/DMSerifDisplay-Regular.ttf",
+          "sha256": "240e3058813b341d3a69a23f1fdf6b99599f89835dca0431f66526d242c9af41"
+        },
+        {
+          "style": "Italic",
+          "file": "dmserifdisplay-Italic.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/dmserifdisplay/DMSerifDisplay-Italic.ttf",
+          "sha256": "835c9d7a56ac5e515a87b702d8a5701682bdc98ec69bf1cf310f8887efef19d8"
+        }
+      ]
+    },
+    {
+      "family": "IBM Plex Serif",
+      "category": "serif",
+      "faces": [
+        {
+          "style": "Regular",
+          "file": "ibmplexserif-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/ibmplexserif/IBMPlexSerif-Regular.ttf",
+          "sha256": "8744aba30cc075988ef677e342e6f5dd218df502d07ab68e3f53d7dac76f3eb9"
+        },
+        {
+          "style": "Bold",
+          "file": "ibmplexserif-Bold.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/ibmplexserif/IBMPlexSerif-Bold.ttf",
+          "sha256": "f399eb824a859e0a0225062b5c20f356585ff3fbf75aef7b57f3a9630d4095ed"
+        },
+        {
+          "style": "Italic",
+          "file": "ibmplexserif-Italic.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/ibmplexserif/IBMPlexSerif-Italic.ttf",
+          "sha256": "7795f3be722aef82ceda57da6c5b651a447a5872125b9e1472230fd97f428c95"
+        },
+        {
+          "style": "BoldItalic",
+          "file": "ibmplexserif-BoldItalic.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/ibmplexserif/IBMPlexSerif-BoldItalic.ttf",
+          "sha256": "04ac730858d381a24f126b0fc36d131898d6fea3b7b555bcbf786c4770e103f6"
+        }
+      ]
+    },
+    {
+      "family": "Roboto Mono",
+      "category": "mono",
+      "faces": [
+        {
+          "style": "Regular",
+          "file": "robotomono-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/robotomono/RobotoMono%5Bwght%5D.ttf",
+          "sha256": "764d2d3a2788534375d937d94c7538f3ecffbedae24edad7d5880c32d22bd5ff"
+        },
+        {
+          "style": "Bold",
+          "file": "robotomono-Bold.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/robotomono/RobotoMono%5Bwght%5D.ttf",
+          "sha256": "679322f81863b8efd0fa0979c2ed72cf72d253c62c085f5577fcaefd51321cb0"
+        },
+        {
+          "style": "Italic",
+          "file": "robotomono-Italic.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/robotomono/RobotoMono-Italic%5Bwght%5D.ttf",
+          "sha256": "c54f512a8105399259969f46cb11101d4d93be72f0a41680785fff1473ed8063"
+        },
+        {
+          "style": "BoldItalic",
+          "file": "robotomono-BoldItalic.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/robotomono/RobotoMono-Italic%5Bwght%5D.ttf",
+          "sha256": "a8af19e588c79b69ce177a40b7e424e0acae1d4d84125a73c99a50942c4c0cd5"
+        }
+      ]
+    },
+    {
+      "family": "Source Code Pro",
+      "category": "mono",
+      "faces": [
+        {
+          "style": "Regular",
+          "file": "sourcecodepro-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/sourcecodepro/SourceCodePro%5Bwght%5D.ttf",
+          "sha256": "349d8d752b3c76d65e76492ed12eb5f851e1dc812146d12cc69817a9acc1bab2"
+        },
+        {
+          "style": "Bold",
+          "file": "sourcecodepro-Bold.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/sourcecodepro/SourceCodePro%5Bwght%5D.ttf",
+          "sha256": "35a3d4cc897838412a1de067ce1df6b2e55f0c2618a4a46fb98425203a3d53ba"
+        },
+        {
+          "style": "Italic",
+          "file": "sourcecodepro-Italic.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/sourcecodepro/SourceCodePro-Italic%5Bwght%5D.ttf",
+          "sha256": "f526d75b19749579fb44ff18d163bae7b69170e613bf0f12aed93c3f1a3da303"
+        },
+        {
+          "style": "BoldItalic",
+          "file": "sourcecodepro-BoldItalic.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/sourcecodepro/SourceCodePro-Italic%5Bwght%5D.ttf",
+          "sha256": "ee773065101d82b403ccf83120f1a26956c6c8d14ae0f6f0f336932a2745585c"
+        }
+      ]
+    },
+    {
+      "family": "IBM Plex Mono",
+      "category": "mono",
+      "faces": [
+        {
+          "style": "Regular",
+          "file": "ibmplexmono-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/ibmplexmono/IBMPlexMono-Regular.ttf",
+          "sha256": "d2550200c7eea902092c867fa4521f0e4b6ae6823d601f6829475f87b359e8a1"
+        },
+        {
+          "style": "Bold",
+          "file": "ibmplexmono-Bold.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/ibmplexmono/IBMPlexMono-Bold.ttf",
+          "sha256": "8b17b80742f636c40e7ea88355dc562b37ca46e907d73695cd01bf77e2a48b05"
+        },
+        {
+          "style": "Italic",
+          "file": "ibmplexmono-Italic.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/ibmplexmono/IBMPlexMono-Italic.ttf",
+          "sha256": "149cda9808cea1833084d178c2cc3cc6f1088e8dd10f96573264f6560c857b80"
+        },
+        {
+          "style": "BoldItalic",
+          "file": "ibmplexmono-BoldItalic.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/ibmplexmono/IBMPlexMono-BoldItalic.ttf",
+          "sha256": "e31ab9e6c30ffb0523db66328f8534aa9a71ed6098612f9d79955684765b38b1"
+        }
+      ]
+    },
+    {
+      "family": "Fira Code",
+      "category": "mono",
+      "faces": [
+        {
+          "style": "Regular",
+          "file": "firacode-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/firacode/FiraCode%5Bwght%5D.ttf",
+          "sha256": "9a42826ce23093fc3721c8318847ebce61a2fab83c56595ecd1f3c228d56a82b"
+        },
+        {
+          "style": "Bold",
+          "file": "firacode-Bold.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/firacode/FiraCode%5Bwght%5D.ttf",
+          "sha256": "45fb9c9685c5d933a37f8841e99d2d4bcab2c737637cb1b25dfe87e93dbf70b2"
+        }
+      ]
+    },
+    {
+      "family": "Inconsolata",
+      "category": "sans",
+      "faces": [
+        {
+          "style": "Regular",
+          "file": "inconsolata-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/inconsolata/Inconsolata%5Bwdth%2Cwght%5D.ttf",
+          "sha256": "6ce1192c8aade03516e02567d2d106567a1cd690528291da41aaea50b92f1c01"
+        },
+        {
+          "style": "Bold",
+          "file": "inconsolata-Bold.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/inconsolata/Inconsolata%5Bwdth%2Cwght%5D.ttf",
+          "sha256": "7aa2ce64bcccb4894e8e187f541c5b66eff7be1bda73b020ec187f4fb34fabc5"
+        }
+      ]
+    },
+    {
+      "family": "Space Mono",
+      "category": "mono",
+      "faces": [
+        {
+          "style": "Regular",
+          "file": "spacemono-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/spacemono/SpaceMono-Regular.ttf",
+          "sha256": "f5865679bb880f21d8a452138ad62714c3cf595de40ad8c980d2a19f0ded780f"
+        },
+        {
+          "style": "Bold",
+          "file": "spacemono-Bold.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/spacemono/SpaceMono-Bold.ttf",
+          "sha256": "39ad8abce80e01517b798df92182f9b858edc902aaf26a3e861122ed23e7c53a"
+        },
+        {
+          "style": "Italic",
+          "file": "spacemono-Italic.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/spacemono/SpaceMono-Italic.ttf",
+          "sha256": "471c197e1b33d19de3b45b7cd4b4dd9ec2cc5cb8c34457f7b0c97747356a8c60"
+        },
+        {
+          "style": "BoldItalic",
+          "file": "spacemono-BoldItalic.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/spacemono/SpaceMono-BoldItalic.ttf",
+          "sha256": "2efea703fafc3c3777af73cbb7cfab25c0c022192e6272a7b682aeaffa262349"
+        }
+      ]
+    },
+    {
+      "family": "JetBrains Mono",
+      "category": "mono",
+      "faces": [
+        {
+          "style": "Regular",
+          "file": "jetbrainsmono-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/jetbrainsmono/JetBrainsMono%5Bwght%5D.ttf",
+          "sha256": "ecc8c1e4b9af5695ea9e65c5c75866d5f4fb0dce87d048373d3ef2cb207745d8"
+        },
+        {
+          "style": "Bold",
+          "file": "jetbrainsmono-Bold.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/jetbrainsmono/JetBrainsMono%5Bwght%5D.ttf",
+          "sha256": "539b97b5977bbc7ba62c816534557b102cfd0c722a7f2c65270fce50e5919317"
+        },
+        {
+          "style": "Italic",
+          "file": "jetbrainsmono-Italic.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/jetbrainsmono/JetBrainsMono-Italic%5Bwght%5D.ttf",
+          "sha256": "5d2a810184f419bd59088f87a5582fb749e3bbdc69a3c1e3b131792e2bc04b00"
+        },
+        {
+          "style": "BoldItalic",
+          "file": "jetbrainsmono-BoldItalic.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/jetbrainsmono/JetBrainsMono-Italic%5Bwght%5D.ttf",
+          "sha256": "d7961427235dcf94d5c8de3f8090aa0bc5291746912552a42e981fbd9abf95a4"
+        }
+      ]
+    },
+    {
+      "family": "Dancing Script",
+      "category": "script",
+      "faces": [
+        {
+          "style": "Regular",
+          "file": "dancingscript-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/dancingscript/DancingScript%5Bwght%5D.ttf",
+          "sha256": "7850c32dce87d2920de490230d3374a2d03b168e0cff6a0fbaf98cb73bb026fb"
+        },
+        {
+          "style": "Bold",
+          "file": "dancingscript-Bold.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/dancingscript/DancingScript%5Bwght%5D.ttf",
+          "sha256": "df366d635a44673a4e5219200b3ed6a126126631906cd135d6c77db334b86ed3"
+        }
+      ]
+    },
+    {
+      "family": "Caveat",
+      "category": "script",
+      "faces": [
+        {
+          "style": "Regular",
+          "file": "caveat-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/caveat/Caveat%5Bwght%5D.ttf",
+          "sha256": "12c3213ad90afd279ef47b5ba380b4562f712f66c80df8669bfc1cdd85d70f45"
+        },
+        {
+          "style": "Bold",
+          "file": "caveat-Bold.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/caveat/Caveat%5Bwght%5D.ttf",
+          "sha256": "0ba8281309348e14b4c9ff72be8b2983f592cd433f25f6dc1f1d5307b8f01df0"
+        }
+      ]
+    },
+    {
+      "family": "Allura",
+      "category": "script",
+      "faces": [
+        {
+          "style": "Regular",
+          "file": "allura-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/allura/Allura-Regular.ttf",
+          "sha256": "7f844a683ac0a26232156056e03be3b596c4014f9a88c63892dcb2328f7a9406"
+        }
+      ]
+    },
+    {
+      "family": "Courgette",
+      "category": "script",
+      "faces": [
+        {
+          "style": "Regular",
+          "file": "courgette-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/courgette/Courgette-Regular.ttf",
+          "sha256": "037d7fd9a7628bf84efe0b6b7226950d49447f813016a2fce5e8df3bd4925ab8"
+        }
+      ]
+    },
+    {
+      "family": "Kalam",
+      "category": "script",
+      "faces": [
+        {
+          "style": "Regular",
+          "file": "kalam-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/kalam/Kalam-Regular.ttf",
+          "sha256": "33e6800328e0f317a10710ec87358421c7511a7f2b121cbd17a123714416610c"
+        },
+        {
+          "style": "Bold",
+          "file": "kalam-Bold.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/kalam/Kalam-Bold.ttf",
+          "sha256": "c41ead82dd6c01a095bb331d710f9331ec2ca5d6dc91849e933a69689674cee7"
+        }
+      ]
+    },
+    {
+      "family": "Patrick Hand",
+      "category": "script",
+      "faces": [
+        {
+          "style": "Regular",
+          "file": "patrickhand-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/patrickhand/PatrickHand-Regular.ttf",
+          "sha256": "7e185967ce75231836b37dcea58cecafe7ce7f488662f77994f82eab7f034f2a"
+        }
+      ]
+    },
+    {
+      "family": "Indie Flower",
+      "category": "script",
+      "faces": [
+        {
+          "style": "Regular",
+          "file": "indieflower-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/indieflower/IndieFlower-Regular.ttf",
+          "sha256": "79b0a22496a4a5e4bd5cea333726cd4de7d1a009f97664097d7d02cdf62af204"
+        }
+      ]
+    },
+    {
+      "family": "Shadows Into Light",
+      "category": "script",
+      "faces": [
+        {
+          "style": "Regular",
+          "file": "shadowsintolight-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/shadowsintolight/ShadowsIntoLight.ttf",
+          "sha256": "b330b2e8e10a6668aed816a5ec58ceb49d02b16bdd361f2d75bf9de67dfc48b9"
+        }
+      ]
+    },
+    {
+      "family": "Amatic SC",
+      "category": "script",
+      "faces": [
+        {
+          "style": "Regular",
+          "file": "amaticsc-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/amaticsc/AmaticSC-Regular.ttf",
+          "sha256": "55ce1f23f3d723a591ac50037a9bd3bddf69e8be2a0c6aa198c1d09b060f8814"
+        },
+        {
+          "style": "Bold",
+          "file": "amaticsc-Bold.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/amaticsc/AmaticSC-Bold.ttf",
+          "sha256": "a3113a62aec3c10b9f0fe7e369e0e4b08e931bc52d53e8840d5bfccefb758ab7"
+        }
+      ]
+    },
+    {
+      "family": "Anton",
+      "category": "display",
+      "faces": [
+        {
+          "style": "Regular",
+          "file": "anton-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/anton/Anton-Regular.ttf",
+          "sha256": "b231dea1eac4ebd281767bf2c411de754c4026d3b0c80472f542c818139f665f"
+        }
+      ]
+    },
+    {
+      "family": "Archivo Black",
+      "category": "sans",
+      "faces": [
+        {
+          "style": "Regular",
+          "file": "archivoblack-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/archivoblack/ArchivoBlack-Regular.ttf",
+          "sha256": "a53be4edbe87692a205b76d6a0a23c7bafd8392827c4cbd30fcf436c986f5d0a"
+        }
+      ]
+    },
+    {
+      "family": "Righteous",
+      "category": "display",
+      "faces": [
+        {
+          "style": "Regular",
+          "file": "righteous-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/righteous/Righteous-Regular.ttf",
+          "sha256": "42c71e96e923161eea73bf33061a77de0abf39fa66e3545c99c7937e9107abae"
+        }
+      ]
+    },
+    {
+      "family": "Comfortaa",
+      "category": "display",
+      "faces": [
+        {
+          "style": "Regular",
+          "file": "comfortaa-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/comfortaa/Comfortaa%5Bwght%5D.ttf",
+          "sha256": "d9a54a796e94a07f454640230affb5847a16e3b3d98603e10da709f0459daf6a"
+        },
+        {
+          "style": "Bold",
+          "file": "comfortaa-Bold.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/comfortaa/Comfortaa%5Bwght%5D.ttf",
+          "sha256": "7743c63acb2517ab6c3d73384813a81358c80e1813df479a95f1a9e4f2e2741a"
+        }
+      ]
+    },
+    {
+      "family": "Cinzel",
+      "category": "serif",
+      "faces": [
+        {
+          "style": "Regular",
+          "file": "cinzel-Regular.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/cinzel/Cinzel%5Bwght%5D.ttf",
+          "sha256": "541a3253165d7cb34fdc1a0de1a6eef9a3f94787779c434143484d8b61121dca"
+        },
+        {
+          "style": "Bold",
+          "file": "cinzel-Bold.ttf",
+          "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/cinzel/Cinzel%5Bwght%5D.ttf",
+          "sha256": "b4ced7e62d0dbb451246df997a9561e34c39217376c1c391ae7bc738acb08f5e"
+        }
+      ]
+    }
+  ]
+}

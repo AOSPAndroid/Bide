@@ -163,3 +163,6 @@ Automatic native PDF text regions and local English OCR for image/scanned pages;
 
 ## 0.6.1
 English + French offline OCR, including accented and mixed-language text. Five additional offline font families (17 total), all with regular/bold/italic/bold-italic faces; an OCR replacement-font selector before conversion.
+
+## 0.7.0
+80 bundled offline font families, alphabetically listed throughout the editor and OCR selector and searchable in the command palette. Available regular/bold/italic faces are embedded on PDF export.
