@@ -6,7 +6,7 @@ A Photopea-inspired visual editor, PDF toolkit, and bundled draw.io diagram edit
 
 ## Start on Windows
 
-1. Get the [prebuilt bide-browser.zip](https://github.com/AOSPAndroid/Bide/releases/download/v0.4.7/bide-browser.zip) and extract the entire ZIP into a **new writable folder**. The app and conversion engines are already included. You should see a `site` folder beside the BAT files.
+1. Get the [prebuilt bide-browser.zip](https://github.com/AOSPAndroid/Bide/releases/download/v0.4.8/bide-browser.zip) and extract the entire ZIP into a **new writable folder**. The app and conversion engines are already included. You should see a `site` folder beside the BAT files.
 2. Use your existing **Node.js 22 or newer**. bide detects `C:\devhome\tools\node24\current\node.exe` or `node.exe` on PATH. With this ZIP, **Install Dependencies.bat is optional**: it only checks your installation and bundled files, with no downloads.
 3. Double-click **launch bide.bat**. It starts the local server in the background and opens the editor in your default browser (use Edge or Chrome).
 
@@ -39,7 +39,7 @@ Photo editor and PDF MasterTool share your current document, layers and undo his
 - Style text, colors, opacity, strokes and alignment. Crop images; adjust brightness, contrast and saturation; apply grayscale, sepia or invert.
 - Order, rename, hide, lock, duplicate and group layers. Apply 16 blend modes on design pages, ellipse/rounded-rectangle shape masks, and image blur. Shift-click for multiple selection.
 - Zoom from 10% to 800% using the toolbar percentage (type a value and press Enter), plus/minus buttons, Ctrl +/−, or Ctrl/Alt + mouse wheel. Ctrl+1 resets to 100%, Ctrl+0 fits the page. Wheel zoom keeps the pointer position anchored. Pan with Space, snap to page edges/center and undo/redo. Drag page thumbnails to reorder.
-- Ctrl+K opens the command palette; Ctrl+O opens files; Ctrl+S saves a project; Ctrl+E exports; Ctrl+0 fits the page.
+- Ctrl+K opens the command palette; Ctrl+O opens files; Ctrl+S saves a project; Ctrl+Shift+E exports; Ctrl+0 fits the page.
 
 Basic 8-bit RGB PSD import preserves raster layer names, positions, opacity and supported blend modes. Complex documents use their saved composite preview with an explicit notice. PSD export writes the current design page as raster layers; text, groups and shapes are not native Photoshop objects. `.bide` retains the editable editor objects. PSB and 16/32-bit or non-RGB PSD files are not supported.
 
@@ -104,3 +104,9 @@ React, TypeScript and Fabric.js provide the editor. MuPDF WebAssembly handles PD
 The tests cover import/render, source and accented overlay text, links, merge order, rotation, ranges, split, image/SVG/DOCX/TXT output, project integrity and blocked external SVG resources. Browser verification covers Word/Excel/PowerPoint conversion, text dragging/resizing, downloads and image compression. `THIRD_PARTY.md` records engine provenance and license locations.
 
 bide is independent and is not affiliated with Photopea, iLovePDF or draw.io. The repository retains its existing Apache-2.0 LICENSE; bundled components retain their own licenses, documented in THIRD_PARTY.md.
+
+### Photo retouching
+
+Select an image layer and use **M** (rectangle) or **L** (lasso), then **Ctrl+C / Ctrl+V** to paste the cropped pixels as a new layer. Move it with **V**, adjust Layers opacity, and use **Warp** for a nine-point grid deformation. **E** soft-erases the selected layer with configurable size and edge softness. Right-click a layer and choose **Merge Down**, or press **Ctrl+E**. PDF export is now **Ctrl+Shift+E**.
+
+Use **S** for Clone Stamp or **J** for Healing Brush. **Alt-click** samples visible image/design artwork; drag to paint a separate patch layer. Healing preserves sampled texture while matching local destination color. It is basic color-matched healing, not content-aware reconstruction. Warp, erasing and merging rasterize the affected layers; Undo restores the originals. Merge Down requires two visible, unlocked Normal-blend layers. Clone/heal require an image/design page; PDF annotation layers can still be erased. Raster retouching is limited to 16 megapixels and warp to 4 megapixels.
