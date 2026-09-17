@@ -89,3 +89,11 @@ test('HTTPS serves the app with a certificate explicitly trusted by the test cli
   await writeFile(join(base,'.runtime','lan.json'),JSON.stringify({tls:{cert:'.runtime/cert.pem',key:'site/private-key.pem'}}));
   await assert.rejects(readLanSettings(base,root), /outside the served site/);
 });
+
+test('hashed assets can be cached while HTML and mutable assets stay fresh',async t=>{
+ const {root}=await fixture(t);await mkdir(join(root,'assets'));await writeFile(join(root,'assets','font-ABCDEFGH.ttf'),'font');await writeFile(join(root,'assets','settings.json'),'{}');
+ const server=await createBideServer({root}),port=await listen(t,server),origin=`http://127.0.0.1:${port}`;
+ assert.equal((await fetch(origin+'/assets/font-ABCDEFGH.ttf')).headers.get('cache-control'),'public, max-age=31536000, immutable');
+ assert.equal((await fetch(origin+'/assets/settings.json')).headers.get('cache-control'),'no-cache');
+ assert.equal((await fetch(origin+'/')).headers.get('cache-control'),'no-cache');
+});

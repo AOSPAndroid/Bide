@@ -1,9 +1,10 @@
 import {Canvas,FabricImage,type FabricObject} from 'fabric';
 import type {XY} from './retouch-pixels';
-export function pageRaster(c:Canvas,width:number,height:number,objects?:FabricObject[]) {
-  if(width*height>16000000)throw new Error('Retouching supports up to 16 megapixels. Resize this page first.');
+export function pageRaster(c:Canvas,width:number,height:number,objects?:FabricObject[],maxDimension?:number) {
+  const scale=maxDimension?Math.min(1,maxDimension/Math.max(width,height)):1;
+  if(width*height*scale*scale>16000000)throw new Error('Retouching supports up to 16 megapixels. Resize this page first.');
   const background=c.backgroundColor;
-  try {if(objects)c.backgroundColor='';return c.toCanvasElement(1/c.getZoom(),{width:width*c.getZoom(),height:height*c.getZoom(),filter:objects?o=>objects.some(object=>object===o):undefined});}
+  try {if(objects)c.backgroundColor='';return c.toCanvasElement(scale/c.getZoom(),{width:width*c.getZoom(),height:height*c.getZoom(),filter:objects?o=>objects.some(object=>object===o):undefined});}
   finally {c.backgroundColor=background;}
 }
 export function cutout(source:HTMLCanvasElement,points:XY[]) {

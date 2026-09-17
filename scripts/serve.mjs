@@ -41,6 +41,7 @@ export async function createBideServer({root, tls}) {
       if (!within(root, file)) throw new Error('Invalid path');
       const info = await stat(file);
       if (!info.isFile()) throw new Error('Invalid path');
+      if(/^\/assets\/[^/]+-[A-Za-z0-9_-]{8,}\.[a-z0-9]+$/.test(pathname))res.setHeader('Cache-Control','public, max-age=31536000, immutable');
       res.writeHead(200, {'Content-Type':types[extname(file)] || 'application/octet-stream', 'Content-Length':info.size});
       if (req.method === 'HEAD') { res.end(); return; }
       const stream = createReadStream(file);

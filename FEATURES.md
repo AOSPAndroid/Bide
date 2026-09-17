@@ -169,3 +169,6 @@ English + French offline OCR, including accented and mixed-language text. Five a
 
 ## 0.7.1
 Reduce the extended font library to Latin/Latin Extended characters and common symbols, retaining English/French coverage while fitting the public demo hosting limit.
+
+## 0.8.0
+Defer PDF export dependencies until needed; load page previews near the visible page list; cap editor thumbnails to 200 pixels; render OCR inputs directly at up to 2400 pixels; skip cancelled queued OCR jobs; allow browser caching of hashed local assets. These changes reduce unnecessary loading and rendering without changing document/export resolution.

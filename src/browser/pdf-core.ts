@@ -4,7 +4,8 @@ export { selectPages } from '../page-range';
 import * as mupdf from 'mupdf';
 
 import type {TextRegion} from '../text-regions';
-import { svgToPdf } from './svg-pdf';
+// Export-only dependencies are loaded when conversion is requested.
+async function svgToPdf(...args:Parameters<typeof import('./svg-pdf').svgToPdf>){return (await import('./svg-pdf')).svgToPdf(...args);}
 
 
 
