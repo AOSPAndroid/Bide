@@ -1,3 +1,23 @@
+import addedLiberationSansRegular from './browser/fonts/LiberationSans-Regular.ttf';
+import addedLiberationSansBold from './browser/fonts/LiberationSans-Bold.ttf';
+import addedLiberationSansItalic from './browser/fonts/LiberationSans-Italic.ttf';
+import addedLiberationSansBoldItalic from './browser/fonts/LiberationSans-BoldItalic.ttf';
+import addedLiberationSerifRegular from './browser/fonts/LiberationSerif-Regular.ttf';
+import addedLiberationSerifBold from './browser/fonts/LiberationSerif-Bold.ttf';
+import addedLiberationSerifItalic from './browser/fonts/LiberationSerif-Italic.ttf';
+import addedLiberationSerifBoldItalic from './browser/fonts/LiberationSerif-BoldItalic.ttf';
+import addedLiberationMonoRegular from './browser/fonts/LiberationMono-Regular.ttf';
+import addedLiberationMonoBold from './browser/fonts/LiberationMono-Bold.ttf';
+import addedLiberationMonoItalic from './browser/fonts/LiberationMono-Italic.ttf';
+import addedLiberationMonoBoldItalic from './browser/fonts/LiberationMono-BoldItalic.ttf';
+import addedCarlitoRegular from './browser/fonts/extra/Carlito-Regular.ttf';
+import addedCarlitoBold from './browser/fonts/extra/Carlito-Bold.ttf';
+import addedCarlitoItalic from './browser/fonts/extra/Carlito-Italic.ttf';
+import addedCarlitoBoldItalic from './browser/fonts/extra/Carlito-BoldItalic.ttf';
+import addedCaladeaRegular from './browser/fonts/extra/Caladea-Regular.ttf';
+import addedCaladeaBold from './browser/fonts/extra/Caladea-Bold.ttf';
+import addedCaladeaItalic from './browser/fonts/extra/Caladea-Italic.ttf';
+import addedCaladeaBoldItalic from './browser/fonts/extra/Caladea-BoldItalic.ttf';
 import font0 from './browser/fonts/extra/Lato-Regular.ttf';
 import font1 from './browser/fonts/extra/Lato-Bold.ttf';
 import font2 from './browser/fonts/extra/Lato-Italic.ttf';
@@ -29,6 +49,11 @@ import font27 from './browser/fonts/extra/AbrilFatface-Regular.ttf';
 import font28 from './browser/fonts/extra/GreatVibes-Regular.ttf';
 import font29 from './browser/fonts/extra/Sacramento-Regular.ttf';
 export const bundledFonts=[
+{family:"Liberation Sans",category:"sans",faces:[{style:"Regular",url:addedLiberationSansRegular},{style:"Bold",url:addedLiberationSansBold},{style:"Italic",url:addedLiberationSansItalic},{style:"BoldItalic",url:addedLiberationSansBoldItalic}]},
+{family:"Liberation Serif",category:"serif",faces:[{style:"Regular",url:addedLiberationSerifRegular},{style:"Bold",url:addedLiberationSerifBold},{style:"Italic",url:addedLiberationSerifItalic},{style:"BoldItalic",url:addedLiberationSerifBoldItalic}]},
+{family:"Liberation Mono",category:"mono",faces:[{style:"Regular",url:addedLiberationMonoRegular},{style:"Bold",url:addedLiberationMonoBold},{style:"Italic",url:addedLiberationMonoItalic},{style:"BoldItalic",url:addedLiberationMonoBoldItalic}]},
+{family:"Carlito",category:"sans",faces:[{style:"Regular",url:addedCarlitoRegular},{style:"Bold",url:addedCarlitoBold},{style:"Italic",url:addedCarlitoItalic},{style:"BoldItalic",url:addedCarlitoBoldItalic}]},
+{family:"Caladea",category:"serif",faces:[{style:"Regular",url:addedCaladeaRegular},{style:"Bold",url:addedCaladeaBold},{style:"Italic",url:addedCaladeaItalic},{style:"BoldItalic",url:addedCaladeaBoldItalic}]},
 {family:"Lato",category:"sans",faces:[{style:"Regular",url:font0},{style:"Bold",url:font1},{style:"Italic",url:font2},{style:"BoldItalic",url:font3}]},
 {family:"Poppins",category:"sans",faces:[{style:"Regular",url:font4},{style:"Bold",url:font5},{style:"Italic",url:font6},{style:"BoldItalic",url:font7}]},
 {family:"PT Sans",category:"sans",faces:[{style:"Regular",url:font8},{style:"Bold",url:font9},{style:"Italic",url:font10},{style:"BoldItalic",url:font11}]},

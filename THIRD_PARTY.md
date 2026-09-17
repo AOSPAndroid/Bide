@@ -15,4 +15,6 @@ This browser edition includes dependencies with their own licenses. License copi
 
 The source bundle accompanies this local handoff. Public or commercial redistribution must follow the upstream licenses, including MuPDF's AGPL or commercial terms. The GitHub repository contains application source, lockfiles and the asset manifests/bootstrap. Large Office and draw.io runtime assets are included in the prebuilt release ZIP, rather than Git history.
 
-- Tesseract.js 6.0.1 and tesseract.js-core: Apache-2.0; bundled local OCR worker and WASM. See public/licenses/tesseract-LICENSE.txt and tesseract-core-LICENSE.txt. English tessdata is packaged from @tesseract.js-data/eng 1.0.0 (package MIT; trained data from the Tesseract project). OCR runs locally; no third-party OCR service receives documents.
+- Tesseract.js 6.0.1 and tesseract.js-core: Apache-2.0; bundled local OCR worker and WASM. See public/licenses/tesseract-LICENSE.txt and tesseract-core-LICENSE.txt. English and French tessdata is packaged from @tesseract.js-data/eng and @tesseract.js-data/fra 1.0.0 (package MIT; trained data from the Tesseract project). OCR runs locally; no third-party OCR service receives documents.
+
+- Carlito and Caladea: SIL Open Font License 1.1, unmodified static TTFs from https://github.com/google/fonts/tree/main/ofl/carlito and https://github.com/google/fonts/tree/main/ofl/caladea . License copies are bundled in public/licenses.

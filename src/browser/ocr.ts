@@ -1,7 +1,7 @@
 import {createWorker,PSM,type Worker} from 'tesseract.js';
 import type {TextRegion} from '../text-regions';
 let worker:Promise<Worker>|undefined,queue=Promise.resolve();
-function getWorker(){return worker??=createWorker('eng',1,{workerPath:new URL('ocr/worker.min.js',document.baseURI).href,corePath:new URL('ocr/core/',document.baseURI).href,langPath:new URL('ocr/lang/',document.baseURI).href,workerBlobURL:false}).catch(e=>{worker=undefined;throw e;});}
+function getWorker(){return worker??=createWorker('fra+eng',1,{workerPath:new URL('ocr/worker.min.js',document.baseURI).href,corePath:new URL('ocr/core/',document.baseURI).href,langPath:new URL('ocr/lang/',document.baseURI).href,workerBlobURL:false}).catch(e=>{worker=undefined;throw e;});}
 export async function recognizeImage(image:HTMLCanvasElement):Promise<TextRegion[]>{
  let resolve!:(v:TextRegion[])=>void,reject!:(e:unknown)=>void;const result=new Promise<TextRegion[]>((yes,no)=>{resolve=yes;reject=no;});
  queue=queue.then(async()=>{try{const engine=await getWorker();await engine.setParameters({tessedit_pageseg_mode:PSM.AUTO});const {data}=await engine.recognize(image,{}, {blocks:true,text:true});const ctx=image.getContext('2d')!;const regions:TextRegion[]=[];

@@ -6,7 +6,7 @@ root = Path(__file__).resolve().parent.parent
 out = root / 'release'
 out.mkdir(exist_ok=True)
 target = out / 'bide-browser.zip'
-for required in ['index.html', 'ocr/worker.min.js', 'ocr/lang/eng.traineddata.gz', 'office/runtime/soffice.wasm', 'diagrams/runtime/index.html', 'diagrams/runtime/js/app.min.js', 'licenses/drawio-LICENSE.txt']:
+for required in ['index.html', 'ocr/worker.min.js', 'ocr/lang/eng.traineddata.gz','ocr/lang/fra.traineddata.gz', 'office/runtime/soffice.wasm', 'diagrams/runtime/index.html', 'diagrams/runtime/js/app.min.js', 'licenses/drawio-LICENSE.txt']:
     if not (root / 'dist' / required).is_file(): raise SystemExit(f'Missing built asset: {required}. Build before packaging.')
 with ZipFile(target, 'w', ZIP_DEFLATED, compresslevel=6) as archive:
     for name in ['Install Dependencies.bat', 'launch bide.bat', 'share bide.bat', 'Stop bide.bat', 'Setup.cmd', 'start bide.cmd', 'lan-settings.example.json']:

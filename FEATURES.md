@@ -160,3 +160,6 @@ Verified a real browser import/export of the generated grouped PSD: hierarchy, t
 ## 0.6.0 text recognition and editing
 
 Automatic native PDF text regions and local English OCR for image/scanned pages; click a region to create a directly editable layer. Usable embedded TrueType/OpenType fonts survive project save and PDF export. Unsupported fonts or missing glyphs use a stated fallback. Native PDF replacements remove source text while retaining surrounding artwork; image replacements use adjustable background patches. Rotated/native complex layouts and exact image font recognition are not fully supported.
+
+## 0.6.1
+English + French offline OCR, including accented and mixed-language text. Five additional offline font families (17 total), all with regular/bold/italic/bold-italic faces; an OCR replacement-font selector before conversion.
