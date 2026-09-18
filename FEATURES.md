@@ -175,3 +175,6 @@ Defer PDF export dependencies until needed; load page previews near the visible 
 
 ## 0.8.1
 Unlock Original PDF from Layers, the selection toolbar or command palette. The current page background becomes an unlocked image beneath existing overlays, supporting Marquee/Lasso and retouch tools. Undo restores the original PDF. Conversion rasterizes original text, vectors and links (up to 3x, longest edge 3500px); existing overlay text remains editable.
+
+## 0.8.2 — sharper text editing
+PDF previews adapt to zoom and screen density, with a 16-megapixel memory budget. PDF unlock rasterizes at up to 300 DPI (large pages are capped). Replacement text renders directly and OCR text uses measured font ascent for vertical placement. Native PDF text editing retains vector content; scanned text still requires a matching font and a background patch.

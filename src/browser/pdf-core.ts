@@ -1,4 +1,5 @@
 import { selectPages } from '../page-range';
+import {pdfRasterScale} from '../render-budget';
 import { digest } from './crypto';
 export { selectPages } from '../page-range';
 import * as mupdf from 'mupdf';
@@ -159,7 +160,7 @@ export function render(source:string,index:number,scale:number) {
 
   const doc=open(data);
 
-  try {const page=doc.loadPage(index),b=page.getBounds();scale=Math.min(3,Math.max(.1,scale),3500/Math.max(b[2]-b[0],b[3]-b[1]));const pix=page.toPixmap(mupdf.Matrix.scale(scale,scale),mupdf.ColorSpace.DeviceRGB,false,true);try{return pix.asPNG().slice() as Uint8Array<ArrayBuffer>;}finally{pix.destroy();page.destroy();}}finally{doc.destroy();}
+  try {const page=doc.loadPage(index),b=page.getBounds();scale=pdfRasterScale(b[2]-b[0],b[3]-b[1],scale);const pix=page.toPixmap(mupdf.Matrix.scale(scale,scale),mupdf.ColorSpace.DeviceRGB,false,true);try{return pix.asPNG().slice() as Uint8Array<ArrayBuffer>;}finally{pix.destroy();page.destroy();}}finally{doc.destroy();}
 
 }
 

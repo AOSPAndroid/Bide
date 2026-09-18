@@ -87,3 +87,9 @@ test('embedded TrueType font is reusable and missing glyphs are identified',asyn
  const region=detectPdfText(imported.id,0).regions[0];assert.ok(region.fontData);assert.ok(region.fontId);assert.equal(fontSupportsText(region.fontData,'Edited font 123'),true);assert.equal(fontSupportsText(region.fontData,'\u{1f9d1}'),false);
  const edited=await removePdfText(imported.id,0,region.id);const output=await exportDocument({pages:[{width:400,height:300,source:edited.id,index:0,svg:`<svg xmlns="http://www.w3.org/2000/svg"><text x="40" y="100" font-family="${region.fontId}" font-size="24">Edited font 123</text></svg>`,fonts:{[region.fontId]:region.fontData}}],title:'Font edit',format:'pdf',compression:'lossless',range:'',dpi:72});const reopened=mupdf.Document.openDocument(output.bytes,'pdf'),page=reopened.loadPage(0),text=page.toStructuredText('');assert.match(text.asText(),/Edited font 123/);assert.doesNotMatch(text.asText(),/Editable embedded/);text.destroy();page.destroy();reopened.destroy();
 });
+
+test('PDF rasterization supplies actual 300 DPI pixels for text editing',()=>{
+ const png=Buffer.from(render(source.id,0,300/72));
+ assert.equal(png.readUInt32BE(16),Math.ceil(595*300/72));
+ assert.equal(png.readUInt32BE(20),Math.ceil(842*300/72));
+});
