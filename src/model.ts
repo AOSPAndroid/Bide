@@ -1,7 +1,7 @@
 import { Circle, Rect, Textbox, FabricObject } from 'fabric';
 import { uuid } from './browser/crypto';
 
-FabricObject.customProperties = ['id', 'name', 'diagramXml','pdfFontData','pdfOriginalFont','pdfFontFallback','recognizedKey'];
+FabricObject.customProperties = ['id', 'name', 'diagramXml','pdfFontData','pdfOriginalFont','pdfFontFallback','recognizedKey','objectCaching'];
 // The editor's coordinates use top-left anchors. Fabric 7 defaults to centered anchors.
 Object.assign(FabricObject.ownDefaults, { originX: 'left', originY: 'top', cornerColor: '#ffffff', cornerStrokeColor: '#0076a8', borderColor: '#00aeef', cornerSize: 9, transparentCorners: false, padding: 3 });
 

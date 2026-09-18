@@ -75,3 +75,9 @@ test('selection masks follow transformed layers and survive serialization', asyn
   object.clipPath=mask;const restored=await object.clone();assert.equal(restored.clipPath.inverted,true);assert.deepEqual(restored.clipPath.path,mask.path);
   assert.throws(()=>selectionMask(object,[{x:0,y:0},{x:1,y:1},{x:2,y:2}]),/too small/);
 });
+
+test('direct rendering survives layer serialization and reload',async()=>{
+ const shape=new Rect({width:100,height:20,objectCaching:false});
+ const saved=shape.toObject();assert.equal(saved.objectCaching,false);
+ const restored=await Rect.fromObject(saved);assert.equal(restored.objectCaching,false);
+});
