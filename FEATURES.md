@@ -181,3 +181,6 @@ PDF previews adapt to zoom and screen density, with a 16-megapixel memory budget
 
 ## 0.8.4 — match text softness
 Text properties include a 0–2 px softness control, Slightly soft preset and Crisp reset, also accessible from the command palette. Text stays editable in .bide projects. Softened text alone exports as a transparent raster image; zero-softness text retains vector export. This is manual appearance matching, not automatic scan reconstruction. Browser pixel/export/reload verification: open /tests/text-appearance.html under the Vite development server.
+
+## 0.8.5 — text box context menus
+Right-click an editable text box on the canvas or its Layers entry to edit text, font, size, color, softness, formatting, duplicate, arrange, lock/unlock or delete. Context clicks work with drawing tools active and do not draw. Locked layers expose Unlock while editing actions are disabled. Soft text serialization also retains names and embedded font metadata.

@@ -6,25 +6,29 @@ export function clampTextSoftness(value:number){return Number.isFinite(value)?Ma
 export class Textbox extends FabricTextbox {
  static type='Textbox';
  declare textSoftness?:number;
- _render(ctx:CanvasRenderingContext2D){
+ private softRaster(requestedScale:number){
   const softness=clampTextSoftness(this.textSoftness??0);
-  if(!softness){super._render(ctx);return;}
+  const pad=Math.ceil(softness*4+this.strokeWidth+this.fontSize*.3),width=this.width+pad*2,height=this.height+pad*2;
+  const scale=Math.min(Math.max(1,requestedScale),4,8192/Math.max(width,height),Math.sqrt(16000000/(width*height)));
+  const bitmap=util.createCanvasElement();bitmap.width=Math.ceil(width*scale);bitmap.height=Math.ceil(height*scale);
+  const context=bitmap.getContext('2d')!;context.scale(scale,scale);context.translate(width/2,height/2);
+  context.filter=`blur(${softness*scale}px)`;super._render(context);
+  return {bitmap,x:-width/2,y:-height/2,width:bitmap.width/scale,height:bitmap.height/scale};
+ }
+ _render(ctx:CanvasRenderingContext2D){
+  if(!clampTextSoftness(this.textSoftness??0)){super._render(ctx);return;}
   const matrix=ctx.getTransform(),scale=Math.sqrt(Math.abs(matrix.a*matrix.d-matrix.b*matrix.c));
-  ctx.save();try{ctx.filter=`blur(${softness*scale}px)`;super._render(ctx);}finally{ctx.restore();}
+  const raster=this.softRaster(scale);
+  ctx.drawImage(raster.bitmap,raster.x,raster.y,raster.width,raster.height);
  }
  _toSVG():string[]{
-  const softness=clampTextSoftness(this.textSoftness??0);
-  if(!softness)return super._toSVG();
-  // PDF's SVG renderer does not implement blur filters. Embed just this text
-  // layer as transparent PNG; other text and PDF page content stay vectors.
-  const pad=Math.ceil(softness*4+this.strokeWidth+this.fontSize*.3),width=this.width+pad*2,height=this.height+pad*2;
-  const scale=Math.min(4,8192/Math.max(width,height),Math.sqrt(16000000/(width*height)));
-  const canvas=util.createCanvasElement();canvas.width=Math.ceil(width*scale);canvas.height=Math.ceil(height*scale);
-  const ctx=canvas.getContext('2d')!;ctx.scale(scale,scale);ctx.translate(width/2,height/2);this._render(ctx);
-  return [`<image `,'COMMON_PARTS',`x="${-width/2}" y="${-height/2}" width="${canvas.width/scale}" height="${canvas.height/scale}" opacity="${this.opacity}" visibility="${this.visible?'visible':'hidden'}" xlink:href="${canvas.toDataURL('image/png')}"/>`];
+  if(!clampTextSoftness(this.textSoftness??0))return super._toSVG();
+  // Rasterize this text layer only; other page content stays vector-based.
+  const raster=this.softRaster(4);
+  return [`<image `,'COMMON_PARTS',`x="${raster.x}" y="${raster.y}" width="${raster.width}" height="${raster.height}" opacity="${this.opacity}" visibility="${this.visible?'visible':'hidden'}" xlink:href="${raster.bitmap.toDataURL('image/png')}"/>`];
  }
 }
-Textbox.customProperties=[...FabricTextbox.customProperties,'textSoftness'];
+Textbox.customProperties=['id','name','diagramXml','pdfFontData','pdfOriginalFont','pdfFontFallback','recognizedKey','objectCaching','textSoftness'];
 Textbox.cacheProperties=[...FabricTextbox.cacheProperties,'textSoftness'];
 classRegistry.setClass(Textbox,'Textbox');
 classRegistry.setClass(Textbox,'textbox');
