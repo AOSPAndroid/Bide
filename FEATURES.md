@@ -184,3 +184,10 @@ Text properties include a 0–2 px softness control, Slightly soft preset and Cr
 
 ## 0.8.5 — text box context menus
 Right-click an editable text box on the canvas or its Layers entry to edit text, font, size, color, softness, formatting, duplicate, arrange, lock/unlock or delete. Context clicks work with drawing tools active and do not draw. Locked layers expose Unlock while editing actions are disabled. Soft text serialization also retains names and embedded font metadata.
+
+## 0.8.6 — Transparent text replacement
+
+- OCR replacement backgrounds: sampled color, chosen solid color, or clear to transparent. Clear removes the rectangular OCR area from intersecting unlocked image layers, rasterizing those layers; Undo restores the originals. Scanned PDFs must first be unlocked as images.
+- Text boxes support a color background or transparent background, including a right-click action.
+- Export selected text or the editable page as a transparent PNG using the command palette. Text export also appears in Properties and the right-click menu. Opaque pixels in images stay opaque; page export removes only the page background. Native PDF backgrounds must first be unlocked.
+- Checkerboard preview shows page transparency. PNG exports keep alpha; .bide keeps editable layers.
