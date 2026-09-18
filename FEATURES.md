@@ -191,3 +191,11 @@ Right-click an editable text box on the canvas or its Layers entry to edit text,
 - Text boxes support a color background or transparent background, including a right-click action.
 - Export selected text or the editable page as a transparent PNG using the command palette. Text export also appears in Properties and the right-click menu. Opaque pixels in images stay opaque; page export removes only the page background. Native PDF backgrounds must first be unlocked.
 - Checkerboard preview shows page transparency. PNG exports keep alpha; .bide keeps editable layers.
+
+## 0.8.7 — Better text replacement
+
+- OCR samples actual foreground lettering and multiple background pixels instead of assuming black or white text.
+- Repair smooth background reconstructs gentle gradients from borders above and below the text, as a separate undoable patch. Detailed textures still need Clone or Healing.
+- Cleanup padding is adjustable from 0 to 20 page pixels; horizontal fitting better matches the original OCR line width without shrinking its height.
+- Letter spacing is adjustable in Text Properties and accessible from the command palette.
+- Property changes exit inline text editing before checking the layer lock, fixing false locked-layer messages during replacement.
