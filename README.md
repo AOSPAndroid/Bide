@@ -6,7 +6,7 @@ A Photopea-inspired visual editor, PDF toolkit, and bundled draw.io diagram edit
 
 ## Start on Windows
 
-1. Get the [prebuilt bide-browser.zip](https://github.com/AOSPAndroid/Bide/releases/download/v0.8.0/bide-browser.zip) and extract the entire ZIP into a **new writable folder**. The app and conversion engines are already included. You should see a `site` folder beside the BAT files.
+1. Get the [prebuilt bide-browser.zip](https://github.com/AOSPAndroid/Bide/releases/download/v0.8.1/bide-browser.zip) and extract the entire ZIP into a **new writable folder**. The app and conversion engines are already included. You should see a `site` folder beside the BAT files.
 2. Use your existing **Node.js 22 or newer**. bide detects `C:\devhome\tools\node24\current\node.exe` or `node.exe` on PATH. With this ZIP, **Install Dependencies.bat is optional**: it only checks your installation and bundled files, with no downloads.
 3. Double-click **launch bide.bat**. It starts the local server in the background and opens the editor in your default browser (use Edge or Chrome).
 
@@ -134,3 +134,5 @@ Images and scanned PDFs use bundled local English and French OCR automatically o
 OCR recognizes English and French together, including mixed-language pages. Before converting an image text region, choose **OCR font** in the detection bar; afterward use **Font family**. There are 80 offline font families, including Liberation Sans/Serif/Mono, Carlito and Caladea. Exact image font identification is not automatic.
 
 The 80 offline families include Inter, Roboto, Open Sans, Montserrat, Merriweather, Playfair Display, EB Garamond, Source Code Pro, Dancing Script and many more. Font menus are alphabetical. Use Ctrl+K and search a font name to apply it to selected text. The same fonts are available for OCR replacements and embedded PDF exports. Fonts load locally when selected. Available bold/italic faces are included; decorative families without those faces use synthetic styling.
+
+To select pixels from the PDF itself, click the lock beside **Original PDF** in Layers (or **Unlock PDF as image** in the Marquee/Lasso toolbar). This converts only that page background to an editable image beneath your added layers. Original PDF text/vectors/links become pixels; Undo restores the source page. Use regular PDF text detection when you want to retain searchable text.

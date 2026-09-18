@@ -172,3 +172,6 @@ Reduce the extended font library to Latin/Latin Extended characters and common s
 
 ## 0.8.0
 Defer PDF export dependencies until needed; load page previews near the visible page list; cap editor thumbnails to 200 pixels; render OCR inputs directly at up to 2400 pixels; skip cancelled queued OCR jobs; allow browser caching of hashed local assets. These changes reduce unnecessary loading and rendering without changing document/export resolution.
+
+## 0.8.1
+Unlock Original PDF from Layers, the selection toolbar or command palette. The current page background becomes an unlocked image beneath existing overlays, supporting Marquee/Lasso and retouch tools. Undo restores the original PDF. Conversion rasterizes original text, vectors and links (up to 3x, longest edge 3500px); existing overlay text remains editable.
