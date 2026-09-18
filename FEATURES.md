@@ -178,3 +178,6 @@ Unlock Original PDF from Layers, the selection toolbar or command palette. The c
 
 ## 0.8.3 — sharper text editing
 PDF previews adapt to zoom and screen density, with a 16-megapixel memory budget. PDF unlock rasterizes at up to 300 DPI (large pages are capped). Replacement text renders directly and OCR text uses measured font ascent for vertical placement. Native PDF text editing retains vector content; scanned text still requires a matching font and a background patch.
+
+## 0.8.4 — match text softness
+Text properties include a 0–2 px softness control, Slightly soft preset and Crisp reset, also accessible from the command palette. Text stays editable in .bide projects. Softened text alone exports as a transparent raster image; zero-softness text retains vector export. This is manual appearance matching, not automatic scan reconstruction. Browser pixel/export/reload verification: open /tests/text-appearance.html under the Vite development server.

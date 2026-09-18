@@ -11,7 +11,7 @@ import {setTimeout as delay} from 'node:timers/promises';
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const runtime = join(projectRoot, '.runtime');
-const releaseUrl = 'https://github.com/AOSPAndroid/Bide/releases/download/v0.8.3/bide-browser.zip';
+const releaseUrl = 'https://github.com/AOSPAndroid/Bide/releases/download/v0.8.4/bide-browser.zip';
 const officeFiles = ['soffice.js', 'soffice.wasm', 'soffice.data', 'soffice.data.js.metadata'];
 const exists = async path => { try { return (await stat(path)).isFile(); } catch { return false; } };
 const jsonFile = async path => JSON.parse((await readFile(path, 'utf8')).replace(/^\uFEFF/, ''));
