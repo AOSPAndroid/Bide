@@ -28,7 +28,7 @@ export class Textbox extends FabricTextbox {
   return [`<image `,'COMMON_PARTS',`x="${raster.x}" y="${raster.y}" width="${raster.width}" height="${raster.height}" opacity="${this.opacity}" visibility="${this.visible?'visible':'hidden'}" xlink:href="${raster.bitmap.toDataURL('image/png')}"/>`];
  }
 }
-Textbox.customProperties=['id','name','diagramXml','pdfFontData','pdfOriginalFont','pdfFontFallback','recognizedKey','objectCaching','textSoftness'];
+Textbox.customProperties=['id','name','diagramXml','pdfFontData','pdfOriginalFont','pdfFontFallback','pdfFontBold','pdfFontItalic','recognizedKey','objectCaching','textSoftness'];
 Textbox.cacheProperties=[...FabricTextbox.cacheProperties,'textSoftness'];
 classRegistry.setClass(Textbox,'Textbox');
 classRegistry.setClass(Textbox,'textbox');

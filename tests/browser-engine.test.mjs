@@ -93,3 +93,14 @@ test('PDF rasterization supplies actual 300 DPI pixels for text editing',()=>{
  assert.equal(png.readUInt32BE(16),Math.ceil(595*300/72));
  assert.equal(png.readUInt32BE(20),Math.ceil(842*300/72));
 });
+
+
+test('native PDF detection retains separate regular and bold faces',async()=>{
+ const doc=new mupdf.PDFDocument(),normal=new mupdf.Font('Helvetica'),bold=new mupdf.Font('Helvetica-Bold'),n=doc.addSimpleFont(normal),b=doc.addSimpleFont(bold);
+ const page=doc.addPage([0,0,500,220],0,{Font:{N:n,B:b}},'BT /N 24 Tf 30 160 Td (Regular replacement) Tj ET BT /B 24 Tf 30 110 Td (Bold replacement) Tj ET');doc.insertPage(-1,page);
+ const buffer=doc.saveToBuffer(''),source=await importBytes(buffer.asUint8Array().slice(),'weights.pdf');
+ await writeFile('tmp/pdfs/weights.pdf',buffer.asUint8Array());
+ const regions=detectPdfText(source.id,0).regions;
+ assert.equal(regions.find(r=>r.text.includes('Regular')).bold,false);assert.equal(regions.find(r=>r.text.includes('Bold')).bold,true);
+ buffer.destroy();page.destroy();n.destroy();b.destroy();normal.destroy();bold.destroy();doc.destroy();
+});

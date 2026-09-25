@@ -199,3 +199,9 @@ Right-click an editable text box on the canvas or its Layers entry to edit text,
 - Cleanup padding is adjustable from 0 to 20 page pixels; horizontal fitting better matches the original OCR line width without shrinking its height.
 - Letter spacing is adjustable in Text Properties and accessible from the command palette.
 - Property changes exit inline text editing before checking the layer lock, fixing false locked-layer messages during replacement.
+
+## 0.8.8 — Restore 0.8.6 replacement defaults and fix bold handling
+
+- Restores 0.8.6 OCR sizing without horizontal stretching, original color sampling, sampled-color cover and automatic cleanup margin. Smooth repair remains an explicit option. Leave cleanup padding blank for Auto.
+- Select OCR weight (Regular, Bold, Italic or Bold italic) before clicking image text. The chosen face is loaded and measured before replacement; OCR does not automatically infer its weight. Native PDF text still uses its detected font.
+- Preserves original PDF bold/italic metadata when a subset embedded font must switch to a bundled fallback for new characters, including on export and after saving a project. Embedded bold faces are not artificially emboldened twice.
