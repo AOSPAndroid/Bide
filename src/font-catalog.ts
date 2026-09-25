@@ -1,3 +1,4 @@
+import {corporateFonts} from './corporate-fonts';
 import {extendedFonts} from './font-library';
 import addedLiberationSansRegular from './browser/fonts/LiberationSans-Regular.ttf';
 import addedLiberationSansBold from './browser/fonts/LiberationSans-Bold.ttf';
@@ -69,4 +70,4 @@ export const bundledFonts=[
 {family:"Great Vibes",category:"script",faces:[{style:"Regular",url:font28}]},
 {family:"Sacramento",category:"script",faces:[{style:"Regular",url:font29}]}
 ].sort((a,b)=>a.family.localeCompare(b.family));
-export const systemFonts=['Arial','Georgia','Times New Roman','Courier New','Verdana','Trebuchet MS','cursive'];
+export const systemFonts=[...corporateFonts,'Arial','Georgia','Times New Roman','Courier New','Verdana','Trebuchet MS','cursive'];

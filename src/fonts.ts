@@ -1,7 +1,8 @@
+import {corporateFonts,corporateFallback} from './corporate-fonts';
 import {bundledFonts} from './font-catalog';
 const loaded=new Map<string,Promise<void>>();
 export function ensureFont(family:string):Promise<void> {
-  const item=bundledFonts.find(font=>font.family===family);if(!item)return Promise.resolve();
+  const item=bundledFonts.find(font=>font.family===family);if(!item){if(!corporateFonts.includes(family))return Promise.resolve();if(!loaded.has(family))loaded.set(family,new FontFace(family,`local("${family}")`).load().then(()=>{}).catch(()=>{loaded.delete(family);throw new Error(`${family} is not installed on this PC. Choose bundled ${corporateFallback(family)} or another installed font.`);}));return loaded.get(family)!;}
   if(!loaded.has(family))loaded.set(family,Promise.all(item.faces.map(async face=>{
     const font=new FontFace(family,`url("${face.url}")`,{weight:face.style.includes('Bold')?'700':'400',style:face.style.includes('Italic')?'italic':'normal'});
     await font.load();document.fonts.add(font);

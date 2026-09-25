@@ -205,3 +205,9 @@ Right-click an editable text box on the canvas or its Layers entry to edit text,
 - Restores 0.8.6 OCR sizing without horizontal stretching, original color sampling, sampled-color cover and automatic cleanup margin. Smooth repair remains an explicit option. Leave cleanup padding blank for Auto.
 - Select OCR weight (Regular, Bold, Italic or Bold italic) before clicking image text. The chosen face is loaded and measured before replacement; OCR does not automatically infer its weight. Native PDF text still uses its detected font.
 - Preserves original PDF bold/italic metadata when a subset embedded font must switch to a bundled fallback for new characters, including on export and after saving a project. Embedded bold faces are not artificially emboldened twice.
+
+## 0.8.9 — Workplace fonts and separate chat text regions
+
+- Smart OCR grouping splits large gaps between avatar initials and adjacent message text. Choose Individual words for precise edits, or Whole lines for legacy grouping. French accents remain supported.
+- Adds 15 installed workplace font choices to both text and OCR menus: Segoe UI variants, Aptos variants, Calibri, Calibri Light, Cambria, Candara, Corbel, Constantia, Consolas, Tahoma and Arial Narrow. These are local system fonts, not redistributed font files. Missing fonts show a message with a bundled alternative.
+- Workplace-font text exports as an image within PDF/SVG so the export engine does not substitute a different font. Other text stays vector-based; .bide retains editable text. Recipients need the same installed font to edit .bide with the same appearance.
