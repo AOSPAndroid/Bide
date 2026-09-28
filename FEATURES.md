@@ -215,3 +215,7 @@ Right-click an editable text box on the canvas or its Layers entry to edit text,
 ### OCR stroke matching (0.8.10)
 
 OCR weight defaults to Auto (match strokes), comparing foreground coverage with regular and bold renderings in the selected font before sizing the replacement. Regular, Bold, Italic and Bold italic remain manual overrides. This estimates weight, not the original font; complex backgrounds, mixed weights and low-resolution scans may require manual adjustment. Existing replacement layers are unchanged; undo and select the detected region again to apply Auto. Text softness remains adjustable in Properties.
+
+### Mobile UI fonts (0.8.11)
+
+Roboto and Inter are already bundled for offline text and OCR editing. SF Pro, SF Pro Text and SF Pro Display are now offered as installed-font choices in both font menus and the command palette. Apple font files are not bundled or downloaded; use requires a local installation and compliance with Apple licensing. Missing SF Pro fonts report an error recommending bundled Inter instead of silently substituting a different face. Installed-font text retains the existing raster-text PDF/SVG export behavior.
