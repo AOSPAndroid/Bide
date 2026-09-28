@@ -211,3 +211,7 @@ Right-click an editable text box on the canvas or its Layers entry to edit text,
 - Smart OCR grouping splits large gaps between avatar initials and adjacent message text. Choose Individual words for precise edits, or Whole lines for legacy grouping. French accents remain supported.
 - Adds 15 installed workplace font choices to both text and OCR menus: Segoe UI variants, Aptos variants, Calibri, Calibri Light, Cambria, Candara, Corbel, Constantia, Consolas, Tahoma and Arial Narrow. These are local system fonts, not redistributed font files. Missing fonts show a message with a bundled alternative.
 - Workplace-font text exports as an image within PDF/SVG so the export engine does not substitute a different font. Other text stays vector-based; .bide retains editable text. Recipients need the same installed font to edit .bide with the same appearance.
+
+### OCR stroke matching (0.8.10)
+
+OCR weight defaults to Auto (match strokes), comparing foreground coverage with regular and bold renderings in the selected font before sizing the replacement. Regular, Bold, Italic and Bold italic remain manual overrides. This estimates weight, not the original font; complex backgrounds, mixed weights and low-resolution scans may require manual adjustment. Existing replacement layers are unchanged; undo and select the detected region again to apply Auto. Text softness remains adjustable in Properties.
