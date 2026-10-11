@@ -18,8 +18,11 @@ test('normal names and accented phrases stay together; absent word boxes are saf
 test('low-confidence symbol noise is dropped but real low-confidence words stay',()=>{
  const l={text:'| Bonjour ~ 42',bbox:{x0:0,x1:200,y0:0,y1:20},words:[{...word('|',0,4),confidence:10},{...word('Bonjour',10,80),confidence:20},{...word('~',90,96),confidence:5},{...word('42',100,120),confidence:90}]};
  assert.deepEqual(segmentOcrLine(l,'words').map(r=>r.text),['Bonjour','42']);
- assert.deepEqual(segmentOcrLine(l,'lines'),[{text:'Bonjour 42',bbox:{x0:10,x1:120,y0:10,y1:30}}]);
+ assert.deepEqual(segmentOcrLine(l,'lines'),[{text:'Bonjour 42',bbox:{x0:10,x1:120,y0:10,y1:30},confidence:20}]);
  assert.deepEqual(segmentOcrLine({...l,words:[l.words[0]]}),[]);
+ assert.deepEqual(segmentOcrLine(l).map(r=>[r.text,r.confidence]),[['Bonjour 42',20]]);
+ const phrase={text:'ta session',bbox:line.bbox,words:[{...word('ta',120,140),confidence:95},{...word('session',148,220),confidence:58}]};
+ assert.equal(segmentOcrLine(phrase)[0].confidence,58);
 });
 test('a thorough second pass only adds lines the first pass missed',async()=>{
  const {missingLines}=await import('../tmp/ocr-segmentation.mjs');

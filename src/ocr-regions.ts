@@ -24,6 +24,9 @@ export function ocrPatchBounds(region:Bounds,padding:number,page:{width:number;h
  return {left,top,width:Math.min(page.width,region.left+region.width+pad)-left,height:Math.min(page.height,region.top+region.height+pad)-top};
 }
 
-export function ocrScanStatus(count:number,languages:string,converted:boolean){
- return count?`${count} OCR regions · ${languages} · choose a matching font`:converted?'Original text converted. Double-click the text layer to edit.':'No text detected. Use Text to add your own.';
+// Below this Tesseract confidence a region is flagged for proofreading.
+export const isUncertain=(r:{kind:string;confidence?:number})=>r.kind==='ocr'&&r.confidence!==undefined&&r.confidence<70;
+
+export function ocrScanStatus(count:number,languages:string,converted:boolean,uncertain=0){
+ return count?`${count} OCR regions${uncertain?` · ${uncertain} to check`:''} · ${languages} · choose a matching font`:converted?'Original text converted. Double-click the text layer to edit.':'No text detected. Use Text to add your own.';
 }

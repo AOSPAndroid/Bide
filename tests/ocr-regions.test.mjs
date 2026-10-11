@@ -18,3 +18,9 @@ test('scan status reflects what was found',()=>{
  assert.match(ocrScanStatus(3,'English',false),/3 OCR regions · English/);
  assert.match(ocrScanStatus(0,'English',true),/converted/);assert.match(ocrScanStatus(0,'English',false),/No text/);
 });
+test('low-confidence OCR regions are flagged for proofreading',async()=>{
+ const {isUncertain}=await import('../tmp/ocr-regions.mjs');
+ assert.equal(isUncertain({kind:'ocr',confidence:55}),true);assert.equal(isUncertain({kind:'ocr',confidence:88}),false);
+ assert.equal(isUncertain({kind:'ocr'}),false);assert.equal(isUncertain({kind:'pdf',confidence:10}),false);
+ assert.match(ocrScanStatus(5,'English',false,2),/5 OCR regions · 2 to check/);
+});

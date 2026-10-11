@@ -8,7 +8,7 @@ import {repairTextBackground} from './text-replacement';
 import {estimateOcrBold} from './ocr-weight';
 import {ensureFont,ensureEmbeddedFont} from './fonts';
 import {fallbackFont,fitOcrText,type TextRegion} from './text-regions';
-import {recognitionKey,scaleRegions,unconvertedRegions,ocrPatchBounds,ocrScanStatus} from './ocr-regions';
+import {recognitionKey,scaleRegions,unconvertedRegions,ocrPatchBounds,ocrScanStatus,isUncertain} from './ocr-regions';
 import type {OcrGrouping} from './ocr-segmentation';
 import {uid,type Page} from './model';
 
@@ -37,7 +37,7 @@ export async function scanPageText(p:Page,c:Canvas,{signal,grouping,thorough,onS
  const {recognizeImage}=await import('./browser/ocr');const detected=await recognizeImage(raster,{signal,grouping,thorough,onProgress:(fraction,label)=>onStatus(`${label}… ${Math.round(fraction*100)}%`)});signal.throwIfAborted();
  const layers=c.getObjects().map(o=>({recognizedKey:(o as Tagged).recognizedKey,bounds:o.getBoundingRect()}));
  const regions=unconvertedRegions(scaleRegions(detected,p.width/raster.width,p.height/raster.height),layers);
- return {regions,status:ocrScanStatus(regions.length,'English + Français',layers.some(l=>l.recognizedKey))};
+ return {regions,status:ocrScanStatus(regions.length,'English + Français',layers.some(l=>l.recognizedKey),regions.filter(isUncertain).length)};
 }
 
 // Editable text positioned so its first baseline matches the detected text.
