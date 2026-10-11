@@ -21,3 +21,8 @@ test('low-confidence symbol noise is dropped but real low-confidence words stay'
  assert.deepEqual(segmentOcrLine(l,'lines'),[{text:'Bonjour 42',bbox:{x0:10,x1:120,y0:10,y1:30}}]);
  assert.deepEqual(segmentOcrLine({...l,words:[l.words[0]]}),[]);
 });
+test('a thorough second pass only adds lines the first pass missed',async()=>{
+ const {missingLines}=await import('../tmp/ocr-segmentation.mjs');
+ const first=[{bbox:{x0:0,y0:0,x1:100,y1:20}}],extra=[{text:'dup',bbox:{x0:5,y0:2,x1:60,y1:18}},{text:'new',bbox:{x0:200,y0:0,x1:240,y1:12}},{text:'edge',bbox:{x0:95,y0:0,x1:160,y1:20}},{text:'empty',bbox:{x0:5,y0:5,x1:5,y1:9}}];
+ assert.deepEqual(missingLines(first,extra).map(l=>l.text),['new','edge']);
+});

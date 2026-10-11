@@ -399,10 +399,10 @@ export default function App() {
   useEffect(()=>{
     if(!ready||initializing||loading.current)return;const scanController=new AbortController(),signal=scanController.signal;setTextRegions([]);setTextScanStatus('');const p=page,c=canvas.current!;
     if(!hasScannableContent(p,c))return;
-    const scan=async()=>{try{const {regions,status}=await scanPageText(p,c,{signal,grouping:ocr.grouping,onStatus:s=>{if(!signal.aborted)setTextScanStatus(s);}});if(signal.aborted)return;setTextRegions(regions);setTextScanStatus(status);}
+    const scan=async()=>{try{const {regions,status}=await scanPageText(p,c,{signal,grouping:ocr.grouping,thorough:ocr.thorough,onStatus:s=>{if(!signal.aborted)setTextScanStatus(s);}});if(signal.aborted)return;setTextRegions(regions);setTextScanStatus(status);}
       catch(e){if(!signal.aborted)setTextScanStatus('Text detection unavailable: '+(e instanceof Error?e.message:String(e)));}};
     const scanTimer=setTimeout(()=>void scan(),120);return()=>{clearTimeout(scanTimer);scanController.abort();};
-  },[ready,initializing,page.id,page.source,textScanRevision,ocr.grouping]);
+  },[ready,initializing,page.id,page.source,textScanRevision,ocr.grouping,ocr.thorough]);
   async function unlockOriginalPdf(){
     const original=projectRef.current.pages.find(p=>p.id===pageIdRef.current);if(!original?.source||busy||loading.current)return;
     setBusy('Unlocking PDF as an image layer…');
@@ -778,6 +778,7 @@ export default function App() {
   const moreActions:PaletteAction[] = [
     {label:'Export text as transparent PNG',hint:'',icon:Download,disabled:requireText,run:()=>void exportTransparentPng(true)},
     {label:'Export page as transparent PNG',hint:'',icon:Download,disabled:page.source?'Unlock Original PDF first':undefined,run:()=>void exportTransparentPng()},
+    {label:'Choose OCR scan depth',hint:'',keywords:'thorough sparse buttons badges labels screenshot',icon:Type,run:()=>focusSetting('OCR scan depth')},
     {label:'Choose OCR selection grouping',hint:'',keywords:'teams avatar initials split words lines',icon:Type,run:()=>focusSetting('OCR selection grouping')},
     {label:'Choose OCR replacement font',hint:'',keywords:'teams segoe aptos calibri corporate',icon:Type,run:()=>focusSetting('OCR replacement font')},
     {label:'Choose OCR replacement weight',hint:'',keywords:'bold regular italic text',icon:Bold,run:()=>focusSetting('OCR replacement weight')},

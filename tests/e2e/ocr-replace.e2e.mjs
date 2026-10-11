@@ -23,6 +23,10 @@ test('OCR text on an imported image becomes an editable layer',{timeout:240000},
   const region=page.locator('button[aria-label^="Edit detected text: Quarterly"]');
   await region.waitFor({timeout:180000});
   assert.ok(await page.locator('button[aria-label^="Edit detected text: Revenue"]').count(),'second line detected');
+  await page.getByLabel('OCR scan depth').selectOption('thorough');
+  await page.waitForFunction(()=>/Thorough pass… \d+%/.test(document.querySelector('.text-detection-bar')?.textContent||''),null,{timeout:120000,polling:50});
+  await region.waitFor({timeout:120000});
+  assert.equal(await page.locator('button[aria-label^="Edit detected text: Quarterly"]').count(),1,'second pass adds no duplicates');
   await page.getByLabel('Text replacement background').selectOption('sampled');
   await region.click();
   await page.getByText('OCR text is editable',{exact:false}).waitFor({timeout:30000});

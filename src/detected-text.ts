@@ -29,12 +29,12 @@ async function ocrRaster(p:Page,c:Canvas){
 
 export function hasScannableContent(p:Page,c:Canvas){return !!p.source||c.getObjects().some(o=>o instanceof FabricImage);}
 
-export async function scanPageText(p:Page,c:Canvas,{signal,grouping,onStatus}:{signal:AbortSignal;grouping:OcrGrouping;onStatus:(status:string)=>void}):Promise<{regions:TextRegion[];status:string}>{
+export async function scanPageText(p:Page,c:Canvas,{signal,grouping,thorough,onStatus}:{signal:AbortSignal;grouping:OcrGrouping;thorough:boolean;onStatus:(status:string)=>void}):Promise<{regions:TextRegion[];status:string}>{
  onStatus('Detecting text…');
  if(p.source){const detected=await detectPdfText(p.source,p.index);signal.throwIfAborted();if(detected.regions.length)return {regions:detected.regions,status:`${detected.regions.length} editable text regions${detected.skipped?' · rotated text kept unchanged':''}`};}
  onStatus('Recognizing image text locally…');
  const raster=await ocrRaster(p,c);signal.throwIfAborted();
- const {recognizeImage}=await import('./browser/ocr');const detected=await recognizeImage(raster,{signal,grouping,onProgress:(fraction,label)=>onStatus(`${label}… ${Math.round(fraction*100)}%`)});signal.throwIfAborted();
+ const {recognizeImage}=await import('./browser/ocr');const detected=await recognizeImage(raster,{signal,grouping,thorough,onProgress:(fraction,label)=>onStatus(`${label}… ${Math.round(fraction*100)}%`)});signal.throwIfAborted();
  const layers=c.getObjects().map(o=>({recognizedKey:(o as Tagged).recognizedKey,bounds:o.getBoundingRect()}));
  const regions=unconvertedRegions(scaleRegions(detected,p.width/raster.width,p.height/raster.height),layers);
  return {regions,status:ocrScanStatus(regions.length,'English + Français',layers.some(l=>l.recognizedKey))};

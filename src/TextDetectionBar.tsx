@@ -3,8 +3,8 @@ import type {OcrGrouping} from './ocr-segmentation';
 import type {ReplacementBackground} from './detected-text';
 import type {TextRegion} from './text-regions';
 
-export type OcrSettings={font:string;style:string;grouping:OcrGrouping;background:ReplacementBackground;color:string;padding:number};
-export const defaultOcrSettings:OcrSettings={font:'Liberation Sans',style:'auto',grouping:'smart',background:'sampled',color:'#ffffff',padding:-1};
+export type OcrSettings={font:string;style:string;grouping:OcrGrouping;background:ReplacementBackground;color:string;padding:number;thorough:boolean};
+export const defaultOcrSettings:OcrSettings={font:'Liberation Sans',style:'auto',grouping:'smart',background:'sampled',color:'#ffffff',padding:-1,thorough:false};
 
 type Props={status:string;regions:TextRegion[];show:boolean;onShow:(show:boolean)=>void;settings:OcrSettings;onChange:(patch:Partial<OcrSettings>)=>void;scanning:boolean;onRescan:()=>void};
 
@@ -23,6 +23,9 @@ export default function TextDetectionBar({status,regions,show,onShow,settings,on
   </>}
   <label title="Smart splits large gaps such as avatar initials beside a message. Words lets you edit each word separately.">OCR selection<select aria-label="OCR selection grouping" value={settings.grouping} onChange={e=>onChange({grouping:e.target.value as OcrGrouping})}>
    <option value="smart">Smart groups</option><option value="words">Individual words</option><option value="lines">Whole lines</option>
+  </select></label>
+  <label title="Thorough adds a second, sparse-text pass that can find isolated labels such as buttons and badges. Takes about twice as long.">OCR scan<select aria-label="OCR scan depth" value={settings.thorough?'thorough':'standard'} onChange={e=>onChange({thorough:e.target.value==='thorough'})}>
+   <option value="standard">Standard</option><option value="thorough">Thorough (slower)</option>
   </select></label>
   <label title="Applies to the next detected image text. Smooth repair follows nearby gradients; use Clone or Healing for detailed textures.">Replacement background<select aria-label="Text replacement background" value={settings.background} onChange={e=>onChange({background:e.target.value as ReplacementBackground})}>
    <option value="repair">Repair smooth background</option><option value="sampled">Sampled color</option><option value="solid">Solid color</option><option value="transparent">Clear to transparent</option>

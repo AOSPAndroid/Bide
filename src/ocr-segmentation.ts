@@ -23,3 +23,11 @@ export function segmentOcrLine(line:Line,mode:OcrGrouping='smart'):Word[]{
  }
  return groups;
 }
+// Lines from a second (sparse-text) pass that the first pass did not cover.
+export function missingLines<T extends {bbox:Box}>(primary:{bbox:Box}[],extra:T[]):T[]{
+ const area=(b:Box)=>Math.max(0,b.x1-b.x0)*Math.max(0,b.y1-b.y0);
+ return extra.filter(e=>area(e.bbox)>0&&!primary.some(p=>{
+  const overlap=area({x0:Math.max(p.bbox.x0,e.bbox.x0),y0:Math.max(p.bbox.y0,e.bbox.y0),x1:Math.min(p.bbox.x1,e.bbox.x1),y1:Math.min(p.bbox.y1,e.bbox.y1)});
+  return overlap>.3*Math.min(area(p.bbox),area(e.bbox));
+ }));
+}
