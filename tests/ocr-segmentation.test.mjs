@@ -15,3 +15,9 @@ test('normal names and accented phrases stay together; absent word boxes are saf
  assert.equal(segmentOcrLine(l).length,1);assert.equal(segmentOcrLine(l)[0].text,l.text);
  assert.equal(segmentOcrLine({...l,words:[]})[0].text,l.text);
 });
+test('low-confidence symbol noise is dropped but real low-confidence words stay',()=>{
+ const l={text:'| Bonjour ~ 42',bbox:{x0:0,x1:200,y0:0,y1:20},words:[{...word('|',0,4),confidence:10},{...word('Bonjour',10,80),confidence:20},{...word('~',90,96),confidence:5},{...word('42',100,120),confidence:90}]};
+ assert.deepEqual(segmentOcrLine(l,'words').map(r=>r.text),['Bonjour','42']);
+ assert.deepEqual(segmentOcrLine(l,'lines'),[{text:'Bonjour 42',bbox:{x0:10,x1:120,y0:10,y1:30}}]);
+ assert.deepEqual(segmentOcrLine({...l,words:[l.words[0]]}),[]);
+});
