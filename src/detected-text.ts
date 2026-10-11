@@ -34,7 +34,7 @@ export async function scanPageText(p:Page,c:Canvas,{signal,grouping,onStatus}:{s
  if(p.source){const detected=await detectPdfText(p.source,p.index);signal.throwIfAborted();if(detected.regions.length)return {regions:detected.regions,status:`${detected.regions.length} editable text regions${detected.skipped?' · rotated text kept unchanged':''}`};}
  onStatus('Recognizing image text locally…');
  const raster=await ocrRaster(p,c);signal.throwIfAborted();
- const {recognizeImage}=await import('./browser/ocr');const detected=await recognizeImage(raster,signal,grouping);signal.throwIfAborted();
+ const {recognizeImage}=await import('./browser/ocr');const detected=await recognizeImage(raster,{signal,grouping,onProgress:(fraction,label)=>onStatus(`${label}… ${Math.round(fraction*100)}%`)});signal.throwIfAborted();
  const layers=c.getObjects().map(o=>({recognizedKey:(o as Tagged).recognizedKey,bounds:o.getBoundingRect()}));
  const regions=unconvertedRegions(scaleRegions(detected,p.width/raster.width,p.height/raster.height),layers);
  return {regions,status:ocrScanStatus(regions.length,'English + Français',layers.some(l=>l.recognizedKey))};

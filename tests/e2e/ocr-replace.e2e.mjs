@@ -19,6 +19,7 @@ test('OCR text on an imported image becomes an editable layer',{timeout:240000},
   const page=await browser.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.goto(server.resolvedUrls.local[0]);
   await page.locator('input[type=file][accept*=".psd"]').setInputFiles(image);
+  await page.waitForFunction(()=>/Recognizing text… \d+%/.test(document.querySelector('.text-detection-bar')?.textContent||''),null,{timeout:120000,polling:50});
   const region=page.locator('button[aria-label^="Edit detected text: Quarterly"]');
   await region.waitFor({timeout:180000});
   assert.ok(await page.locator('button[aria-label^="Edit detected text: Revenue"]').count(),'second line detected');
