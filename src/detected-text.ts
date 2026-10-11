@@ -11,6 +11,7 @@ import {fallbackFont,fitOcrText,type TextRegion} from './text-regions';
 import {recognitionKey,scaleRegions,unconvertedRegions,ocrPatchBounds,ocrScanStatus,isUncertain} from './ocr-regions';
 import type {OcrGrouping} from './ocr-segmentation';
 import {uid,type Page} from './model';
+import {bundledOcrLanguages,languageLabel} from './ocr-languages';
 
 type Tagged=FabricObject&{recognizedKey?:string;id?:string;name?:string};
 export type ReplacementBackground='repair'|'sampled'|'solid'|'transparent';
@@ -29,17 +30,17 @@ async function ocrRaster(p:Page,c:Canvas){
 
 export function hasScannableContent(p:Page,c:Canvas){return !!p.source||c.getObjects().some(o=>o instanceof FabricImage);}
 
-export async function scanPageText(p:Page,c:Canvas,{signal,grouping,thorough,onStatus}:{signal:AbortSignal;grouping:OcrGrouping;thorough:boolean;onStatus:(status:string)=>void}):Promise<{regions:TextRegion[];status:string;suggestedFont?:string}>{
+export async function scanPageText(p:Page,c:Canvas,{signal,grouping,thorough,languages,onStatus}:{signal:AbortSignal;grouping:OcrGrouping;thorough:boolean;languages:string[];onStatus:(status:string)=>void}):Promise<{regions:TextRegion[];status:string;suggestedFont?:string}>{
  onStatus('Detecting text…');
  if(p.source){const detected=await detectPdfText(p.source,p.index);signal.throwIfAborted();if(detected.regions.length)return {regions:detected.regions,status:`${detected.regions.length} editable text regions${detected.skipped?' · rotated text kept unchanged':''}`};}
  onStatus('Recognizing image text locally…');
  const raster=await ocrRaster(p,c);signal.throwIfAborted();
- const {recognizeImage}=await import('./browser/ocr');const detected=await recognizeImage(raster,{signal,grouping,thorough,onProgress:(fraction,label)=>onStatus(`${label}… ${Math.round(fraction*100)}%`)});signal.throwIfAborted();
+ const {recognizeImage}=await import('./browser/ocr');const detected=await recognizeImage(raster,{signal,grouping,thorough,languages,onProgress:(fraction,label)=>onStatus(`${label}… ${Math.round(fraction*100)}%`)});signal.throwIfAborted();
  const layers=c.getObjects().map(o=>({recognizedKey:(o as Tagged).recognizedKey,bounds:o.getBoundingRect()}));
  const regions=unconvertedRegions(scaleRegions(detected,p.width/raster.width,p.height/raster.height),layers);
  let suggestedFont:string|undefined;
  if(regions.length){onStatus('Matching font…');try{suggestedFont=await suggestFont(raster,detected);}catch{}signal.throwIfAborted();}
- return {regions,suggestedFont,status:ocrScanStatus(regions.length,'English + Français',layers.some(l=>l.recognizedKey),regions.filter(isUncertain).length)+(suggestedFont?` · closest font: ${suggestedFont}`:'')};
+ return {regions,suggestedFont,status:ocrScanStatus(regions.length,languageLabel(languages,await bundledOcrLanguages()),layers.some(l=>l.recognizedKey),regions.filter(isUncertain).length)+(suggestedFont?` · closest font: ${suggestedFont}`:'')};
 }
 
 // Compare the clearest recognized words against bundled fonts. Only confident

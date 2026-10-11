@@ -2,13 +2,18 @@ import {bundledFonts,systemFonts} from './font-catalog';
 import type {OcrGrouping} from './ocr-segmentation';
 import type {ReplacementBackground} from './detected-text';
 import type {TextRegion} from './text-regions';
+import {useEffect,useState} from 'react';
+import {bundledOcrLanguages,defaultOcrLanguages,languageLabel,type OcrLanguage} from './ocr-languages';
 
-export type OcrSettings={font:string;style:string;grouping:OcrGrouping;background:ReplacementBackground;color:string;padding:number;thorough:boolean};
-export const defaultOcrSettings:OcrSettings={font:'Liberation Sans',style:'auto',grouping:'smart',background:'sampled',color:'#ffffff',padding:-1,thorough:false};
+export type OcrSettings={font:string;style:string;grouping:OcrGrouping;background:ReplacementBackground;color:string;padding:number;thorough:boolean;languages:string[]};
+export const defaultOcrSettings:OcrSettings={font:'Liberation Sans',style:'auto',grouping:'smart',background:'sampled',color:'#ffffff',padding:-1,thorough:false,languages:defaultOcrLanguages};
 
 type Props={status:string;regions:TextRegion[];show:boolean;onShow:(show:boolean)=>void;settings:OcrSettings;onChange:(patch:Partial<OcrSettings>)=>void;scanning:boolean;onRescan:()=>void};
 
 export default function TextDetectionBar({status,regions,show,onShow,settings,onChange,scanning,onRescan}:Props){
+ const [available,setAvailable]=useState<OcrLanguage[]>([]);
+ useEffect(()=>{let live=true;void bundledOcrLanguages().then(list=>{if(live)setAvailable(list);});return()=>{live=false;};},[]);
+ const toggle=(code:string,on:boolean)=>{const next=available.map(l=>l.code).filter(c=>c===code?on:settings.languages.includes(c));if(next.length)onChange({languages:next});};
  return <div className="text-detection-bar">
   <label><input type="checkbox" checked={show} onChange={e=>onShow(e.target.checked)}/>Edit detected text</label>
   <span>{status||'Open a page to detect its text'}</span>
@@ -24,6 +29,7 @@ export default function TextDetectionBar({status,regions,show,onShow,settings,on
   <label title="Smart splits large gaps such as avatar initials beside a message. Words lets you edit each word separately.">OCR selection<select aria-label="OCR selection grouping" value={settings.grouping} onChange={e=>onChange({grouping:e.target.value as OcrGrouping})}>
    <option value="smart">Smart groups</option><option value="words">Individual words</option><option value="lines">Whole lines</option>
   </select></label>
+  {available.length>1&&<details className="ocr-languages"><summary aria-label="OCR languages" title="Languages on the page. Fewer languages scan faster and misread less.">OCR languages: {languageLabel(settings.languages,available)}</summary><div>{available.map(l=><label key={l.code}><input type="checkbox" aria-label={`OCR language ${l.name}`} checked={settings.languages.includes(l.code)} disabled={settings.languages.length===1&&settings.languages.includes(l.code)} onChange={e=>toggle(l.code,e.target.checked)}/>{l.name}</label>)}</div></details>}
   <label title="Thorough adds a second, sparse-text pass that can find isolated labels such as buttons and badges. Takes about twice as long.">OCR scan<select aria-label="OCR scan depth" value={settings.thorough?'thorough':'standard'} onChange={e=>onChange({thorough:e.target.value==='thorough'})}>
    <option value="standard">Standard</option><option value="thorough">Thorough (slower)</option>
   </select></label>

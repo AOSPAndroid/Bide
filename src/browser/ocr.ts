@@ -1,39 +1,42 @@
 import {inkDensity} from '../ocr-weight';
 import {segmentOcrLine,missingLines,type OcrGrouping} from '../ocr-segmentation';
-import {ocrScale,prepareOcrPixels,sampleBackground,estimateTextColor,toHex} from '../ocr-image';
+import {sampleBackground,estimateTextColor,toHex} from '../ocr-image';
+import {prepareOcrImage} from './ocr-prepare';
 import {createWorker,PSM,type Worker as OcrEngine,type LoggerMessage} from 'tesseract.js';
 import type {TextRegion} from '../text-regions';
 
 export type OcrProgress=(fraction:number,label:string)=>void;
-export type OcrOptions={signal?:AbortSignal;grouping?:OcrGrouping;onProgress?:OcrProgress;thorough?:boolean};
+export type OcrOptions={signal?:AbortSignal;grouping?:OcrGrouping;languages?:string[];onProgress?:OcrProgress;thorough?:boolean};
 
-let worker:Promise<OcrEngine>|undefined,queue=Promise.resolve(),report:((m:LoggerMessage)=>void)|undefined;
-function getWorker(){return worker??=createWorker('fra+eng',1,{workerPath:new URL('ocr/worker.min.js',document.baseURI).href,corePath:new URL('ocr/core/',document.baseURI).href,langPath:new URL('ocr/lang/',document.baseURI).href,workerBlobURL:false,logger:m=>report?.(m)}).catch(e=>{worker=undefined;throw e;});}
+let worker:Promise<OcrEngine>|undefined,workerLanguages='',queue=Promise.resolve(),report:((m:LoggerMessage)=>void)|undefined;
+// One shared engine; switching languages re-initializes it instead of starting another.
+async function getWorker(languages:string){
+ if(worker&&workerLanguages!==languages){const engine=await worker;await engine.reinitialize(languages,1);workerLanguages=languages;}
+ if(!worker)workerLanguages=languages;
+ return worker??=createWorker(languages,1,{workerPath:new URL('ocr/worker.min.js',document.baseURI).href,corePath:new URL('ocr/core/',document.baseURI).href,langPath:new URL('ocr/lang/',document.baseURI).href,workerBlobURL:false,logger:m=>report?.(m)}).catch(e=>{worker=undefined;throw e;});
+}
 
-// Upscaled, contrast-normalized grayscale copy for recognition. Prepared in a
-// worker when OffscreenCanvas exists so large pages don't block the editor.
+// Prepared copy for recognition (see ocr-prepare.ts). Done in a worker when
+// OffscreenCanvas exists so large pages don't block the editor.
 async function prepare(image:HTMLCanvasElement,signal?:AbortSignal):Promise<{input:HTMLCanvasElement|Blob;width:number;height:number}>{
- const scale=ocrScale(image.width,image.height),width=Math.round(image.width*scale),height=Math.round(image.height*scale);
  if(typeof OffscreenCanvas!=='undefined'&&typeof createImageBitmap!=='undefined'){
   const bitmap=await createImageBitmap(image),prep=new Worker(new URL('./ocr-prepare.worker.ts',import.meta.url),{type:'module'});
   try{
-   const reply=await new Promise<{blob?:Blob;error?:string}>((resolve,reject)=>{prep.onmessage=e=>resolve(e.data);prep.onerror=e=>reject(new Error(e.message||'OCR image preparation failed.'));signal?.addEventListener('abort',()=>reject(signal.reason),{once:true});prep.postMessage({bitmap,width,height},[bitmap]);});
-   if(reply.blob)return {input:reply.blob,width,height};
+   const reply=await new Promise<{blob?:Blob;width?:number;height?:number;error?:string}>((resolve,reject)=>{prep.onmessage=e=>resolve(e.data);prep.onerror=e=>reject(new Error(e.message||'OCR image preparation failed.'));signal?.addEventListener('abort',()=>reject(signal.reason),{once:true});prep.postMessage({bitmap},[bitmap]);});
+   if(reply.blob&&reply.width&&reply.height)return {input:reply.blob,width:reply.width,height:reply.height};
   }catch(e){if(signal?.aborted)throw e;}finally{prep.terminate();}
  }
- const canvas=document.createElement('canvas');canvas.width=width;canvas.height=height;
- const ctx=canvas.getContext('2d',{willReadFrequently:true})!;ctx.imageSmoothingQuality='high';ctx.drawImage(image,0,0,width,height);
- const pixels=ctx.getImageData(0,0,width,height);prepareOcrPixels(pixels);ctx.putImageData(pixels,0,0);
- return {input:canvas,width,height};
+ const {canvas,width,height}=prepareOcrImage(image,(w,h)=>Object.assign(document.createElement('canvas'),{width:w,height:h}));
+ return {input:canvas as HTMLCanvasElement,width,height};
 }
 
-export async function recognizeImage(image:HTMLCanvasElement,{signal,grouping='smart',onProgress,thorough=false}:OcrOptions={}):Promise<TextRegion[]>{
+export async function recognizeImage(image:HTMLCanvasElement,{signal,grouping='smart',languages=['eng','fra'],onProgress,thorough=false}:OcrOptions={}):Promise<TextRegion[]>{
  let resolve!:(v:TextRegion[])=>void,reject!:(e:unknown)=>void;const result=new Promise<TextRegion[]>((yes,no)=>{resolve=yes;reject=no;});
  queue=queue.then(async()=>{try{
   signal?.throwIfAborted();onProgress?.(0,'Preparing image');
   let pass=0;const passes=thorough?2:1;
   report=m=>{if(signal?.aborted)return;if(m.status==='recognizing text')onProgress?.(.1+(pass+m.progress)/passes*.9,thorough&&pass?'Thorough pass':'Recognizing text');else if(/load|initializ/i.test(m.status))onProgress?.(0,'Loading OCR engine');};
-  const [engine,prepared]=await Promise.all([getWorker(),prepare(image,signal)]);signal?.throwIfAborted();
+  const [engine,prepared]=await Promise.all([getWorker(languages.join('+')),prepare(image,signal)]);signal?.throwIfAborted();
   const recognize=async(mode:PSM)=>{await engine.setParameters({tessedit_pageseg_mode:mode,preserve_interword_spaces:'1',user_defined_dpi:'300'});const {data}=await engine.recognize(prepared.input,{}, {blocks:true,text:true});signal?.throwIfAborted();return (data.blocks||[]).flatMap(b=>b.paragraphs.flatMap(p=>p.lines)).filter(l=>l.text.trim()&&l.confidence>=35);};
   const lines=await recognize(PSM.AUTO);
   // Sparse-text mode finds isolated labels (buttons, badges) that page layout analysis can skip.

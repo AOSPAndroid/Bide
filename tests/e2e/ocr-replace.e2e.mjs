@@ -11,22 +11,26 @@ function fixture(){
  pix.destroy();page.destroy();obj.destroy();ref.destroy();font.destroy();doc.destroy();return png;
 }
 
+// Record every status-bar text from page load: scans can finish between polls.
+const recordStatuses=page=>page.addInitScript(()=>{window.__statuses=[];new MutationObserver(()=>{const t=document.querySelector('.text-detection-bar span')?.textContent;if(t&&window.__statuses.at(-1)!==t)window.__statuses.push(t);}).observe(document,{subtree:true,childList:true,characterData:true});});
+const sawStatus=(page,pattern)=>page.waitForFunction(source=>window.__statuses.some(t=>new RegExp(source).test(t)),pattern.source,{timeout:120000});
+
 test('OCR text on an imported image becomes an editable layer',{timeout:240000},async()=>{
  const dir=await mkdtemp(join(tmpdir(),'bide-e2e-')),image=join(dir,'scan.png');await writeFile(image,fixture());
  const server=await createServer({logLevel:'error',server:{port:0,host:'127.0.0.1'}});await server.listen();
  const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||undefined});
  try{
-  const page=await browser.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
+  const page=await browser.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));await recordStatuses(page);
   await page.goto(server.resolvedUrls.local[0]);
   await page.locator('input[type=file][accept*=".psd"]').setInputFiles(image);
-  await page.waitForFunction(()=>/Recognizing text… \d+%/.test(document.querySelector('.text-detection-bar')?.textContent||''),null,{timeout:120000,polling:50});
+  await sawStatus(page,/Recognizing text… \d+%/);
   const region=page.locator('button[aria-label^="Edit detected text: Quarterly"]');
   await region.waitFor({timeout:180000});
   assert.ok(await page.locator('button[aria-label^="Edit detected text: Revenue"]').count(),'second line detected');
   await page.waitForFunction(()=>/closest font: /.test(document.querySelector('.text-detection-bar')?.textContent||''),null,{timeout:60000});
   assert.equal(await page.getByLabel('OCR replacement font').inputValue(),'Liberation Sans','Helvetica scan suggests its metric twin');
   await page.getByLabel('OCR scan depth').selectOption('thorough');
-  await page.waitForFunction(()=>/Thorough pass… \d+%/.test(document.querySelector('.text-detection-bar')?.textContent||''),null,{timeout:120000,polling:50});
+  await sawStatus(page,/Thorough pass… \d+%/);
   await region.waitFor({timeout:120000});
   assert.equal(await page.locator('button[aria-label^="Edit detected text: Quarterly"]').count(),1,'second pass adds no duplicates');
   await page.getByLabel('Text replacement background').selectOption('sampled');
@@ -35,6 +39,26 @@ test('OCR text on an imported image becomes an editable layer',{timeout:240000},
   await page.locator('button[aria-label^="Edit detected text: Quarterly"]').waitFor({state:'detached'});
   const layers=await page.locator('body').innerText();
   assert.match(layers,/Text background patch/);assert.match(layers,/Quarterly report/);
+  assert.deepEqual(errors,[]);
+ }finally{await browser.close();await server.close();}
+});
+
+test('enabling German re-scans with the German model',{timeout:240000},async()=>{
+ const doc=new mupdf.PDFDocument(),font=new mupdf.Font('Helvetica'),ref=doc.addSimpleFont(font,'Latin');
+ const obj=doc.addPage([0,0,460,120],0,{Font:{F:ref}},'1 1 1 rg 0 0 460 120 re f 0.1 0.1 0.1 rg BT /F 20 Tf 20 70 Td (Gr\\366\\337ere \\334bungen f\\374r Stra\\337enbahnen) Tj ET');
+ doc.insertPage(-1,obj);const pix=doc.loadPage(0).toPixmap(mupdf.Matrix.scale(2,2),mupdf.ColorSpace.DeviceRGB,false,true);
+ const dir=await mkdtemp(join(tmpdir(),'bide-e2e-')),image=join(dir,'german.png');await writeFile(image,Buffer.from(pix.asPNG()));
+ const server=await createServer({logLevel:'error',server:{port:0,host:'127.0.0.1'}});await server.listen();
+ const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||undefined});
+ try{
+  const page=await browser.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
+  await page.goto(server.resolvedUrls.local[0]);
+  await page.locator('input[type=file][accept*=".psd"]').setInputFiles(image);
+  await page.locator('button[aria-label^="Edit detected text: Gr"]').waitFor({timeout:180000});
+  assert.equal(await page.locator('button[aria-label*="Straßenbahnen"]').count(),0,'English + French misreads ß');
+  await page.getByLabel('OCR languages').click();await page.getByLabel('OCR language Deutsch').check();
+  await page.locator('button[aria-label*="Größere Übungen für Straßenbahnen"]').waitFor({timeout:180000});
+  assert.match(await page.locator('.text-detection-bar').innerText(),/English \+ Français \+ Deutsch/);
   assert.deepEqual(errors,[]);
  }finally{await browser.close();await server.close();}
 });

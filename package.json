@@ -14,7 +14,7 @@
     "prebuild": "node scripts/prepare-ocr.mjs && node scripts/check-assets.mjs",
     "build:demo": "tsc -b && vite build --mode demo",
     "assets:ocr": "node scripts/prepare-ocr.mjs",
-    "test:e2e": "node --test tests/e2e/ocr-replace.e2e.mjs"
+    "test:e2e": "node --test --test-concurrency=1 tests/e2e/ocr-replace.e2e.mjs"
   },
   "dependencies": {
     "@noble/hashes": "1.8.0",
@@ -31,8 +31,13 @@
     "tesseract.js": "6.0.1"
   },
   "devDependencies": {
+    "@tesseract.js-data/deu": "^1.0.0",
     "@tesseract.js-data/eng": "1.0.0",
     "@tesseract.js-data/fra": "1.0.0",
+    "@tesseract.js-data/ita": "^1.0.0",
+    "@tesseract.js-data/nld": "^1.0.0",
+    "@tesseract.js-data/por": "^1.0.0",
+    "@tesseract.js-data/spa": "^1.0.0",
     "@types/pdfkit": "^0.17.6",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
