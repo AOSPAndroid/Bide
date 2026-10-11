@@ -35,7 +35,7 @@ Checked against the [Photopea manual](https://www.photopea.com/learn/) and [iLov
 | Selections | Partial | Rectangular and freehand lasso selections create reversible masks or copied cutouts on a selected layer; no magic wand, subject selection, edge refinement or multi-selection Boolean operations |
 | Masks and clipping masks | Partial | Ellipse, rounded-rectangle and selection-path masks, including inverse masks; no feathering, painted masks or Photoshop-compatible mask stacks |
 | Smart objects | Missing | No linked/embedded smart-object editing |
-| Retouching | Missing | No clone stamp, healing, content-aware fill, liquify, dodge/burn or advanced brush engine |
+| Retouching | Partial | Clone Stamp and basic color-matched Healing Brush (Alt-click to sample, size/softness/opacity) on separate patch layers; warp; no content-aware fill, liquify, dodge/burn or advanced brush engine |
 | PSD / PSB workflows | Partial | 8-bit RGB PSD raster layers and supported group hierarchy import/export, positions, names, opacity and supported blend modes; complex PSDs use saved composites; no PSB, native text/vector/Photoshop effect round-trip |
 | RAW, advanced design formats | Missing | No RAW development, AI/CDR/XD/Sketch compatibility guarantee |
 | Color management | Missing | No editable ICC/CMYK/Lab workflow, channels, or 16/32-bit editing |
@@ -66,7 +66,7 @@ The catalogue includes [organization, conversion, editing, security and intellig
 | PDF to Excel | Missing | No table detection or structured spreadsheet conversion |
 | PDF to PDF/A | Missing | No archival-profile validation or certified conversion |
 | Scan to PDF | Missing | No camera/scanner capture workflow |
-| OCR PDF | Missing | No local OCR engine or searchable scan reconstruction |
+| OCR PDF | Partial | Local offline OCR (English, French, German, Spanish, Italian, Dutch, Portuguese) turns image and scanned-page text into editable text layers; no searchable invisible-text PDF output |
 | Repair PDF | Missing | Parser recovery may open some files, but no dedicated repair/recovery workflow |
 | Rotate PDF | Partial | Rotate current page and undo; no multi-document batch rotation panel |
 | Page numbers | Implemented | Editable numbering layers across selected pages; template, start number and header/footer controls |
@@ -117,9 +117,9 @@ These checks use representative fixtures. They do not establish identical behavi
 
 Both the visual editor and PDF toolkit have equal priority. The numbered groups below organize remaining work; they are not a commitment to finish one product before the other.
 
-1. PDF completeness: proper redaction, embedded-image extraction, OCR, forms, richer password permissions, and batch crop/image-watermark workflows.
+1. PDF completeness: proper redaction, embedded-image extraction, searchable OCR PDF output, forms, richer password permissions, and batch crop/image-watermark workflows.
 2. Conversion fidelity: document corpus tests, layout-preserving PDF-to-Office, PDF/A validation and repair workflows.
-3. Raster editing foundation: selections, painted masks, layer effects, brush/retouch tools and color management.
+3. Raster editing foundation: selections, painted masks, layer effects, advanced brush/retouch tools (content-aware fill, dodge/burn) and color management.
 4. Full PSD/PSB compatibility, smart objects, advanced typography/paths, animation and automation.
 5. Separate decisions for cloud collaboration, remote signature requests and AI tools, which need services or substantial local models beyond the current offline editor.
 
@@ -219,3 +219,14 @@ OCR weight defaults to Auto (match strokes), comparing foreground coverage with 
 ### Mobile UI fonts (0.8.11)
 
 Roboto and Inter are already bundled for offline text and OCR editing. SF Pro, SF Pro Text and SF Pro Display are now offered as installed-font choices in both font menus and the command palette. Apple font files are not bundled or downloaded; use requires a local installation and compliance with Apple licensing. Missing SF Pro fonts report an error recommending bundled Inter instead of silently substituting a different face. Installed-font text retains the existing raster-text PDF/SVG export behavior.
+
+## Unreleased — OCR accuracy, languages and font matching
+
+- Small text is enlarged before recognition, based on line height measured from the image (lines under 24 px, up to 3x), and light-on-dark images are inverted. Already-large text is left at native size: enlarging it or stretching contrast measurably hurt accents and ß. PDF pages are rendered for OCR at up to 3600 px. On rendered test text at 72 DPI, character errors fell from about 18% to 0–3% at 9 pt and from about 92% to under 8% at 7 pt.
+- Replacement text color comes from the glyph pixels and the background from a ring around the region, instead of black/white text and a single corner pixel.
+- Low-confidence punctuation-only "words" (borders, icons, specks) are dropped. Regions whose least certain word is below 70% confidence get a dashed amber outline and a tooltip; the status bar counts them.
+- OCR languages: English and French by default; German, Spanish, Italian, Dutch and Portuguese are bundled and can be enabled in the detection bar (stored per browser). The bundle uses integer "best" LSTM models, which give identical results to the previous standard data: the seven languages take 13 MB, less than English and French did before (17 MB). `OCR_LANGUAGES` restricts a build.
+- OCR scan: Thorough (slower) adds a sparse-text second pass for isolated labels and keeps only lines the first pass missed. It is off by default; on synthetic UI layouts the standard pass already found every label.
+- After a scan, the clearest regions (≥85% confidence) are compared with 12 common faces by rendered glyph shape, and the closest pre-selects OCR font unless one was chosen. In Chromium it identified all 12 at 14–32 px, including bold, blurred and light-on-dark text; misread characters reduce accuracy.
+- Image preparation runs in a worker and the status bar shows recognition progress.
+- `npm run test:e2e` drives the app in Chromium: imports a rendered PNG, waits for OCR, checks the suggested font and the thorough pass, replaces a region (text layer and background patch), and verifies that enabling German re-scans ß and umlauts correctly. The Vite dev server now loads the PDF engine (mupdf is excluded from dependency pre-bundling).
