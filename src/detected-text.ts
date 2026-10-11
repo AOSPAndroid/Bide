@@ -29,7 +29,7 @@ async function ocrRaster(p:Page,c:Canvas){
 
 export function hasScannableContent(p:Page,c:Canvas){return !!p.source||c.getObjects().some(o=>o instanceof FabricImage);}
 
-export async function scanPageText(p:Page,c:Canvas,{signal,grouping,thorough,onStatus}:{signal:AbortSignal;grouping:OcrGrouping;thorough:boolean;onStatus:(status:string)=>void}):Promise<{regions:TextRegion[];status:string}>{
+export async function scanPageText(p:Page,c:Canvas,{signal,grouping,thorough,onStatus}:{signal:AbortSignal;grouping:OcrGrouping;thorough:boolean;onStatus:(status:string)=>void}):Promise<{regions:TextRegion[];status:string;suggestedFont?:string}>{
  onStatus('Detecting text…');
  if(p.source){const detected=await detectPdfText(p.source,p.index);signal.throwIfAborted();if(detected.regions.length)return {regions:detected.regions,status:`${detected.regions.length} editable text regions${detected.skipped?' · rotated text kept unchanged':''}`};}
  onStatus('Recognizing image text locally…');
@@ -37,7 +37,21 @@ export async function scanPageText(p:Page,c:Canvas,{signal,grouping,thorough,onS
  const {recognizeImage}=await import('./browser/ocr');const detected=await recognizeImage(raster,{signal,grouping,thorough,onProgress:(fraction,label)=>onStatus(`${label}… ${Math.round(fraction*100)}%`)});signal.throwIfAborted();
  const layers=c.getObjects().map(o=>({recognizedKey:(o as Tagged).recognizedKey,bounds:o.getBoundingRect()}));
  const regions=unconvertedRegions(scaleRegions(detected,p.width/raster.width,p.height/raster.height),layers);
- return {regions,status:ocrScanStatus(regions.length,'English + Français',layers.some(l=>l.recognizedKey),regions.filter(isUncertain).length)};
+ let suggestedFont:string|undefined;
+ if(regions.length){onStatus('Matching font…');try{suggestedFont=await suggestFont(raster,detected);}catch{}signal.throwIfAborted();}
+ return {regions,suggestedFont,status:ocrScanStatus(regions.length,'English + Français',layers.some(l=>l.recognizedKey),regions.filter(isUncertain).length)+(suggestedFont?` · closest font: ${suggestedFont}`:'')};
+}
+
+// Compare the clearest recognized words against bundled fonts. Only confident
+// regions are used: a misread character skews the shape comparison.
+async function suggestFont(raster:HTMLCanvasElement,regions:TextRegion[]){
+ const ctx=raster.getContext('2d',{willReadFrequently:true})!;
+ const samples=regions.filter(r=>(r.confidence??0)>=85&&r.text.replace(/\s/g,'').length>=4&&r.height>=8).sort((a,b)=>b.width*b.height-a.width*a.height).slice(0,6).map(r=>{
+  const left=Math.max(0,Math.floor(r.left-2)),top=Math.max(0,Math.floor(r.top-2)),width=Math.min(raster.width-left,Math.ceil(r.width+4)),height=Math.min(raster.height-top,Math.ceil(r.height+4));
+  const hex=r.background||'#ffffff';return {text:r.text,pixels:ctx.getImageData(left,top,width,height),background:[1,3,5].map(i=>parseInt(hex.slice(i,i+2),16))};
+ });
+ if(!samples.length)return undefined;
+ const {suggestOcrFont}=await import('./ocr-font');return (await suggestOcrFont(samples))?.family;
 }
 
 // Editable text positioned so its first baseline matches the detected text.

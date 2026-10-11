@@ -23,6 +23,8 @@ test('OCR text on an imported image becomes an editable layer',{timeout:240000},
   const region=page.locator('button[aria-label^="Edit detected text: Quarterly"]');
   await region.waitFor({timeout:180000});
   assert.ok(await page.locator('button[aria-label^="Edit detected text: Revenue"]').count(),'second line detected');
+  await page.waitForFunction(()=>/closest font: /.test(document.querySelector('.text-detection-bar')?.textContent||''),null,{timeout:60000});
+  assert.equal(await page.getByLabel('OCR replacement font').inputValue(),'Liberation Sans','Helvetica scan suggests its metric twin');
   await page.getByLabel('OCR scan depth').selectOption('thorough');
   await page.waitForFunction(()=>/Thorough pass… \d+%/.test(document.querySelector('.text-detection-bar')?.textContent||''),null,{timeout:120000,polling:50});
   await region.waitFor({timeout:120000});
