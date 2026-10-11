@@ -9,5 +9,6 @@ export default defineConfig(({mode}) => ({
     for (const name of ['ocr','diagrams','licenses','favicon.svg','barclays-eagle.svg','_headers']) await cp(`public/${name}`, `out/${name}`, {recursive:true});
   }}] : [])],
   build: {target:'esnext',outDir:mode === 'demo' ? 'out' : 'dist'},
+  optimizeDeps: {exclude:['mupdf'], esbuildOptions:{target:'esnext'}},
   worker: {format:'es'}, server:{headers}, preview:{headers},
 }));
