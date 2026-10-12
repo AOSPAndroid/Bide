@@ -186,3 +186,45 @@ export async function pageInkLevel(regions:TextRegion[],family:string):Promise<P
 // Only text of a similar colour shares the page's ink level (a light grey
 // caption must not be judged against black body text).
 function sameInk(region:TextRegion,page:PageInk|undefined){return page&&/^#[0-9a-f]{6}$/i.test(region.color)&&luma(region.color)<=page.luma+90?page.ink:undefined;}
+
+// Rebuild an edited OCR line from the image's own letters (see glyph-edit.ts):
+// from the first changed character onward, this line's letters are erased and
+// redrawn from their original pixels at their new positions. Ink is assigned to
+// lines by connectivity: a blob reaching outside this line's rows belongs to a
+// neighbouring line (lines can overlap by a pixel) and stays where it is.
+// Letters missing from the line are borrowed from page regions of the same
+// size. Returns undefined when a letter cannot be found (use font text then).
+export async function glyphEditPatch(c:Canvas,p:Page,region:TextRegion,next:string,page:TextRegion[]=[]){
+ if(region.kind!=='ocr'||!region.glyphs)return undefined;
+ const {lineCells,planGlyphEdit,ownInk}=await import('./glyph-edit');
+ const cells=lineCells(region.text,region.glyphs);if(!cells)return undefined;
+ const library=page.filter(r=>r!==region&&r.kind==='ocr'&&r.glyphs&&Math.abs(r.height-region.height)<=Math.max(1,region.height*.06)).flatMap(r=>{const own=lineCells(r.text,r.glyphs!);return own?own.filter(g=>!g.space).map(g=>({...g,y0:r.top,y1:r.top+r.height,source:r.id})):[];});
+ const plan=planGlyphEdit(region.text,cells,next,library);if(!plan)return undefined;
+ const raster=await pageComposite(c,p),W=raster.width,H=raster.height;
+ const pieces=plan.pieces.map(q=>({...q,x0:Math.round(q.x0),x1:Math.round(q.x1)})),startX=Math.max(0,Math.round(plan.startX)),width=pieces.reduce((s,q)=>s+q.x1-q.x0,0);
+ const top=Math.max(0,Math.floor(region.top)-1),bottom=Math.min(H,Math.ceil(region.top+region.height)+1),endX=Math.min(W,Math.ceil(Math.max(plan.oldEnd,startX+width))+1);
+ // Analyse the whole line plus a margin of rows to see where blobs lead.
+ const ax0=Math.max(0,Math.floor(Math.min(region.left,startX))-2),ax1=Math.min(W,Math.max(endX,Math.ceil(region.left+region.width)+2)),ay0=Math.max(0,top-8),ay1=Math.min(H,bottom+8);
+ const ctx=raster.getContext('2d',{willReadFrequently:true})!,area=ctx.getImageData(ax0,ay0,ax1-ax0,ay1-ay0),bg=hexRgb(region.background||'#ffffff');
+ const own=ownInk(area.data,area.width,area.height,bg,top-ay0,bottom-ay0);
+ const patchW=Math.max(1,endX-startX),patchH=bottom-top,out=new ImageData(patchW,patchH);
+ for(let y=0;y<patchH;y++)for(let x=0;x<patchW;x++){
+  const ai=((y+top-ay0)*area.width+(x+startX-ax0)),o=(y*patchW+x)*4;
+  if(own[ai]){out.data.set(bg,o);out.data[o+3]=255;}else{out.data.set(area.data.subarray(ai*4,ai*4+4),o);}
+ }
+ let x=0;
+ for(const q of pieces){
+  const w=q.x1-q.x0;if(w<=0)continue;
+  if(q.source!==undefined){
+   // Borrowed letter from another line of the same size: copy its band as is.
+   const sy=Math.max(0,Math.floor(q.y0!)-1),sh=Math.min(H,Math.ceil(q.y1!)+1)-sy,src=ctx.getImageData(q.x0,sy,w,sh);
+   for(let y=0;y<Math.min(sh,patchH);y++)for(let dx=0;dx<w&&x+dx<patchW;dx++){const i=(y*w+dx)*4,dist=Math.max(...[0,1,2].map(k=>Math.abs(src.data[i+k]-bg[k])));if(dist>12)out.data.set(src.data.subarray(i,i+4),(y*patchW+x+dx)*4);}
+  }else if(!q.blank)for(let y=0;y<patchH;y++)for(let dx=0;dx<w&&x+dx<patchW;dx++){
+   const ai=((y+top-ay0)*area.width+(q.x0+dx-ax0));if(own[ai])out.data.set(area.data.subarray(ai*4,ai*4+4),(y*patchW+x+dx)*4);
+  }
+  x+=w;
+ }
+ const patch=document.createElement('canvas');patch.width=patchW;patch.height=patchH;patch.getContext('2d')!.putImageData(out,0,0);
+ return Object.assign(new FabricImage(patch,{left:startX,top}),{id:uid(),name:`Edited text: ${next.slice(0,40)}`});
+}
+const hexRgb=(hex:string)=>[1,3,5].map(i=>parseInt(hex.slice(i,i+2),16)||0);

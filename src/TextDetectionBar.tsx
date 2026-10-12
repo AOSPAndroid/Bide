@@ -5,12 +5,12 @@ import type {TextRegion} from './text-regions';
 import {useEffect,useState} from 'react';
 import {bundledOcrLanguages,defaultOcrLanguages,languageLabel,type OcrLanguage} from './ocr-languages';
 
-export type OcrSettings={font:string;style:string;grouping:OcrGrouping;background:ReplacementBackground;color:string;padding:number;thorough:boolean;languages:string[];matchBlur:boolean;engine:'tesseract'|'paddle';aiSharpen:boolean};
-export const defaultOcrSettings:OcrSettings={font:'Liberation Sans',style:'auto',grouping:'smart',background:'sampled',color:'#ffffff',padding:-1,thorough:false,languages:defaultOcrLanguages,matchBlur:true,engine:'paddle',aiSharpen:false};
+export type OcrSettings={font:string;style:string;grouping:OcrGrouping;background:ReplacementBackground;color:string;padding:number;thorough:boolean;languages:string[];matchBlur:boolean;engine:'tesseract'|'paddle';aiSharpen:boolean;editMode:'letters'|'font'};
+export const defaultOcrSettings:OcrSettings={font:'Liberation Sans',style:'auto',grouping:'smart',background:'sampled',color:'#ffffff',padding:-1,thorough:false,languages:defaultOcrLanguages,matchBlur:true,engine:'paddle',aiSharpen:false,editMode:'letters'};
 
-type Props={ai:boolean;status:string;regions:TextRegion[];show:boolean;onShow:(show:boolean)=>void;settings:OcrSettings;onChange:(patch:Partial<OcrSettings>)=>void;scanning:boolean;onRescan:()=>void;onConvertAll:()=>void};
+type Props={ai:boolean;status:string;regions:TextRegion[];show:boolean;onShow:(show:boolean)=>void;settings:OcrSettings;onChange:(patch:Partial<OcrSettings>)=>void;scanning:boolean;onRescan:()=>void;onConvertAll:()=>void;onFindReplace:()=>void};
 
-export default function TextDetectionBar({ai,status,regions,show,onShow,settings,onChange,scanning,onRescan,onConvertAll}:Props){
+export default function TextDetectionBar({ai,status,regions,show,onShow,settings,onChange,scanning,onRescan,onConvertAll,onFindReplace}:Props){
  const [available,setAvailable]=useState<OcrLanguage[]>([]);
  useEffect(()=>{let live=true;void bundledOcrLanguages().then(list=>{if(live)setAvailable(list);});return()=>{live=false;};},[]);
  const toggle=(code:string,on:boolean)=>{const next=available.map(l=>l.code).filter(c=>c===code?on:settings.languages.includes(c));if(next.length)onChange({languages:next});};
@@ -26,6 +26,10 @@ export default function TextDetectionBar({ai,status,regions,show,onShow,settings
     <option value="auto">Auto (match strokes)</option><option value="regular">Regular</option><option value="bold">Bold</option><option value="italic">Italic</option><option value="bold-italic">Bold italic</option>
    </select></label>
    <label title="Soften each replacement to match the blur measured on the original letters, so it blends in. Convert all always makes crisp text."><input type="checkbox" aria-label="Match original blur" checked={settings.matchBlur} onChange={e=>onChange({matchBlur:e.target.checked})}/>Match blur</label>
+   <label title="Original letters: clicking a line opens a text box; changes are rebuilt from the image's own letters (exact font). New font: the line becomes editable text in the OCR font.">Edit with<select aria-label="Edit image text with" value={settings.editMode} onChange={e=>onChange({editMode:e.target.value as OcrSettings['editMode']})}>
+    <option value="letters">Original letters</option><option value="font">New font</option>
+   </select></label>
+   <button disabled={scanning} title="Replace a word or phrase everywhere it was detected, in one step." onClick={onFindReplace}>Find & replace</button>
    <button disabled={scanning} title="Replace every detected line with crisp editable text in one step. Undo restores the original." onClick={onConvertAll}>Convert all</button>
   </>}
   <label title="Smart splits large gaps such as avatar initials beside a message. Words lets you edit each word separately.">OCR selection<select aria-label="OCR selection grouping" value={settings.grouping} onChange={e=>onChange({grouping:e.target.value as OcrGrouping})}>

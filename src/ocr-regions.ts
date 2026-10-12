@@ -6,7 +6,7 @@ export function recognitionKey(r:TextRegion){return `${r.kind}:${Math.round(r.le
 
 // OCR runs on a reduced raster; map its pixel boxes back to page units.
 export function scaleRegions(regions:TextRegion[],sx:number,sy:number):TextRegion[]{
- return regions.map(r=>({...r,left:r.left*sx,top:r.top*sy,width:r.width*sx,height:r.height*sy,size:r.size*sy,baseline:r.baseline*sy,...r.blur===undefined?{}:{blur:r.blur*(sx+sy)/2}}));
+ return regions.map(r=>({...r,left:r.left*sx,top:r.top*sy,width:r.width*sx,height:r.height*sy,size:r.size*sy,baseline:r.baseline*sy,...r.blur===undefined?{}:{blur:r.blur*(sx+sy)/2},...r.glyphs?{glyphs:r.glyphs.map(g=>({...g,x0:g.x0*sx,x1:g.x1*sx}))}:{}}));
 }
 
 // Hide regions that already became editable text: same key, or an OCR text

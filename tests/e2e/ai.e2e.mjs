@@ -25,7 +25,7 @@ test('AI OCR, AI background fill, AI removal and AI sharpening work offline in t
   assert.ok(read.some(l=>/HUERTO DE/.test(l))&&read.some(l=>/LOS NARANJOS/.test(l)),'AI OCR read: '+read.join(' | '));
 
   // LaMa fills the background behind replaced text.
-  await page.getByLabel('Text replacement background').selectOption('ai');
+  await page.getByLabel('Text replacement background').selectOption('ai');await page.getByLabel('Edit image text with').selectOption('font');
   await page.locator('button[aria-label*="LOS NARANJOS"]').click();await page.getByText('OCR text is editable',{exact:false}).waitFor({timeout:300000});
   assert.ok((await layers()).some(l=>l.name==='AI-filled background'),'AI background patch layer');
 

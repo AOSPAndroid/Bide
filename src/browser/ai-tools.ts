@@ -1,5 +1,6 @@
 // Real-ESRGAN upscaling, LaMa inpainting and PaddleOCR recognition on canvases.
 import {runModel} from './ai';
+import {segmentGlyphs,type Glyph} from '../glyph-edit';
 import {tilePlan,toPlanar,dbBoxes,ctcDecode,ctcWords,trimToInk,inkBand,inpaintWindows,resizeBilinear,snapToGap,type Rect} from '../ai-image';
 
 type Progress=(fraction:number)=>void;
@@ -51,7 +52,7 @@ export async function inpaintCanvas(source:HTMLCanvasElement,mask:HTMLCanvasElem
  return patches;
 }
 
-export type AiOcrLine={text:string;confidence:number;bbox:{x0:number;y0:number;x1:number;y1:number};words:{text:string;confidence:number;bbox:{x0:number;y0:number;x1:number;y1:number}}[]};
+export type AiOcrLine={text:string;confidence:number;bbox:{x0:number;y0:number;x1:number;y1:number};words:{text:string;confidence:number;bbox:{x0:number;y0:number;x1:number;y1:number};chars?:Glyph[]}[]};
 let dictionary:Promise<string[]>|undefined;
 
 // PaddleOCR PP-OCRv5: DB text detection, then Latin recognition per line with
@@ -85,13 +86,18 @@ export async function paddleOcr(source:HTMLCanvasElement,onProgress?:Progress,si
    // Word edges: snap boundaries to the blank gap between words, trim to ink,
    // then give each word its own inked rows (a word without descenders must
    // not inherit the line's full height, or its replacement is sized too big).
+   // Columns over the line's own rows only, so a neighbouring line inside the
+   // padded box does not fill the blank columns between letters.
+   const bandColumns=new Float32Array(w);for(let y=top;y<bottom;y++)for(let x=x0;x<x1;x++){const p=(y*width+x)*4;bandColumns[x-x0]+=Math.max(Math.abs(src.data[p]-bg[0]),Math.abs(src.data[p+1]-bg[1]),Math.abs(src.data[p+2]-bg[2]))>60?1:0;}
    const lineHeight=bottom-top,gap=Math.max(2,Math.round(lineHeight*.15)),raw=ctcWords(decoded.chars,rw/steps,rw);
    const edges=raw.map((word,i)=>({x0:i?snapToGap(columns,word.x0*w/rw,gap,lineHeight):word.x0*w/rw,x1:i<raw.length-1?snapToGap(columns,word.x1*w/rw,gap,lineHeight):word.x1*w/rw}));
    const words=raw.map((word,i)=>{
     const t=trimToInk(columns,edges[i].x0,edges[i].x1),wordRows=new Float32Array(h);
     for(let y=top;y<bottom;y++)for(let x=x0+t.x0;x<x0+t.x1;x++){const p=(y*width+x)*4;wordRows[y-y0]+=Math.max(Math.abs(src.data[p]-bg[0]),Math.abs(src.data[p+1]-bg[1]),Math.abs(src.data[p+2]-bg[2]))>60?1:0;}
     const v=trimToInk(wordRows,top-y0,bottom-y0);
-    return {text:word.text,confidence:word.confidence,bbox:{x0:x0+t.x0,y0:y0+v.x0,x1:x0+t.x1,y1:y0+v.x1}};
+    // Character cells, for editing with the image's own letters (glyph-edit.ts).
+    const chars=segmentGlyphs(word.text,word.centers.map(c=>c*w/rw),t.x0,t.x1,bandColumns)?.map(g=>({...g,x0:x0+g.x0,x1:x0+g.x1}));
+    return {text:word.text,confidence:word.confidence,bbox:{x0:x0+t.x0,y0:y0+v.x0,x1:x0+t.x1,y1:y0+v.x1},chars};
    });
    lines.push({text:decoded.text,confidence:decoded.confidence*100,bbox:{x0:words.length?Math.min(...words.map(w=>w.bbox.x0)):x0,y0:top,x1:words.length?Math.max(...words.map(w=>w.bbox.x1)):x1,y1:bottom},words});
   }
