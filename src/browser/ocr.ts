@@ -6,7 +6,8 @@ import {createWorker,PSM,type Worker as OcrEngine,type LoggerMessage} from 'tess
 import type {TextRegion} from '../text-regions';
 
 export type OcrProgress=(fraction:number,label:string)=>void;
-export type OcrOptions={signal?:AbortSignal;grouping?:OcrGrouping;languages?:string[];onProgress?:OcrProgress;thorough?:boolean};
+export type OcrReader='tesseract'|'paddle';
+export type OcrOptions={signal?:AbortSignal;grouping?:OcrGrouping;languages?:string[];engine?:OcrReader;onProgress?:OcrProgress;thorough?:boolean};
 
 let worker:Promise<OcrEngine>|undefined,workerLanguages='',queue=Promise.resolve(),report:((m:LoggerMessage)=>void)|undefined;
 // One shared engine; switching languages re-initializes it instead of starting another.
@@ -30,18 +31,28 @@ async function prepare(image:HTMLCanvasElement,signal?:AbortSignal):Promise<{inp
  return {input:canvas as HTMLCanvasElement,width,height};
 }
 
-export async function recognizeImage(image:HTMLCanvasElement,{signal,grouping='smart',languages=['eng','fra'],onProgress,thorough=false}:OcrOptions={}):Promise<TextRegion[]>{
+export async function recognizeImage(image:HTMLCanvasElement,{signal,grouping='smart',languages=['eng','fra'],engine:ocrEngine='tesseract',onProgress,thorough=false}:OcrOptions={}):Promise<TextRegion[]>{
  let resolve!:(v:TextRegion[])=>void,reject!:(e:unknown)=>void;const result=new Promise<TextRegion[]>((yes,no)=>{resolve=yes;reject=no;});
  queue=queue.then(async()=>{try{
-  signal?.throwIfAborted();onProgress?.(0,'Preparing image');
+  signal?.throwIfAborted();
+  let lines:{text:string;confidence:number;bbox:{x0:number;y0:number;x1:number;y1:number};words?:{text:string;confidence?:number;bbox:{x0:number;y0:number;x1:number;y1:number}}[]}[],sx=1,sy=1;
+  if(ocrEngine==='paddle'){
+   // PaddleOCR (bundled AI models) reads the original pixels; its Latin model
+   // covers all bundled languages at once.
+   onProgress?.(0,'Loading AI OCR');const {paddleOcr}=await import('./ai-tools');
+   lines=(await paddleOcr(image,f=>onProgress?.(f,'Recognizing text (AI)'),signal)).filter(l=>l.confidence>=35);
+  }else{
+  onProgress?.(0,'Preparing image');
   let pass=0;const passes=thorough?2:1;
   report=m=>{if(signal?.aborted)return;if(m.status==='recognizing text')onProgress?.(.1+(pass+m.progress)/passes*.9,thorough&&pass?'Thorough pass':'Recognizing text');else if(/load|initializ/i.test(m.status))onProgress?.(0,'Loading OCR engine');};
   const [engine,prepared]=await Promise.all([getWorker(languages.join('+')),prepare(image,signal)]);signal?.throwIfAborted();
   const recognize=async(mode:PSM)=>{await engine.setParameters({tessedit_pageseg_mode:mode,preserve_interword_spaces:'1',user_defined_dpi:'300'});const {data}=await engine.recognize(prepared.input,{}, {blocks:true,text:true});signal?.throwIfAborted();return (data.blocks||[]).flatMap(b=>b.paragraphs.flatMap(p=>p.lines)).filter(l=>l.text.trim()&&l.confidence>=35);};
-  const lines=await recognize(PSM.AUTO);
+  lines=await recognize(PSM.AUTO);
   // Sparse-text mode finds isolated labels (buttons, badges) that page layout analysis can skip.
   if(thorough){pass=1;lines.push(...missingLines(lines,await recognize(PSM.SPARSE_TEXT)));}
-  const sx=image.width/prepared.width,sy=image.height/prepared.height,ctx=image.getContext('2d')!,original=ctx.getImageData(0,0,image.width,image.height),regions:TextRegion[]=[];
+  sx=image.width/prepared.width;sy=image.height/prepared.height;
+  }
+  const ctx=image.getContext('2d')!,original=ctx.getImageData(0,0,image.width,image.height),regions:TextRegion[]=[];
   for(const line of lines){
    for(const part of segmentOcrLine(line,grouping)){
     const b={x0:Math.max(0,Math.floor(part.bbox.x0*sx)),y0:Math.max(0,Math.floor(part.bbox.y0*sy)),x1:Math.min(image.width,Math.ceil(part.bbox.x1*sx)),y1:Math.min(image.height,Math.ceil(part.bbox.y1*sy))},w=b.x1-b.x0,h=b.y1-b.y0;if(w<1||h<1)continue;

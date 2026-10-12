@@ -6,7 +6,7 @@ import {detectPdfText,pagePreview} from './browser/engine';
 import {pageRaster,rasterLayer} from './retouch-canvas';
 import {repairTextBackground} from './text-replacement';
 import {estimateOcrBold,glyphInk,wordInk,classifyWordWeights} from './ocr-weight';
-import {darkenToInk} from './ocr-image';
+import {darkenToInk,prepareOcrPixels,estimateLineHeight} from './ocr-image';
 import {ensureFont,ensureEmbeddedFont} from './fonts';
 import {fallbackFont,fitOcrText,type TextRegion} from './text-regions';
 import {mixedWeights,recognitionKey,scaleRegions,unconvertedRegions,ocrPatchBounds,ocrScanStatus,isUncertain} from './ocr-regions';
@@ -15,7 +15,7 @@ import {uid,type Page} from './model';
 import {bundledOcrLanguages,languageLabel} from './ocr-languages';
 
 type Tagged=FabricObject&{recognizedKey?:string;id?:string;name?:string};
-export type ReplacementBackground='repair'|'sampled'|'solid'|'transparent';
+export type ReplacementBackground='repair'|'ai'|'sampled'|'solid'|'transparent';
 
 async function previewCanvas(source:string,index:number,scale:number,width?:number,height?:number){
  const image=new Image();image.src=await pagePreview(source,index,scale);await image.decode();
@@ -31,17 +31,23 @@ async function ocrRaster(p:Page,c:Canvas){
 
 export function hasScannableContent(p:Page,c:Canvas){return !!p.source||c.getObjects().some(o=>o instanceof FabricImage);}
 
-export async function scanPageText(p:Page,c:Canvas,{signal,grouping,thorough,languages,onStatus}:{signal:AbortSignal;grouping:OcrGrouping;thorough:boolean;languages:string[];onStatus:(status:string)=>void}):Promise<{regions:TextRegion[];status:string;suggestedFont?:string}>{
+export async function scanPageText(p:Page,c:Canvas,{signal,grouping,thorough,languages,engine='tesseract',aiSharpen=false,onStatus}:{signal:AbortSignal;grouping:OcrGrouping;thorough:boolean;languages:string[];engine?:'tesseract'|'paddle';aiSharpen?:boolean;onStatus:(status:string)=>void}):Promise<{regions:TextRegion[];status:string;suggestedFont?:string}>{
  onStatus('Detecting text…');
  if(p.source){const detected=await detectPdfText(p.source,p.index);signal.throwIfAborted();if(detected.regions.length)return {regions:detected.regions,status:`${detected.regions.length} editable text regions${detected.skipped?' · rotated text kept unchanged':''}`};}
  onStatus('Recognizing image text locally…');
- const raster=await ocrRaster(p,c);signal.throwIfAborted();
- const {recognizeImage}=await import('./browser/ocr');const detected=await recognizeImage(raster,{signal,grouping,thorough,languages,onProgress:(fraction,label)=>onStatus(`${label}… ${Math.round(fraction*100)}%`)});signal.throwIfAborted();
+ let raster=await ocrRaster(p,c);signal.throwIfAborted();
+ // AI sharpening (Real-ESRGAN, 2x) only pays off for small or soft text; it is
+ // skipped for large rasters, where it would take minutes on a CPU.
+ if(aiSharpen&&raster.width*raster.height<=2.5e6){
+  const probe=raster.getContext('2d',{willReadFrequently:true})!.getImageData(0,0,raster.width,raster.height);prepareOcrPixels(probe);const line=estimateLineHeight(probe);
+  if(line!==undefined&&line<20){const {upscaleCanvas}=await import('./browser/ai-tools');raster=await upscaleCanvas(raster,2,f=>onStatus(`Sharpening with AI… ${Math.round(f*100)}%`),signal);}
+ }
+ const {recognizeImage}=await import('./browser/ocr');const detected=await recognizeImage(raster,{signal,grouping,thorough,languages,engine,onProgress:(fraction,label)=>onStatus(`${label}… ${Math.round(fraction*100)}%`)});signal.throwIfAborted();
  const layers=c.getObjects().map(o=>({recognizedKey:(o as Tagged).recognizedKey,bounds:o.getBoundingRect()}));
  const regions=unconvertedRegions(scaleRegions(detected,p.width/raster.width,p.height/raster.height),layers);
  let suggestedFont:string|undefined;
  if(regions.length){onStatus('Matching font…');try{suggestedFont=await suggestFont(raster,detected);}catch{}signal.throwIfAborted();}
- return {regions,suggestedFont,status:ocrScanStatus(regions.length,languageLabel(languages,await bundledOcrLanguages()),layers.some(l=>l.recognizedKey),regions.filter(isUncertain).length)+(suggestedFont?` · closest font: ${suggestedFont}`:'')};
+ return {regions,suggestedFont,status:ocrScanStatus(regions.length,engine==='paddle'?'AI OCR (Latin languages)':languageLabel(languages,await bundledOcrLanguages()),layers.some(l=>l.recognizedKey),regions.filter(isUncertain).length)+(suggestedFont?` · closest font: ${suggestedFont}`:'')};
 }
 
 // Compare the clearest recognized words against bundled fonts. Only confident
@@ -94,7 +100,7 @@ export async function detectedTextbox(region:TextRegion,{ocrFont,ocrStyle,matchB
 // Hide the original OCR text by clearing, repairing or patching the area under
 // each region. Several regions are handled in one pass (Convert all), so each
 // image layer is rasterized once. Mutates the serialized `objects` list of the page.
-export async function coverOcrText(c:Canvas,p:Page,regions:TextRegion[],objects:unknown[],{mode,color,padding}:{mode:ReplacementBackground;color:string;padding:number}){
+export async function coverOcrText(c:Canvas,p:Page,regions:TextRegion[],objects:unknown[],{mode,color,padding,onProgress}:{mode:ReplacementBackground;color:string;padding:number;onProgress?:(fraction:number)=>void}){
  const areas=regions.map(region=>({region,...ocrPatchBounds(region,padding,p)}));
  if(mode==='transparent'){
   const overlaps=(o:FabricObject)=>{const b=o.getBoundingRect();return areas.some(a=>b.left<a.left+a.width&&b.top<a.top+a.height&&b.left+b.width>a.left&&b.top+b.height>a.top);};
@@ -107,8 +113,14 @@ export async function coverOcrText(c:Canvas,p:Page,regions:TextRegion[],objects:
    const replacement=rasterLayer(raster,(image as Tagged).name||'Image',(image as Tagged).id!),index=objects.findIndex(o=>(o as Tagged).id===(image as Tagged).id);
    if(index>=0){if(replacement){replacement.globalCompositeOperation=blend;objects[index]=replacement.toObject();}else objects.splice(index,1);}
   }
+ }else if(mode==='ai'){
+  // LaMa reconstructs textures (photos, maps, gradients) behind the old text.
+  const raster=await pageComposite(c,p),mask=document.createElement('canvas');mask.width=raster.width;mask.height=raster.height;const mctx=mask.getContext('2d')!;mctx.fillStyle='#000';
+  for(const a of areas)mctx.fillRect(a.left,a.top,a.width,a.height);
+  const {inpaintCanvas}=await import('./browser/ai-tools');
+  for(const patch of await inpaintCanvas(raster,mask,areas.map(a=>({x:a.left,y:a.top,width:a.width,height:a.height})),onProgress))objects.push(Object.assign(new FabricImage(patch.canvas,{left:patch.x,top:patch.y}),{id:uid(),name:'AI-filled background'}).toObject());
  }else if(mode==='repair'){
-  const raster=p.source?await previewCanvas(p.source,p.index,1,Math.ceil(p.width),Math.ceil(p.height)):pageRaster(c,p.width,p.height,c.getObjects().filter(o=>o instanceof FabricImage));
+  const raster=await pageComposite(c,p);
   const pixels=raster.getContext('2d')!.getImageData(0,0,raster.width,raster.height);
   for(const a of areas){
    const repaired=repairTextBackground(pixels,{left:a.left,top:a.top,width:a.width,height:a.height});
@@ -116,4 +128,32 @@ export async function coverOcrText(c:Canvas,p:Page,regions:TextRegion[],objects:
    objects.push(Object.assign(new FabricImage(patchCanvas,{left:repaired.left,top:repaired.top}),{id:uid(),name:'Repaired text background'}).toObject());
   }
  }else for(const a of areas)objects.push(Object.assign(new Rect({left:a.left,top:a.top,width:a.width,height:a.height,fill:mode==='solid'?color:a.region.background||'#ffffff',strokeWidth:0}),{id:uid(),name:'Text background patch'}).toObject());
+}
+
+// The page as shown under the editable layers, in page units: the PDF preview,
+// or the visible image layers of a design page.
+export async function pageComposite(c:Canvas,p:Page){
+ return p.source?await previewCanvas(p.source,p.index,1,Math.ceil(p.width),Math.ceil(p.height)):pageRaster(c,p.width,p.height,c.getObjects().filter(o=>o instanceof FabricImage&&o.visible));
+}
+
+// Remove whatever is inside a selection polygon with LaMa; returns new patch layers.
+export async function aiRemoveSelection(c:Canvas,p:Page,points:{x:number;y:number}[],onProgress?:(fraction:number)=>void){
+ const raster=await pageComposite(c,p),mask=document.createElement('canvas');mask.width=raster.width;mask.height=raster.height;
+ const ctx=mask.getContext('2d')!;ctx.fillStyle=ctx.strokeStyle='#000';ctx.lineWidth=4;ctx.lineJoin='round';ctx.beginPath();points.forEach((pt,i)=>i?ctx.lineTo(pt.x,pt.y):ctx.moveTo(pt.x,pt.y));ctx.closePath();ctx.fill();ctx.stroke();
+ const xs=points.map(pt=>pt.x),ys=points.map(pt=>pt.y),x=Math.max(0,Math.min(...xs)-3),y=Math.max(0,Math.min(...ys)-3);
+ const hole={x,y,width:Math.min(raster.width,Math.max(...xs)+3)-x,height:Math.min(raster.height,Math.max(...ys)+3)-y};
+ if(hole.width<2||hole.height<2)throw new Error('Draw a larger selection to remove.');
+ const {inpaintCanvas}=await import('./browser/ai-tools');
+ return (await inpaintCanvas(raster,mask,[hole],onProgress)).map(patch=>Object.assign(new FabricImage(patch.canvas,{left:patch.x,top:patch.y}),{id:uid(),name:'AI-removed area'}));
+}
+
+// Sharpen an image layer with Real-ESRGAN, keeping its size and position on the page.
+export async function aiSharpenImage(image:FabricImage,onProgress?:(fraction:number)=>void){
+ const element=image.getElement() as HTMLImageElement|HTMLCanvasElement,source=document.createElement('canvas');
+ source.width=element instanceof HTMLImageElement?element.naturalWidth:element.width;source.height=element instanceof HTMLImageElement?element.naturalHeight:element.height;
+ if(source.width*source.height>4e6)throw new Error('This image is already large (over 4 megapixels); AI sharpening is for small or blurry images.');
+ source.getContext('2d')!.drawImage(element,0,0);
+ const {upscaleCanvas}=await import('./browser/ai-tools');const sharp=await upscaleCanvas(source,2,onProgress);
+ const crop=image.cropX||image.cropY?{cropX:(image.cropX??0)*2,cropY:(image.cropY??0)*2}:{};
+ return {element:sharp,props:{...crop,width:(image.width??source.width)*2,height:(image.height??source.height)*2,scaleX:(image.scaleX??1)/2,scaleY:(image.scaleY??1)/2}};
 }
