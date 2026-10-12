@@ -9,7 +9,7 @@ import {estimateOcrBold,glyphInk,wordInk,classifyWordWeights} from './ocr-weight
 import {darkenToInk,prepareOcrPixels,estimateLineHeight} from './ocr-image';
 import {ensureFont,ensureEmbeddedFont} from './fonts';
 import {fallbackFont,fitOcrText,type TextRegion} from './text-regions';
-import {mixedWeights,recognitionKey,scaleRegions,unconvertedRegions,ocrPatchBounds,ocrScanStatus,isUncertain} from './ocr-regions';
+import {mixedWeights,attachNumberParts,recognitionKey,scaleRegions,unconvertedRegions,ocrPatchBounds,ocrScanStatus,isUncertain} from './ocr-regions';
 import type {OcrGrouping} from './ocr-segmentation';
 import {uid,type Page} from './model';
 import {bundledOcrLanguages,languageLabel} from './ocr-languages';
@@ -78,7 +78,7 @@ export async function detectedTextbox(region:TextRegion,{ocrFont,ocrStyle,matchB
  if(auto&&region.line&&region.line.words.every(w=>!measurable(w.text)||(w.inkMass!==undefined&&w.width))){
   // Judge weights across the full text line (blur-proof ink comparison), then
   // take this region's words: a lone word is compared with its neighbours.
-  const {words:line,start,count}=region.line,result=classifyWordWeights(line.map(inkOf),vote(line),sameInk(region,pageInk)),own=result.bold.slice(start,start+count);inkLevel=result.ink;
+  const {words:line,start,count}=region.line,result=classifyWordWeights(line.map(inkOf),vote(line),sameInk(region,pageInk)),own=attachNumberParts(line.map(w=>w.text),result.bold).slice(start,start+count);inkLevel=result.ink;
   if(words&&words.length>1&&words.length===own.length&&words.map(w=>w.text).join(' ')===region.text)weights=mixedWeights(words,own);
   else if(count===1)ownBold=own[0];
  }else if(auto&&words&&words.length>1&&words.map(w=>w.text).join(' ')===region.text){

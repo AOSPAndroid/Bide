@@ -60,3 +60,16 @@ export function mixedWeights(words:{text:string}[],bold:(boolean|undefined)[]){
  words.forEach((w,i)=>{const b=bold[i];if(b!==undefined&&b!==base){const last=ranges.at(-1);if(last&&last.end+1===offset)last.end=offset+len(w.text);else ranges.push({start:offset,end:offset+len(w.text),bold:b});}offset+=len(w.text)+1;});
  return {base,ranges};
 }
+
+// A lone digit or currency sign is too small to weigh reliably; it belongs to
+// the number next to it ("1 284,99 €"), so it takes that number's weight. A
+// digit prefers the number on its right (thousands), a currency sign the one on
+// its left when both sides are numbers.
+export function attachNumberParts(texts:string[],bold:(boolean|undefined)[]){
+ const out=[...bold],numeric=(i:number)=>i>=0&&i<texts.length&&/\d/.test(texts[i])&&Array.from(texts[i]).length>1;
+ texts.forEach((t,i)=>{
+  const digit=/^\d$/.test(t),currency=/^\p{Sc}$/u.test(t);if(!digit&&!currency)return;
+  const order=digit?[i+1,i-1]:[i-1,i+1],host=order.find(numeric);if(host!==undefined&&bold[host]!==undefined)out[i]=bold[host];
+ });
+ return out;
+}
