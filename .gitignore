@@ -16,3 +16,6 @@ public/diagrams/runtime/
 public/ocr/
 public/ai/models/
 public/ai/ort/
+tests/real/*
+!tests/real/README.md
+!tests/real/example.json
