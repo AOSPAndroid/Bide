@@ -62,7 +62,7 @@ export async function detectedTextbox(region:TextRegion,{ocrFont,ocrStyle}:{ocrF
  await ensureFont(family);
  const italic=region.kind==='ocr'?ocrStyle.includes('italic'):region.italic,words=region.words;
  // Auto weight is estimated per word so mixed bold/regular lines keep both.
- const weights=region.kind==='ocr'&&ocrStyle==='auto'&&words&&words.length>1&&words.map(w=>w.text).join(' ')===region.text?mixedWeights(words,words.map(w=>w.inkDensity===undefined||!/[\p{L}\p{N}]/u.test(w.text)?undefined:estimateOcrBold(w.text,family,region.height,w.inkDensity))):undefined;
+ const weights=region.kind==='ocr'&&ocrStyle==='auto'&&words&&words.length>1&&words.map(w=>w.text).join(' ')===region.text?mixedWeights(words,words.map(w=>w.inkDensity===undefined||!/[\p{L}\p{N}\p{Sc}%&@#]/u.test(w.text)?undefined:estimateOcrBold(w.text,family,region.height,w.inkDensity))):undefined;
  const bold=weights?weights.base:region.kind==='ocr'?(ocrStyle==='auto'?estimateOcrBold(region.text,family,region.height,region.inkDensity):ocrStyle.includes('bold')):region.bold;
  let size=region.size,ocrAscent=region.height;
  if(region.kind==='ocr'){

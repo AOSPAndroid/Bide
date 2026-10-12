@@ -9,6 +9,7 @@ export default defineConfig(({mode}) => ({
     for (const name of ['ocr','diagrams','licenses','favicon.svg','barclays-eagle.svg','_headers']) await cp(`public/${name}`, `out/${name}`, {recursive:true});
   }}] : [])],
   build: {target:'esnext',outDir:mode === 'demo' ? 'out' : 'dist'},
-  optimizeDeps: {exclude:['mupdf'], esbuildOptions:{target:'esnext'}},
+  // Lazily imported deps are listed so the dev server doesn't reload the page mid-session on first use.
+  optimizeDeps: {exclude:['mupdf'], include:['docx','fflate'], esbuildOptions:{target:'esnext'}},
   worker: {format:'es'}, server:{headers}, preview:{headers},
 }));

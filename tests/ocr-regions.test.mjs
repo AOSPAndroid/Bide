@@ -32,4 +32,6 @@ test('a bold label keeps its weight next to a regular value',async()=>{
  assert.equal(words.map(w=>w.text).join(' ').slice(0,14),'Nom du client:');
  assert.deepEqual(mixedWeights([{text:'Répas:'},{text:'é'}],[true,false]),{base:true,ranges:[{start:7,end:8,bold:false}]});
  assert.deepEqual(mixedWeights(words.slice(0,2),[undefined,undefined]),{base:false,ranges:[]});
+ // Unknown punctuation follows its neighbour: the bold amount's symbol stays bold.
+ assert.deepEqual(mixedWeights(['Prix','1','284,99','€','taxes'].map(text=>({text})),[false,true,true,undefined,false]).ranges,[{start:5,end:15,bold:true}]);
 });
