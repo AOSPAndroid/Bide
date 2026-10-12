@@ -5,6 +5,11 @@ import {inkMask,normalizeMask,shapeScore,type Mask} from './font-match';
 
 // Common document/UI faces and their metric-compatible bundled stand-ins.
 export const fontCandidates=['Liberation Sans','Liberation Serif','Liberation Mono','Carlito','Caladea','Roboto','Open Sans','Inter','Lato','PT Sans','PT Serif','Montserrat'];
+// System fonts screenshots often use (iPhone, Windows, Office). Only those
+// installed on this computer are compared; others can't be rendered.
+export const systemCandidates=['SF Pro Text','SF Pro Display','Segoe UI','Arial','Calibri','Aptos','Cambria','Tahoma','Verdana','Georgia','Times New Roman'];
+const installed=new Map<string,Promise<boolean>>();
+function isInstalled(family:string){if(!installed.has(family))installed.set(family,new FontFace(`bide-probe-${family}`,`local("${family}")`).load().then(()=>true,()=>false));return installed.get(family)!;}
 export type FontSample={text:string;pixels:ImageData;background:readonly number[]};
 
 function rendered(text:string,family:string,weight:string):Mask|undefined{
@@ -15,11 +20,12 @@ function rendered(text:string,family:string,weight:string):Mask|undefined{
  return normalizeMask(inkMask(ctx.getImageData(0,0,w,h).data,w,h,[255,255,255]));
 }
 
-export async function suggestOcrFont(samples:FontSample[],candidates=fontCandidates):Promise<{family:string;score:number}|undefined>{
+export async function suggestOcrFont(samples:FontSample[],candidates=[...fontCandidates,...systemCandidates]):Promise<{family:string;score:number}|undefined>{
  const sources=samples.map(s=>({text:s.text,mask:normalizeMask(inkMask(s.pixels.data,s.pixels.width,s.pixels.height,s.background))})).filter((s):s is {text:string;mask:Mask}=>!!s.mask);
  if(!sources.length)return undefined;
  let best:{family:string;score:number}|undefined;
  for(const family of candidates){
+  if(systemCandidates.includes(family)&&!await isInstalled(family))continue;
   try{await ensureFont(family);}catch{continue;}
   let total=0;
   for(const s of sources)total+=Math.max(...['normal','bold'].map(weight=>{const mask=rendered(s.text,family,weight);return mask?shapeScore(s.mask,mask):0;}));

@@ -24,3 +24,21 @@ test('low-confidence OCR regions are flagged for proofreading',async()=>{
  assert.equal(isUncertain({kind:'ocr'}),false);assert.equal(isUncertain({kind:'pdf',confidence:10}),false);
  assert.match(ocrScanStatus(5,'English',false,2),/5 OCR regions · 2 to check/);
 });
+test('a bold label keeps its weight next to a regular value',async()=>{
+ const {mixedWeights}=await import('../tmp/ocr-regions.mjs');
+ const words=['Nom','du','client:','Dalil','REDOUANE','/','pour','6','adultes'].map(text=>({text}));
+ const {base,ranges}=mixedWeights(words,[true,true,true,false,false,undefined,false,false,false]);
+ assert.equal(base,false);assert.deepEqual(ranges,[{start:0,end:14,bold:true}]);
+ assert.equal(words.map(w=>w.text).join(' ').slice(0,14),'Nom du client:');
+ assert.deepEqual(mixedWeights([{text:'Répas:'},{text:'é'}],[true,false]),{base:true,ranges:[{start:7,end:8,bold:false}]});
+ assert.deepEqual(mixedWeights(words.slice(0,2),[undefined,undefined]),{base:false,ranges:[]});
+ // Unknown punctuation follows its neighbour: the bold amount's symbol stays bold.
+ assert.deepEqual(mixedWeights(['Prix','1','284,99','€','taxes'].map(text=>({text})),[false,true,true,undefined,false]).ranges,[{start:5,end:15,bold:true}]);
+});
+test('the cleanup margin stops at neighbouring lines and words',()=>{
+ const line={left:10,top:100,width:300,height:14},below={left:10,top:115,width:280,height:14},above={left:12,top:85,width:200,height:14},next={left:313,top:100,width:40,height:14},far={left:400,top:300,width:20,height:10};
+ assert.deepEqual(ocrPatchBounds(line,-1,{width:500,height:500},[below,above,next,far]),{left:8,top:99,width:304,height:16},'stops at the line above (99), the line below (115) and the next word (312 inside its 313 edge)');
+ assert.deepEqual(ocrPatchBounds(line,-1,{width:500,height:500}),{left:8,top:98,width:304,height:18},'no neighbours: unchanged');
+ const overlapping={left:10,top:112,width:280,height:14};
+ assert.equal(ocrPatchBounds(line,-1,{width:500,height:500},[overlapping]).height,112-98,'a next line overlapping our descenders still stops the patch');
+});

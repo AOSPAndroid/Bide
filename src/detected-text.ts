@@ -1,20 +1,21 @@
 // Detecting page text (PDF text layer, else local OCR) and turning a detected
 // region into an editable text layer with a background patch.
 import {FabricImage,Rect,type Canvas,type FabricObject} from 'fabric';
-import {Textbox} from './text-appearance';
+import {Textbox,clampTextSoftness} from './text-appearance';
 import {detectPdfText,pagePreview} from './browser/engine';
 import {pageRaster,rasterLayer} from './retouch-canvas';
 import {repairTextBackground} from './text-replacement';
-import {estimateOcrBold} from './ocr-weight';
+import {estimateOcrBold,glyphInk,wordInk,classifyWordWeights} from './ocr-weight';
+import {darkenToInk,prepareOcrPixels,estimateLineHeight} from './ocr-image';
 import {ensureFont,ensureEmbeddedFont} from './fonts';
 import {fallbackFont,fitOcrText,type TextRegion} from './text-regions';
-import {recognitionKey,scaleRegions,unconvertedRegions,ocrPatchBounds,ocrScanStatus,isUncertain} from './ocr-regions';
+import {mixedWeights,recognitionKey,scaleRegions,unconvertedRegions,ocrPatchBounds,ocrScanStatus,isUncertain} from './ocr-regions';
 import type {OcrGrouping} from './ocr-segmentation';
 import {uid,type Page} from './model';
 import {bundledOcrLanguages,languageLabel} from './ocr-languages';
 
 type Tagged=FabricObject&{recognizedKey?:string;id?:string;name?:string};
-export type ReplacementBackground='repair'|'sampled'|'solid'|'transparent';
+export type ReplacementBackground='repair'|'ai'|'sampled'|'solid'|'transparent';
 
 async function previewCanvas(source:string,index:number,scale:number,width?:number,height?:number){
  const image=new Image();image.src=await pagePreview(source,index,scale);await image.decode();
@@ -30,17 +31,23 @@ async function ocrRaster(p:Page,c:Canvas){
 
 export function hasScannableContent(p:Page,c:Canvas){return !!p.source||c.getObjects().some(o=>o instanceof FabricImage);}
 
-export async function scanPageText(p:Page,c:Canvas,{signal,grouping,thorough,languages,onStatus}:{signal:AbortSignal;grouping:OcrGrouping;thorough:boolean;languages:string[];onStatus:(status:string)=>void}):Promise<{regions:TextRegion[];status:string;suggestedFont?:string}>{
+export async function scanPageText(p:Page,c:Canvas,{signal,grouping,thorough,languages,engine='tesseract',aiSharpen=false,onStatus}:{signal:AbortSignal;grouping:OcrGrouping;thorough:boolean;languages:string[];engine?:'tesseract'|'paddle';aiSharpen?:boolean;onStatus:(status:string)=>void}):Promise<{regions:TextRegion[];all?:TextRegion[];status:string;suggestedFont?:string}>{
  onStatus('Detecting text…');
  if(p.source){const detected=await detectPdfText(p.source,p.index);signal.throwIfAborted();if(detected.regions.length)return {regions:detected.regions,status:`${detected.regions.length} editable text regions${detected.skipped?' · rotated text kept unchanged':''}`};}
  onStatus('Recognizing image text locally…');
- const raster=await ocrRaster(p,c);signal.throwIfAborted();
- const {recognizeImage}=await import('./browser/ocr');const detected=await recognizeImage(raster,{signal,grouping,thorough,languages,onProgress:(fraction,label)=>onStatus(`${label}… ${Math.round(fraction*100)}%`)});signal.throwIfAborted();
+ let raster=await ocrRaster(p,c);signal.throwIfAborted();
+ // AI sharpening (Real-ESRGAN, 2x) only pays off for small or soft text; it is
+ // skipped for large rasters, where it would take minutes on a CPU.
+ if(aiSharpen&&raster.width*raster.height<=2.5e6){
+  const probe=raster.getContext('2d',{willReadFrequently:true})!.getImageData(0,0,raster.width,raster.height);prepareOcrPixels(probe);const line=estimateLineHeight(probe);
+  if(line!==undefined&&line<20){const {upscaleCanvas}=await import('./browser/ai-tools');raster=await upscaleCanvas(raster,2,f=>onStatus(`Sharpening with AI… ${Math.round(f*100)}%`),signal);}
+ }
+ const {recognizeImage}=await import('./browser/ocr');const detected=await recognizeImage(raster,{signal,grouping,thorough,languages,engine,onProgress:(fraction,label)=>onStatus(`${label}… ${Math.round(fraction*100)}%`)});signal.throwIfAborted();
  const layers=c.getObjects().map(o=>({recognizedKey:(o as Tagged).recognizedKey,bounds:o.getBoundingRect()}));
- const regions=unconvertedRegions(scaleRegions(detected,p.width/raster.width,p.height/raster.height),layers);
+ const all=scaleRegions(detected,p.width/raster.width,p.height/raster.height),regions=unconvertedRegions(all,layers);
  let suggestedFont:string|undefined;
  if(regions.length){onStatus('Matching font…');try{suggestedFont=await suggestFont(raster,detected);}catch{}signal.throwIfAborted();}
- return {regions,suggestedFont,status:ocrScanStatus(regions.length,languageLabel(languages,await bundledOcrLanguages()),layers.some(l=>l.recognizedKey),regions.filter(isUncertain).length)+(suggestedFont?` · closest font: ${suggestedFont}`:'')};
+ return {regions,all,suggestedFont,status:ocrScanStatus(regions.length,engine==='paddle'?'AI OCR (Latin languages)':languageLabel(languages,await bundledOcrLanguages()),layers.some(l=>l.recognizedKey),regions.filter(isUncertain).length)+(suggestedFont?` · closest font: ${suggestedFont}`:'')};
 }
 
 // Compare the clearest recognized words against bundled fonts. Only confident
@@ -56,36 +63,123 @@ async function suggestFont(raster:HTMLCanvasElement,regions:TextRegion[]){
 }
 
 // Editable text positioned so its first baseline matches the detected text.
-export async function detectedTextbox(region:TextRegion,{ocrFont,ocrStyle}:{ocrFont:string;ocrStyle:string}){
+// matchBlur gives OCR text the measured softness of the original letters.
+export async function detectedTextbox(region:TextRegion,{ocrFont,ocrStyle,matchBlur=false,pageInk}:{ocrFont:string;ocrStyle:string;matchBlur?:boolean;pageInk?:PageInk}){
  let family=region.kind==='ocr'?ocrFont:fallbackFont(region.fontName),embedded=false;
  if(region.fontData&&region.fontId){try{await ensureEmbeddedFont(region.fontId,region.fontData);family=region.fontId;embedded=true;}catch{}}
  await ensureFont(family);
- const bold=region.kind==='ocr'?(ocrStyle==='auto'?estimateOcrBold(region.text,family,region.height,region.inkDensity):ocrStyle.includes('bold')):region.bold,italic=region.kind==='ocr'?ocrStyle.includes('italic'):region.italic;
+ const italic=region.kind==='ocr'?ocrStyle.includes('italic'):region.italic,words=region.words;
+ // Auto weight is estimated per word so mixed bold/regular lines keep both.
+ const auto=region.kind==='ocr'&&ocrStyle==='auto',measurable=(t:string)=>/[\p{L}\p{N}\p{Sc}%&@#]/u.test(t);
+ const inkOf=(w:{text:string;inkMass?:number;width?:number})=>{if(!measurable(w.text)||!w.inkMass||!w.width)return undefined;const regular=glyphInk(w.text,family,'normal'),heavy=glyphInk(w.text,family,'bold');return regular&&heavy?wordInk(w.text,w.inkMass,w.width,regular,heavy):undefined;};
+ // Stroke-coverage vote, used when a whole line has a single weight.
+ const vote=(list:{text:string;inkDensity?:number}[])=>{let b=0,r=0;for(const w of list){if(w.inkDensity===undefined||!measurable(w.text))continue;const n=Array.from(w.text).length;if(estimateOcrBold(w.text,family,region.height,w.inkDensity,region.blur))b+=n;else r+=n;}return b>r;};
+ let weights:ReturnType<typeof mixedWeights>|undefined,inkLevel:number|undefined,ownBold:boolean|undefined;
+ if(auto&&region.line&&region.line.words.every(w=>!measurable(w.text)||(w.inkMass!==undefined&&w.width))){
+  // Judge weights across the full text line (blur-proof ink comparison), then
+  // take this region's words: a lone word is compared with its neighbours.
+  const {words:line,start,count}=region.line,result=classifyWordWeights(line.map(inkOf),vote(line),sameInk(region,pageInk)),own=result.bold.slice(start,start+count);inkLevel=result.ink;
+  if(words&&words.length>1&&words.length===own.length&&words.map(w=>w.text).join(' ')===region.text)weights=mixedWeights(words,own);
+  else if(count===1)ownBold=own[0];
+ }else if(auto&&words&&words.length>1&&words.map(w=>w.text).join(' ')===region.text){
+  if(words.every(w=>!measurable(w.text)||(w.inkMass!==undefined&&w.width))){const result=classifyWordWeights(words.map(inkOf),vote(words),sameInk(region,pageInk));weights=mixedWeights(words,result.bold);inkLevel=result.ink;}
+  else weights=mixedWeights(words,words.map(w=>w.inkDensity===undefined||!measurable(w.text)?undefined:estimateOcrBold(w.text,family,region.height,w.inkDensity,region.blur)));
+ }
+ const bold=weights?weights.base:ownBold??(region.kind==='ocr'?(auto?estimateOcrBold(region.text,family,region.height,region.inkDensity,region.blur):ocrStyle.includes('bold')):region.bold);
  let size=region.size,ocrAscent=region.height;
- if(region.kind==='ocr'){const ctx=document.createElement('canvas').getContext('2d')!;ctx.font=`${italic?'italic ':''}${bold?'bold ':''}100px "${family}"`;const fit=fitOcrText(region,ctx.measureText(region.text));size=fit.size;ocrAscent=fit.ascent;}
- const text=Object.assign(new Textbox(region.text,{left:region.left,top:region.top,width:Math.max(region.width+4,20),fontSize:size,fontFamily:family,fontWeight:embedded?'normal':bold?'bold':'normal',fontStyle:embedded?'normal':italic?'italic':'normal',fill:region.color,lineHeight:1,splitByGrapheme:true,objectCaching:false}),{id:uid(),name:region.text.slice(0,40),pdfOriginalFont:region.fontName,pdfFontData:embedded?region.fontData:undefined,pdfFontFallback:fallbackFont(region.fontName),pdfFontBold:bold,pdfFontItalic:italic,recognizedKey:recognitionKey(region)});
+ if(region.kind==='ocr'){
+  const ctx=document.createElement('canvas').getContext('2d')!,font=(b:boolean)=>`${italic?'italic ':''}${b?'bold ':''}100px "${family}"`;ctx.font=font(bold);const metrics=ctx.measureText(region.text);
+  let width=metrics.width;
+  if(weights?.ranges.length){width=0;let offset=0;for(const w of words!){const own=weights.ranges.find(r=>offset>=r.start&&offset<r.end);ctx.font=font(own?own.bold:bold);width+=ctx.measureText(w.text).width;offset+=Array.from(w.text).length+1;}ctx.font=font(bold);width+=ctx.measureText(' ').width*(words!.length-1);}
+  const fit=fitOcrText(region,{width,actualBoundingBoxAscent:metrics.actualBoundingBoxAscent,actualBoundingBoxDescent:metrics.actualBoundingBoxDescent});size=fit.size;ocrAscent=fit.ascent;
+ }
+ const text=Object.assign(new Textbox(region.text,{left:region.left,top:region.top,width:Math.max(region.width+4,20),fontSize:size,fontFamily:family,fontWeight:embedded?'normal':bold?'bold':'normal',fontStyle:embedded?'normal':italic?'italic':'normal',fill:region.kind==='ocr'?darkenToInk(region.color,region.background,inkLevel):region.color,lineHeight:1,splitByGrapheme:true,objectCaching:false}),{id:uid(),name:region.text.slice(0,40),pdfOriginalFont:region.fontName,pdfFontData:embedded?region.fontData:undefined,pdfFontFallback:fallbackFont(region.fontName),pdfFontBold:bold,pdfFontItalic:italic,recognizedKey:recognitionKey(region)});
+ for(const r of weights?.ranges??[])text.setSelectionStyles({fontWeight:r.bold?'bold':'normal'},r.start,r.end);
+ if(matchBlur&&region.kind==='ocr'&&(region.blur??0)>=.3)Object.assign(text,{textSoftness:clampTextSoftness(region.blur!)});
  // Fabric's top includes its ascender allowance; anchor the first baseline.
  text.top=region.kind==='pdf'?region.baseline-region.size*.93:region.top+ocrAscent-size*.93;
  return {text,embedded};
 }
 
-// Hide the original OCR text by clearing, repairing or patching the area under it.
-// Mutates the serialized `objects` list of the page.
-export async function coverOcrText(c:Canvas,p:Page,region:TextRegion,objects:unknown[],{mode,color,padding}:{mode:ReplacementBackground;color:string;padding:number}){
- const {left,top,width,height}=ocrPatchBounds(region,padding,p);
+// Hide the original OCR text by clearing, repairing or patching the area under
+// each region. Several regions are handled in one pass (Convert all), so each
+// image layer is rasterized once. Mutates the serialized `objects` list of the page.
+export async function coverOcrText(c:Canvas,p:Page,regions:TextRegion[],objects:unknown[],{mode,color,padding,others=[],onProgress}:{mode:ReplacementBackground;color:string;padding:number;others?:TextRegion[];onProgress?:(fraction:number)=>void}){
+ const areas=regions.map(region=>({region,...ocrPatchBounds(region,padding,p,others.filter(o=>o!==region&&o.kind==='ocr'))}));
  if(mode==='transparent'){
-  const images=c.getObjects().filter(o=>o instanceof FabricImage&&o.visible&&(()=>{const b=o.getBoundingRect();return b.left<left+width&&b.top<top+height&&b.left+b.width>left&&b.top+b.height>top;})());
+  const overlaps=(o:FabricObject)=>{const b=o.getBoundingRect();return areas.some(a=>b.left<a.left+a.width&&b.top<a.top+a.height&&b.left+b.width>a.left&&b.top+b.height>a.top);};
+  const images=c.getObjects().filter(o=>o instanceof FabricImage&&o.visible&&overlaps(o));
   if(!images.length)throw new Error('Select image text to clear its background.');
   if(images.some(o=>o.lockMovementX))throw new Error('Unlock the image layers beneath this text first.');
   for(const image of images){
-   const blend=image.globalCompositeOperation;let raster:HTMLCanvasElement;try{image.globalCompositeOperation='source-over';raster=pageRaster(c,p.width,p.height,[image]);}finally{image.globalCompositeOperation=blend;}raster.getContext('2d')!.clearRect(left,top,width,height);
+   const blend=image.globalCompositeOperation;let raster:HTMLCanvasElement;try{image.globalCompositeOperation='source-over';raster=pageRaster(c,p.width,p.height,[image]);}finally{image.globalCompositeOperation=blend;}
+   for(const a of areas)raster.getContext('2d')!.clearRect(a.left,a.top,a.width,a.height);
    const replacement=rasterLayer(raster,(image as Tagged).name||'Image',(image as Tagged).id!),index=objects.findIndex(o=>(o as Tagged).id===(image as Tagged).id);
    if(index>=0){if(replacement){replacement.globalCompositeOperation=blend;objects[index]=replacement.toObject();}else objects.splice(index,1);}
   }
+ }else if(mode==='ai'){
+  // LaMa reconstructs textures (photos, maps, gradients) behind the old text.
+  const raster=await pageComposite(c,p),mask=document.createElement('canvas');mask.width=raster.width;mask.height=raster.height;const mctx=mask.getContext('2d')!;mctx.fillStyle='#000';
+  for(const a of areas)mctx.fillRect(a.left,a.top,a.width,a.height);
+  const {inpaintCanvas}=await import('./browser/ai-tools');
+  for(const patch of await inpaintCanvas(raster,mask,areas.map(a=>({x:a.left,y:a.top,width:a.width,height:a.height})),onProgress))objects.push(Object.assign(new FabricImage(patch.canvas,{left:patch.x,top:patch.y}),{id:uid(),name:'AI-filled background'}).toObject());
  }else if(mode==='repair'){
-  const raster=p.source?await previewCanvas(p.source,p.index,1,Math.ceil(p.width),Math.ceil(p.height)):pageRaster(c,p.width,p.height,c.getObjects().filter(o=>o instanceof FabricImage));
-  const repaired=repairTextBackground(raster.getContext('2d')!.getImageData(0,0,raster.width,raster.height),{left,top,width,height});
-  const patchCanvas=document.createElement('canvas');patchCanvas.width=repaired.width;patchCanvas.height=repaired.height;const context=patchCanvas.getContext('2d')!,pixels=context.createImageData(repaired.width,repaired.height);pixels.data.set(repaired.data);context.putImageData(pixels,0,0);
-  objects.push(Object.assign(new FabricImage(patchCanvas,{left:repaired.left,top:repaired.top}),{id:uid(),name:'Repaired text background'}).toObject());
- }else objects.push(Object.assign(new Rect({left,top,width,height,fill:mode==='solid'?color:region.background||'#ffffff',strokeWidth:0}),{id:uid(),name:'Text background patch'}).toObject());
+  const raster=await pageComposite(c,p);
+  const pixels=raster.getContext('2d')!.getImageData(0,0,raster.width,raster.height);
+  for(const a of areas){
+   const repaired=repairTextBackground(pixels,{left:a.left,top:a.top,width:a.width,height:a.height});
+   const patchCanvas=document.createElement('canvas');patchCanvas.width=repaired.width;patchCanvas.height=repaired.height;const context=patchCanvas.getContext('2d')!,patch=context.createImageData(repaired.width,repaired.height);patch.data.set(repaired.data);context.putImageData(patch,0,0);
+   objects.push(Object.assign(new FabricImage(patchCanvas,{left:repaired.left,top:repaired.top}),{id:uid(),name:'Repaired text background'}).toObject());
+  }
+ }else for(const a of areas)objects.push(Object.assign(new Rect({left:a.left,top:a.top,width:a.width,height:a.height,fill:mode==='solid'?color:a.region.background||'#ffffff',strokeWidth:0}),{id:uid(),name:'Text background patch'}).toObject());
 }
+
+// The page as shown under the editable layers, in page units: the PDF preview,
+// or the visible image layers of a design page.
+export async function pageComposite(c:Canvas,p:Page){
+ return p.source?await previewCanvas(p.source,p.index,1,Math.ceil(p.width),Math.ceil(p.height)):pageRaster(c,p.width,p.height,c.getObjects().filter(o=>o instanceof FabricImage&&o.visible));
+}
+
+// Remove whatever is inside a selection polygon with LaMa; returns new patch layers.
+export async function aiRemoveSelection(c:Canvas,p:Page,points:{x:number;y:number}[],onProgress?:(fraction:number)=>void){
+ const raster=await pageComposite(c,p),mask=document.createElement('canvas');mask.width=raster.width;mask.height=raster.height;
+ const ctx=mask.getContext('2d')!;ctx.fillStyle=ctx.strokeStyle='#000';ctx.lineWidth=4;ctx.lineJoin='round';ctx.beginPath();points.forEach((pt,i)=>i?ctx.lineTo(pt.x,pt.y):ctx.moveTo(pt.x,pt.y));ctx.closePath();ctx.fill();ctx.stroke();
+ const xs=points.map(pt=>pt.x),ys=points.map(pt=>pt.y),x=Math.max(0,Math.min(...xs)-3),y=Math.max(0,Math.min(...ys)-3);
+ const hole={x,y,width:Math.min(raster.width,Math.max(...xs)+3)-x,height:Math.min(raster.height,Math.max(...ys)+3)-y};
+ if(hole.width<2||hole.height<2)throw new Error('Draw a larger selection to remove.');
+ const {inpaintCanvas}=await import('./browser/ai-tools');
+ return (await inpaintCanvas(raster,mask,[hole],onProgress)).map(patch=>Object.assign(new FabricImage(patch.canvas,{left:patch.x,top:patch.y}),{id:uid(),name:'AI-removed area'}));
+}
+
+// Sharpen an image layer with Real-ESRGAN, keeping its size and position on the page.
+export async function aiSharpenImage(image:FabricImage,onProgress?:(fraction:number)=>void){
+ const element=image.getElement() as HTMLImageElement|HTMLCanvasElement,source=document.createElement('canvas');
+ source.width=element instanceof HTMLImageElement?element.naturalWidth:element.width;source.height=element instanceof HTMLImageElement?element.naturalHeight:element.height;
+ if(source.width*source.height>4e6)throw new Error('This image is already large (over 4 megapixels); AI sharpening is for small or blurry images.');
+ source.getContext('2d')!.drawImage(element,0,0);
+ const {upscaleCanvas}=await import('./browser/ai-tools');const sharp=await upscaleCanvas(source,2,onProgress);
+ const crop=image.cropX||image.cropY?{cropX:(image.cropX??0)*2,cropY:(image.cropY??0)*2}:{};
+ return {element:sharp,props:{...crop,width:(image.width??source.width)*2,height:(image.height??source.height)*2,scaleX:(image.scaleX??1)/2,scaleY:(image.scaleY??1)/2}};
+}
+
+// Ink level of the page's text, measured on lines that mix bold and regular
+// (their split pins the level down). Used to settle single-weight lines on the
+// same page when blur makes their own evidence ambiguous.
+export type PageInk={ink:number;luma:number};
+const luma=(hex:string)=>{const v=[1,3,5].map(i=>parseInt(hex.slice(i,i+2),16));return .299*v[0]+.587*v[1]+.114*v[2];};
+export async function pageInkLevel(regions:TextRegion[],family:string):Promise<PageInk|undefined>{
+ await ensureFont(family);
+ const seen=new Set<unknown>(),levels:{ink:number;luma:number}[]=[];
+ for(const r of regions){
+  if(r.kind!=='ocr'||!r.line||seen.has(r.line.words)||!/^#[0-9a-f]{6}$/i.test(r.color))continue;seen.add(r.line.words);
+  const inks=r.line.words.map(w=>{if(!/[\p{L}\p{N}]/u.test(w.text)||!w.inkMass||!w.width)return undefined;const a=glyphInk(w.text,family,'normal'),b=glyphInk(w.text,family,'bold');return a&&b?wordInk(w.text,w.inkMass,w.width,a,b):undefined;});
+  const result=classifyWordWeights(inks,false);
+  if(result.ink!==undefined&&result.bold.includes(true)&&result.bold.includes(false))levels.push({ink:result.ink,luma:luma(r.color)});
+ }
+ if(!levels.length)return undefined;
+ const mid=(v:number[])=>v.sort((a,b)=>a-b)[v.length>>1];
+ return {ink:mid(levels.map(l=>l.ink)),luma:mid(levels.map(l=>l.luma))};
+}
+// Only text of a similar colour shares the page's ink level (a light grey
+// caption must not be judged against black body text).
+function sameInk(region:TextRegion,page:PageInk|undefined){return page&&/^#[0-9a-f]{6}$/i.test(region.color)&&luma(region.color)<=page.luma+90?page.ink:undefined;}

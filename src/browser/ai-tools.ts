@@ -1,0 +1,101 @@
+// Real-ESRGAN upscaling, LaMa inpainting and PaddleOCR recognition on canvases.
+import {runModel} from './ai';
+import {tilePlan,toPlanar,dbBoxes,ctcDecode,ctcWords,trimToInk,inkBand,inpaintWindows,resizeBilinear,snapToGap,type Rect} from '../ai-image';
+
+type Progress=(fraction:number)=>void;
+const canvas=(width:number,height:number)=>Object.assign(document.createElement('canvas'),{width,height});
+const context=(c:HTMLCanvasElement)=>c.getContext('2d',{willReadFrequently:true})!;
+function scaled(source:CanvasImageSource,sx:number,sy:number,sw:number,sh:number,width:number,height:number,quality:ImageSmoothingQuality='high'){
+ const out=canvas(width,height),ctx=context(out);ctx.imageSmoothingQuality=quality;ctx.drawImage(source,sx,sy,sw,sh,0,0,width,height);return out;
+}
+
+// Real-ESRGAN (general x4v3) on 128px tiles. factor 2 renders at 4x and halves,
+// which is sharper than a native 2x pass with this model. Transparency is kept
+// by upscaling the alpha channel conventionally.
+export async function upscaleCanvas(source:HTMLCanvasElement,factor:2|4=2,onProgress?:Progress,signal?:AbortSignal){
+ const {width,height}=source,src=context(source).getImageData(0,0,width,height),out=canvas(width*4,height*4),octx=context(out),tiles=tilePlan(width,height);
+ let done=0;
+ for(const {read,inner} of tiles){
+  const rgba=new Uint8ClampedArray(read.width*read.height*4);
+  for(let y=0;y<read.height;y++)rgba.set(src.data.subarray(((read.y+y)*width+read.x)*4,((read.y+y)*width+read.x+read.width)*4),y*read.width*4);
+  const result=(await runModel('realesr-general-x4v3',{input:{data:toPlanar(rgba,read.width,read.height),dims:[1,3,read.height,read.width]}},signal)).output;
+  const ow=read.width*4,oh=read.height*4,n=ow*oh,tile=new ImageData(inner.width*4,inner.height*4),ox=(inner.x-read.x)*4,oy=(inner.y-read.y)*4;
+  for(let y=0;y<tile.height;y++)for(let x=0;x<tile.width;x++){const i=(oy+y)*ow+ox+x,o=(y*tile.width+x)*4;for(let c=0;c<3;c++)tile.data[o+c]=Math.max(0,Math.min(255,result.data[c*n+i]*255));tile.data[o+3]=255;}
+  octx.putImageData(tile,inner.x*4,inner.y*4);onProgress?.(++done/tiles.length);
+ }
+ if(src.data.some((v,i)=>i%4===3&&v<255)){octx.globalCompositeOperation='destination-in';octx.imageSmoothingQuality='high';octx.drawImage(source,0,0,out.width,out.height);octx.globalCompositeOperation='source-over';}
+ return factor===4?out:scaled(out,0,0,out.width,out.height,width*2,height*2);
+}
+
+// LaMa fills `mask` (alpha > 0 = hole) in `source`. Holes are grouped into
+// 512px windows with surrounding context; each result is returned as a patch
+// covering its holes (with original pixels around them), ready to add as a layer.
+export async function inpaintCanvas(source:HTMLCanvasElement,mask:HTMLCanvasElement,holes:Rect[],onProgress?:Progress,signal?:AbortSignal){
+ const patches:{canvas:HTMLCanvasElement;x:number;y:number}[]=[],windows=inpaintWindows(holes,source.width,source.height);let done=0;
+ for(const {rects,crop} of windows){
+  const image=context(scaled(source,crop.x,crop.y,crop.width,crop.height,512,512)).getImageData(0,0,512,512);
+  const holeMask=context(scaled(mask,crop.x,crop.y,crop.width,crop.height,512,512)).getImageData(0,0,512,512),m=new Float32Array(512*512);
+  for(let i=0;i<m.length;i++)m[i]=holeMask.data[i*4+3]>8?1:0;
+  const filled=(await runModel('lama',{image:{data:toPlanar(image.data,512,512),dims:[1,3,512,512]},mask:{data:m,dims:[1,1,512,512]}},signal)).output;
+  const result=new ImageData(512,512),n=512*512;
+  for(let i=0;i<n;i++){for(let c=0;c<3;c++)result.data[i*4+c]=Math.max(0,Math.min(255,filled.data[c*n+i]));result.data[i*4+3]=255;}
+  const filled512=canvas(512,512);context(filled512).putImageData(result,0,0);
+  const back=scaled(filled512,0,0,512,512,crop.width,crop.height);
+  // Keep only the holes (slightly feathered by the mask's own edges).
+  const x0=Math.max(crop.x,Math.floor(Math.min(...rects.map(r=>r.x))-2)),y0=Math.max(crop.y,Math.floor(Math.min(...rects.map(r=>r.y))-2));
+  const x1=Math.min(crop.x+crop.width,Math.ceil(Math.max(...rects.map(r=>r.x+r.width))+2)),y1=Math.min(crop.y+crop.height,Math.ceil(Math.max(...rects.map(r=>r.y+r.height))+2));
+  const patch=canvas(x1-x0,y1-y0),pctx=context(patch);
+  pctx.drawImage(mask,x0,y0,patch.width,patch.height,0,0,patch.width,patch.height);pctx.globalCompositeOperation='source-in';pctx.drawImage(back,x0-crop.x,y0-crop.y,patch.width,patch.height,0,0,patch.width,patch.height);
+  patches.push({canvas:patch,x:x0,y:y0});onProgress?.(++done/windows.length);
+ }
+ return patches;
+}
+
+export type AiOcrLine={text:string;confidence:number;bbox:{x0:number;y0:number;x1:number;y1:number};words:{text:string;confidence:number;bbox:{x0:number;y0:number;x1:number;y1:number}}[]};
+let dictionary:Promise<string[]>|undefined;
+
+// PaddleOCR PP-OCRv5: DB text detection, then Latin recognition per line with
+// word boxes recovered from CTC time steps and trimmed to the inked columns.
+export async function paddleOcr(source:HTMLCanvasElement,onProgress?:Progress,signal?:AbortSignal):Promise<AiOcrLine[]>{
+ const dict=await(dictionary??=fetch(new URL('ai/models/ppocr-latin-dict.json',document.baseURI)).then(r=>{if(!r.ok)throw new Error('PaddleOCR dictionary is not bundled with this build.');return r.json();}).catch(e=>{dictionary=undefined;throw e;}));
+ const {width,height}=source,src=context(source).getImageData(0,0,width,height);
+ const scale=Math.min(1,1600/Math.max(width,height)),dw=Math.max(32,Math.round(width*scale/32)*32),dh=Math.max(32,Math.round(height*scale/32)*32);
+ const detInput={data:resizeBilinear(src.data,width,height,dw,dh)};
+ const prob=(await runModel('ppocr-det',{x:{data:toPlanar(detInput.data,dw,dh,{mean:[.485,.456,.406],std:[.229,.224,.225],bgr:true}),dims:[1,3,dh,dw]}},signal));
+ const boxes=dbBoxes(Object.values(prob)[0].data,dw,dh),lines:AiOcrLine[]=[];onProgress?.(.1);
+ for(const [k,b] of boxes.entries()){
+   // Widen the crop a little: on soft or textured backgrounds the detector can
+  // start a line just inside its first letter.
+  const margin=(b.y1-b.y0)*height/dh*.25;
+  const x0=Math.max(0,Math.floor(b.x0*width/dw-margin)),y0=Math.max(0,Math.floor(b.y0*height/dh)),x1=Math.min(width,Math.ceil(b.x1*width/dw+margin)),y1=Math.min(height,Math.ceil(b.y1*height/dh)),w=x1-x0,h=y1-y0;
+  if(w<4||h<4)continue;
+  const rw=Math.max(16,Math.min(3200,Math.round(w*48/h))),region=new Uint8ClampedArray(w*h*4);
+  for(let y=0;y<h;y++)region.set(src.data.subarray(((y0+y)*width+x0)*4,((y0+y)*width+x1)*4),y*w*4);
+  const crop={data:resizeBilinear(region,w,h,rw,48)};
+  const out=Object.values(await runModel('ppocr-latin-rec',{x:{data:toPlanar(crop.data,rw,48,{mean:[.5,.5,.5],std:[.5,.5,.5],bgr:true}),dims:[1,3,48,rw]}},signal))[0];
+  const [,steps,classes]=out.dims,decoded=ctcDecode(out.data,steps,classes,dict);
+  if(decoded.text){
+   // Column ink inside the line (contrast with the line's corner colour) to tighten word boxes.
+   // The detector pads its boxes; trim lines and words to inked rows/columns
+   // (contrast with the box corner, which lies in the padding) so text sizing
+   // and background patches follow the letters.
+   const corner=(y0*width+x0)*4,bg=[src.data[corner],src.data[corner+1],src.data[corner+2]],columns=new Float32Array(w),rows=new Float32Array(h);
+   for(let y=y0;y<y1;y++)for(let x=x0;x<x1;x++){const i=(y*width+x)*4,ink=Math.max(Math.abs(src.data[i]-bg[0]),Math.abs(src.data[i+1]-bg[1]),Math.abs(src.data[i+2]-bg[2]))>60?1:0;columns[x-x0]+=ink;rows[y-y0]+=ink;}
+   const vertical=inkBand(rows,((b.y0+b.y1)/2)*height/dh-y0),top=y0+vertical.x0,bottom=y0+vertical.x1;
+   // Word edges: snap boundaries to the blank gap between words, trim to ink,
+   // then give each word its own inked rows (a word without descenders must
+   // not inherit the line's full height, or its replacement is sized too big).
+   const lineHeight=bottom-top,gap=Math.max(2,Math.round(lineHeight*.15)),raw=ctcWords(decoded.chars,rw/steps,rw);
+   const edges=raw.map((word,i)=>({x0:i?snapToGap(columns,word.x0*w/rw,gap,lineHeight):word.x0*w/rw,x1:i<raw.length-1?snapToGap(columns,word.x1*w/rw,gap,lineHeight):word.x1*w/rw}));
+   const words=raw.map((word,i)=>{
+    const t=trimToInk(columns,edges[i].x0,edges[i].x1),wordRows=new Float32Array(h);
+    for(let y=top;y<bottom;y++)for(let x=x0+t.x0;x<x0+t.x1;x++){const p=(y*width+x)*4;wordRows[y-y0]+=Math.max(Math.abs(src.data[p]-bg[0]),Math.abs(src.data[p+1]-bg[1]),Math.abs(src.data[p+2]-bg[2]))>60?1:0;}
+    const v=trimToInk(wordRows,top-y0,bottom-y0);
+    return {text:word.text,confidence:word.confidence,bbox:{x0:x0+t.x0,y0:y0+v.x0,x1:x0+t.x1,y1:y0+v.x1}};
+   });
+   lines.push({text:decoded.text,confidence:decoded.confidence*100,bbox:{x0:words.length?Math.min(...words.map(w=>w.bbox.x0)):x0,y0:top,x1:words.length?Math.max(...words.map(w=>w.bbox.x1)):x1,y1:bottom},words});
+  }
+  onProgress?.(.1+.9*(k+1)/boxes.length);
+ }
+ return lines;
+}

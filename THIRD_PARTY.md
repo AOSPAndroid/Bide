@@ -20,3 +20,9 @@ The source bundle accompanies this local handoff. Public or commercial redistrib
 - Carlito and Caladea: SIL Open Font License 1.1, unmodified static TTFs from https://github.com/google/fonts/tree/main/ofl/carlito and https://github.com/google/fonts/tree/main/ofl/caladea . License copies are bundled in public/licenses.
 
 - Extended font library: 63 additional families from Google Fonts, SIL Open Font License 1.1. Per-family licenses are in public/licenses/fonts. scripts/font-library-manifest.json records the upstream revision, source URLs and output hashes. Variable fonts are instantiated into static faces at build preparation time with fontTools. The extended library is subset to Latin/Latin Extended, punctuation, currencies, arrows and mathematics; derivatives have internal bide-prefixed names. End users need no font installation or downloads.
+- ONNX Runtime Web 1.23.2 (Microsoft): MIT; runs the bundled AI models locally in a worker (WebGPU when available, otherwise WebAssembly). Its WebAssembly files are copied to ai/ort/ at build time.
+- AI models, downloaded at build time by scripts/prepare-ai.mjs, pinned by URL, size and SHA-256 in public/ai/manifest.json, and bundled in the ZIP (no runtime downloads):
+  - LaMa inpainting (Carve/LaMa-ONNX export of advimman/lama): Apache-2.0.
+  - Real-ESRGAN realesr-general-x4v3 (ONNX export of xinntao/Real-ESRGAN): BSD-3-Clause.
+  - PaddleOCR PP-OCRv5 mobile text detection and Latin recognition (official PaddlePaddle ONNX exports): Apache-2.0.
+

@@ -1,0 +1,46 @@
+{
+ "files": {
+  "lama.onnx": {
+   "url": "https://huggingface.co/Carve/LaMa-ONNX/resolve/c3c0c9e468934d62e79c329e35d82dd09ff8c444/lama_fp32.onnx",
+   "bytes": 208044816,
+   "sha256": "1faef5301d78db7dda502fe59966957ec4b79dd64e16f03ed96913c7a4eb68d6",
+   "license": "Apache-2.0",
+   "source": "https://huggingface.co/Carve/LaMa-ONNX"
+  },
+  "realesr-general-x4v3.onnx": {
+   "url": "https://huggingface.co/CoderViking/realesr-general-x4v3-onnx/resolve/c6a971706797c7502945a2b4c4274fce4900d4ab/realesr-general-x4v3.onnx",
+   "bytes": 4866417,
+   "sha256": "1940a93ee08283a0a7286183186357b1688fe9fa8ede74604b424586aaddf112",
+   "license": "BSD-3-Clause",
+   "source": "https://huggingface.co/CoderViking/realesr-general-x4v3-onnx"
+  },
+  "ppocr-det.onnx": {
+   "url": "https://huggingface.co/PaddlePaddle/PP-OCRv5_mobile_det_onnx/resolve/e6f4fa85f00e168c862bc462aebca69eef9b3d3d/inference.onnx",
+   "bytes": 4826518,
+   "sha256": "a431985659dc921974177a95adcfbb90fd9e51989a5e04d70d0b75f597b6e61d",
+   "license": "Apache-2.0",
+   "source": "https://huggingface.co/PaddlePaddle/PP-OCRv5_mobile_det_onnx"
+  },
+  "ppocr-latin-rec.onnx": {
+   "url": "https://huggingface.co/PaddlePaddle/latin_PP-OCRv5_mobile_rec_onnx/resolve/89d3a50e2c27e2e7cceeab0e944c25c807d5db4f/inference.onnx",
+   "bytes": 8042023,
+   "sha256": "7888113072263cb471b93f66dd5e2ad70548dc526fa1ace760d0d973dd121498",
+   "license": "Apache-2.0",
+   "source": "https://huggingface.co/PaddlePaddle/latin_PP-OCRv5_mobile_rec_onnx"
+  },
+  "ppocr-latin-rec.yml": {
+   "url": "https://huggingface.co/PaddlePaddle/latin_PP-OCRv5_mobile_rec_onnx/resolve/89d3a50e2c27e2e7cceeab0e944c25c807d5db4f/inference.yml",
+   "bytes": 6817,
+   "sha256": "0bbe984570f597af3638e50bdf2e8276f3ab26a61966096538b3b0d1849f5c84",
+   "license": "Apache-2.0",
+   "source": "https://huggingface.co/PaddlePaddle/latin_PP-OCRv5_mobile_rec_onnx"
+  },
+  "ppocr-det.yml": {
+   "url": "https://huggingface.co/PaddlePaddle/PP-OCRv5_mobile_det_onnx/resolve/e6f4fa85f00e168c862bc462aebca69eef9b3d3d/inference.yml",
+   "bytes": 903,
+   "sha256": "98069072e1b6b37d727fd9d9f11725faa46d6ea0de012f2ed26caea011c37699",
+   "license": "Apache-2.0",
+   "source": "https://huggingface.co/PaddlePaddle/PP-OCRv5_mobile_det_onnx"
+  }
+ }
+}

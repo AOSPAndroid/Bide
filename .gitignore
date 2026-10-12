@@ -14,3 +14,5 @@ public/office/runtime/
 public/diagrams/runtime/
 
 public/ocr/
+public/ai/models/
+public/ai/ort/
