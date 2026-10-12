@@ -24,3 +24,12 @@ test('low-confidence OCR regions are flagged for proofreading',async()=>{
  assert.equal(isUncertain({kind:'ocr'}),false);assert.equal(isUncertain({kind:'pdf',confidence:10}),false);
  assert.match(ocrScanStatus(5,'English',false,2),/5 OCR regions · 2 to check/);
 });
+test('a bold label keeps its weight next to a regular value',async()=>{
+ const {mixedWeights}=await import('../tmp/ocr-regions.mjs');
+ const words=['Nom','du','client:','Dalil','REDOUANE','/','pour','6','adultes'].map(text=>({text}));
+ const {base,ranges}=mixedWeights(words,[true,true,true,false,false,undefined,false,false,false]);
+ assert.equal(base,false);assert.deepEqual(ranges,[{start:0,end:14,bold:true}]);
+ assert.equal(words.map(w=>w.text).join(' ').slice(0,14),'Nom du client:');
+ assert.deepEqual(mixedWeights([{text:'Répas:'},{text:'é'}],[true,false]),{base:true,ranges:[{start:7,end:8,bold:false}]});
+ assert.deepEqual(mixedWeights(words.slice(0,2),[undefined,undefined]),{base:false,ranges:[]});
+});

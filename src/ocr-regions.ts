@@ -30,3 +30,15 @@ export const isUncertain=(r:{kind:string;confidence?:number})=>r.kind==='ocr'&&r
 export function ocrScanStatus(count:number,languages:string,converted:boolean,uncertain=0){
  return count?`${count} OCR regions${uncertain?` · ${uncertain} to check`:''} · ${languages} · choose a matching font`:converted?'Original text converted. Double-click the text layer to edit.':'No text detected. Use Text to add your own.';
 }
+
+// Line-level weight plus the character ranges whose weight differs, e.g. a bold
+// "Nom du client:" label before a regular value. Words with unknown weight
+// (undefined) follow the majority, which is counted in characters.
+// Offsets count code points, matching Fabric's per-character style indices.
+export function mixedWeights(words:{text:string}[],bold:(boolean|undefined)[]){
+ const len=(t:string)=>Array.from(t).length;
+ let boldChars=0,regularChars=0;words.forEach((w,i)=>{if(bold[i]===true)boldChars+=len(w.text);else if(bold[i]===false)regularChars+=len(w.text);});
+ const base=boldChars>regularChars,ranges:{start:number;end:number;bold:boolean}[]=[];let offset=0;
+ words.forEach((w,i)=>{const b=bold[i];if(b!==undefined&&b!==base){const last=ranges.at(-1);if(last&&last.end+1===offset)last.end=offset+len(w.text);else ranges.push({start:offset,end:offset+len(w.text),bold:b});}offset+=len(w.text)+1;});
+ return {base,ranges};
+}

@@ -8,7 +8,7 @@ import {repairTextBackground} from './text-replacement';
 import {estimateOcrBold} from './ocr-weight';
 import {ensureFont,ensureEmbeddedFont} from './fonts';
 import {fallbackFont,fitOcrText,type TextRegion} from './text-regions';
-import {recognitionKey,scaleRegions,unconvertedRegions,ocrPatchBounds,ocrScanStatus,isUncertain} from './ocr-regions';
+import {mixedWeights,recognitionKey,scaleRegions,unconvertedRegions,ocrPatchBounds,ocrScanStatus,isUncertain} from './ocr-regions';
 import type {OcrGrouping} from './ocr-segmentation';
 import {uid,type Page} from './model';
 import {bundledOcrLanguages,languageLabel} from './ocr-languages';
@@ -60,10 +60,19 @@ export async function detectedTextbox(region:TextRegion,{ocrFont,ocrStyle}:{ocrF
  let family=region.kind==='ocr'?ocrFont:fallbackFont(region.fontName),embedded=false;
  if(region.fontData&&region.fontId){try{await ensureEmbeddedFont(region.fontId,region.fontData);family=region.fontId;embedded=true;}catch{}}
  await ensureFont(family);
- const bold=region.kind==='ocr'?(ocrStyle==='auto'?estimateOcrBold(region.text,family,region.height,region.inkDensity):ocrStyle.includes('bold')):region.bold,italic=region.kind==='ocr'?ocrStyle.includes('italic'):region.italic;
+ const italic=region.kind==='ocr'?ocrStyle.includes('italic'):region.italic,words=region.words;
+ // Auto weight is estimated per word so mixed bold/regular lines keep both.
+ const weights=region.kind==='ocr'&&ocrStyle==='auto'&&words&&words.length>1&&words.map(w=>w.text).join(' ')===region.text?mixedWeights(words,words.map(w=>w.inkDensity===undefined||!/[\p{L}\p{N}]/u.test(w.text)?undefined:estimateOcrBold(w.text,family,region.height,w.inkDensity))):undefined;
+ const bold=weights?weights.base:region.kind==='ocr'?(ocrStyle==='auto'?estimateOcrBold(region.text,family,region.height,region.inkDensity):ocrStyle.includes('bold')):region.bold;
  let size=region.size,ocrAscent=region.height;
- if(region.kind==='ocr'){const ctx=document.createElement('canvas').getContext('2d')!;ctx.font=`${italic?'italic ':''}${bold?'bold ':''}100px "${family}"`;const fit=fitOcrText(region,ctx.measureText(region.text));size=fit.size;ocrAscent=fit.ascent;}
+ if(region.kind==='ocr'){
+  const ctx=document.createElement('canvas').getContext('2d')!,font=(b:boolean)=>`${italic?'italic ':''}${b?'bold ':''}100px "${family}"`;ctx.font=font(bold);const metrics=ctx.measureText(region.text);
+  let width=metrics.width;
+  if(weights?.ranges.length){width=0;let offset=0;for(const w of words!){const own=weights.ranges.find(r=>offset>=r.start&&offset<r.end);ctx.font=font(own?own.bold:bold);width+=ctx.measureText(w.text).width;offset+=Array.from(w.text).length+1;}ctx.font=font(bold);width+=ctx.measureText(' ').width*(words!.length-1);}
+  const fit=fitOcrText(region,{width,actualBoundingBoxAscent:metrics.actualBoundingBoxAscent,actualBoundingBoxDescent:metrics.actualBoundingBoxDescent});size=fit.size;ocrAscent=fit.ascent;
+ }
  const text=Object.assign(new Textbox(region.text,{left:region.left,top:region.top,width:Math.max(region.width+4,20),fontSize:size,fontFamily:family,fontWeight:embedded?'normal':bold?'bold':'normal',fontStyle:embedded?'normal':italic?'italic':'normal',fill:region.color,lineHeight:1,splitByGrapheme:true,objectCaching:false}),{id:uid(),name:region.text.slice(0,40),pdfOriginalFont:region.fontName,pdfFontData:embedded?region.fontData:undefined,pdfFontFallback:fallbackFont(region.fontName),pdfFontBold:bold,pdfFontItalic:italic,recognizedKey:recognitionKey(region)});
+ for(const r of weights?.ranges??[])text.setSelectionStyles({fontWeight:r.bold?'bold':'normal'},r.start,r.end);
  // Fabric's top includes its ascender allowance; anchor the first baseline.
  text.top=region.kind==='pdf'?region.baseline-region.size*.93:region.top+ocrAscent-size*.93;
  return {text,embedded};
