@@ -6,7 +6,7 @@ import {useEffect,useState} from 'react';
 import {bundledOcrLanguages,defaultOcrLanguages,languageLabel,type OcrLanguage} from './ocr-languages';
 
 export type OcrSettings={font:string;style:string;grouping:OcrGrouping;background:ReplacementBackground;color:string;padding:number;thorough:boolean;languages:string[];matchBlur:boolean;engine:'tesseract'|'paddle';aiSharpen:boolean};
-export const defaultOcrSettings:OcrSettings={font:'Liberation Sans',style:'auto',grouping:'smart',background:'sampled',color:'#ffffff',padding:-1,thorough:false,languages:defaultOcrLanguages,matchBlur:true,engine:'tesseract',aiSharpen:false};
+export const defaultOcrSettings:OcrSettings={font:'Liberation Sans',style:'auto',grouping:'smart',background:'sampled',color:'#ffffff',padding:-1,thorough:false,languages:defaultOcrLanguages,matchBlur:true,engine:'paddle',aiSharpen:false};
 
 type Props={ai:boolean;status:string;regions:TextRegion[];show:boolean;onShow:(show:boolean)=>void;settings:OcrSettings;onChange:(patch:Partial<OcrSettings>)=>void;scanning:boolean;onRescan:()=>void;onConvertAll:()=>void};
 
@@ -36,9 +36,9 @@ export default function TextDetectionBar({ai,status,regions,show,onShow,settings
   </select></label>}
   {ai&&<label title="Before reading small or soft text, enlarge and sharpen the image with AI (Real-ESRGAN). Slower; skipped for large pages."><input type="checkbox" aria-label="AI sharpen before OCR" checked={settings.aiSharpen} onChange={e=>onChange({aiSharpen:e.target.checked})}/>AI sharpen</label>}
   {settings.engine==='tesseract'&&available.length>1&&<details className="ocr-languages"><summary aria-label="OCR languages" title="Languages on the page. Fewer languages scan faster and misread less.">OCR languages: {languageLabel(settings.languages,available)}</summary><div>{available.map(l=><label key={l.code}><input type="checkbox" aria-label={`OCR language ${l.name}`} checked={settings.languages.includes(l.code)} disabled={settings.languages.length===1&&settings.languages.includes(l.code)} onChange={e=>toggle(l.code,e.target.checked)}/>{l.name}</label>)}</div></details>}
-  <label title="Thorough adds a second, sparse-text pass that can find isolated labels such as buttons and badges. Takes about twice as long.">OCR scan<select aria-label="OCR scan depth" value={settings.thorough?'thorough':'standard'} onChange={e=>onChange({thorough:e.target.value==='thorough'})}>
+  {(!ai||settings.engine==='tesseract')&&<label title="Thorough adds a second, sparse-text pass that can find isolated labels such as buttons and badges. Takes about twice as long.">OCR scan<select aria-label="OCR scan depth" value={settings.thorough?'thorough':'standard'} onChange={e=>onChange({thorough:e.target.value==='thorough'})}>
    <option value="standard">Standard</option><option value="thorough">Thorough (slower)</option>
-  </select></label>
+  </select></label>}
   <label title="Applies to the next detected image text. Smooth repair follows nearby gradients; use Clone or Healing for detailed textures.">Replacement background<select aria-label="Text replacement background" value={settings.background} onChange={e=>onChange({background:e.target.value as ReplacementBackground})}>
    <option value="repair">Repair smooth background</option>{ai&&<option value="ai">AI fill (textures, photos)</option>}<option value="sampled">Sampled color</option><option value="solid">Solid color</option><option value="transparent">Clear to transparent</option>
   </select></label>

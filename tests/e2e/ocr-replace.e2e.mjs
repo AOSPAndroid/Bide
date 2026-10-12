@@ -23,12 +23,14 @@ test('OCR text on an imported image becomes an editable layer',{timeout:240000},
   const page=await browser.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));await recordStatuses(page);
   await page.goto(server.resolvedUrls.local[0]);
   await page.locator('input[type=file][accept*=".psd"]').setInputFiles(image);
-  await sawStatus(page,/Recognizing text… \d+%/);
+  await sawStatus(page,/Recognizing text( \(AI\))?… \d+%/);
   const region=page.locator('button[aria-label^="Edit detected text: Quarterly"]');
   await region.waitFor({timeout:180000});
   assert.ok(await page.locator('button[aria-label^="Edit detected text: Revenue"]').count(),'second line detected');
   await page.waitForFunction(()=>/closest font: /.test(document.querySelector('.text-detection-bar')?.textContent||''),null,{timeout:60000});
   assert.equal(await page.getByLabel('OCR replacement font').inputValue(),'Liberation Sans','Helvetica scan suggests its metric twin');
+  // The thorough sparse-text pass belongs to the standard (Tesseract) engine.
+  await page.getByLabel('OCR engine').selectOption('tesseract');
   await page.getByLabel('OCR scan depth').selectOption('thorough');
   await sawStatus(page,/Thorough pass… \d+%/);
   await region.waitFor({timeout:120000});
@@ -54,6 +56,9 @@ test('enabling German re-scans with the German model',{timeout:240000},async()=>
   const page=await browser.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.goto(server.resolvedUrls.local[0]);
   await page.locator('input[type=file][accept*=".psd"]').setInputFiles(image);
+  // Tesseract's language models are what this test exercises (AI OCR covers Latin languages at once).
+  await page.getByLabel('OCR engine').selectOption('tesseract');
+  await page.waitForFunction(()=>/English \+ Français · /.test(document.querySelector('.text-detection-bar span')?.textContent||''),null,{timeout:180000});
   await page.locator('button[aria-label^="Edit detected text: Gr"]').waitFor({timeout:180000});
   assert.equal(await page.locator('button[aria-label*="Straßenbahnen"]').count(),0,'English + French misreads ß');
   await page.getByLabel('OCR languages').click();await page.getByLabel('OCR language Deutsch').check();
@@ -75,7 +80,8 @@ test('a bold label and a regular value on one line keep their own weights',{time
   await page.goto(server.resolvedUrls.local[0]);
   await page.locator('input[type=file][accept*=".psd"]').setInputFiles(image);
   const region=page.locator('button[aria-label^="Edit detected text: Nom du client: Dalil"]');await region.waitFor({timeout:180000});
-  await region.click();await page.getByText('OCR text is editable',{exact:false}).waitFor({timeout:30000});
+  // The confirmation toast is brief; the saved text layer below is the real check.
+  await region.click();
   // Read the saved text layer and the weight of every character.
   const read=()=>page.evaluate(async()=>{const {restoreLocal}=await import('/src/model.ts');const o=(await restoreLocal())?.pages[0].canvas.objects.find(o=>o.recognizedKey?.startsWith('ocr:'));if(!o)return null;
    const at=i=>{const s=o.styles;if(Array.isArray(s)){for(const r of s)if(i>=r.start&&i<r.end&&r.style?.fontWeight)return r.style.fontWeight;return o.fontWeight;}return s?.[0]?.[i]?.fontWeight??o.fontWeight;};

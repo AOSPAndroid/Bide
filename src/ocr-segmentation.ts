@@ -18,7 +18,7 @@ export function restoreBullets(words:Word[]):Word[]{
   // Letters (Italian/Portuguese "e" is a word) must be clearly bullet-sized. For
   // symbols Tesseract sometimes stretches the box to the full line height, so
   // judge by width; wide shapes (a real dash) are left alone.
-  return (/^[eoc]$/.test(t)?Math.max(bw,bh)<height*.45:/^[«»*+·•●°©®¢.,-]$/.test(t)&&bw<height*.6&&bw<=bh*2)&&centre>top+(bottom-top)*.25&&centre<top+(bottom-top)*.8?{...w,text:'•',confidence:undefined}:w;
+  return (/^[eoc]$/.test(t)?Math.max(bw,bh)<height*.45:/^[«»*+●°©®¢.,-]$/.test(t)&&bw<height*.6&&bw<=bh*2)&&centre>top+(bottom-top)*.25&&centre<top+(bottom-top)*.8?{...w,text:'•',confidence:undefined}:w;
  });
 }
 const group=(words:Word[]):OcrGroup=>({text:words.map(w=>w.text.trim()).join(' '),bbox:{x0:Math.min(...words.map(w=>w.bbox.x0)),y0:Math.min(...words.map(w=>w.bbox.y0)),x1:Math.max(...words.map(w=>w.bbox.x1)),y1:Math.max(...words.map(w=>w.bbox.y1))},words,...lowest(words)});
