@@ -119,6 +119,9 @@ export default function App() {
   useEffect(()=>{void import('./browser/ai').then(m=>m.aiAvailable()).then(setAiReady);},[]);
   const [ocr,setOcr]=useState<OcrSettings>(()=>({...defaultOcrSettings,languages:storedOcrLanguages()}));
   const ocrFontChosen=useRef(false);
+  // Every OCR region of each page's first scan, for the page ink level: later
+  // scans omit lines already converted, which may be the ones that set it.
+  const pageOcrRegions=useRef(new Map<string,TextRegion[]>());
   const pendingTextEdit=useRef<string|null>(null);
   const pendingLayerSelection=useRef<string|null>(null);
   const [layoutGrid,setLayoutGrid]=useState(false),[gridSize,setGridSize]=useState(8),[layoutGap,setLayoutGap]=useState(16);
@@ -405,7 +408,7 @@ export default function App() {
   useEffect(()=>{
     if(!ready||initializing||loading.current||aiReady===undefined)return;const scanController=new AbortController(),signal=scanController.signal;setTextRegions([]);setTextScanStatus('');const p=page,c=canvas.current!;
     if(!hasScannableContent(p,c))return;
-    const scan=async()=>{try{const {regions,status,suggestedFont}=await scanPageText(p,c,{signal,grouping:ocr.grouping,thorough:ocr.thorough,languages:ocr.languages,engine:aiReady?ocr.engine:'tesseract',aiSharpen:aiReady&&ocr.aiSharpen,onStatus:s=>{if(!signal.aborted)setTextScanStatus(s);}});if(signal.aborted)return;setTextRegions(regions);setTextScanStatus(status);if(suggestedFont&&!ocrFontChosen.current)setOcr(o=>({...o,font:suggestedFont}));}
+    const scan=async()=>{try{const {regions,all,status,suggestedFont}=await scanPageText(p,c,{signal,grouping:ocr.grouping,thorough:ocr.thorough,languages:ocr.languages,engine:aiReady?ocr.engine:'tesseract',aiSharpen:aiReady&&ocr.aiSharpen,onStatus:s=>{if(!signal.aborted)setTextScanStatus(s);}});if(signal.aborted)return;if(all?.length&&!pageOcrRegions.current.has(p.id))pageOcrRegions.current.set(p.id,all);setTextRegions(regions);setTextScanStatus(status);if(suggestedFont&&!ocrFontChosen.current)setOcr(o=>({...o,font:suggestedFont}));}
       catch(e){if(!signal.aborted)setTextScanStatus('Text detection unavailable: '+(e instanceof Error?e.message:String(e)));}};
     const scanTimer=setTimeout(()=>void scan(),120);return()=>{clearTimeout(scanTimer);scanController.abort();};
   },[ready,initializing,page.id,page.source,textScanRevision,ocr.grouping,ocr.thorough,ocr.languages.join('+'),ocr.engine,ocr.aiSharpen,aiReady]);
@@ -427,7 +430,7 @@ export default function App() {
   async function editDetectedText(region:TextRegion){
     if(busy||loading.current)return;const originalPage=page;setBusy('Making text editable…');
     try{if(region.kind==='ocr'&&ocr.background==='transparent'&&originalPage.source)throw new Error('Unlock Original PDF first to clear scanned text to transparency.');
-      const {text,embedded}=await detectedTextbox(region,{ocrFont:ocr.font,ocrStyle:ocr.style,matchBlur:ocr.matchBlur,pageInk:ocr.style==='auto'?await pageInkLevel(textRegions,ocr.font):undefined});
+      const {text,embedded}=await detectedTextbox(region,{ocrFont:ocr.font,ocrStyle:ocr.style,matchBlur:ocr.matchBlur,pageInk:ocr.style==='auto'?await pageInkLevel(pageOcrRegions.current.get(originalPage.id)??textRegions,ocr.font):undefined});
       let nextSource=originalPage.source,nextData:string|undefined;
       if(region.kind==='pdf'&&originalPage.source){const result=await removePdfText(originalPage.source,originalPage.index,region.id);nextSource=result.id;nextData=result.data;}
       if(pageIdRef.current!==originalPage.id)return;const current=capture();const objects=[...((current.pages.find(p=>p.id===originalPage.id)!.canvas.objects||[]) as unknown[])];
@@ -442,7 +445,7 @@ export default function App() {
   async function convertAllDetectedText(){
     const regions=textRegions.filter(r=>r.kind==='ocr');if(busy||loading.current||!regions.length)return;const originalPage=page;setBusy(`Converting ${regions.length} text regions…`);
     try{if(ocr.background==='transparent'&&originalPage.source)throw new Error('Unlock Original PDF first to clear scanned text to transparency.');
-      const pageInk=ocr.style==='auto'?await pageInkLevel(regions,ocr.font):undefined,texts=[];for(const region of regions)texts.push((await detectedTextbox(region,{ocrFont:ocr.font,ocrStyle:ocr.style,pageInk})).text);
+      const pageInk=ocr.style==='auto'?await pageInkLevel(pageOcrRegions.current.get(originalPage.id)??regions,ocr.font):undefined,texts=[];for(const region of regions)texts.push((await detectedTextbox(region,{ocrFont:ocr.font,ocrStyle:ocr.style,pageInk})).text);
       if(pageIdRef.current!==originalPage.id)return;const current=capture();const objects=[...((current.pages.find(p=>p.id===originalPage.id)!.canvas.objects||[]) as unknown[])];
       await coverOcrText(canvas.current!,originalPage,regions,objects,{mode:ocr.background,color:ocr.color,padding:ocr.padding,others:textRegions,onProgress:f=>setBusy(`AI filling background… ${Math.round(f*100)}%`)});
       if(pageIdRef.current!==originalPage.id)return;
