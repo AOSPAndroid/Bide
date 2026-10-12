@@ -1,6 +1,6 @@
 import {inkDensity} from '../ocr-weight';
 import {segmentOcrLine,missingLines,type OcrGrouping} from '../ocr-segmentation';
-import {sampleBackground,estimateTextColor,toHex} from '../ocr-image';
+import {sampleBackground,estimateTextColor,toHex,edgeWidth,blurFromEdgeWidth,inkMass} from '../ocr-image';
 import {prepareOcrImage} from './ocr-prepare';
 import {createWorker,PSM,type Worker as OcrEngine,type LoggerMessage} from 'tesseract.js';
 import type {TextRegion} from '../text-regions';
@@ -46,9 +46,10 @@ export async function recognizeImage(image:HTMLCanvasElement,{signal,grouping='s
    for(const part of segmentOcrLine(line,grouping)){
     const b={x0:Math.max(0,Math.floor(part.bbox.x0*sx)),y0:Math.max(0,Math.floor(part.bbox.y0*sy)),x1:Math.min(image.width,Math.ceil(part.bbox.x1*sx)),y1:Math.min(image.height,Math.ceil(part.bbox.y1*sy))},w=b.x1-b.x0,h=b.y1-b.y0;if(w<1||h<1)continue;
     const rgb=sampleBackground(original,b),light=rgb[0]+rgb[1]+rgb[2]>384,ink=estimateTextColor(original,b,rgb);
-    // Per-word stroke coverage lets a bold label and regular value share one line.
-    const words=part.words.length>1?part.words.map(word=>{const x0=Math.max(0,Math.floor(word.bbox.x0*sx)),y0=Math.max(0,Math.floor(word.bbox.y0*sy)),x1=Math.min(image.width,Math.ceil(word.bbox.x1*sx)),y1=Math.min(image.height,Math.ceil(word.bbox.y1*sy));return {text:word.text.trim(),inkDensity:x1>x0&&y1>y0?inkDensity(ctx.getImageData(x0,y0,x1-x0,y1-y0).data,rgb):undefined};}):undefined;
-    regions.push({id:'ocr-'+regions.length,text:part.text,left:b.x0,top:b.y0,width:w,height:h,size:h/.75,baseline:b.y1,fontName:'Image text (font unknown)',bold:false,italic:false,color:ink?toHex(ink):light?'#151515':'#ffffff',kind:'ocr',confidence:part.confidence??line.confidence,background:toHex(rgb),inkDensity:inkDensity(ctx.getImageData(b.x0,b.y0,w,h).data,rgb),words});
+    const edge=edgeWidth(original,b,rgb),blur=edge===undefined?undefined:blurFromEdgeWidth(edge);
+    // Per-word ink lets a bold label and regular value share one line (see ocr-weight.ts).
+    const words=part.words.length>1?part.words.map(word=>{const x0=Math.max(0,Math.floor(word.bbox.x0*sx)),y0=Math.max(0,Math.floor(word.bbox.y0*sy)),x1=Math.min(image.width,Math.ceil(word.bbox.x1*sx)),y1=Math.min(image.height,Math.ceil(word.bbox.y1*sy)),box={x0,y0,x1,y1};return {text:word.text.trim(),width:x1-x0,inkMass:inkMass(original,box,rgb,Math.min(3,Math.ceil((blur??0)*2))),inkDensity:x1>x0&&y1>y0?inkDensity(ctx.getImageData(x0,y0,x1-x0,y1-y0).data,rgb):undefined};}):undefined;
+    regions.push({id:'ocr-'+regions.length,text:part.text,left:b.x0,top:b.y0,width:w,height:h,size:h/.75,baseline:b.y1,fontName:'Image text (font unknown)',bold:false,italic:false,color:ink?toHex(ink):light?'#151515':'#ffffff',kind:'ocr',confidence:part.confidence??line.confidence,background:toHex(rgb),inkDensity:inkDensity(ctx.getImageData(b.x0,b.y0,w,h).data,rgb),words,blur});
    }
   }
   resolve(regions.slice(0,2000));
