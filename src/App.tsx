@@ -1,13 +1,15 @@
 import {isUncertain} from './ocr-regions';
 import {storedOcrLanguages,storeOcrLanguages} from './ocr-languages';
 import TextDetectionBar,{defaultOcrSettings,type OcrSettings} from './TextDetectionBar';
-import {hasScannableContent,scanPageText,detectedTextbox,coverOcrText,aiRemoveSelection,aiSharpenImage,pageInkLevel,glyphEditPatch} from './detected-text';
+import {hasScannableContent,scanPageText,detectedTextbox,coverOcrText,aiRemoveSelection,aiSharpenImage,pageInkLevel} from './detected-text';
+import {planOcrReplacement,lettersNote,type OcrEdit} from './ocr-replace';
+import {readDataUrl,parseProject,imageFilePage,exportPayload} from './project-io';
 import {EditTextDialog,FindReplaceDialog,findMatches,replaceText} from './TextEditDialogs';
 import {Textbox} from './text-appearance';
 import {unlockPdfPage} from './pdf-layer';
 import {thumbnailScale,editorPreviewScale} from './render-budget';
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
-import { Canvas, StaticCanvas, Rect, Ellipse, Line, FabricImage, FabricObject, PencilBrush, Path, Group, ActiveSelection, filters } from 'fabric';
+import { Canvas, Rect, Ellipse, Line, FabricImage, FabricObject, PencilBrush, Path, Group, ActiveSelection, filters } from 'fabric';
 import { LassoSelect, SquareDashed, ArrowDown, ArrowUp, ArrowUpRight, Bold, Check, ChevronDown, ChevronLeft, ChevronRight, Circle, Command, Copy, Download, Eraser, Eye, EyeOff, FileImage, FilePlus2, FileText, FolderOpen, GripVertical, Hand, Highlighter, ImagePlus, Italic, Layers, LockKeyhole, Maximize, Merge, Minus, MoreHorizontal, MousePointer2, PanelLeftClose, PenLine, Plus, Redo2, RotateCw, Save, Scaling, Scissors, Search, Settings2, ShieldCheck, SlidersHorizontal, Sparkles, Square, Trash2, Type, Underline, Undo2, UnlockKeyhole, X, ZoomIn } from 'lucide-react';
 import { autosave, blankPage, demoProject, download, restoreLocal, safeName, uid, type Page, type Project } from './model';
 import Signature from './Signature';
@@ -15,7 +17,7 @@ import { engineHealth, restoreSources, importDocument, exportInBrowser, detectPd
 import PDFPreview from './browser/PDFPreview';
 import { StampForm, CropForm, PasswordForm, type StampOptions, type CropMargins } from './DocumentTools';
 import { selectPages } from './page-range';
-import { blendModes, hasBlending } from './browser/layer-utils';
+import { blendModes } from './browser/layer-utils';
 import Diagrams, {type DiagramCommands, type NativeDiagramCommand} from './Diagrams';
 import {clampZoom, fitZoom, markerColor} from './editor-tools';
 import {searchCommands, commandMetadata, type SearchableCommand} from './command-search';
@@ -25,7 +27,7 @@ import WorkspaceDock, {type Workspace} from './WorkspaceDock';
 import PdfWorkspace, {type PdfTool} from './PdfWorkspace';
 import {PUBLIC_DEMO, DOWNLOAD_URL} from './build-flags';
 import {bundledFonts, systemFonts} from './font-catalog';
-import {ensureFont, ensureDocumentFonts, ensureEmbeddedFont, documentEmbeddedFonts} from './fonts';
+import {ensureFont, ensureDocumentFonts, ensureEmbeddedFont} from './fonts';
 import {selectionMask, rectanglePoints, type SelectionPoint} from './selection-mask';
 import {makeBrush, makeEraserStroke, brushWidth, brushNames, type BrushKind} from './brushes';
 import PageMenu from './PageMenu';
@@ -396,7 +398,7 @@ export default function App() {
     try{
       const url=await pagePreview(original.source,original.index,300/72);
       const blob=await (await fetch(url)).blob();
-      const data=await new Promise<string>((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result as string);reader.onerror=()=>reject(new Error('Could not read the PDF image.'));reader.readAsDataURL(blob);});
+      const data=await readDataUrl(blob);
       const image=await FabricImage.fromURL(data);image.set({left:0,top:0,scaleX:original.width/image.width,scaleY:original.height/image.height,lockMovementX:false,lockMovementY:false,lockScalingX:false,lockScalingY:false,lockRotation:false});
       Object.assign(image,{id:uid(),name:'Original PDF · editable image'});
       if(pageIdRef.current!==original.id)return;const current=capture(),latest=current.pages.find(p=>p.id===original.id);if(latest?.source!==original.source)return;
@@ -419,28 +421,20 @@ export default function App() {
     }catch(e){fail(e);}finally{setBusy('');}
   }
 
-  // Replace every OCR region at once with crisp editable text, as one undo step.
-  // Replace OCR regions in one undo step. With new text and `letters`, a line is
-  // rebuilt from the image's own letters when all of them are available;
-  // otherwise it becomes editable text in the OCR font (as Convert all does).
-  async function replaceOcrRegions(items:{region:TextRegion;text?:string}[],{letters,done}:{letters:boolean;done:(lettersUsed:number,fontUsed:number)=>string}){
+  // Replace OCR regions in one undo step (see ocr-replace.ts).
+  async function replaceOcrRegions(items:OcrEdit[],{letters,done}:{letters:boolean;done:(lettersUsed:number,fontUsed:number)=>string}){
     const regions=items.filter(i=>i.region.kind==='ocr');if(busy||loading.current||!regions.length)return;const originalPage=page,c=canvas.current!;setBusy(`Replacing ${regions.length} text region${regions.length===1?'':'s'}…`);
     try{
-      const pageRegions=pageOcrRegions.current.get(originalPage.id)??textRegions,patches=[],fonts:typeof regions=[];
-      for(const item of regions){const patch=letters&&item.text!==undefined?await glyphEditPatch(c,originalPage,item.region,item.text,pageRegions):undefined;if(patch)patches.push(patch);else fonts.push(item);}
-      if(fonts.length&&ocr.background==='transparent'&&originalPage.source)throw new Error('Unlock Original PDF first to clear scanned text to transparency.');
-      const pageInk=ocr.style==='auto'?await pageInkLevel(pageRegions,ocr.font):undefined,texts=[];
-      for(const item of fonts){const {text}=await detectedTextbox(item.region,{ocrFont:ocr.font,ocrStyle:ocr.style,pageInk,matchBlur:ocr.matchBlur&&regions.length===1});if(item.text!==undefined&&item.text!==item.region.text){text.set({text:item.text});text.initDimensions();}texts.push(text);}
+      const plan=await planOcrReplacement(c,originalPage,regions,{settings:ocr,pageRegions:pageOcrRegions.current.get(originalPage.id)??textRegions,others:textRegions,letters});
       if(pageIdRef.current!==originalPage.id)return;const current=capture();const objects=[...((current.pages.find(p=>p.id===originalPage.id)!.canvas.objects||[]) as unknown[])];
-      if(fonts.length)await coverOcrText(c,originalPage,fonts.map(f=>f.region),objects,{mode:ocr.background,color:ocr.color,padding:ocr.padding,others:textRegions,onProgress:f=>setBusy(`AI filling background… ${Math.round(f*100)}%`)});
+      await plan.apply(objects,f=>setBusy(`AI filling background… ${Math.round(f*100)}%`));
       if(pageIdRef.current!==originalPage.id)return;
-      objects.push(...patches.map(p=>p.toObject()),...texts.map(t=>t.toObject()));setTool('select');setTextRegions([]);
-      commit({...current,pages:current.pages.map(p=>p.id===originalPage.id?{...p,color:fonts.length&&ocr.background==='transparent'?'transparent':p.color,canvas:{...p.canvas,objects},thumb:undefined}:p)},true);
-      notify(done(patches.length,texts.length));
+      setTool('select');setTextRegions([]);
+      commit({...current,pages:current.pages.map(p=>p.id===originalPage.id?{...p,color:plan.transparent?'transparent':p.color,canvas:{...p.canvas,objects},thumb:undefined}:p)},true);
+      notify(done(plan.letters,plan.fonts));
     }catch(e){fail(e);}finally{setBusy('');}
   }
   const convertAllDetectedText=()=>replaceOcrRegions(textRegions.filter(r=>r.kind==='ocr').map(region=>({region})),{letters:false,done:(_,n)=>`${n} text regions are now crisp editable text. Undo restores the original.`});
-  const lettersNote=(letters:number,fonts:number)=>letters&&!fonts?'Edited with the image\'s own letters. Undo restores the original.':letters?`${letters} line${letters===1?'':'s'} edited with the image's own letters; ${fonts} needed letters not found on the page and use the OCR font.`:'Some letters do not appear on the page, so the OCR font was used. Check font and spacing.';
   const editRegionText=(region:TextRegion,text:string)=>{setTextEdit(null);void replaceOcrRegions([{region,text}],{letters:true,done:lettersNote});};
   const findAndReplace=(find:string,replacement:string,matchCase:boolean)=>{setFindOpen(false);const matches=findMatches(textRegions,find,matchCase);void replaceOcrRegions(matches.map(region=>({region,text:replaceText(region.text,find,replacement,matchCase)})),{letters:ocr.editMode==='letters',done:(l,f)=>`Replaced in ${l+f} line${l+f===1?'':'s'}. `+(ocr.editMode==='letters'?lettersNote(l,f):'Undo restores the original.')});};
 
@@ -501,7 +495,7 @@ export default function App() {
   function addText() { addObject(new Textbox('Your text', { left: 60, top: 90, width: 300, fontSize: 32, fill: color, fontFamily: textFont.current }), 'Text box'); }
   async function addImage(file: File | string, name = 'Image') {
     try {
-      const url = typeof file === 'string' ? file : await new Promise<string>((resolve,reject) => { const r = new FileReader(); r.onload = () => resolve(r.result as string); r.onerror = reject; r.readAsDataURL(file); });
+      const url = typeof file === 'string' ? file : await readDataUrl(file);
       const image = await FabricImage.fromURL(url);
       image.scale(Math.min((page.width-100)/image.width,(page.height-120)/image.height,1));
       image.set({ left: (page.width-image.getScaledWidth())/2, top: (page.height-image.getScaledHeight())/2 });
@@ -537,11 +531,7 @@ export default function App() {
     openedByUser.current=true;
     setBusy('Opening project…');
     try {
-      const data = JSON.parse(await file.text()) as Project;
-      if (data.version !== 1 || !Array.isArray(data.pages) || !data.pages.length || !data.sources || data.pages.some(p => !p.id || !p.canvas || !Number.isFinite(p.width) || !Number.isFinite(p.height) || p.width <= 0 || p.height <= 0 || p.width > 14400 || p.height > 14400)) throw new Error('This is not a valid bide project.');
-      // Restored canvas images must be embedded, never fetched from the network.
-      const validate = (value: unknown): void => { if (!value || typeof value !== 'object') return; for (const [key,v] of Object.entries(value)) { if (key === 'src' && typeof v === 'string' && !v.startsWith('data:image/')) throw new Error('Project images must be embedded.'); if (typeof v === 'object') validate(v); } };
-      data.pages.forEach(p => validate(p.canvas));
+      const data = parseProject(await file.text());
       if(Object.keys(data.sources).length)await restoreSources(data.sources);
       commit(data,true); setPageId(data.pages[0].id); notify('Project opened.');
     } catch(e) { fail(e); } finally { setBusy(''); }
@@ -574,15 +564,7 @@ export default function App() {
           const result = await importPsd(file); pages.push(result.page); notices.push(result.notice); continue;
         }
         if (/\.(png|jpe?g|webp)$/i.test(file.name)) {
-          const data = await new Promise<string>((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result as string); reader.onerror = reject; reader.readAsDataURL(file); });
-          const image = await FabricImage.fromURL(data);
-          const ratio = Math.min(1, 5000 / Math.max(image.width, image.height));
-          image.scale(ratio);
-          Object.assign(image, { id: uid(), name: file.name });
-          const p = blankPage(image.width * ratio, image.height * ratio);
-          p.name = file.name.replace(/\.[^.]+$/, '');
-          p.canvas = { objects: [image.toObject()] };
-          pages.push(p);
+          pages.push(await imageFilePage(file));
           continue;
         }
         if (/\.(docx?|xlsx?|pptx?|odt|ods|odp|rtf)$/i.test(file.name)) setBusy('Loading Office engine & converting locally… First use loads the bundled Office engine.');
@@ -597,27 +579,6 @@ export default function App() {
     } catch(e) { fail(e); } finally { setBusy(''); }
   }
   function openFiles(append = false) { importMode.current = append ? 'append' : 'open'; fileInput.current?.click(); }
-  async function payload() {
-    const current = capture();
-    const pages = [];
-    for (const p of current.pages) {
-      const c = new StaticCanvas(undefined, { width: p.width, height: p.height, backgroundColor: p.source ? '' : p.color });
-      try {
-        await ensureDocumentFonts(p.canvas);
-        await c.loadFromJSON(p.canvas);
-        for(const object of c.getObjects()){const o=object as Obj;if(o instanceof Textbox&&(o as Obj).pdfFontData&&o.fontFamily.startsWith('PDFfont-')&&!await fontSupportsText((o as Obj).pdfFontData!,o.text)){const family=(o as Obj).pdfFontFallback||'Lato';await ensureFont(family);o.set({fontFamily:family,...pdfFallbackStyle(o as Obj)});o.initDimensions();}}
-        c.backgroundColor = p.source ? '' : p.color;
-        let svg = c.toSVG({ width: String(p.width), height: String(p.height), viewBox: { x:0,y:0,width:p.width,height:p.height } });
-        if (hasBlending(c.getObjects())) {
-          const png = c.toDataURL({ format: 'png', multiplier: Math.min(2, 4096 / Math.max(p.width, p.height)) });
-          svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${p.width}" height="${p.height}"><image href="${png}" width="${p.width}" height="${p.height}"/></svg>`;
-        }
-        pages.push({ width: p.width, height: p.height, source: p.source, index: p.index, svg, fonts:documentEmbeddedFonts(p.canvas) });
-      }
-      finally { await c.dispose(); }
-    }
-    return { pages, title: current.name };
-  }
   async function runExport(options?: { targetId?: string; format?: string; rotation?: number; range?: string; reimport?: boolean; crop?: CropMargins }) {
     const targetId = options?.targetId || pageId;
     setBusy(options?.reimport ? 'Updating page…' : 'Preparing your export…');
@@ -629,7 +590,7 @@ export default function App() {
         setModal(null); notify(needsFlattenedPsd(canvas.current?.getObjects()||[])?'PSD exported as a merged appearance to preserve erasing. Save .bide to retain editable layers.':'PSD exported with raster layers and supported groups. Save .bide to retain editable text and masks.'); return;
       }
       if (protect && format === 'pdf' && !options?.reimport && (!exportPassword || exportPassword !== passwordConfirmation)) throw new Error('Enter and confirm the same non-empty PDF password.');
-      const body = { ...await payload(), format, compression, range, dpi, ...options, ...(options?.reimport ? { compression: 'lossless' } : {}), password: !options?.reimport && format === 'pdf' && protect ? exportPassword : undefined };
+      const body = { ...await exportPayload(capture()), format, compression, range, dpi, ...options, ...(options?.reimport ? { compression: 'lossless' } : {}), password: !options?.reimport && format === 'pdf' && protect ? exportPassword : undefined };
       const blob = await exportInBrowser(body);
       if (options?.reimport) {
         const result = await importDocument(new File([blob], 'rotated.pdf'));
