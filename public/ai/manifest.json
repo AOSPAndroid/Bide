@@ -5,7 +5,12 @@
    "bytes": 208044816,
    "sha256": "1faef5301d78db7dda502fe59966957ec4b79dd64e16f03ed96913c7a4eb68d6",
    "license": "Apache-2.0",
-   "source": "https://huggingface.co/Carve/LaMa-ONNX"
+   "source": "https://huggingface.co/Carve/LaMa-ONNX",
+   "convert": "fp16-weights",
+   "output": {
+    "bytes": 106295753,
+    "sha256": "a4770bfa878f39f34110c9f806d3c8227c5f006c61ce1cf56736cb6efbfeda22"
+   }
   },
   "realesr-general-x4v3.onnx": {
    "url": "https://huggingface.co/CoderViking/realesr-general-x4v3-onnx/resolve/c6a971706797c7502945a2b4c4274fce4900d4ab/realesr-general-x4v3.onnx",
