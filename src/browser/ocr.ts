@@ -53,14 +53,21 @@ export async function recognizeImage(image:HTMLCanvasElement,{signal,grouping='s
   sx=image.width/prepared.width;sy=image.height/prepared.height;
   }
   const ctx=image.getContext('2d')!,original=ctx.getImageData(0,0,image.width,image.height),regions:TextRegion[]=[];
+  const scaleBox=(bb:{x0:number;y0:number;x1:number;y1:number})=>({x0:Math.max(0,Math.floor(bb.x0*sx)),y0:Math.max(0,Math.floor(bb.y0*sy)),x1:Math.min(image.width,Math.ceil(bb.x1*sx)),y1:Math.min(image.height,Math.ceil(bb.y1*sy))});
   for(const line of lines){
+   // Every word of the full line is measured once, so weights can be judged
+   // against the rest of the line even when a region holds a single word.
+   const lineWords=segmentOcrLine(line,'words'),lineBox=scaleBox(line.bbox),lineBg=sampleBackground(original,lineBox),lineEdge=edgeWidth(original,lineBox,lineBg),pad=Math.min(3,Math.ceil((lineEdge===undefined?0:blurFromEdgeWidth(lineEdge))*2));
+   const measured=lineWords.map(g=>{const box=scaleBox(g.bbox);return {text:g.text,width:box.x1-box.x0,inkMass:inkMass(original,box,lineBg,pad),inkDensity:box.x1>box.x0&&box.y1>box.y0?inkDensity(ctx.getImageData(box.x0,box.y0,box.x1-box.x0,box.y1-box.y0).data,lineBg):undefined};});
    for(const part of segmentOcrLine(line,grouping)){
+    const start=part.words.length?lineWords.findIndex(g=>g.bbox.x0===part.words[0].bbox.x0&&g.bbox.y0===part.words[0].bbox.y0):-1;
+    const lineContext=measured.length>1&&start>=0?{words:measured,start,count:part.words.length}:undefined;
     const b={x0:Math.max(0,Math.floor(part.bbox.x0*sx)),y0:Math.max(0,Math.floor(part.bbox.y0*sy)),x1:Math.min(image.width,Math.ceil(part.bbox.x1*sx)),y1:Math.min(image.height,Math.ceil(part.bbox.y1*sy))},w=b.x1-b.x0,h=b.y1-b.y0;if(w<1||h<1)continue;
     const rgb=sampleBackground(original,b),light=rgb[0]+rgb[1]+rgb[2]>384,ink=estimateTextColor(original,b,rgb);
     const edge=edgeWidth(original,b,rgb),blur=edge===undefined?undefined:blurFromEdgeWidth(edge);
     // Per-word ink lets a bold label and regular value share one line (see ocr-weight.ts).
     const words=part.words.length>1?part.words.map(word=>{const x0=Math.max(0,Math.floor(word.bbox.x0*sx)),y0=Math.max(0,Math.floor(word.bbox.y0*sy)),x1=Math.min(image.width,Math.ceil(word.bbox.x1*sx)),y1=Math.min(image.height,Math.ceil(word.bbox.y1*sy)),box={x0,y0,x1,y1};return {text:word.text.trim(),width:x1-x0,inkMass:inkMass(original,box,rgb,Math.min(3,Math.ceil((blur??0)*2))),inkDensity:x1>x0&&y1>y0?inkDensity(ctx.getImageData(x0,y0,x1-x0,y1-y0).data,rgb):undefined};}):undefined;
-    regions.push({id:'ocr-'+regions.length,text:part.text,left:b.x0,top:b.y0,width:w,height:h,size:h/.75,baseline:b.y1,fontName:'Image text (font unknown)',bold:false,italic:false,color:ink?toHex(ink):light?'#151515':'#ffffff',kind:'ocr',confidence:part.confidence??line.confidence,background:toHex(rgb),inkDensity:inkDensity(ctx.getImageData(b.x0,b.y0,w,h).data,rgb),words,blur});
+    regions.push({id:'ocr-'+regions.length,text:part.text,left:b.x0,top:b.y0,width:w,height:h,size:h/.75,baseline:b.y1,fontName:'Image text (font unknown)',bold:false,italic:false,color:ink?toHex(ink):light?'#151515':'#ffffff',kind:'ocr',confidence:part.confidence??line.confidence,background:toHex(rgb),inkDensity:inkDensity(ctx.getImageData(b.x0,b.y0,w,h).data,rgb),words,blur,line:lineContext});
    }
   }
   resolve(regions.slice(0,2000));

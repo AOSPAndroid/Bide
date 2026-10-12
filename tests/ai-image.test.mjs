@@ -34,3 +34,16 @@ test('line band keeps accents but drops the neighbouring line in a padded box',(
  const rows=[3,3,3,3,0,0,0,0,2,0,...Array(10).fill(9),0,0,0,0,4,4,4,4];
  assert.deepEqual(inkBand(rows,14),{x0:8,x1:20});assert.deepEqual(inkBand(rows,9),{x0:8,x1:20},'centre on an empty row snaps to ink');
 });
+test('bilinear resize keeps flat colours, aligns pixel centres and interpolates',async()=>{
+ const {resizeBilinear}=await import('../tmp/ai-image.mjs');
+ const flat=resizeBilinear(new Uint8ClampedArray(4*4).fill(200),2,2,5,3);assert.ok(flat.every(v=>v===200));
+ const ramp=resizeBilinear([0,0,0,255, 255,255,255,255],2,1,4,1);assert.deepEqual([...ramp].filter((_,i)=>i%4===0),[0,64,191,255]);
+ assert.deepEqual([...resizeBilinear([10,20,30,40],1,1,2,2)],[10,20,30,40,10,20,30,40,10,20,30,40,10,20,30,40]);
+});
+test('word boundaries snap to the nearest real gap between words',async()=>{
+ const {snapToGap}=await import('../tmp/ai-image.mjs');
+ // "Daliil" ink 0-29, 1-px letter gaps, a 5-px space, then "R..." from 35.
+ const cols=Array.from({length:60},(_,x)=>x<30?(x%6===5?0:3):x<35?0:3);
+ assert.equal(snapToGap(cols,36,3,13),32,'boundary inside R moves back to the space (blank 29-34)');
+ assert.equal(snapToGap(cols,20,3,13),32);assert.equal(snapToGap(cols,58,3,5),58,'no gap within reach: unchanged');
+});

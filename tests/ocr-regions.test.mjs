@@ -35,3 +35,10 @@ test('a bold label keeps its weight next to a regular value',async()=>{
  // Unknown punctuation follows its neighbour: the bold amount's symbol stays bold.
  assert.deepEqual(mixedWeights(['Prix','1','284,99','€','taxes'].map(text=>({text})),[false,true,true,undefined,false]).ranges,[{start:5,end:15,bold:true}]);
 });
+test('the cleanup margin stops at neighbouring lines and words',()=>{
+ const line={left:10,top:100,width:300,height:14},below={left:10,top:115,width:280,height:14},above={left:12,top:85,width:200,height:14},next={left:313,top:100,width:40,height:14},far={left:400,top:300,width:20,height:10};
+ assert.deepEqual(ocrPatchBounds(line,-1,{width:500,height:500},[below,above,next,far]),{left:8,top:99,width:304,height:16},'stops at the line above (99), the line below (115) and the next word (312 inside its 313 edge)');
+ assert.deepEqual(ocrPatchBounds(line,-1,{width:500,height:500}),{left:8,top:98,width:304,height:18},'no neighbours: unchanged');
+ const overlapping={left:10,top:112,width:280,height:14};
+ assert.equal(ocrPatchBounds(line,-1,{width:500,height:500},[overlapping]).height,112-98,'a next line overlapping our descenders still stops the patch');
+});

@@ -29,3 +29,12 @@ test('per-word ink picks out a bold label even when blur hides stroke width',asy
  assert.deepEqual(classifyWordWeights([word('Titre',true,.95),word('entièrement',true,.95)],false).bold,[true,true]);
  assert.equal(classifyWordWeights([word('Titre',true),undefined],false).bold[1],undefined,'unmeasured words stay undefined');
 });
+test('the page ink level settles a single-weight line that blur leaves ambiguous',async()=>{
+ const {classifyWordWeights,wordInk}=await import('../tmp/ocr-weight.mjs');
+ const word=(text,bold,ink=.9)=>{const n=[...text].length,reg={area:10*n,width:8*n},hv={area:14.5*n,width:9*n};return wordInk(text,(bold?14.5:10)*n*ink,(bold?9:8)*n,reg,hv);};
+ const regularLine=[word('Tout',false),word('regular',false),word('sans',false)];
+ assert.deepEqual(classifyWordWeights(regularLine,true).bold,[true,true,true],'the line-level guess alone says bold');
+ assert.deepEqual(classifyWordWeights(regularLine,true,.9).bold,[false,false,false],'page ink 0.9 matches the regular reading');
+ const boldLine=[word('Titre',true),word('épais',true)];
+ assert.deepEqual(classifyWordWeights(boldLine,false,.9).bold,[true,true]);
+});

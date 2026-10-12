@@ -19,9 +19,24 @@ export function unconvertedRegions(regions:TextRegion[],layers:{recognizedKey?:s
 }
 
 // Area cleared or patched under replaced OCR text; padding < 0 means automatic.
-export function ocrPatchBounds(region:Bounds,padding:number,page:{width:number;height:number}):Bounds{
- const pad=padding<0?Math.max(2,region.height*.1):padding,left=Math.max(0,region.left-pad),top=Math.max(0,region.top-pad);
- return {left,top,width:Math.min(page.width,region.left+region.width+pad)-left,height:Math.min(page.height,region.top+region.height+pad)-top};
+// The margin stops at neighbouring text (`others`), so tightly spaced lines and
+// adjacent words are never clipped by the patch.
+export function ocrPatchBounds(region:Bounds,padding:number,page:{width:number;height:number},others:Bounds[]=[]):Bounds{
+ const pad=padding<0?Math.max(2,region.height*.1):padding;
+ let left=Math.max(0,region.left-pad),top=Math.max(0,region.top-pad),right=Math.min(page.width,region.left+region.width+pad),bottom=Math.min(page.height,region.top+region.height+pad);
+ const rx1=region.left+region.width,ry1=region.top+region.height;
+ for(const o of others){
+  const ox1=o.left+o.width,oy1=o.top+o.height,overlapX=o.left<rx1&&ox1>region.left,overlapY=o.top<ry1&&oy1>region.top;
+  // Lines can overlap by a pixel or two (descenders over the next line's
+  // ascenders): a box starting in our lower half is the next line, one ending
+  // in our upper half the previous one; the patch stops at their edge.
+  const mid=region.top+region.height/2;
+  if(overlapX&&(oy1<=region.top||(o.top<region.top&&oy1<=mid)))top=Math.max(top,oy1);
+  if(overlapX&&(o.top>=ry1||(oy1>ry1&&o.top>=mid)))bottom=Math.min(bottom,o.top);
+  if(overlapY&&ox1<=region.left)left=Math.max(left,ox1);
+  if(overlapY&&o.left>=rx1)right=Math.min(right,o.left);
+ }
+ return {left,top,width:right-left,height:bottom-top};
 }
 
 // Below this Tesseract confidence a region is flagged for proofreading.

@@ -108,3 +108,31 @@ export function inkBand(rows:ArrayLike<number>,center:number,maxGap=2,min=.5){
  for(let gap=0,y=c+1;y<rows.length&&gap<=maxGap;y++){if(has(y)){b=y;gap=0;}else gap++;}
  return {x0:a,x1:b+1};
 }
+
+// Bilinear resize of RGBA pixels with pixel-centre alignment. Used instead of
+// canvas scaling for model inputs: browsers' smoothing filters differ and soften
+// thin strokes, which made the recognizer read "ii" as "i".
+export function resizeBilinear(src:ArrayLike<number>,sw:number,sh:number,dw:number,dh:number){
+ const out=new Uint8ClampedArray(dw*dh*4);
+ for(let y=0;y<dh;y++){
+  const fy=Math.min(sh-1,Math.max(0,(y+.5)*sh/dh-.5)),y0=Math.floor(fy),y1=Math.min(sh-1,y0+1),ay=fy-y0;
+  for(let x=0;x<dw;x++){
+   const fx=Math.min(sw-1,Math.max(0,(x+.5)*sw/dw-.5)),x0=Math.floor(fx),x1=Math.min(sw-1,x0+1),ax=fx-x0,o=(y*dw+x)*4;
+   for(let c=0;c<4;c++){const a=src[(y0*sw+x0)*4+c],b=src[(y0*sw+x1)*4+c],d=src[(y1*sw+x0)*4+c],e=src[(y1*sw+x1)*4+c];out[o+c]=(a*(1-ax)+b*ax)*(1-ay)+(d*(1-ax)+e*ax)*ay;}
+  }
+ }
+ return out;
+}
+
+// Move a word boundary from the recognizer's timing estimate to the centre of
+// the nearest blank column run of at least `minGap` (the real space between
+// words); a boundary inside a letter would clip it when the old word is covered.
+export function snapToGap(columns:ArrayLike<number>,x:number,minGap:number,maxDistance:number,min=.5){
+ let best:number|undefined,bestDistance=Infinity,run=0;
+ for(let i=0;i<=columns.length;i++){
+  if(i<columns.length&&columns[i]<min){run++;continue;}
+  if(run>=minGap){const centre=i-run/2,distance=Math.abs(centre-x);if(distance<=maxDistance&&distance<bestDistance){best=centre;bestDistance=distance;}}
+  run=0;
+ }
+ return best??x;
+}

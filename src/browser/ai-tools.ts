@@ -1,12 +1,12 @@
 // Real-ESRGAN upscaling, LaMa inpainting and PaddleOCR recognition on canvases.
 import {runModel} from './ai';
-import {tilePlan,toPlanar,dbBoxes,ctcDecode,ctcWords,trimToInk,inkBand,inpaintWindows,type Rect} from '../ai-image';
+import {tilePlan,toPlanar,dbBoxes,ctcDecode,ctcWords,trimToInk,inkBand,inpaintWindows,resizeBilinear,snapToGap,type Rect} from '../ai-image';
 
 type Progress=(fraction:number)=>void;
 const canvas=(width:number,height:number)=>Object.assign(document.createElement('canvas'),{width,height});
 const context=(c:HTMLCanvasElement)=>c.getContext('2d',{willReadFrequently:true})!;
-function scaled(source:CanvasImageSource,sx:number,sy:number,sw:number,sh:number,width:number,height:number){
- const out=canvas(width,height),ctx=context(out);ctx.imageSmoothingQuality='high';ctx.drawImage(source,sx,sy,sw,sh,0,0,width,height);return out;
+function scaled(source:CanvasImageSource,sx:number,sy:number,sw:number,sh:number,width:number,height:number,quality:ImageSmoothingQuality='high'){
+ const out=canvas(width,height),ctx=context(out);ctx.imageSmoothingQuality=quality;ctx.drawImage(source,sx,sy,sw,sh,0,0,width,height);return out;
 }
 
 // Real-ESRGAN (general x4v3) on 128px tiles. factor 2 renders at 4x and halves,
@@ -60,7 +60,7 @@ export async function paddleOcr(source:HTMLCanvasElement,onProgress?:Progress,si
  const dict=await(dictionary??=fetch(new URL('ai/models/ppocr-latin-dict.json',document.baseURI)).then(r=>{if(!r.ok)throw new Error('PaddleOCR dictionary is not bundled with this build.');return r.json();}).catch(e=>{dictionary=undefined;throw e;}));
  const {width,height}=source,src=context(source).getImageData(0,0,width,height);
  const scale=Math.min(1,1600/Math.max(width,height)),dw=Math.max(32,Math.round(width*scale/32)*32),dh=Math.max(32,Math.round(height*scale/32)*32);
- const detInput=context(scaled(source,0,0,width,height,dw,dh)).getImageData(0,0,dw,dh);
+ const detInput={data:resizeBilinear(src.data,width,height,dw,dh)};
  const prob=(await runModel('ppocr-det',{x:{data:toPlanar(detInput.data,dw,dh,{mean:[.485,.456,.406],std:[.229,.224,.225],bgr:true}),dims:[1,3,dh,dw]}},signal));
  const boxes=dbBoxes(Object.values(prob)[0].data,dw,dh),lines:AiOcrLine[]=[];onProgress?.(.1);
  for(const [k,b] of boxes.entries()){
@@ -69,7 +69,9 @@ export async function paddleOcr(source:HTMLCanvasElement,onProgress?:Progress,si
   const margin=(b.y1-b.y0)*height/dh*.25;
   const x0=Math.max(0,Math.floor(b.x0*width/dw-margin)),y0=Math.max(0,Math.floor(b.y0*height/dh)),x1=Math.min(width,Math.ceil(b.x1*width/dw+margin)),y1=Math.min(height,Math.ceil(b.y1*height/dh)),w=x1-x0,h=y1-y0;
   if(w<4||h<4)continue;
-  const rw=Math.max(16,Math.min(3200,Math.round(w*48/h))),crop=context(scaled(source,x0,y0,w,h,rw,48)).getImageData(0,0,rw,48);
+  const rw=Math.max(16,Math.min(3200,Math.round(w*48/h))),region=new Uint8ClampedArray(w*h*4);
+  for(let y=0;y<h;y++)region.set(src.data.subarray(((y0+y)*width+x0)*4,((y0+y)*width+x1)*4),y*w*4);
+  const crop={data:resizeBilinear(region,w,h,rw,48)};
   const out=Object.values(await runModel('ppocr-latin-rec',{x:{data:toPlanar(crop.data,rw,48,{mean:[.5,.5,.5],std:[.5,.5,.5],bgr:true}),dims:[1,3,48,rw]}},signal))[0];
   const [,steps,classes]=out.dims,decoded=ctcDecode(out.data,steps,classes,dict);
   if(decoded.text){
@@ -80,7 +82,17 @@ export async function paddleOcr(source:HTMLCanvasElement,onProgress?:Progress,si
    const corner=(y0*width+x0)*4,bg=[src.data[corner],src.data[corner+1],src.data[corner+2]],columns=new Float32Array(w),rows=new Float32Array(h);
    for(let y=y0;y<y1;y++)for(let x=x0;x<x1;x++){const i=(y*width+x)*4,ink=Math.max(Math.abs(src.data[i]-bg[0]),Math.abs(src.data[i+1]-bg[1]),Math.abs(src.data[i+2]-bg[2]))>60?1:0;columns[x-x0]+=ink;rows[y-y0]+=ink;}
    const vertical=inkBand(rows,((b.y0+b.y1)/2)*height/dh-y0),top=y0+vertical.x0,bottom=y0+vertical.x1;
-   const words=ctcWords(decoded.chars,rw/steps,rw).map(word=>{const t=trimToInk(columns,word.x0*w/rw,word.x1*w/rw);return {text:word.text,confidence:word.confidence,bbox:{x0:x0+t.x0,y0:top,x1:x0+t.x1,y1:bottom}};});
+   // Word edges: snap boundaries to the blank gap between words, trim to ink,
+   // then give each word its own inked rows (a word without descenders must
+   // not inherit the line's full height, or its replacement is sized too big).
+   const lineHeight=bottom-top,gap=Math.max(2,Math.round(lineHeight*.15)),raw=ctcWords(decoded.chars,rw/steps,rw);
+   const edges=raw.map((word,i)=>({x0:i?snapToGap(columns,word.x0*w/rw,gap,lineHeight):word.x0*w/rw,x1:i<raw.length-1?snapToGap(columns,word.x1*w/rw,gap,lineHeight):word.x1*w/rw}));
+   const words=raw.map((word,i)=>{
+    const t=trimToInk(columns,edges[i].x0,edges[i].x1),wordRows=new Float32Array(h);
+    for(let y=top;y<bottom;y++)for(let x=x0+t.x0;x<x0+t.x1;x++){const p=(y*width+x)*4;wordRows[y-y0]+=Math.max(Math.abs(src.data[p]-bg[0]),Math.abs(src.data[p+1]-bg[1]),Math.abs(src.data[p+2]-bg[2]))>60?1:0;}
+    const v=trimToInk(wordRows,top-y0,bottom-y0);
+    return {text:word.text,confidence:word.confidence,bbox:{x0:x0+t.x0,y0:y0+v.x0,x1:x0+t.x1,y1:y0+v.x1}};
+   });
    lines.push({text:decoded.text,confidence:decoded.confidence*100,bbox:{x0:words.length?Math.min(...words.map(w=>w.bbox.x0)):x0,y0:top,x1:words.length?Math.max(...words.map(w=>w.bbox.x1)):x1,y1:bottom},words});
   }
   onProgress?.(.1+.9*(k+1)/boxes.length);

@@ -1,7 +1,7 @@
 import {isUncertain} from './ocr-regions';
 import {storedOcrLanguages,storeOcrLanguages} from './ocr-languages';
 import TextDetectionBar,{defaultOcrSettings,type OcrSettings} from './TextDetectionBar';
-import {hasScannableContent,scanPageText,detectedTextbox,coverOcrText,aiRemoveSelection,aiSharpenImage} from './detected-text';
+import {hasScannableContent,scanPageText,detectedTextbox,coverOcrText,aiRemoveSelection,aiSharpenImage,pageInkLevel} from './detected-text';
 import {Textbox} from './text-appearance';
 import {unlockPdfPage} from './pdf-layer';
 import {thumbnailScale,editorPreviewScale} from './render-budget';
@@ -427,11 +427,11 @@ export default function App() {
   async function editDetectedText(region:TextRegion){
     if(busy||loading.current)return;const originalPage=page;setBusy('Making text editable…');
     try{if(region.kind==='ocr'&&ocr.background==='transparent'&&originalPage.source)throw new Error('Unlock Original PDF first to clear scanned text to transparency.');
-      const {text,embedded}=await detectedTextbox(region,{ocrFont:ocr.font,ocrStyle:ocr.style,matchBlur:ocr.matchBlur});
+      const {text,embedded}=await detectedTextbox(region,{ocrFont:ocr.font,ocrStyle:ocr.style,matchBlur:ocr.matchBlur,pageInk:ocr.style==='auto'?await pageInkLevel(textRegions,ocr.font):undefined});
       let nextSource=originalPage.source,nextData:string|undefined;
       if(region.kind==='pdf'&&originalPage.source){const result=await removePdfText(originalPage.source,originalPage.index,region.id);nextSource=result.id;nextData=result.data;}
       if(pageIdRef.current!==originalPage.id)return;const current=capture();const objects=[...((current.pages.find(p=>p.id===originalPage.id)!.canvas.objects||[]) as unknown[])];
-      if(region.kind==='ocr')await coverOcrText(canvas.current!,originalPage,[region],objects,{mode:ocr.background,color:ocr.color,padding:ocr.padding,onProgress:f=>setBusy(`AI filling background… ${Math.round(f*100)}%`)});
+      if(region.kind==='ocr')await coverOcrText(canvas.current!,originalPage,[region],objects,{mode:ocr.background,color:ocr.color,padding:ocr.padding,others:textRegions,onProgress:f=>setBusy(`AI filling background… ${Math.round(f*100)}%`)});
       if(pageIdRef.current!==originalPage.id)return;
       objects.push(text.toObject());pendingTextEdit.current=text.id;setTool('select');setTextRegions([]);commit({...current,sources:nextData&&nextSource?{...current.sources,[nextSource]:nextData}:current.sources,pages:current.pages.map(p=>p.id===originalPage.id?{...p,source:nextSource,color:region.kind==='ocr'&&ocr.background==='transparent'?'transparent':p.color,canvas:{...p.canvas,objects},thumb:undefined}:p)},true);
       notify(region.kind==='ocr'?(ocr.background==='transparent'?'Old image text cleared to transparency. Undo restores the cleared area.':'OCR text is editable. Check recognition, font and background patch.'):embedded?'Editing with the embedded PDF font.':'Text is editable using a matching bundled font.');
@@ -442,9 +442,9 @@ export default function App() {
   async function convertAllDetectedText(){
     const regions=textRegions.filter(r=>r.kind==='ocr');if(busy||loading.current||!regions.length)return;const originalPage=page;setBusy(`Converting ${regions.length} text regions…`);
     try{if(ocr.background==='transparent'&&originalPage.source)throw new Error('Unlock Original PDF first to clear scanned text to transparency.');
-      const texts=[];for(const region of regions)texts.push((await detectedTextbox(region,{ocrFont:ocr.font,ocrStyle:ocr.style})).text);
+      const pageInk=ocr.style==='auto'?await pageInkLevel(regions,ocr.font):undefined,texts=[];for(const region of regions)texts.push((await detectedTextbox(region,{ocrFont:ocr.font,ocrStyle:ocr.style,pageInk})).text);
       if(pageIdRef.current!==originalPage.id)return;const current=capture();const objects=[...((current.pages.find(p=>p.id===originalPage.id)!.canvas.objects||[]) as unknown[])];
-      await coverOcrText(canvas.current!,originalPage,regions,objects,{mode:ocr.background,color:ocr.color,padding:ocr.padding,onProgress:f=>setBusy(`AI filling background… ${Math.round(f*100)}%`)});
+      await coverOcrText(canvas.current!,originalPage,regions,objects,{mode:ocr.background,color:ocr.color,padding:ocr.padding,others:textRegions,onProgress:f=>setBusy(`AI filling background… ${Math.round(f*100)}%`)});
       if(pageIdRef.current!==originalPage.id)return;
       objects.push(...texts.map(t=>t.toObject()));setTool('select');setTextRegions([]);commit({...current,pages:current.pages.map(p=>p.id===originalPage.id?{...p,color:ocr.background==='transparent'?'transparent':p.color,canvas:{...p.canvas,objects},thumb:undefined}:p)},true);
       notify(`${regions.length} text regions are now crisp editable text. Undo restores the original.`);

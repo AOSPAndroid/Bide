@@ -45,7 +45,9 @@ export function wordInk(text:string,mass:number,width:number,regular:{area:numbe
 // A bold/regular split must explain the line much better than one weight;
 // otherwise `uniformBold` (the line-level estimate) decides. `ink` is the ink
 // level as a fraction of full contrast. Unmeasured words stay undefined.
-export function classifyWordWeights(words:(WordInk|undefined)[],uniformBold:boolean):{bold:(boolean|undefined)[];ink?:number}{
+// `pageInk` (from mixed lines elsewhere on the page) settles single-weight lines
+// when the line itself cannot: the reading whose ink level matches it wins.
+export function classifyWordWeights(words:(WordInk|undefined)[],uniformBold:boolean,pageInk?:number):{bold:(boolean|undefined)[];ink?:number}{
  const measured=words.map((w,i)=>({w,i})).filter((x):x is {w:WordInk;i:number}=>!!x.w&&[...x.w.ink,...x.w.scale].every(v=>Number.isFinite(v)&&v>0));
  // Single characters (€, 1, /) are too noisy to steer the fit; they are
  // assigned afterwards to whichever reading matches the line's ink level.
@@ -57,6 +59,10 @@ export function classifyWordWeights(words:(WordInk|undefined)[],uniformBold:bool
  // contrast is impossible, so the line is bold.
  let best=fit(known.map(()=>uniformBold));
  if(known.length&&!uniformBold&&level(best)>1.1&&level(fit(known.map(()=>true)))<=1.1)best=fit(known.map(()=>true));
+ else if(known.length&&pageInk!==undefined){
+  const regular=fit(known.map(()=>false)),heavy=fit(known.map(()=>true)),dr=Math.abs(Math.log(level(regular)/pageInk)),db=Math.abs(Math.log(level(heavy)/pageInk));
+  if(Math.abs(dr-db)>.1)best=dr<db?regular:heavy;
+ }
  const order=known.map((_,j)=>j).sort((a,b)=>known[b].w.ink[0]-known[a].w.ink[0]);
  for(let n=1;n<order.length;n++){
   const labels=known.map((_,j)=>order.indexOf(j)<n),boldChars=known.reduce((s,{w},j)=>s+(labels[j]?w.chars:0),0);
