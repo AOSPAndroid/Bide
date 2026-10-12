@@ -6,7 +6,7 @@ A Photopea-inspired visual editor, PDF toolkit, and bundled draw.io diagram edit
 
 ## Start on Windows
 
-1. Get the [prebuilt bide-browser.zip](https://github.com/AOSPAndroid/Bide/releases/download/v0.8.11/bide-browser.zip) and extract the entire ZIP into a **new writable folder**. The app and conversion engines are already included. You should see a `site` folder beside the BAT files.
+1. Get the [prebuilt bide-browser.zip](https://github.com/AOSPAndroid/Bide/releases/download/v0.8.12/bide-browser.zip) and extract the entire ZIP into a **new writable folder**. The app and conversion engines are already included. You should see a `site` folder beside the BAT files.
 2. Use your existing **Node.js 22 or newer**. bide detects `C:\devhome\tools\node24\current\node.exe` or `node.exe` on PATH. With this ZIP, **Install Dependencies.bat is optional**: it only checks your installation and bundled files, with no downloads.
 3. Double-click **launch bide.bat**. It starts the local server in the background and opens the editor in your default browser (use Edge or Chrome).
 
@@ -16,7 +16,7 @@ The BAT files run directly through Node: **PowerShell and execution-policy chang
 
 GitHub's **Code → Download ZIP** creates a source folder such as `Bide-main`. A source build must be explicitly requested with `"Install Dependencies.bat" --build-source`; it needs npm packages and the browser Office/diagram runtimes, which may require network access. Use the prebuilt release ZIP on a PC where proxy authentication blocks dependency downloads. Its root launchers run offline using your existing Node; the `source` folder is only for rebuilding.
 
-The local edition works without internet after setup. A hosted edition needs only a browser and no Node runtime on the work PC; see [HOSTING.md](HOSTING.md). A public [bide demo](https://bide-demo.dalilooksk.chatgpt.site) is hosted with Sites. The demo includes the photo editor, PDF tools and draw.io; Office-to-PDF conversion is available only in the local download because the Office assets exceed the host's 25 MiB file limit. Files and drafts stay in each visitor's browser. The previous `Setup.cmd` and `start bide.cmd` now forward to these BAT files.
+The local edition works without internet after setup. A hosted edition needs only a browser and no Node runtime on the work PC; see [HOSTING.md](HOSTING.md). A public [bide demo](https://bide-demo.daaalil.chatgpt.site) is hosted with Sites. The demo includes the photo editor, PDF tools and draw.io; Office-to-PDF conversion is available only in the local download because the Office assets exceed the host's 25 MiB file limit. Files and drafts stay in each visitor's browser. The previous `Setup.cmd` and `start bide.cmd` now forward to these BAT files.
 
 ## Share internally using IP:port
 

@@ -230,3 +230,7 @@ Roboto and Inter are already bundled for offline text and OCR editing. SF Pro, S
 - After a scan, the clearest regions (≥85% confidence) are compared with 12 common faces by rendered glyph shape, and the closest pre-selects OCR font unless one was chosen. In Chromium it identified all 12 at 14–32 px, including bold, blurred and light-on-dark text; misread characters reduce accuracy.
 - Image preparation runs in a worker and the status bar shows recognition progress.
 - `npm run test:e2e` drives the app in Chromium: imports a rendered PNG, waits for OCR, checks the suggested font and the thorough pass, replaces a region (text layer and background patch), and verifies that enabling German re-scans ß and umlauts correctly. The Vite dev server now loads the PDF engine (mupdf is excluded from dependency pre-bundling).
+
+### OCR accuracy and language release (0.8.12)
+
+Merged claude/lucid-fermat-jvmf9l: better preparation for small and dark-mode text, progress reporting, optional thorough scan, uncertain-region indicators, suggested bundled font matching and selectable offline English, French, German, Spanish, Italian, Dutch and Portuguese models. OCR geometry maps back to the original page and replacement sizing keeps proportional fitting. Source-map-js build dependency updated to the patched 1.2.2 release.
