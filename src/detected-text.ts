@@ -101,6 +101,17 @@ export async function detectedTextbox(region:TextRegion,{ocrFont,ocrStyle,matchB
  return {text,embedded};
 }
 
+export async function matchedDetectedTextbox(region:TextRegion,c:Canvas,p:Page,regions:TextRegion[],options:{ocrFont:string;ocrStyle:string;matchBlur:boolean;autoFont:boolean;appearanceRegions?:TextRegion[]}){
+ if(region.kind!=='ocr')return detectedTextbox(region,options);
+ const all=regions.length?regions:[region],inkCache=new Map<string,Promise<PageInk|undefined>>();
+ const ink=(family:string)=>{if(!inkCache.has(family))inkCache.set(family,options.ocrStyle==='auto'?pageInkLevel(all,family):Promise.resolve(undefined));return inkCache.get(family)!;};
+ const makeText=async(r:TextRegion,family:string)=>(await detectedTextbox(r,{...options,ocrFont:family,matchBlur:false,pageInk:await ink(family)})).text;
+ const {matchOcrAppearance,applyOcrAppearance}=await import('./browser/ocr-appearance');
+ const raster=await pageComposite(c,p),fit=await matchOcrAppearance(raster,region,options.appearanceRegions??all,options.ocrFont,{autoFont:options.autoFont,matchBlur:options.matchBlur,makeText});
+ if(!fit)return detectedTextbox(region,{...options,pageInk:await ink(options.ocrFont)});
+ const text=await makeText(region,fit.family);applyOcrAppearance(text,region,fit);return {text,embedded:false};
+}
+
 // Hide the original OCR text by clearing, repairing or patching the area under
 // each region. Several regions are handled in one pass (Convert all), so each
 // image layer is rasterized once. Mutates the serialized `objects` list of the page.

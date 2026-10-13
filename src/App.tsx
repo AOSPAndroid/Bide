@@ -1,7 +1,7 @@
 import {isUncertain} from './ocr-regions';
 import {storedOcrLanguages,storeOcrLanguages} from './ocr-languages';
 import TextDetectionBar,{defaultOcrSettings,type OcrSettings} from './TextDetectionBar';
-import {hasScannableContent,scanPageText,detectedTextbox,coverOcrText,aiRemoveSelection,aiSharpenImage,pageInkLevel} from './detected-text';
+import {hasScannableContent,scanPageText,detectedTextbox,matchedDetectedTextbox,coverOcrText,aiRemoveSelection,aiSharpenImage,pageInkLevel} from './detected-text';
 import {Textbox} from './text-appearance';
 import {unlockPdfPage} from './pdf-layer';
 import {thumbnailScale,editorPreviewScale} from './render-budget';
@@ -430,7 +430,7 @@ export default function App() {
   async function editDetectedText(region:TextRegion){
     if(busy||loading.current)return;const originalPage=page;setBusy('Making text editable…');
     try{if(region.kind==='ocr'&&ocr.background==='transparent'&&originalPage.source)throw new Error('Unlock Original PDF first to clear scanned text to transparency.');
-      const {text,embedded}=await detectedTextbox(region,{ocrFont:ocr.font,ocrStyle:ocr.style,matchBlur:ocr.matchBlur,pageInk:ocr.style==='auto'?await pageInkLevel(pageOcrRegions.current.get(originalPage.id)??textRegions,ocr.font):undefined});
+      const {text,embedded}=await matchedDetectedTextbox(region,canvas.current!,originalPage,pageOcrRegions.current.get(originalPage.id)??textRegions,{ocrFont:ocr.font,ocrStyle:ocr.style,matchBlur:ocr.matchBlur,autoFont:!ocrFontChosen.current,appearanceRegions:textRegions});
       let nextSource=originalPage.source,nextData:string|undefined;
       if(region.kind==='pdf'&&originalPage.source){const result=await removePdfText(originalPage.source,originalPage.index,region.id);nextSource=result.id;nextData=result.data;}
       if(pageIdRef.current!==originalPage.id)return;const current=capture();const objects=[...((current.pages.find(p=>p.id===originalPage.id)!.canvas.objects||[]) as unknown[])];
