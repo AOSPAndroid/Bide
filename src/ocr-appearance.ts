@@ -12,6 +12,20 @@ export function alphaCoverage(pixels:ArrayLike<number>,width:number,height:numbe
  const data=new Float32Array(width*height);for(let i=0;i<data.length;i++)data[i]=pixels[i*4+3]/255;
  return {data,width,height};
 }
+// Compare physical edge widths directly: a calibrated blur radius can vary
+// with glyph shape and size. Include the padded fringe and normalize ink
+// strength so changing text colour does not appear to sharpen its edges.
+export function coverageEdgeWidth(mask:Coverage):number|undefined{
+ const {data,width,height}=mask;if(width<3||height<3)return undefined;
+ let peak=0;for(const value of data)if(value>peak)peak=value;
+ if(peak<40/255)return undefined;
+ let partial=0,outline=0;
+ for(let y=0;y<height;y++)for(let x=0;x<width;x++){
+  const i=y*width+x,value=data[i]/peak;if(value>=.2&&value<=.8)partial++;
+  if(value>=.5&&x>0&&y>0&&x<width-1&&y<height-1&&(data[i-1]<peak*.5||data[i+1]<peak*.5||data[i-width]<peak*.5||data[i+width]<peak*.5))outline++;
+ }
+ return outline>=10?partial/outline:undefined;
+}
 function at(mask:Coverage,x:number,y:number){
  const x0=Math.floor(x),y0=Math.floor(y),fx=x-x0,fy=y-y0;
  const value=(xx:number,yy:number)=>xx<0||yy<0||xx>=mask.width||yy>=mask.height?0:mask.data[yy*mask.width+xx];

@@ -1,9 +1,27 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {contrastCoverage,coverageFit,matchedInkColor} from '../tmp/ocr-appearance.mjs';
+import {contrastCoverage,coverageEdgeWidth,coverageFit,matchedInkColor} from '../tmp/ocr-appearance.mjs';
 const coverage=(fill)=>{const width=28,height=16,data=new Float32Array(width*height);for(let y=0;y<height;y++)for(let x=0;x<width;x++)data[y*width+x]=fill(x,y);return {width,height,data};};
 const glyphs=(x,y)=>y>=4&&y<12&&((x>=5&&x<7)||(x>=11&&x<14)||(y<6&&x>=5&&x<14))?1:0;
 const soft=coverage((x,y)=>{let sum=0;for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++)sum+=glyphs(x+dx,y+dy)*(dx===0?2:1)*(dy===0?2:1);return sum/16;});
+
+test('physical edge width distinguishes crisp glyphs from their blurred fringes',()=>{
+ const crisp=coverage(glyphs),sharpWidth=coverageEdgeWidth(crisp),softWidth=coverageEdgeWidth(soft);
+ assert.equal(sharpWidth,0);assert.ok(softWidth>sharpWidth+1);
+ // The padded pixels outside the half-contrast glyph mask still contribute.
+ const clipped={...soft,data:soft.data.map(v=>v<.5?0:v)};
+ assert.ok(coverageEdgeWidth(clipped)<softWidth);
+});
+test('edge width normalizes colour strength without changing the measured softness',()=>{
+ const width=coverageEdgeWidth(soft);
+ for(const gain of [.8,.42])assert.equal(coverageEdgeWidth({...soft,data:soft.data.map(v=>v*gain)}),width);
+});
+test('edge width rejects weak, empty or insufficient glyph evidence',()=>{
+ assert.equal(coverageEdgeWidth(coverage(()=>0)),undefined);
+ assert.equal(coverageEdgeWidth({...soft,data:soft.data.map(v=>v*.1)}),undefined);
+ assert.equal(coverageEdgeWidth(coverage((x,y)=>x===5&&y===5?1:0)),undefined);
+ assert.equal(coverageEdgeWidth({width:2,height:2,data:new Float32Array(4).fill(1)}),undefined);
+});
 test('continuous matching distinguishes soft edges from crisp glyphs at the same ink strength',()=>{
  const original={...soft,data:soft.data.map(v=>v*.72)},crisp=coverage(glyphs);
  const fit=coverageFit(original,soft);assert.ok(fit.score>.999);assert.ok(Math.abs(fit.gain-.72)<1e-6);
