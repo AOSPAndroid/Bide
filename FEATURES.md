@@ -1,3 +1,7 @@
+## Current app identity
+
+- Original B monogram and independent warm white, graphite, and burnt-orange identity, with “Image & Document Editor” beneath bide.
+
 ## v0.4.7 — Searchable command palette
 
 - Workspace aliases: visio/draw/diagram/drawio/flowchart, photoshop/photopea, PDF/ilovepdf. Exact aliases rank first; search accepts multiple words and punctuation.
@@ -25,7 +29,7 @@ Checked against the [Photopea manual](https://www.photopea.com/learn/) and [iLov
 
 | Feature family | bide status | Actual scope / remaining work |
 |---|---|---|
-| Local GUI, canvas navigation, command search | Implemented | White/blue interface, animated three-workspace dock, searchable PDF tools, zoom, pan, Ctrl+K palette and keyboard shortcuts |
+| Local GUI, canvas navigation, command search | Implemented | Warm white/graphite interface with burnt-orange accents, animated three-workspace dock, searchable PDF tools, zoom, pan, Ctrl+K palette and keyboard shortcuts |
 | Draggable/resizable/rotatable text | Implemented | Text boxes, typography controls, color, alignment, property inspector |
 | Layers | Partial | Ordering, names, groups, visibility, lock, duplication and 16 blend modes on design pages; layer styles (drop shadow, inner shadow, outer and inner glow, stroke outside/center/inside, colour and gradient overlays) rendered live and kept in .bide, PSD and image exports, and as pixels in PDF/SVG; no clipping masks between layers or adjustment layers |
 | Painting tools | Partial | Brush styles, highlighter and eraser; Gradient tool (G: linear or radial, drawing colour to a second colour or to transparent, limited to the selection) as an editable vector layer; Paint bucket (K: tolerance, contiguous, all layers, opacity) as a new layer; no pattern fills or blend-mode painting |
@@ -142,7 +146,6 @@ There is no full-parity completion claim or committed delivery date. The checkli
 
 ### v0.4.4 — Branding and selection masks
 
-- Barclays eagle logo stored locally, with “Barclays Image & Document Editor” beneath bide.
 - M selects rectangular selection; Q selects freehand lasso. Select an unlocked layer first, then draw on the canvas. Keep inside / Hide inside apply a reversible mask; Copy to layer creates an independently editable cutout without changing the source layer. Each action replaces that layer's previous mask. Choose Shape mask → None to recover the original pixels, or Undo.
 - Masks follow layer rotation, scale and flipping and persist in .bide projects. This is a foundation for photo compositing, not Photoshop feature parity. Original PDF page content is not a selectable image layer.
 - Browser verified mask placement, mask removal, copying a cutout and hiding the source. Automated geometry checks cover rotated, scaled and flipped layers and serialized inverse masks.

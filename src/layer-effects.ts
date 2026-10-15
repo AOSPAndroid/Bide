@@ -18,9 +18,9 @@ export const effectDefaults:{[K in EffectName]-?:NonNullable<LayerStyle[K]>}={
  innerShadow:{enabled:true,color:'#000000',opacity:45,angle:120,distance:3,size:5,spread:0},
  outerGlow:{enabled:true,color:'#ffe38a',opacity:75,size:10,spread:0},
  innerGlow:{enabled:true,color:'#fff7d6',opacity:75,size:6,spread:0},
- stroke:{enabled:true,color:'#00395d',opacity:100,size:3,position:'outside'},
- colorOverlay:{enabled:true,color:'#00aeef',opacity:100},
- gradientOverlay:{enabled:true,from:'#00395d',to:'#00aeef',angle:90,opacity:100},
+ stroke:{enabled:true,color:'#25272d',opacity:100,size:3,position:'outside'},
+ colorOverlay:{enabled:true,color:'#c44c28',opacity:100},
+ gradientOverlay:{enabled:true,from:'#25272d',to:'#c44c28',angle:90,opacity:100},
 };
 export const effectLabels:Record<EffectName,string>={dropShadow:'Drop shadow',innerShadow:'Inner shadow',outerGlow:'Outer glow',innerGlow:'Inner glow',stroke:'Stroke',colorOverlay:'Color overlay',gradientOverlay:'Gradient overlay'};
 

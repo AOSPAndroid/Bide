@@ -28,7 +28,7 @@ Every visitor has an independent workspace stored in their own browser. Sharing 
 
 ## Workspaces and dock
 
-The interface uses white panels, Barclays blue accents (`#00AEEF`) and navy text (`#00395D`). Move the pointer to the **Workspaces** tab at the bottom center to reveal the animated dock. Its three icons open **Photo editor**, **PDF MasterTool** and **Drawio**. Icons lift and show their labels on hover; the active workspace has a blue icon. Click/tap the tab to keep the dock open, or focus it with Tab and press Up to reach the icons. Escape dismisses keyboard access. Reduced-motion preferences disable the animations.
+The interface uses warm white panels, burnt-orange accents (`#C44C28`), graphite text (`#25272D`), and an original B monogram. The bide wordmark carries the tagline “Image & Document Editor”. Move the pointer to the **Workspaces** tab at the bottom center to reveal the animated dock. Its three icons open **Photo editor**, **PDF MasterTool** and **Drawio**. Icons lift and show their labels on hover; the active workspace has an orange icon. Click/tap the tab to keep the dock open, or focus it with Tab and press Up to reach the icons. Escape dismisses keyboard access. Reduced-motion preferences disable the animations.
 
 Photo editor and PDF MasterTool share your current document, layers and undo history. The PDF home has searchable tools grouped under Organize, Convert, Edit and Security; **Continue editing** returns to the document. Drawio keeps its own diagram draft, and **Place in document** returns to the photo/PDF workspace you came from. Ctrl+K can also switch workspaces.
 

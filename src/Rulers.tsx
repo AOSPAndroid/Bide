@@ -22,11 +22,11 @@ export default function Rulers({show,zoom,width,height,workspace,artboard,onAdd,
    if(c.width!==Math.round(r.width*dpr)||c.height!==Math.round(r.height*dpr)){c.width=Math.round(r.width*dpr);c.height=Math.round(r.height*dpr);}
    const g=c.getContext('2d')!;g.setTransform(dpr,0,0,dpr,0,0);g.clearRect(0,0,r.width,r.height);
    const origin=axis==='x'?board.left-r.left:board.top-r.top,length=axis==='x'?r.width:r.height,thick=axis==='x'?r.height:r.width,step=rulerStep(zoom),minor=step/5;
-   const styles=getComputedStyle(c);g.strokeStyle=styles.getPropertyValue('--ruler-tick')||'#b9cfdc';g.fillStyle=styles.getPropertyValue('--ruler-text')||'#6f8ea2';g.font='9px Inter, Segoe UI, sans-serif';g.lineWidth=1;
+   const styles=getComputedStyle(c);g.strokeStyle=styles.getPropertyValue('--line')||'#dedfe3';g.fillStyle=styles.getPropertyValue('--muted')||'#686b74';g.font='9px Inter, Segoe UI, sans-serif';g.lineWidth=1;
    // Page extent shaded.
-   g.fillStyle='#e3eff6';const a=origin,b=origin+(axis==='x'?width:height)*zoom;
+   g.fillStyle=styles.getPropertyValue('--soft')||'#f4f5f7';const a=origin,b=origin+(axis==='x'?width:height)*zoom;
    if(axis==='x')g.fillRect(a,0,b-a,thick);else g.fillRect(0,a,thick,b-a);
-   g.fillStyle=styles.getPropertyValue('--ruler-text')||'#6f8ea2';
+   g.fillStyle=styles.getPropertyValue('--muted')||'#686b74';
    const first=Math.floor(-origin/zoom/minor)*minor;
    g.beginPath();
    for(let v=first;(v*zoom+origin)<=length;v+=minor){
