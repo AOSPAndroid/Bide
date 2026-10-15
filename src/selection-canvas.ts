@@ -78,7 +78,7 @@ export function maskFill(m:Mask,color:readonly number[],opacity=1){
 // Layer masks are an image clip path in the layer's own coordinates, at about
 // the layer's on-page resolution, so painting on them later stays sharp.
 export type LayerMask=FabricImage&{layerMask?:boolean};
-export const hasLayerMask=(o:FabricObject|null|undefined):o is FabricObject&{clipPath:LayerMask}=>!!(o?.clipPath as LayerMask|undefined)?.layerMask;
+export const hasLayerMask=<T extends FabricObject>(o:T|null|undefined):o is T&{clipPath:LayerMask}=>!!(o?.clipPath as LayerMask|undefined)?.layerMask;
 
 export function layerMaskFrame(object:FabricObject){
  const w=Math.max(1,object.width),h=Math.max(1,object.height),scale=Math.min(Math.max(Math.abs(object.scaleX),Math.abs(object.scaleY),.05),4096/Math.max(w,h),2);
@@ -127,7 +127,8 @@ export function paintLayerMask(object:FabricObject,mask:LayerMask,point:{x:numbe
  const local=util.transformPoint(point as never,inv),f=layerMaskFrame(object),sx=c.width/f.w,sy=c.height/f.h;
  const x=(local.x+f.w/2)*sx,y=(local.y+f.h/2)*sy,layerScale=Math.max(1e-3,Math.abs(object.scaleX));
  const r=Math.max(.5,size/2/layerScale*sx),hard=Math.max(0,Math.min(1,1-softness/100));
- const grad=g.createRadialGradient(x,y,r*hard,x,y,r);grad.addColorStop(0,`rgba(255,255,255,${opacity})`);grad.addColorStop(1,'rgba(255,255,255,0)');
+ // A hard brush still needs an inner radius below the outer one (equal radii paint nothing).
+ const grad=g.createRadialGradient(x,y,Math.min(r*hard,Math.max(0,r-1)),x,y,r);grad.addColorStop(0,`rgba(255,255,255,${opacity})`);grad.addColorStop(1,'rgba(255,255,255,0)');
  g.save();g.globalCompositeOperation=reveal?'source-over':'destination-out';g.fillStyle=grad;g.beginPath();g.arc(x,y,r,0,Math.PI*2);g.fill();g.restore();
- object.set('dirty',true);
+ mask.set('dirty',true);object.set('dirty',true);
 }
