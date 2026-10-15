@@ -24,5 +24,6 @@ The source bundle accompanies this local handoff. Public or commercial redistrib
 - AI models, downloaded at build time by scripts/prepare-ai.mjs, pinned by URL, size and SHA-256 in public/ai/manifest.json, and bundled in the ZIP (no runtime downloads):
   - LaMa inpainting (Carve/LaMa-ONNX export of advimman/lama): Apache-2.0. Converted at build time to float16 weights (float32 computation; identical output, half the size) by scripts/onnx-fp16.mjs, using onnx-proto (MIT).
   - Real-ESRGAN realesr-general-x4v3 (ONNX export of xinntao/Real-ESRGAN): BSD-3-Clause.
+  - ISNet general-use (xuebinqin/DIS, Apache-2.0; ONNX export from the rembg project, MIT; dynamic int8 build from Ko033/isnet-general-use-onnx, Apache-2.0) for Select subject and Remove background.
   - PaddleOCR PP-OCRv5 mobile text detection and Latin recognition (official PaddlePaddle ONNX exports): Apache-2.0.
 

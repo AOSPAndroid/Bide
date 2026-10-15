@@ -105,3 +105,15 @@ export async function paddleOcr(source:HTMLCanvasElement,onProgress?:Progress,si
  }
  return lines;
 }
+
+// ISNet (general use, int8) finds the main subject. Returns a 1024×1024 map
+// (0-255, higher = subject) for `source`, stretched to its aspect when used.
+// Transparent areas are judged against white.
+export async function segmentSubject(source:HTMLCanvasElement,signal?:AbortSignal){
+ const S=1024,flat=canvas(source.width,source.height),f=context(flat);f.fillStyle='#fff';f.fillRect(0,0,flat.width,flat.height);f.drawImage(source,0,0);
+ const small=resizeBilinear(f.getImageData(0,0,flat.width,flat.height).data,flat.width,flat.height,S,S);
+ const out=(await runModel('isnet',{input_image:{data:toPlanar(small,S,S,{mean:[.5,.5,.5]}),dims:[1,3,S,S]}},signal)).output_image.data;
+ let lo=Infinity,hi=-Infinity;for(const v of out){if(v<lo)lo=v;if(v>hi)hi=v;}
+ const values=new Uint8ClampedArray(S*S),range=hi-lo||1;for(let i=0;i<values.length;i++)values[i]=(out[i]-lo)/range*255;
+ return {values,width:S,height:S};
+}

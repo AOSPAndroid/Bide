@@ -1,6 +1,8 @@
 // Detecting page text (PDF text layer, else local OCR) and turning a detected
 // region into an editable text layer with a background patch.
 import {FabricImage,Rect,type Canvas,type FabricObject} from 'fabric';
+import {growMask,maskBounds,type Mask} from './pixel-mask';
+import {maskToCanvas} from './selection-canvas';
 import {Textbox,clampTextSoftness} from './text-appearance';
 import {detectPdfText,pagePreview} from './browser/engine';
 import {pageRaster,rasterLayer} from './retouch-canvas';
@@ -143,15 +145,16 @@ export async function pageComposite(c:Canvas,p:Page){
  return p.source?await previewCanvas(p.source,p.index,1,Math.ceil(p.width),Math.ceil(p.height)):pageRaster(c,p.width,p.height,c.getObjects().filter(o=>o instanceof FabricImage&&o.visible));
 }
 
-// Remove whatever is inside a selection polygon with LaMa; returns new patch layers.
-export async function aiRemoveSelection(c:Canvas,p:Page,points:{x:number;y:number}[],onProgress?:(fraction:number)=>void){
- const raster=await pageComposite(c,p),mask=document.createElement('canvas');mask.width=raster.width;mask.height=raster.height;
- const ctx=mask.getContext('2d')!;ctx.fillStyle=ctx.strokeStyle='#000';ctx.lineWidth=4;ctx.lineJoin='round';ctx.beginPath();points.forEach((pt,i)=>i?ctx.lineTo(pt.x,pt.y):ctx.moveTo(pt.x,pt.y));ctx.closePath();ctx.fill();ctx.stroke();
- const xs=points.map(pt=>pt.x),ys=points.map(pt=>pt.y),x=Math.max(0,Math.min(...xs)-3),y=Math.max(0,Math.min(...ys)-3);
- const hole={x,y,width:Math.min(raster.width,Math.max(...xs)+3)-x,height:Math.min(raster.height,Math.max(...ys)+3)-y};
- if(hole.width<2||hole.height<2)throw new Error('Draw a larger selection to remove.');
+// Remove whatever is inside a selection mask (page-sized) with LaMa; returns
+// new patch layers. The hole reaches 2px past the selection edge.
+export async function aiRemoveSelection(c:Canvas,p:Page,selection:Mask,onProgress?:(fraction:number)=>void){
+ const raster=await pageComposite(c,p),grown=growMask(selection,2),bounds=maskBounds(grown,9);
+ if(!bounds||bounds.width<2||bounds.height<2)throw new Error('Draw a larger selection to remove.');
+ const mask=document.createElement('canvas');mask.width=raster.width;mask.height=raster.height;
+ const sx=raster.width/grown.width,sy=raster.height/grown.height;mask.getContext('2d')!.drawImage(maskToCanvas(grown,[0,0,0]),0,0,raster.width,raster.height);
+ const hole={x:bounds.left*sx,y:bounds.top*sy,width:bounds.width*sx,height:bounds.height*sy};
  const {inpaintCanvas}=await import('./browser/ai-tools');
- return (await inpaintCanvas(raster,mask,[hole],onProgress)).map(patch=>Object.assign(new FabricImage(patch.canvas,{left:patch.x,top:patch.y}),{id:uid(),name:'AI-removed area'}));
+ return (await inpaintCanvas(raster,mask,[hole],onProgress)).map(patch=>Object.assign(new FabricImage(patch.canvas,{left:patch.x/sx,top:patch.y/sy,scaleX:1/sx,scaleY:1/sy}),{id:uid(),name:'AI-removed area'}));
 }
 
 // Sharpen an image layer with Real-ESRGAN, keeping its size and position on the page.

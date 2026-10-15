@@ -46,6 +46,13 @@
    "sha256": "98069072e1b6b37d727fd9d9f11725faa46d6ea0de012f2ed26caea011c37699",
    "license": "Apache-2.0",
    "source": "https://huggingface.co/PaddlePaddle/PP-OCRv5_mobile_det_onnx"
+  },
+  "isnet.onnx": {
+   "url": "https://huggingface.co/Ko033/isnet-general-use-onnx/resolve/5349b617911fd60c619b52f32e2b593517b78df3/onnx/model_quantized.onnx",
+   "bytes": 45902969,
+   "sha256": "5039225b9a4ac3df55f185d24b7a92d640c86cc4747002d7f23351e394de03a6",
+   "license": "Apache-2.0",
+   "source": "https://huggingface.co/Ko033/isnet-general-use-onnx"
   }
  }
 }
