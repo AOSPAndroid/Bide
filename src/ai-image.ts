@@ -61,12 +61,12 @@ export function ctcDecode(data:ArrayLike<number>,steps:number,classes:number,dic
 // sit midway between the last character of one word and the first of the next.
 // `stepWidth` is input width / time steps.
 export function ctcWords(chars:{ch:string;t:number;p:number}[],stepWidth:number,lineWidth:number){
- const words:{text:string;first:number;last:number;p:number[]}[]=[];let current:typeof words[number]|undefined;
- for(const c of chars){if(/\s/.test(c.ch)){current=undefined;continue;}if(!current){current={text:'',first:c.t,last:c.t,p:[]};words.push(current);}current.text+=c.ch;current.last=c.t;current.p.push(c.p);}
+ const words:{text:string;first:number;last:number;p:number[];t:number[]}[]=[];let current:typeof words[number]|undefined;
+ for(const c of chars){if(/\s/.test(c.ch)){current=undefined;continue;}if(!current){current={text:'',first:c.t,last:c.t,p:[],t:[]};words.push(current);}current.text+=c.ch;current.last=c.t;current.p.push(c.p);current.t.push(c.t);}
  return words.map((w,i)=>{
   const prev=words[i-1],next=words[i+1];
   const x0=prev?(prev.last+w.first+1)/2*stepWidth:Math.max(0,(w.first-1)*stepWidth),x1=next?(w.last+next.first+1)/2*stepWidth:Math.min(lineWidth,(w.last+2)*stepWidth);
-  return {text:w.text,x0,x1,confidence:100*w.p.reduce((s,p)=>s+p,0)/w.p.length};
+  return {text:w.text,x0,x1,confidence:100*w.p.reduce((s,p)=>s+p,0)/w.p.length,centers:w.t.map(t=>(t+.5)*stepWidth)};
  });
 }
 

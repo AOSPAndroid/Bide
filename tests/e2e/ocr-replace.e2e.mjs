@@ -3,6 +3,8 @@
 import {test} from 'node:test';import assert from 'node:assert/strict';
 import {createServer} from 'vite';import {chromium} from 'playwright-core';import * as mupdf from 'mupdf';
 import {mkdtemp,writeFile} from 'node:fs/promises';import {tmpdir} from 'node:os';import {join} from 'node:path';
+// OCR options sit in the "OCR settings" dropdown; open it before using one.
+const ocrSetting=async(page,label)=>{await page.locator('.ocr-settings').waitFor({state:'attached',timeout:120000});await page.evaluate(()=>{const d=document.querySelector('.ocr-settings');if(d)d.open=true;});return page.getByLabel(label);};
 
 function fixture(){
  const doc=new mupdf.PDFDocument(),font=new mupdf.Font('Helvetica'),ref=doc.addSimpleFont(font);
@@ -28,14 +30,16 @@ test('OCR text on an imported image becomes an editable layer',{timeout:240000},
   await region.waitFor({timeout:180000});
   assert.ok(await page.locator('button[aria-label^="Edit detected text: Revenue"]').count(),'second line detected');
   await page.waitForFunction(()=>/closest font: /.test(document.querySelector('.text-detection-bar')?.textContent||''),null,{timeout:60000});
-  assert.equal(await page.getByLabel('OCR replacement font').inputValue(),'Liberation Sans','Helvetica scan suggests its metric twin');
+  assert.equal(await (await ocrSetting(page,'OCR replacement font')).inputValue(),'Liberation Sans','Helvetica scan suggests its metric twin');
   // The thorough sparse-text pass belongs to the standard (Tesseract) engine.
-  await page.getByLabel('OCR engine').selectOption('tesseract');
-  await page.getByLabel('OCR scan depth').selectOption('thorough');
+  await (await ocrSetting(page,'OCR engine')).selectOption('tesseract');
+  await (await ocrSetting(page,'OCR scan depth')).selectOption('thorough');
   await sawStatus(page,/Thorough pass… \d+%/);
   await region.waitFor({timeout:120000});
   assert.equal(await page.locator('button[aria-label^="Edit detected text: Quarterly"]').count(),1,'second pass adds no duplicates');
-  await page.getByLabel('Text replacement background').selectOption('sampled');
+  await (await ocrSetting(page,'Text replacement background')).selectOption('sampled');
+  // This test covers replacement with editable font text.
+  await (await ocrSetting(page,'Edit image text with')).selectOption('font');
   await region.click();
   await page.getByText('OCR text is editable',{exact:false}).waitFor({timeout:30000});
   await page.locator('button[aria-label^="Edit detected text: Quarterly"]').waitFor({state:'detached'});
@@ -57,11 +61,11 @@ test('enabling German re-scans with the German model',{timeout:240000},async()=>
   await page.goto(server.resolvedUrls.local[0]);
   await page.locator('input[type=file][accept*=".psd"]').setInputFiles(image);
   // Tesseract's language models are what this test exercises (AI OCR covers Latin languages at once).
-  await page.getByLabel('OCR engine').selectOption('tesseract');
+  await (await ocrSetting(page,'OCR engine')).selectOption('tesseract');
   await page.waitForFunction(()=>/English \+ Français · /.test(document.querySelector('.text-detection-bar span')?.textContent||''),null,{timeout:180000});
   await page.locator('button[aria-label^="Edit detected text: Gr"]').waitFor({timeout:180000});
   assert.equal(await page.locator('button[aria-label*="Straßenbahnen"]').count(),0,'English + French misreads ß');
-  await page.getByLabel('OCR languages').click();await page.getByLabel('OCR language Deutsch').check();
+  await (await ocrSetting(page,'OCR languages')).click();await page.getByLabel('OCR language Deutsch').check();
   await page.locator('button[aria-label*="Größere Übungen für Straßenbahnen"]').waitFor({timeout:180000});
   assert.match(await page.locator('.text-detection-bar').innerText(),/English \+ Français \+ Deutsch/);
   assert.deepEqual(errors,[]);
@@ -80,6 +84,7 @@ test('a bold label and a regular value on one line keep their own weights',{time
   await page.goto(server.resolvedUrls.local[0]);
   await page.locator('input[type=file][accept*=".psd"]').setInputFiles(image);
   const region=page.locator('button[aria-label^="Edit detected text: Nom du client: Dalil"]');await region.waitFor({timeout:180000});
+  await (await ocrSetting(page,'Edit image text with')).selectOption('font');
   // The confirmation toast is brief; the saved text layer below is the real check.
   await region.click();
   // Read the saved text layer and the weight of every character.
@@ -89,6 +94,37 @@ test('a bold label and a regular value on one line keep their own weights',{time
   let weights=null;for(let i=0;i<60&&!weights;i++){weights=await read();if(!weights)await page.waitForTimeout(500);}
   assert.equal(weights.text,'Nom du client: Dalil REDOUANE');
   assert.match(weights.weights,/^B{14}.r{14}$/,'label bold, value regular: '+weights.weights);
+  assert.deepEqual(errors,[]);
+ }finally{await browser.close();await server.close();}
+});
+
+test('editing image text reuses the original letters; find & replace fixes every line',{timeout:300000},async()=>{
+ // A made-up booking card with a misspelt name on two lines.
+ const server=await createServer({logLevel:'error',server:{port:0,host:'127.0.0.1'}});await server.listen();
+ const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||undefined});
+ try{
+  const shot=await browser.newPage({viewport:{width:460,height:130},deviceScaleFactor:1});
+  await shot.setContent('<body style="margin:0;padding:12px;font:15px/1.45 sans-serif;color:#1c1c1e;background:#fafafa"><b>Nom du client:</b> Jeaan MARTIN / pour 2 adultes<br><b>Repas:</b> Les repas ne sont pas compris.<br>Titulaire: Jeaan MARTIN, Lyon</body>');
+  const image=join(await mkdtemp(join(tmpdir(),'bide-e2e-')),'card.png');await shot.screenshot({path:image});await shot.close();
+  const page=await browser.newPage({viewport:{width:1400,height:900}}),errors=[];page.on('pageerror',e=>errors.push(e.message));
+  const layers=async()=>{await page.waitForTimeout(1500);return page.evaluate(async()=>{const {restoreLocal}=await import('/src/model.ts');return (await restoreLocal()).pages[0].canvas.objects.map(o=>({name:o.name,type:o.type,left:o.left,width:o.width}));});};
+  await page.goto(server.resolvedUrls.local[0]);await page.locator('input[type=file][accept*=".psd"]').setInputFiles(image);
+  await page.waitForFunction(()=>/OCR regions/.test(document.querySelector('.text-detection-bar span')?.textContent||''),null,{timeout:180000});
+  // Click a line: edit in the dialog; the result is a pixel patch, not font text.
+  await page.locator('.detected-text-overlay button[aria-label*="Nom du client"]').click();
+  const input=page.getByLabel('New text');await input.fill((await input.inputValue()).replace('Jeaan','Jean'));await page.getByRole('button',{name:'Apply',exact:true}).click();
+  let saved=await layers();
+  assert.ok(saved.some(l=>/^Edited text: Nom du client: Jean MARTIN/.test(l.name)),'letters patch: '+saved.map(l=>l.name).join(', '));
+  assert.ok(!saved.some(l=>l.type==='Textbox'||l.type==='textbox'),'no font text was needed');
+  // Find & replace fixes the remaining line in one step.
+  await page.getByRole('button',{name:'Find & replace'}).click();await page.getByLabel('Find text').fill('Jeaan');await page.getByLabel('Replace with').fill('Jean');
+  assert.match(await page.locator('[aria-live=polite]').innerText(),/^1 detected line contains/);
+  await page.getByRole('button',{name:'Replace all'}).click();saved=await layers();
+  assert.ok(saved.some(l=>/^Edited text: Titulaire: Jean MARTIN/.test(l.name)),'find & replace patch');
+  // A letter that appears nowhere on the page falls back to font text.
+  await page.locator('.detected-text-overlay button[aria-label*="Repas"]').click();
+  const repas=page.getByLabel('New text');await repas.fill('Repas: Les repas ne sont pas compris (zzz).');await page.getByRole('button',{name:'Apply',exact:true}).click();saved=await layers();
+  assert.ok(saved.some(l=>/Repas/.test(l.name)&&(l.type==='Textbox'||l.type==='textbox')),'fallback to font text');
   assert.deepEqual(errors,[]);
  }finally{await browser.close();await server.close();}
 });

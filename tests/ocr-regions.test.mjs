@@ -42,3 +42,9 @@ test('the cleanup margin stops at neighbouring lines and words',()=>{
  const overlapping={left:10,top:112,width:280,height:14};
  assert.equal(ocrPatchBounds(line,-1,{width:500,height:500},[overlapping]).height,112-98,'a next line overlapping our descenders still stops the patch');
 });
+test('a lone digit or currency sign takes the weight of its number',async()=>{
+ const {attachNumberParts}=await import('../tmp/ocr-regions.mjs');
+ const texts=['Prix','total','1','284,99','€','taxes'];
+ assert.deepEqual(attachNumberParts(texts,[false,false,false,true,false,false]),[false,false,true,true,true,false]);
+ assert.deepEqual(attachNumberParts(['pour','6','adultes'],[false,true,false]),[false,true,false],'no number next to it: unchanged');
+});

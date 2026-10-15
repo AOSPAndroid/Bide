@@ -5,7 +5,7 @@ const headers = { 'Cross-Origin-Opener-Policy': 'same-origin', 'Cross-Origin-Emb
 export default defineConfig(({mode}) => ({
   base: './', publicDir: mode === 'demo' ? false : 'public',
   plugins: [react(), ...(mode === 'demo' ? [{name:'bide-demo-assets', async closeBundle() {
-    // The AI model pack (LaMa alone is 208 MB) is left out of the hosted demo; AI actions hide when it is absent.
+    // The AI model pack (LaMa alone is 106 MB) is left out of the hosted demo; AI actions hide when it is absent.
     await mkdir('out', {recursive:true});
     for (const name of ['ocr','diagrams','licenses','favicon.svg','barclays-eagle.svg','_headers']) await cp(`public/${name}`, `out/${name}`, {recursive:true});
   }}] : [])],

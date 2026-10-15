@@ -4,9 +4,14 @@ import {matchOcrAppearance,applyOcrAppearance} from '../src/browser/ocr-appearan
 import {contrastCoverage,alphaCoverage,coverageEdgeWidth} from '../src/ocr-appearance';
 import type {Textbox} from '../src/text-appearance';
 import type {TextRegion} from '../src/text-regions';
+import {Canvas,FabricImage} from 'fabric';
+import {blankPage} from '../src/model';
+import {planOcrReplacement} from '../src/ocr-replace';
+import {defaultOcrSettings} from '../src/TextDetectionBar';
 
 const result=document.querySelector('#result')!;
 function outputEdges(text:Textbox,width:number,height:number){
+ if(!text.textSoftness){const native=document.createElement('canvas');native.width=width;native.height=height;const ctx=native.getContext('2d')!;text.render(ctx);return coverageEdgeWidth(alphaCoverage(ctx.getImageData(0,0,width,height).data,width,height));}
  const hi=document.createElement('canvas');hi.width=width*4;hi.height=height*4;
  const ctx=hi.getContext('2d')!;ctx.scale(4,4);text.render(ctx);
  const native=document.createElement('canvas');native.width=width;native.height=height;const c=native.getContext('2d')!;c.drawImage(hi,0,0,width,height);
@@ -28,11 +33,14 @@ document.querySelector('#run')!.addEventListener('click',async()=>{
    const diagnostics:unknown[]=[];
    const fitted=await matchOcrAppearance(canvas,region,[region],'Liberation Sans',{autoFont:true,matchBlur:true,makeText,onFit:f=>diagnostics.push(f)});
    if(!fitted||fitted.family!==family)throw Error(`Font mismatch for ${family}: ${JSON.stringify({fitted,region,diagnostics})}`);
-   if(softness===0&&fitted.softness>.2)throw Error('Crisp source was unnecessarily blurred');
-   if(softness>0&&fitted.softness<.2)throw Error(`Soft source was converted to crisp text: ${JSON.stringify({family,weight,fitted,diagnostics})}`);
+   const base=await makeText(region,fitted.family),baseSize=base.fontSize,baseSpacing=base.charSpacing;
    const replacement=await makeText(region,fitted.family);applyOcrAppearance(replacement,region,fitted);
    const sourceEdges=coverageEdgeWidth(coverage),replacementEdges=outputEdges(replacement,380,70);
-   if(softness>0&&sourceEdges!==undefined&&replacementEdges!==undefined&&replacementEdges>sourceEdges+.15)throw Error(`Replacement edges are too soft: ${JSON.stringify({family,weight,sourceEdges,replacementEdges,fitted})}`);
+   if(softness>0&&fitted.softness<.2)throw Error(`Soft source was converted to crisp text: ${JSON.stringify({family,weight,fitted,diagnostics})}`);
+   // Font size and tracking change the radius needed for equal edge clarity.
+   // Compare actual rendered pixels for crisp and soft sources alike; a CSS
+   // blur radius alone is not a stable measure across those geometry changes.
+   if(sourceEdges===undefined||replacementEdges===undefined||replacementEdges>sourceEdges+.15)throw Error(`Replacement edges are too soft: ${JSON.stringify({family,weight,baseSize,baseSpacing,sourceEdges,replacementEdges,fitted,diagnostics})}`);
    const manual=await matchOcrAppearance(canvas,region,[region],family,{autoFont:false,matchBlur:false,makeText});
    if(!manual||manual.family!==family||manual.softness!==0)throw Error('Manual font/crisp override was ignored');
    results.push({family,weight,sourceSoftness:softness,sourceEdges,replacementEdges,fit:fitted,manual});document.body.append(canvas);
@@ -53,6 +61,19 @@ document.querySelector('#run')!.addEventListener('click',async()=>{
   const sourcePixels=ctx.getImageData(0,0,65,50),sourceEdges=coverageEdgeWidth(contrastCoverage(sourcePixels.data,65,50,[250,250,250])),replacementEdges=outputEdges(text,65,50);
   if(sourceEdges===undefined||replacementEdges===undefined||replacementEdges>sourceEdges+.15)throw Error(`Soft neighbour blurred the name: ${JSON.stringify({sourceEdges,replacementEdges,fitted})}`);
   results.push({case:'Small name beside soft label',sourceEdges,replacementEdges,fit:fitted});document.body.append(canvas);
+  // The letters-first planner must retain matching when it falls back to font
+  // text, while Convert all stays crisp even on a page with only one region.
+  const scene=new Canvas(document.createElement('canvas'),{width:280,height:50,renderOnAddRemove:false,enableRetinaScaling:false});
+  try{
+   scene.add(new FabricImage(canvas,{left:0,top:0}));const page=blankPage(280,50),settings={...defaultOcrSettings,font:'Inter',style:'regular',matchBlur:true};
+   const plan=await planOcrReplacement(scene,page,[{region:regions[0],text:'Dali'}],{settings,pageRegions:regions,others:regions,letters:true,autoFont:false});
+   const objects:unknown[]=[];await plan.apply(objects);const edited=objects.at(-1) as {text:string;fontFamily:string;textSoftness?:number};
+   if(plan.letters||plan.fonts!==1||edited.text!=='Dali'||edited.fontFamily!=='Inter'||(edited.textSoftness??0)!==fitted.softness)throw Error(`Letters fallback lost appearance matching: ${JSON.stringify({edited,fitted})}`);
+   const bulk=await planOcrReplacement(scene,page,[{region:regions[0]}],{settings,pageRegions:regions,others:regions,letters:false,autoFont:false});
+   const bulkObjects:unknown[]=[];await bulk.apply(bulkObjects);const converted=bulkObjects.at(-1) as {textSoftness?:number};
+   if(converted.textSoftness)throw Error('Convert all softened a single-region page');
+   results.push({case:'Planner fallback and crisp bulk conversion',font:edited.fontFamily,softness:edited.textSoftness,bulkSoftness:converted.textSoftness??0});
+  }finally{await scene.dispose();}
   result.textContent=JSON.stringify({passed:true,results},null,2);
  }catch(error){result.textContent=String(error);}
 });

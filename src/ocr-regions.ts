@@ -6,7 +6,7 @@ export function recognitionKey(r:TextRegion){return `${r.kind}:${Math.round(r.le
 
 // OCR runs on a reduced raster; map its pixel boxes back to page units.
 export function scaleRegions(regions:TextRegion[],sx:number,sy:number):TextRegion[]{
- return regions.map(r=>({...r,left:r.left*sx,top:r.top*sy,width:r.width*sx,height:r.height*sy,size:r.size*sy,baseline:r.baseline*sy,...r.blur===undefined?{}:{blur:r.blur*(sx+sy)/2}}));
+ return regions.map(r=>({...r,left:r.left*sx,top:r.top*sy,width:r.width*sx,height:r.height*sy,size:r.size*sy,baseline:r.baseline*sy,...r.blur===undefined?{}:{blur:r.blur*(sx+sy)/2},...r.glyphs?{glyphs:r.glyphs.map(g=>({...g,x0:g.x0*sx,x1:g.x1*sx}))}:{}}));
 }
 
 // Hide regions that already became editable text: same key, or an OCR text
@@ -59,4 +59,17 @@ export function mixedWeights(words:{text:string}[],bold:(boolean|undefined)[]){
  const base=boldChars>regularChars,ranges:{start:number;end:number;bold:boolean}[]=[];let offset=0;
  words.forEach((w,i)=>{const b=bold[i];if(b!==undefined&&b!==base){const last=ranges.at(-1);if(last&&last.end+1===offset)last.end=offset+len(w.text);else ranges.push({start:offset,end:offset+len(w.text),bold:b});}offset+=len(w.text)+1;});
  return {base,ranges};
+}
+
+// A lone digit or currency sign is too small to weigh reliably; it belongs to
+// the number next to it ("1 284,99 €"), so it takes that number's weight. A
+// digit prefers the number on its right (thousands), a currency sign the one on
+// its left when both sides are numbers.
+export function attachNumberParts(texts:string[],bold:(boolean|undefined)[]){
+ const out=[...bold],numeric=(i:number)=>i>=0&&i<texts.length&&/\d/.test(texts[i])&&Array.from(texts[i]).length>1;
+ texts.forEach((t,i)=>{
+  const digit=/^\d$/.test(t),currency=/^\p{Sc}$/u.test(t);if(!digit&&!currency)return;
+  const order=digit?[i+1,i-1]:[i-1,i+1],host=order.find(numeric);if(host!==undefined&&bold[host]!==undefined)out[i]=bold[host];
+ });
+ return out;
 }

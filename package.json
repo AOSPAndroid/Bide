@@ -14,8 +14,9 @@
     "prebuild": "node scripts/prepare-ocr.mjs && node scripts/prepare-ai.mjs && node scripts/check-assets.mjs",
     "build:demo": "tsc -b && vite build --mode demo",
     "assets:ocr": "node scripts/prepare-ocr.mjs",
-    "test:e2e": "node --test --test-concurrency=1 tests/e2e/ocr-replace.e2e.mjs tests/e2e/ai.e2e.mjs",
-    "assets:ai": "node scripts/prepare-ai.mjs"
+    "test:e2e": "node --test --test-concurrency=1 tests/e2e/ocr-replace.e2e.mjs tests/e2e/ai.e2e.mjs tests/e2e/selection.e2e.mjs tests/e2e/paint.e2e.mjs tests/e2e/canvas-tools.e2e.mjs",
+    "assets:ai": "node scripts/prepare-ai.mjs",
+    "test:real": "node scripts/test-real.mjs"
   },
   "dependencies": {
     "@noble/hashes": "1.8.0",
@@ -45,6 +46,7 @@
     "@types/react-dom": "^19.0.0",
     "@types/svg-to-pdfkit": "^0.1.4",
     "@vitejs/plugin-react": "^4.3.4",
+    "onnx-proto": "^8.0.1",
     "playwright-core": "^1.56.1",
     "typescript": "~5.7.3",
     "vite": "^6.1.0"

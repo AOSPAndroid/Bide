@@ -1,77 +1,68 @@
 import {isUncertain} from './ocr-regions';
 import {storedOcrLanguages,storeOcrLanguages} from './ocr-languages';
 import TextDetectionBar,{defaultOcrSettings,type OcrSettings} from './TextDetectionBar';
-import {hasScannableContent,scanPageText,detectedTextbox,matchedDetectedTextbox,coverOcrText,aiRemoveSelection,aiSharpenImage,pageInkLevel} from './detected-text';
+import {hasScannableContent,scanPageText,matchedDetectedTextbox,coverOcrText,aiRemoveSelection,aiSharpenImage,pageComposite} from './detected-text';
+import SelectionBar,{ColorRangeDialog,type SelectionAction} from './SelectionBar';
+import LayerStylePanel from './LayerStylePanel';
+import Rulers,{GuideLayer,snapToGuides,type Guides} from './Rulers';
+import {ImageSizeDialog,CanvasSizeDialog,type Anchor as CanvasAnchor} from './CanvasDialogs';
+import PerspectiveEditor from './PerspectiveEditor';
+import HistoryPanel from './HistoryPanel';
+import {historyLabel} from './history-labels';
+import {penPathData,withHandles,nearPoint,type Anchor as PenAnchor} from './pen-path';
+import {effectDefaults,effectLabels,type EffectName,type LayerStyle} from './layer-effects';
+import {gradientLayer,bucketFill,createMaskBrush} from './paint-tools';
+import {createMask,combineMasks,invertMask,featherMask,growMask,smoothMask,floodSelect,colorRangeMask,maskOutline,maskOpFor,maskBounds,maskArea,type Mask,type MaskOp} from './pixel-mask';
+import {polygonMask,samplePage,layerPixelsMask,scaledMask,maskedCutout,layerMaskFromPage,hasLayerMask,maskSize,blankLayerMask,invertLayerMask} from './selection-canvas';
+import {planOcrReplacement,lettersNote,type OcrEdit} from './ocr-replace';
+import {readDataUrl,parseProject,imageFilePage,exportPayload} from './project-io';
+import {EditTextDialog,FindReplaceDialog,findMatches,replaceText} from './TextEditDialogs';
 import {Textbox} from './text-appearance';
 import {unlockPdfPage} from './pdf-layer';
 import {thumbnailScale,editorPreviewScale} from './render-budget';
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
-import { Canvas, StaticCanvas, Rect, Ellipse, Line, FabricImage, FabricObject, PencilBrush, Path, Group, ActiveSelection, filters } from 'fabric';
-import { LassoSelect, SquareDashed, ArrowDown, ArrowUp, ArrowUpRight, Bold, Check, ChevronDown, ChevronLeft, ChevronRight, Circle, Command, Copy, Download, Eraser, Eye, EyeOff, FileImage, FilePlus2, FileText, FolderOpen, GripVertical, Hand, Highlighter, ImagePlus, Italic, Layers, LockKeyhole, Maximize, Merge, Minus, MoreHorizontal, MousePointer2, PanelLeftClose, PenLine, Plus, Redo2, RotateCw, Save, Scaling, Scissors, Search, Settings2, ShieldCheck, SlidersHorizontal, Sparkles, Square, Trash2, Type, Underline, Undo2, UnlockKeyhole, X, ZoomIn } from 'lucide-react';
+import { Canvas, Rect, Ellipse, Line, FabricImage, FabricObject, PencilBrush, Path, Group, ActiveSelection, filters, controlsUtils, util, Point } from 'fabric';
+import { LassoSelect, SquareDashed, Wand2, PaintBucket, Blend, Brush, PenTool, Crop, Ruler, History as HistoryIcon, ArrowDown, ArrowUp, ArrowUpRight, Bold, Check, ChevronDown, ChevronLeft, ChevronRight, Circle, Command, Copy, Download, Eraser, Eye, EyeOff, FileImage, FilePlus2, FileText, FolderOpen, GripVertical, Hand, Highlighter, ImagePlus, Italic, Layers, LockKeyhole, Maximize, Merge, Minus, MoreHorizontal, MousePointer2, PanelLeftClose, PenLine, Plus, Redo2, RotateCw, Save, Scaling, Scissors, Search, Settings2, ShieldCheck, SlidersHorizontal, Sparkles, Square, Trash2, Type, Underline, Undo2, UnlockKeyhole, X, ZoomIn } from 'lucide-react';
 import { autosave, blankPage, demoProject, download, restoreLocal, safeName, uid, type Page, type Project } from './model';
 import Signature from './Signature';
 import { engineHealth, restoreSources, importDocument, exportInBrowser, detectPdfText, removePdfText, pagePreview, fontSupportsText } from './browser/engine';
 import PDFPreview from './browser/PDFPreview';
 import { StampForm, CropForm, PasswordForm, type StampOptions, type CropMargins } from './DocumentTools';
 import { selectPages } from './page-range';
-import { blendModes, hasBlending } from './browser/layer-utils';
+import { blendModes } from './browser/layer-utils';
 import Diagrams, {type DiagramCommands, type NativeDiagramCommand} from './Diagrams';
 import {clampZoom, fitZoom, markerColor} from './editor-tools';
 import {searchCommands, commandMetadata, type SearchableCommand} from './command-search';
 import WorkspaceNav from './WorkspaceNav';
-import WorkspaceDock, {type Workspace} from './WorkspaceDock';
+import {IconButton,Field,ModalShell} from './ui-kit';
+import {type Workspace} from './WorkspaceDock';
 import PdfWorkspace, {type PdfTool} from './PdfWorkspace';
 import {PUBLIC_DEMO, DOWNLOAD_URL} from './build-flags';
 import {bundledFonts, systemFonts} from './font-catalog';
-import {ensureFont, ensureDocumentFonts, ensureEmbeddedFont, documentEmbeddedFonts} from './fonts';
-import {selectionMask, rectanglePoints, type SelectionPoint} from './selection-mask';
+import {ensureFont, ensureDocumentFonts, ensureEmbeddedFont} from './fonts';
+import {rectanglePoints, type SelectionPoint} from './selection-mask';
 import {makeBrush, makeEraserStroke, brushWidth, brushNames, type BrushKind} from './brushes';
 import PageMenu from './PageMenu';
 import WarpEditor from './WarpEditor';
 import {pdfFallbackStyle,type TextRegion} from './text-regions';
 import DesignTools,{type ColorStyle} from './DesignTools';
 import {framePresets,layoutLabels,layoutOffsets,type LayoutAction} from './design-layout';
-import {pageRaster,cutout,trimRaster,rasterLayer} from './retouch-canvas';
+import {pageRaster,trimRaster,rasterLayer} from './retouch-canvas';
 import {createRetouchController} from './retouch-controller';
 import {useWorkspaceTools} from './workspace-tools';
 
-type Obj = FabricObject & { textSoftness?:number; pdfFontData?:string;pdfOriginalFont?:string;pdfFontFallback?:string;pdfFontBold?:boolean;pdfFontItalic?:boolean;recognizedKey?:string; id?: string; name?: string; diagramXml?: string; text?: string; fontSize?: number; fontFamily?: string; fontWeight?: string | number; fontStyle?: string; underline?: boolean; textAlign?: string; isEditing?: boolean };
-type Tool = 'select' | 'text' | 'rect' | 'ellipse' | 'line' | 'brush' | 'highlight' | 'eraser' | 'marquee' | 'lasso' | 'hand' | 'clone' | 'heal' | 'zoom';
+type Obj = FabricObject & { layerStyle?:LayerStyle; textSoftness?:number; pdfFontData?:string;pdfOriginalFont?:string;pdfFontFallback?:string;pdfFontBold?:boolean;pdfFontItalic?:boolean;recognizedKey?:string; id?: string; name?: string; diagramXml?: string; text?: string; fontSize?: number; fontFamily?: string; fontWeight?: string | number; fontStyle?: string; underline?: boolean; textAlign?: string; isEditing?: boolean };
+type Tool = 'select' | 'pen' | 'crop' | 'wand' | 'gradient' | 'bucket' | 'mask' | 'text' | 'rect' | 'ellipse' | 'line' | 'brush' | 'highlight' | 'eraser' | 'marquee' | 'lasso' | 'hand' | 'clone' | 'heal' | 'zoom';
 type PaletteAction = SearchableCommand & {hint:string;icon:typeof Type;run:()=>void};
-type Modal = 'new' | 'export' | 'signature' | 'shortcuts' | 'resize' | 'watermark' | 'numbers' | 'crop' | null;
+type Modal = 'imagesize' | 'canvassize' | 'new' | 'export' | 'signature' | 'shortcuts' | 'resize' | 'watermark' | 'numbers' | 'crop' | null;
 const TOOLS: { id: Tool; label: string; key: string; icon: typeof Type }[] = [
   {id:'zoom',label:'Zoom tool',key:'Z',icon:ZoomIn},
   {id:'clone',label:'Clone Stamp',key:'S',icon:Copy},{id:'heal',label:'Healing Brush',key:'J',icon:Sparkles},
-  { id: 'select', label: 'Move & select', key: 'V', icon: MousePointer2 }, { id: 'text', label: 'Text box', key: 'T', icon: Type },
+  { id: 'select', label: 'Move & select', key: 'V', icon: MousePointer2 }, { id: 'crop', label: 'Crop', key: 'C', icon: Crop }, { id: 'pen', label: 'Pen', key: 'P', icon: PenTool }, { id: 'wand', label: 'Magic wand', key: 'W', icon: Wand2 }, { id: 'text', label: 'Text box', key: 'T', icon: Type },
   { id: 'rect', label: 'Rectangle', key: 'R', icon: Square }, { id: 'ellipse', label: 'Ellipse', key: 'O', icon: Circle },
   { id: 'line', label: 'Line', key: 'U', icon: Minus }, { id: 'brush', label: 'Brush', key: 'B', icon: PenLine },
-  { id: 'highlight', label: 'Highlight', key: 'H', icon: Highlighter }, { id: 'eraser', label: 'Eraser', key: 'E', icon: Eraser }, { id:'marquee',label:'Rectangular selection',key:'M',icon:SquareDashed }, { id:'lasso',label:'Lasso selection',key:'L',icon:LassoSelect }, { id: 'hand', label: 'Pan', key: 'Space', icon: Hand },
+  { id: 'highlight', label: 'Highlight', key: 'H', icon: Highlighter }, { id: 'gradient', label: 'Gradient', key: 'G', icon: Blend }, { id: 'bucket', label: 'Paint bucket', key: 'K', icon: PaintBucket }, { id: 'mask', label: 'Mask brush', key: 'Q', icon: Brush }, { id: 'eraser', label: 'Eraser', key: 'E', icon: Eraser }, { id:'marquee',label:'Rectangular selection',key:'M',icon:SquareDashed }, { id:'lasso',label:'Lasso selection',key:'L',icon:LassoSelect }, { id: 'hand', label: 'Pan', key: 'Space', icon: Hand },
 ];
-
-function IconButton({ icon: Icon, label, onClick, disabled, active }: { icon: typeof Type; label: string; onClick: () => void; disabled?: boolean; active?: boolean }) {
-  return <button type="button" aria-pressed={active===undefined?undefined:active} className={`icon-button ${active ? 'active' : ''}`} title={label} aria-label={label} onClick={onClick} disabled={disabled}><Icon size={16}/></button>;
-}
-function Field({ label, value, onChange, min, max, step = 1 }: { label: string; value: number; onChange: (v: number) => void; min?: number; max?: number; step?: number }) {
-  return <label className="number-field"><span>{label}</span><input aria-label={label} type="number" value={Number.isFinite(value) ? Math.round(value * 100) / 100 : 0} min={min} max={max} step={step} onChange={e => { const v = Number(e.target.value); if (Number.isFinite(v)) onChange(Math.min(max ?? Infinity, Math.max(min ?? -Infinity, v))); }}/></label>;
-}
-function ModalShell({ title, children, close, wide }: { title: string; children: ReactNode; close: () => void; wide?: boolean }) {
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const previous = document.activeElement as HTMLElement | null;
-    const root = ref.current;
-    ((root?.querySelector('input:not([type=color]),textarea,select') || root?.querySelector('button')) as HTMLElement)?.focus();
-    const key = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') close();
-      if (e.key !== 'Tab' || !root) return;
-      const items = [...root.querySelectorAll<HTMLElement>('button:not([disabled]),input,select,textarea,[tabindex="0"]')];
-      if (e.shiftKey && document.activeElement === items[0]) { e.preventDefault(); items.at(-1)?.focus(); }
-      if (!e.shiftKey && document.activeElement === items.at(-1)) { e.preventDefault(); items[0]?.focus(); }
-    };
-    document.addEventListener('keydown', key);
-    return () => { document.removeEventListener('keydown', key); previous?.focus(); };
-  }, []);
-  return <div className="modal-backdrop" onMouseDown={e => { if (e.target === e.currentTarget) close(); }}><div ref={ref} className={`modal ${wide ? 'wide' : ''}`} role="dialog" aria-modal="true" aria-label={title}><div className="modal-header"><h2>{title}</h2><IconButton icon={X} label="Close dialog" onClick={close}/></div>{children}</div></div>;
-}
 
 export default function App() {
   const [view, setView] = useState<Workspace>(()=>PUBLIC_DEMO && window.innerWidth<700 ? 'pdf' : 'photo');
@@ -110,13 +101,39 @@ export default function App() {
   const [brushSize, setBrushSize] = useState(4);
   const [brushKind, setBrushKind] = useState<BrushKind>('round');
   const [brushOpacity, setBrushOpacity] = useState(100);
-  const [region,setRegion] = useState<{id:string;points:SelectionPoint[]}|null>(null);
+  // The active selection: a polygon (marquee, lasso) and/or a pixel mask (wand,
+  // AI subject, colour range, combined selections). `id` is the target layer.
+  const [region,setRegion] = useState<{id:string;points:SelectionPoint[];mask?:Mask;outline?:string}|null>(null);
+  const regionRef=useRef(region);regionRef.current=region;
+  const pageRef=useRef(page);pageRef.current=page;
+  const [selectMode,setSelectMode]=useState<MaskOp>('replace');const selectModeRef=useRef(selectMode);selectModeRef.current=selectMode;
+  const [wand,setWand]=useState({tolerance:32,contiguous:true,antiAlias:true,allLayers:true});const wandRef=useRef(wand);wandRef.current=wand;
+  const [colorRange,setColorRange]=useState<{sample:ImageData;id:string;before:typeof region}|null>(null);
+  // Painting tools: the gradient runs from the drawing colour to the second colour.
+  const [secondColor,setSecondColor]=useState('#ffffff');
+  const [gradient,setGradient]=useState({type:'linear' as 'linear'|'radial',toTransparent:false,opacity:100});
+  const [bucket,setBucket]=useState({tolerance:32,contiguous:true,antiAlias:true,allLayers:true,opacity:100});
+  const [maskBrush,setMaskBrush]=useState({reveal:false,size:40,softness:50,opacity:100});
+  const paintRef=useRef({secondColor,gradient,bucket,maskBrush});paintRef.current={secondColor,gradient,bucket,maskBrush};
+  // Pen tool: anchors being placed (a ref for the canvas handlers, state to draw them).
+  const penRef=useRef<{anchors:PenAnchor[];dragging:boolean}|null>(null);
+  const [penPreview,setPenPreview]=useState<{anchors:PenAnchor[];cursor?:SelectionPoint}|null>(null);
+  const [pen,setPen]=useState({fill:false,strokeColor:'#00395d',strokeWidth:2});const penSettings=useRef(pen);penSettings.current=pen;
+  const editingPath=useRef<{path:Path;controls:FabricObject['controls']}|null>(null);
+  // Crop tool: the rectangle to keep and a straightening angle.
+  const [crop,setCrop]=useState<{rect:{left:number;top:number;width:number;height:number};angle:number}|null>(null);
+  const cropRef=useRef(crop);cropRef.current=crop;
+  const [showRulers,setShowRulers]=useState(()=>{try{return localStorage.getItem('bide-rulers')!=='hidden';}catch{return true;}});
+  const [showGuides,setShowGuides]=useState(true);
+  const [sidePanel,setSidePanel]=useState<'layers'|'history'>('layers');
+  const historyLabels=useRef<{past:string[];future:string[]}>({past:[],future:[]});
   const selectionTarget=useRef<string|null>(null);
   const [eraserSize, setEraserSize] = useState(28);
   const [textRegions,setTextRegions]=useState<TextRegion[]>([]),[textScanStatus,setTextScanStatus]=useState(''),[textScanRevision,setTextScanRevision]=useState(0),[showDetectedText,setShowDetectedText]=useState(true);
   // undefined until the model pack check finishes, so the first scan already uses the right engine.
   const [aiReady,setAiReady]=useState<boolean>();
   useEffect(()=>{void import('./browser/ai').then(m=>m.aiAvailable()).then(setAiReady);},[]);
+  const [textEdit,setTextEdit]=useState<TextRegion|null>(null),[findOpen,setFindOpen]=useState(false);
   const [ocr,setOcr]=useState<OcrSettings>(()=>({...defaultOcrSettings,languages:storedOcrLanguages()}));
   const ocrFontChosen=useRef(false);
   // Every OCR region of each page's first scan, for the page ink level: later
@@ -134,7 +151,7 @@ export default function App() {
   const retouch=useRef<ReturnType<typeof createRetouchController>|null>(null);
   const retouchSettings=useRef({tool,pageId,width:page.width,height:page.height,pdf:!!page.source,size:36,softness:24,opacity:100,target:null as Obj|null});
   retouchSettings.current={tool,pageId,width:page.width,height:page.height,pdf:!!page.source,size:tool==='eraser'?eraserSize:retouchSize,softness,opacity:retouchOpacity,target:retouchTarget.current};
-  const [warp,setWarp]=useState<{source:HTMLCanvasElement;left:number;top:number;target:Obj;pageId:string}|null>(null);
+  const [warp,setWarp]=useState<{source:HTMLCanvasElement;left:number;top:number;target:Obj;pageId:string;mode?:'perspective'}|null>(null);
   const [layerMenu,setLayerMenu]=useState<{id:string;x:number;y:number}|null>(null);
   function openLayerMenu(o:Obj,x:number,y:number){
     const c=canvas.current;if(!c)return;
@@ -175,7 +192,11 @@ export default function App() {
   const [newName, setNewName] = useState('Untitled document');
   const [snap, setSnap] = useState(true);
   const snapRef = useRef(snap); snapRef.current = snap;
-  const [leftOpen, setLeftOpen] = useState(true);
+  const [leftOpen, setLeftOpen] = useState(false);
+  // The page strip opens by itself for multi-page documents; one page leaves the room to the canvas.
+  const multiPage=project.pages.length>1;useEffect(()=>{if(multiPage)setLeftOpen(true);},[multiPage]);
+  const [demoHidden,setDemoHidden]=useState(()=>{try{return localStorage.getItem('bide-demo-notice')==='hidden';}catch{return false;}});
+  const hideDemo=()=>{setDemoHidden(true);try{localStorage.setItem('bide-demo-notice','hidden');}catch{/* per-visit only */}};
   const [mobilePanel,setMobilePanel]=useState<'pages'|'properties'|null>(null);
   const [draggingFile, setDraggingFile] = useState(false);
   const [pageMenu, setPageMenu] = useState<{id:string;x:number;y:number}|null>(null);
@@ -190,10 +211,10 @@ export default function App() {
   const notify = (s: string) => { setToast(s); setTimeout(() => setToast(''), 4200); };
   const fail = (e: unknown) => setError(e instanceof Error ? e.message : String(e));
 
-  function commit(next: Project, reload = false) {
-    history.current.past.push(projectRef.current);
-    if (history.current.past.length > 45) history.current.past.shift();
-    history.current.future = [];
+  function commit(next: Project, reload = false, label?: string) {
+    history.current.past.push(projectRef.current);historyLabels.current.past.push(label??historyLabel(projectRef.current,next));
+    if (history.current.past.length > 45) {history.current.past.shift();historyLabels.current.past.shift();}
+    history.current.future = [];historyLabels.current.future=[];
     projectRef.current = next; setProject(next); setSaved(false);
     if (reload) setEpoch(v => v + 1);
   }
@@ -211,9 +232,11 @@ export default function App() {
     refresh(v => v + 1);
   }
   saveCanvasRef.current = saveCanvas;
+  const finishPenRef=useRef(finishPen);finishPenRef.current=finishPen;
   function syncSelection() {
     const c = canvas.current;
     const active=(c?.getActiveObject() as Obj)||null;if(active)retouchTarget.current=active;
+    const editing=editingPath.current;if(editing&&active!==editing.path){editing.path.controls=editing.controls;editing.path.hasBorders=true;editing.path.setCoords();editingPath.current=null;}
     setSelected(active);
     if (c) setLayers([...c.getObjects()].reverse() as Obj[]);
     refresh(v => v + 1);
@@ -310,6 +333,7 @@ export default function App() {
       if (!snapRef.current || e.e.altKey) return;
       const o = e.target, p = projectRef.current.pages.find(p => p.id === pageIdRef.current)!;
       if (!p) return;
+      if(p.guides){const b=o.getBoundingRect(),d=snapToGuides(b,p.guides,6/zoomRef.current);if(d.x)o.set('left',o.left+d.x);if(d.y)o.set('top',o.top+d.y);}
       const center = o.getCenterPoint();
       if (Math.abs(center.x - p.width / 2) < 5) o.set('left', o.left + p.width / 2 - center.x);
       if (Math.abs(center.y - p.height / 2) < 5) o.set('top', o.top + p.height / 2 - center.y);
@@ -317,9 +341,11 @@ export default function App() {
       if (Math.abs(o.top) < 5) o.set('top', 0);
     });
     let zoomDrag:{x:number;y:number;initial:number;out:boolean;dragged:boolean}|null=null;
-    let selectionDrag:{id:string;points:SelectionPoint[]}|null=null;
+    let selectionDrag:{id:string;points:SelectionPoint[];op:MaskOp;base:typeof region;baseOutline?:string}|null=null;
+    let gradientDrag:{start:SelectionPoint;line:Line}|null=null,maskStroke:ReturnType<typeof createMaskBrush>|null=null,cropStart:SelectionPoint|null=null;
     let origin = { x: 0, y: 0 }, shape: Obj | null = null;
     let pan: { x: number; y: number; left: number; top: number } | null = null;
+    c.on('mouse:dblclick',()=>{if(toolRef.current==='pen'&&penRef.current&&penRef.current.anchors.length>2)finishPenRef.current(false);});
     c.on('contextmenu', e=>{
       if(loading.current)return;const skip=c.skipTargetFind;c.skipTargetFind=false;
       let target;try{target=c.findTarget(e.e as MouseEvent).target;}finally{c.skipTargetFind=skip;}
@@ -331,11 +357,39 @@ export default function App() {
       const t = toolRef.current;
       if(t==='zoom'){const event=e.e as MouseEvent;if(event.button!==0)return;zoomDrag={x:event.clientX,y:event.clientY,initial:zoomRef.current,out:zoomOutRef.current!==!!event.altKey,dragged:false};return;}
       if(retouch.current?.down({x:e.scenePoint.x,y:e.scenePoint.y},!!e.e.altKey))return;
-      if(t==='marquee'||t==='lasso'){
-        const target=c.getObjects().find(o=>(o as Obj).id===selectionTarget.current)||[...c.getObjects()].reverse().find(o=>o instanceof FabricImage&&o.visible&&!o.lockMovementX);
-        if(target)selectionTarget.current=(target as Obj).id||null;
-        if(!target||target.lockMovementX){notify(projectRef.current.pages.find(p=>p.id===pageIdRef.current)?.source?'Unlock Original PDF in Layers to select its pixels, or select an overlay layer.':'Select an unlocked layer before drawing a selection.');return;}
-        selectionDrag={id:selectionTarget.current!,points:[{x:e.scenePoint.x,y:e.scenePoint.y}]};setRegion(null);return;
+      if(t==='pen'){
+        const pt={x:e.scenePoint.x,y:e.scenePoint.y},st=penRef.current;
+        if(st&&st.anchors.length>=2&&nearPoint(pt,st.anchors[0],8/zoomRef.current)){finishPen(true);return;}
+        if(st){st.anchors.push(pt);st.dragging=true;}else penRef.current={anchors:[pt],dragging:true};
+        setPenPreview({anchors:[...penRef.current!.anchors],cursor:pt});return;
+      }
+      if(t==='crop'){const p=pageRef.current,pt={x:Math.max(0,Math.min(p.width,e.scenePoint.x)),y:Math.max(0,Math.min(p.height,e.scenePoint.y))};cropStart=pt;setCrop({rect:{left:pt.x,top:pt.y,width:0,height:0},angle:cropRef.current?.angle??0});return;}
+      if(t==='gradient'){const pt=e.scenePoint,line=new Line([pt.x,pt.y,pt.x,pt.y],{stroke:'#00395d',strokeWidth:1.5/zoomRef.current,strokeDashArray:[5/zoomRef.current,4/zoomRef.current],selectable:false,evented:false,excludeFromExport:true});gradientDrag={start:{x:pt.x,y:pt.y},line};c.add(line);return;}
+      if(t==='bucket'){
+        const p=pageRef.current,b=paintRef.current.bucket,target=retouchTarget.current&&c.getObjects().includes(retouchTarget.current)?retouchTarget.current:undefined;
+        if(p.source&&b.allLayers){notify('Unlock Original PDF in Layers first, so the bucket can see its pixels.');return;}
+        try{const layer=bucketFill(samplePage(c,p,b.allLayers||!target?undefined:[target]),{x:e.scenePoint.x,y:e.scenePoint.y},colorRef.current,b,regionRef.current?selectionPixels(regionRef.current):undefined);
+          if(!layer){notify('Nothing to fill there.');return;}
+          Object.assign(layer,{id:uid(),name:'Fill'});c.add(layer);c.requestRenderAll();saveCanvasRef.current();syncSelection();}
+        catch(error){notify(error instanceof Error?error.message:String(error));}
+        return;
+      }
+      if(t==='mask'){
+        const target=retouchTarget.current;
+        if(!target||target.lockMovementX||!c.getObjects().includes(target)||target instanceof ActiveSelection){notify('Select one unlocked layer, then paint its mask.');return;}
+        const m=paintRef.current.maskBrush;maskStroke=createMaskBrush(target,m);maskStroke.to({x:e.scenePoint.x,y:e.scenePoint.y});return;
+      }
+      if(t==='marquee'||t==='lasso'||t==='wand'){
+        const target=selectionLayer();
+        if(!target){notify(projectRef.current.pages.find(p=>p.id===pageIdRef.current)?.source?'Unlock Original PDF in Layers to select its pixels, or select an overlay layer.':'Select an unlocked layer before drawing a selection.');return;}
+        const op=e.e.shiftKey||e.e.altKey?maskOpFor(e.e.shiftKey,e.e.altKey):selectModeRef.current,base=op==='replace'?null:regionRef.current,pt={x:e.scenePoint.x,y:e.scenePoint.y};
+        if(t==='wand'){
+          try{const p=pageRef.current,w=wandRef.current,sample=samplePage(c,p,w.allLayers?undefined:[target]);
+            showMask(target.id!,combineMasks(base?selectionPixels(base):null,floodSelect(sample.data,sample.width,sample.height,pt.x,pt.y,w),op));}
+          catch(error){notify(error instanceof Error?error.message:String(error));}
+          return;
+        }
+        selectionDrag={id:target.id!,points:[pt],op,base,baseOutline:base?base.outline??outlineOf(base.points):undefined};if(!base)setRegion(null);return;
       }
       if (t === 'hand') { const event = e.e as MouseEvent; pan = { x: event.clientX, y: event.clientY, left: workspace.current!.scrollLeft, top: workspace.current!.scrollTop }; return; }
       if (['select','brush','highlight','eraser'].includes(t)) return;
@@ -351,9 +405,14 @@ export default function App() {
       if(toolRef.current==='zoom'){c.setCursor(zoomOutRef.current!==!!e.e.altKey?'zoom-out':'zoom-in');}
       if(zoomDrag){if(toolRef.current!=='zoom'){zoomDrag=null;return;}const event=e.e as MouseEvent,dx=event.clientX-zoomDrag.x;if(Math.abs(dx)>4||zoomDrag.dragged){zoomDrag.dragged=true;changeZoom(zoomDrag.initial*Math.exp(Math.max(-600,Math.min(600,dx))*0.01),{x:zoomDrag.x,y:zoomDrag.y});}return;}
       if(retouch.current?.move({x:e.scenePoint.x,y:e.scenePoint.y}))return;
+      if(gradientDrag){gradientDrag.line.set({x2:e.scenePoint.x,y2:e.scenePoint.y});c.requestRenderAll();return;}
+      if(toolRef.current==='pen'&&penRef.current){const st=penRef.current,pt={x:e.scenePoint.x,y:e.scenePoint.y};if(st.dragging){const i=st.anchors.length-1;st.anchors[i]=withHandles(st.anchors[i],pt);}setPenPreview({anchors:[...st.anchors],cursor:pt});return;}
+      if(cropStart){const p=pageRef.current,x=Math.max(0,Math.min(p.width,e.scenePoint.x)),y=Math.max(0,Math.min(p.height,e.scenePoint.y)),a=cropStart;setCrop(cr=>({rect:{left:Math.min(a.x,x),top:Math.min(a.y,y),width:Math.abs(x-a.x),height:Math.abs(y-a.y)},angle:cr?.angle??0}));return;}
+      if(maskStroke){maskStroke.to({x:e.scenePoint.x,y:e.scenePoint.y});return;}
       if(selectionDrag){const pt={x:e.scenePoint.x,y:e.scenePoint.y};
-        if(toolRef.current==='marquee')setRegion({id:selectionDrag.id,points:rectanglePoints(selectionDrag.points[0],pt)});
-        else {const last=selectionDrag.points.at(-1)!;if(Math.hypot(pt.x-last.x,pt.y-last.y)>2&&selectionDrag.points.length<2000)selectionDrag.points.push(pt);setRegion({id:selectionDrag.id,points:[...selectionDrag.points]});}return;
+        const outline=selectionDrag.baseOutline;
+        if(toolRef.current==='marquee'){selectionDrag.points=[selectionDrag.points[0],pt];setRegion({id:selectionDrag.id,points:rectanglePoints(selectionDrag.points[0],pt),outline});}
+        else {const last=selectionDrag.points.at(-1)!;if(Math.hypot(pt.x-last.x,pt.y-last.y)>2&&selectionDrag.points.length<2000)selectionDrag.points.push(pt);setRegion({id:selectionDrag.id,points:[...selectionDrag.points],outline});}return;
       }
       if (pan) { const event = e.e as MouseEvent; workspace.current!.scrollLeft = pan.left - event.clientX + pan.x; workspace.current!.scrollTop = pan.top - event.clientY + pan.y; return; }
       if (!shape) return;
@@ -366,7 +425,21 @@ export default function App() {
     c.on('mouse:up', () => {
       if(zoomDrag){const drag=zoomDrag;zoomDrag=null;if(toolRef.current==='zoom'&&!drag.dragged)changeZoom(drag.initial*(drag.out?1/1.25:1.25),{x:drag.x,y:drag.y});return;}
       if(retouch.current?.up())return;
-      if(selectionDrag){selectionDrag=null;return;}
+      if(maskStroke){maskStroke=null;saveCanvasRef.current();return;}
+      if(penRef.current?.dragging){penRef.current.dragging=false;return;}
+      if(cropStart){cropStart=null;setCrop(cr=>cr&&cr.rect.width>=4&&cr.rect.height>=4?cr:null);return;}
+      if(gradientDrag){
+        const {start,line}=gradientDrag,end={x:line.x2,y:line.y2};gradientDrag=null;c.remove(line);
+        if(Math.hypot(end.x-start.x,end.y-start.y)<2){c.requestRenderAll();return;}
+        const g=paintRef.current,layer=gradientLayer(pageRef.current,start,end,{...g.gradient,from:colorRef.current,to:g.secondColor},regionRef.current?selectionPixels(regionRef.current):undefined);
+        Object.assign(layer,{id:uid(),name:'Gradient'});c.add(layer);c.setActiveObject(layer);c.requestRenderAll();saveCanvasRef.current();syncSelection();return;
+      }
+      if(selectionDrag){
+        // Shift/Alt drags combine with the previous selection into one mask.
+        const drag=selectionDrag;selectionDrag=null;const points=toolRef.current==='marquee'&&drag.points.length===2?rectanglePoints(drag.points[0],drag.points[1]):drag.points;
+        if(drag.base&&points.length>2)try{showMask(drag.id,combineMasks(selectionPixels(drag.base),polygonMask(points,pageRef.current),drag.op));}catch(error){notify(error instanceof Error?error.message:String(error));}
+        return;
+      }
       pan = null;
       if (!shape) return;
       if (shape.width < 3 && shape.height < 3) {
@@ -406,8 +479,9 @@ export default function App() {
   }, [ready, pageId, epoch]);
 
   useEffect(()=>{
-    if(!ready||initializing||loading.current||aiReady===undefined)return;const scanController=new AbortController(),signal=scanController.signal;setTextRegions([]);setTextScanStatus('');const p=page,c=canvas.current!;
-    if(!hasScannableContent(p,c))return;
+    if(!ready||initializing||loading.current||aiReady===undefined)return;const scanController=new AbortController(),signal=scanController.signal;setTextRegions([]);const p=page,c=canvas.current!;
+    // The bar stays up while rescanning, so its settings menu does not close mid-change.
+    if(!hasScannableContent(p,c)){setTextScanStatus('');return;}setTextScanStatus(s=>s?'Looking for text…':s);
     const scan=async()=>{try{const {regions,all,status,suggestedFont}=await scanPageText(p,c,{signal,grouping:ocr.grouping,thorough:ocr.thorough,languages:ocr.languages,engine:aiReady?ocr.engine:'tesseract',aiSharpen:aiReady&&ocr.aiSharpen,onStatus:s=>{if(!signal.aborted)setTextScanStatus(s);}});if(signal.aborted)return;if(all?.length&&!pageOcrRegions.current.has(p.id))pageOcrRegions.current.set(p.id,all);setTextRegions(regions);setTextScanStatus(status);if(suggestedFont&&!ocrFontChosen.current)setOcr(o=>({...o,font:suggestedFont}));}
       catch(e){if(!signal.aborted)setTextScanStatus('Text detection unavailable: '+(e instanceof Error?e.message:String(e)));}};
     const scanTimer=setTimeout(()=>void scan(),120);return()=>{clearTimeout(scanTimer);scanController.abort();};
@@ -418,7 +492,7 @@ export default function App() {
     try{
       const url=await pagePreview(original.source,original.index,300/72);
       const blob=await (await fetch(url)).blob();
-      const data=await new Promise<string>((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result as string);reader.onerror=()=>reject(new Error('Could not read the PDF image.'));reader.readAsDataURL(blob);});
+      const data=await readDataUrl(blob);
       const image=await FabricImage.fromURL(data);image.set({left:0,top:0,scaleX:original.width/image.width,scaleY:original.height/image.height,lockMovementX:false,lockMovementY:false,lockScalingX:false,lockScalingY:false,lockRotation:false});
       Object.assign(image,{id:uid(),name:'Original PDF · editable image'});
       if(pageIdRef.current!==original.id)return;const current=capture(),latest=current.pages.find(p=>p.id===original.id);if(latest?.source!==original.source)return;
@@ -441,23 +515,96 @@ export default function App() {
     }catch(e){fail(e);}finally{setBusy('');}
   }
 
-  // Replace every OCR region at once with crisp editable text, as one undo step.
-  async function convertAllDetectedText(){
-    const regions=textRegions.filter(r=>r.kind==='ocr');if(busy||loading.current||!regions.length)return;const originalPage=page;setBusy(`Converting ${regions.length} text regions…`);
-    try{if(ocr.background==='transparent'&&originalPage.source)throw new Error('Unlock Original PDF first to clear scanned text to transparency.');
-      const pageInk=ocr.style==='auto'?await pageInkLevel(pageOcrRegions.current.get(originalPage.id)??regions,ocr.font):undefined,texts=[];for(const region of regions)texts.push((await detectedTextbox(region,{ocrFont:ocr.font,ocrStyle:ocr.style,pageInk})).text);
+  // Replace OCR regions in one undo step (see ocr-replace.ts).
+  async function replaceOcrRegions(items:OcrEdit[],{letters,done}:{letters:boolean;done:(lettersUsed:number,fontUsed:number)=>string}){
+    const regions=items.filter(i=>i.region.kind==='ocr');if(busy||loading.current||!regions.length)return;const originalPage=page,c=canvas.current!;setBusy(`Replacing ${regions.length} text region${regions.length===1?'':'s'}…`);
+    try{
+      const plan=await planOcrReplacement(c,originalPage,regions,{settings:ocr,pageRegions:pageOcrRegions.current.get(originalPage.id)??textRegions,others:textRegions,letters,autoFont:!ocrFontChosen.current});
       if(pageIdRef.current!==originalPage.id)return;const current=capture();const objects=[...((current.pages.find(p=>p.id===originalPage.id)!.canvas.objects||[]) as unknown[])];
-      await coverOcrText(canvas.current!,originalPage,regions,objects,{mode:ocr.background,color:ocr.color,padding:ocr.padding,others:textRegions,onProgress:f=>setBusy(`AI filling background… ${Math.round(f*100)}%`)});
+      await plan.apply(objects,f=>setBusy(`AI filling background… ${Math.round(f*100)}%`));
       if(pageIdRef.current!==originalPage.id)return;
-      objects.push(...texts.map(t=>t.toObject()));setTool('select');setTextRegions([]);commit({...current,pages:current.pages.map(p=>p.id===originalPage.id?{...p,color:ocr.background==='transparent'?'transparent':p.color,canvas:{...p.canvas,objects},thumb:undefined}:p)},true);
-      notify(`${regions.length} text regions are now crisp editable text. Undo restores the original.`);
+      setTool('select');setTextRegions([]);
+      commit({...current,pages:current.pages.map(p=>p.id===originalPage.id?{...p,color:plan.transparent?'transparent':p.color,canvas:{...p.canvas,objects},thumb:undefined}:p)},true);
+      notify(done(plan.letters,plan.fonts));
     }catch(e){fail(e);}finally{setBusy('');}
+  }
+  const convertAllDetectedText=()=>replaceOcrRegions(textRegions.filter(r=>r.kind==='ocr').map(region=>({region})),{letters:false,done:(_,n)=>`${n} text regions are now crisp editable text. Undo restores the original.`});
+  const editRegionText=(region:TextRegion,text:string)=>{setTextEdit(null);void replaceOcrRegions([{region,text}],{letters:true,done:lettersNote});};
+  const findAndReplace=(find:string,replacement:string,matchCase:boolean)=>{setFindOpen(false);const matches=findMatches(textRegions,find,matchCase);void replaceOcrRegions(matches.map(region=>({region,text:replaceText(region.text,find,replacement,matchCase)})),{letters:ocr.editMode==='letters',done:(l,f)=>`Replaced in ${l+f} line${l+f===1?'':'s'}. `+(ocr.editMode==='letters'?lettersNote(l,f):'Undo restores the original.')});};
+
+
+  // Selection helpers -----------------------------------------------------
+  const outlineOf=(points:SelectionPoint[])=>points.length>2?'M'+points.map(p=>`${p.x} ${p.y}`).join('L')+'Z':'';
+  const selectionPixels=(r:NonNullable<typeof region>)=>r.mask??polygonMask(r.points,pageRef.current);
+  // The layer a selection applies to: the one chosen before, else the top unlocked image.
+  function selectionLayer(){
+    const c=canvas.current;if(!c)return undefined;
+    const target=(c.getObjects().find(o=>(o as Obj).id===selectionTarget.current)||[...c.getObjects()].reverse().find(o=>o instanceof FabricImage&&o.visible&&!o.lockMovementX)) as Obj|undefined;
+    if(target)selectionTarget.current=target.id||null;
+    return target&&!target.lockMovementX?target:undefined;
+  }
+  function showMask(id:string,mask:Mask){
+    if(!maskBounds(mask,128)){setRegion(null);notify('Nothing was selected. Try a higher tolerance or another spot.');return;}
+    setRegion({id,points:[],mask,outline:maskOutline(mask)});
+  }
+  const selectionCutout=(object:FabricObject)=>{const p=pageRef.current;return maskedCutout(pageRaster(canvas.current!,p.width,p.height,[object]),selectionPixels(region!),p);};
+  async function selectSubject(){
+    const c=canvas.current,target=selectionLayer();if(!c||busy)return;
+    if(!target){notify(page.source?'Unlock Original PDF in Layers first, so the selection has pixels to act on.':'Add or select an image layer first.');return;}
+    setBusy('Finding the subject with AI…');
+    try{const raster=await pageComposite(c,page),{segmentSubject}=await import('./browser/ai-tools'),map=await segmentSubject(raster);
+      showMask(target.id!,scaledMask(map.values,map.width,map.height,page));setTool(t=>['marquee','lasso','wand'].includes(t)?t:'marquee');notify('Subject selected. Refine it, or use Keep inside to mask the layer.');}
+    catch(e){fail(e);}finally{setBusy('');}
+  }
+  // AI background removal as a layer mask (non-destructive: paint or delete the mask).
+  async function removeBackground(){
+    const c=canvas.current,o=c?.getActiveObject() as Obj|undefined;if(!c||!o||busy)return;
+    if(!(o instanceof FabricImage)||o.lockMovementX){notify('Select an unlocked image layer first.');return;}
+    setBusy('Removing the background with AI…');
+    try{const b=o.getBoundingRect(),x=Math.max(0,Math.floor(b.left)),y=Math.max(0,Math.floor(b.top)),w=Math.min(Math.ceil(page.width),Math.ceil(b.left+b.width))-x,h=Math.min(Math.ceil(page.height),Math.ceil(b.top+b.height))-y;
+      if(w<4||h<4)throw new Error('The image is outside the page.');
+      const raster=pageRaster(c,page.width,page.height,[o]),crop=Object.assign(document.createElement('canvas'),{width:w,height:h});crop.getContext('2d')!.drawImage(raster,x*raster.width/Math.ceil(page.width),y*raster.height/Math.ceil(page.height),w*raster.width/Math.ceil(page.width),h*raster.height/Math.ceil(page.height),0,0,w,h);
+      const {segmentSubject}=await import('./browser/ai-tools'),map=await segmentSubject(crop);
+      o.set({clipPath:layerMaskFromPage(o,scaledMask(map.values,map.width,map.height,page,{left:x,top:y,width:w,height:h}))});c.requestRenderAll();saveCanvas();syncSelection();
+      notify('Background removed with a layer mask. Paint the mask to refine it; Undo restores the image.');}
+    catch(e){fail(e);}finally{setBusy('');}
+  }
+  function openColorRange(){
+    const c=canvas.current,target=selectionLayer();if(!c)return;
+    if(!target){notify('Select an unlocked layer first.');return;}
+    try{setColorRange({sample:samplePage(c,page,wand.allLayers?undefined:[target]),id:target.id!,before:region});}catch(e){fail(e);}
+  }
+  function previewColorRange(color:string,fuzziness:number){
+    if(!colorRange)return 0;const rgb=[1,3,5].map(i=>parseInt(color.slice(i,i+2),16)),{sample}=colorRange;
+    const m=colorRangeMask(sample.data,sample.width,sample.height,rgb,fuzziness),area=Math.round(maskArea(m));
+    if(area)setRegion({id:colorRange.id,points:[],mask:m,outline:maskOutline(m)});else setRegion(colorRange.before);
+    return area;
+  }
+  function runSelection(action:SelectionAction,amount=4){
+    const r=region,id=r?.id;
+    switch(action){
+      case 'unlock':void unlockOriginalPdf();return;
+      case 'copy':copyToClipboard();return;
+      case 'paste':void pasteFromClipboard();return;
+      case 'keep':case 'hide':void applySelection(action);return;
+      case 'layer':void applySelection('copy');return;
+      case 'mask':void applySelection('keep');return;
+      case 'ai-remove':void aiRemove();return;
+      case 'subject':void selectSubject();return;
+      case 'color-range':openColorRange();return;
+      case 'deselect':setRegion(null);setTool('select');return;
+      case 'all':{const target=selectionLayer();if(!target){notify('Select an unlocked layer first.');return;}const {width,height}=maskSize(page);showMask(target.id!,createMask(width,height,255));return;}
+    }
+    if(!r||!id)return;
+    const pixels=selectionPixels(r);
+    const next=action==='inverse'?invertMask(pixels):action==='feather'?featherMask(pixels,amount):action==='expand'?growMask(pixels,amount):action==='contract'?growMask(pixels,-amount):smoothMask(pixels,amount);
+    showMask(id,next);
   }
 
   // LaMa fills the selected area from its surroundings, as a separate undoable layer.
   async function aiRemove(){
-    const c=canvas.current;if(!c||!region||busy)return;const points=region.points;setBusy('Removing with AI…');
-    try{const patches=await aiRemoveSelection(c,page,points,f=>setBusy(`Removing with AI… ${Math.round(f*100)}%`));for(const patch of patches)c.add(patch);setRegion(null);setTool('select');c.requestRenderAll();saveCanvas();notify('Selection filled with AI as a new layer. Undo or delete the layer to restore it.');}
+    const c=canvas.current;if(!c||!region||busy)return;const pixels=selectionPixels(region);setBusy('Removing with AI…');
+    try{const patches=await aiRemoveSelection(c,page,pixels,f=>setBusy(`Removing with AI… ${Math.round(f*100)}%`));for(const patch of patches)c.add(patch);setRegion(null);setTool('select');c.requestRenderAll();saveCanvas();notify('Selection filled with AI as a new layer. Undo or delete the layer to restore it.');}
     catch(e){fail(e);}finally{setBusy('');}
   }
   // Real-ESRGAN doubles the image layer's resolution; its size on the page is unchanged.
@@ -476,6 +623,7 @@ export default function App() {
     if(anchor&&root&&bounds){root.scrollLeft+=bounds.left+anchor.x*zoom-anchor.screenX;root.scrollTop+=bounds.top+anchor.y*zoom-anchor.screenY;zoomAnchor.current=null;}
   }, [zoom, page.width, page.height, page.color, page.source, ready]);
 
+  useEffect(()=>{if(tool!=='pen'&&penRef.current){penRef.current=null;setPenPreview(null);}if(tool!=='crop')setCrop(null);},[tool]);
   useEffect(() => {
     const c = canvas.current; if (!c) return;
     c.isDrawingMode = tool === 'brush' || tool === 'highlight'; c.selection = tool === 'select'; c.skipTargetFind = tool !== 'select';
@@ -485,7 +633,7 @@ export default function App() {
       if(tool!=='brush') {brush.color=tool==='eraser'?'rgba(100,130,150,0.35)':markerColor(highlightColor,highlightOpacity);brush.width=tool==='eraser'?eraserSize:highlightSize;}
       c.freeDrawingBrush = brush;
     }
-    if (tool==='marquee'||tool==='lasso'){const target=c.getActiveObject() as Obj|undefined;if(target&&! (target instanceof ActiveSelection))selectionTarget.current=target.id||null;}
+    if (tool==='marquee'||tool==='lasso'||tool==='wand'){const target=c.getActiveObject() as Obj|undefined;if(target&&! (target instanceof ActiveSelection))selectionTarget.current=target.id||null;}
     if (tool !== 'select') {const target=c.getActiveObject();if(target&&!(target instanceof ActiveSelection))retouchTarget.current=target as Obj;c.discardActiveObject();}
     c.requestRenderAll();
   }, [tool, zoomOutMode, color, brushSize, brushKind, brushOpacity, eraserSize, highlightColor, highlightSize, highlightOpacity, ready]);
@@ -510,7 +658,7 @@ export default function App() {
   function addText() { addObject(new Textbox('Your text', { left: 60, top: 90, width: 300, fontSize: 32, fill: color, fontFamily: textFont.current }), 'Text box'); }
   async function addImage(file: File | string, name = 'Image') {
     try {
-      const url = typeof file === 'string' ? file : await new Promise<string>((resolve,reject) => { const r = new FileReader(); r.onload = () => resolve(r.result as string); r.onerror = reject; r.readAsDataURL(file); });
+      const url = typeof file === 'string' ? file : await readDataUrl(file);
       const image = await FabricImage.fromURL(url);
       image.scale(Math.min((page.width-100)/image.width,(page.height-120)/image.height,1));
       image.set({ left: (page.width-image.getScaledWidth())/2, top: (page.height-image.getScaledHeight())/2 });
@@ -533,6 +681,7 @@ export default function App() {
     if (loading.current) return;
     const h = history.current, from = redo ? h.future : h.past, to = redo ? h.past : h.future;
     const next = from.pop(); if (!next) return;
+    const labels=historyLabels.current,label=(redo?labels.future:labels.past).pop();if(label!==undefined)(redo?labels.past:labels.future).push(label);
     to.push(projectRef.current); projectRef.current = next; setProject(next);
     if (!next.pages.some(p => p.id === pageId)) setPageId(next.pages[0].id);
     setEpoch(v => v+1); setSaved(false);
@@ -546,11 +695,7 @@ export default function App() {
     openedByUser.current=true;
     setBusy('Opening project…');
     try {
-      const data = JSON.parse(await file.text()) as Project;
-      if (data.version !== 1 || !Array.isArray(data.pages) || !data.pages.length || !data.sources || data.pages.some(p => !p.id || !p.canvas || !Number.isFinite(p.width) || !Number.isFinite(p.height) || p.width <= 0 || p.height <= 0 || p.width > 14400 || p.height > 14400)) throw new Error('This is not a valid bide project.');
-      // Restored canvas images must be embedded, never fetched from the network.
-      const validate = (value: unknown): void => { if (!value || typeof value !== 'object') return; for (const [key,v] of Object.entries(value)) { if (key === 'src' && typeof v === 'string' && !v.startsWith('data:image/')) throw new Error('Project images must be embedded.'); if (typeof v === 'object') validate(v); } };
-      data.pages.forEach(p => validate(p.canvas));
+      const data = parseProject(await file.text());
       if(Object.keys(data.sources).length)await restoreSources(data.sources);
       commit(data,true); setPageId(data.pages[0].id); notify('Project opened.');
     } catch(e) { fail(e); } finally { setBusy(''); }
@@ -583,15 +728,7 @@ export default function App() {
           const result = await importPsd(file); pages.push(result.page); notices.push(result.notice); continue;
         }
         if (/\.(png|jpe?g|webp)$/i.test(file.name)) {
-          const data = await new Promise<string>((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(reader.result as string); reader.onerror = reject; reader.readAsDataURL(file); });
-          const image = await FabricImage.fromURL(data);
-          const ratio = Math.min(1, 5000 / Math.max(image.width, image.height));
-          image.scale(ratio);
-          Object.assign(image, { id: uid(), name: file.name });
-          const p = blankPage(image.width * ratio, image.height * ratio);
-          p.name = file.name.replace(/\.[^.]+$/, '');
-          p.canvas = { objects: [image.toObject()] };
-          pages.push(p);
+          pages.push(await imageFilePage(file));
           continue;
         }
         if (/\.(docx?|xlsx?|pptx?|odt|ods|odp|rtf)$/i.test(file.name)) setBusy('Loading Office engine & converting locally… First use loads the bundled Office engine.');
@@ -606,27 +743,6 @@ export default function App() {
     } catch(e) { fail(e); } finally { setBusy(''); }
   }
   function openFiles(append = false) { importMode.current = append ? 'append' : 'open'; fileInput.current?.click(); }
-  async function payload() {
-    const current = capture();
-    const pages = [];
-    for (const p of current.pages) {
-      const c = new StaticCanvas(undefined, { width: p.width, height: p.height, backgroundColor: p.source ? '' : p.color });
-      try {
-        await ensureDocumentFonts(p.canvas);
-        await c.loadFromJSON(p.canvas);
-        for(const object of c.getObjects()){const o=object as Obj;if(o instanceof Textbox&&(o as Obj).pdfFontData&&o.fontFamily.startsWith('PDFfont-')&&!await fontSupportsText((o as Obj).pdfFontData!,o.text)){const family=(o as Obj).pdfFontFallback||'Lato';await ensureFont(family);o.set({fontFamily:family,...pdfFallbackStyle(o as Obj)});o.initDimensions();}}
-        c.backgroundColor = p.source ? '' : p.color;
-        let svg = c.toSVG({ width: String(p.width), height: String(p.height), viewBox: { x:0,y:0,width:p.width,height:p.height } });
-        if (hasBlending(c.getObjects())) {
-          const png = c.toDataURL({ format: 'png', multiplier: Math.min(2, 4096 / Math.max(p.width, p.height)) });
-          svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${p.width}" height="${p.height}"><image href="${png}" width="${p.width}" height="${p.height}"/></svg>`;
-        }
-        pages.push({ width: p.width, height: p.height, source: p.source, index: p.index, svg, fonts:documentEmbeddedFonts(p.canvas) });
-      }
-      finally { await c.dispose(); }
-    }
-    return { pages, title: current.name };
-  }
   async function runExport(options?: { targetId?: string; format?: string; rotation?: number; range?: string; reimport?: boolean; crop?: CropMargins }) {
     const targetId = options?.targetId || pageId;
     setBusy(options?.reimport ? 'Updating page…' : 'Preparing your export…');
@@ -638,7 +754,7 @@ export default function App() {
         setModal(null); notify(needsFlattenedPsd(canvas.current?.getObjects()||[])?'PSD exported as a merged appearance to preserve erasing. Save .bide to retain editable layers.':'PSD exported with raster layers and supported groups. Save .bide to retain editable text and masks.'); return;
       }
       if (protect && format === 'pdf' && !options?.reimport && (!exportPassword || exportPassword !== passwordConfirmation)) throw new Error('Enter and confirm the same non-empty PDF password.');
-      const body = { ...await payload(), format, compression, range, dpi, ...options, ...(options?.reimport ? { compression: 'lossless' } : {}), password: !options?.reimport && format === 'pdf' && protect ? exportPassword : undefined };
+      const body = { ...await exportPayload(capture()), format, compression, range, dpi, ...options, ...(options?.reimport ? { compression: 'lossless' } : {}), password: !options?.reimport && format === 'pdf' && protect ? exportPassword : undefined };
       const blob = await exportInBrowser(body);
       if (options?.reimport) {
         const result = await importDocument(new File([blob], 'rotated.pdf'));
@@ -695,7 +811,7 @@ export default function App() {
     const c=canvas.current;if(!c)return;
     if(region){
       const object=c.getObjects().find(o=>(o as Obj).id===region.id);if(!object)return;
-      try {const patch=cutout(pageRaster(c,page.width,page.height,[object]),region.points);clipboard.current=Object.assign(new FabricImage(patch.canvas,{left:patch.left,top:patch.top}),{name:'Selection patch'});copyPending.current=null;clipboardPatch.current=true;notify('Selection copied. Ctrl V pastes it as a new patch layer.');}catch(error){fail(error);}return;
+      try {const patch=selectionCutout(object);clipboard.current=Object.assign(new FabricImage(patch.canvas,{left:patch.left,top:patch.top}),{name:'Selection patch'});copyPending.current=null;clipboardPatch.current=true;notify('Selection copied. Ctrl V pastes it as a new patch layer.');}catch(error){fail(error);}return;
     }
     const o=c.getActiveObject();if(!o){notify('Select an area or layer to copy.');return;}clipboardPatch.current=false;
     const pending=o.clone() as Promise<Obj>;copyPending.current=pending;void pending.then(clone=>{if(copyPending.current===pending){clipboard.current=clone;notify('Layer copied');}}).catch(fail);
@@ -713,21 +829,23 @@ export default function App() {
     const c=canvas.current,o=c?.getActiveObject() as Obj|undefined;if(!c||!o||o.lockMovementX||o instanceof ActiveSelection){notify('Select one unlocked patch or layer first.');return;}
     try {const trimmed=trimRaster(pageRaster(c,page.width,page.height,[o]));if(trimmed.empty)return;if(trimmed.canvas.width*trimmed.canvas.height>4000000)throw new Error('Warp supports patches up to 4 megapixels. Copy a smaller selection first.');setWarp({source:trimmed.canvas,left:trimmed.left,top:trimmed.top,target:o,pageId});setLayerMenu(null);}catch(error){fail(error);}
   }
-  function applyWarp(source:HTMLCanvasElement) {
+  function applyWarp(source:HTMLCanvasElement,dx=0,dy=0) {
     const c=canvas.current;if(!c||!warp||warp.pageId!==pageId)return;const index=c.getObjects().indexOf(warp.target);if(index<0){setWarp(null);return;}
-    const image=Object.assign(new FabricImage(source,{left:warp.left,top:warp.top,globalCompositeOperation:warp.target.globalCompositeOperation}),{id:uid(),name:`${warp.target.name||'Layer'} warped`});c.discardActiveObject();c.remove(warp.target);c.insertAt(index,image);c.setActiveObject(image);setWarp(null);setTool('select');saveCanvas();syncSelection();
+    const image=Object.assign(new FabricImage(source,{left:warp.left+dx,top:warp.top+dy,globalCompositeOperation:warp.target.globalCompositeOperation}),{id:uid(),name:`${warp.target.name||'Layer'} ${warp.mode==='perspective'?'in perspective':'warped'}`});c.discardActiveObject();c.remove(warp.target);c.insertAt(index,image);c.setActiveObject(image);setWarp(null);setTool('select');saveCanvas();syncSelection();
   }
   async function applySelection(mode:'keep'|'hide'|'copy') {
     const c=canvas.current;if(!c||!region)return;
     const object=c.getObjects().find(o=>(o as Obj).id===region.id) as Obj|undefined;
     if(!object||object.lockMovementX){notify('Choose an unlocked layer.');return;}
     try {
-      const mask=selectionMask(object,region.points,mode==='hide');
       if(mode==='copy'){
-        const patch=cutout(pageRaster(c,page.width,page.height,[object]),region.points);const copy=Object.assign(new FabricImage(patch.canvas,{left:patch.left,top:patch.top}),{id:uid(),name:`${object.name||'Layer'} cutout`});c.add(copy);c.setActiveObject(copy);
-      } else {object.set({clipPath:mask});c.setActiveObject(object);}
+        const patch=selectionCutout(object);const copy=Object.assign(new FabricImage(patch.canvas,{left:patch.left,top:patch.top}),{id:uid(),name:`${object.name||'Layer'} cutout`});c.add(copy);c.setActiveObject(copy);
+      } else {
+        // A raster layer mask: soft edges survive and it can be painted on later.
+        const pixels=selectionPixels(region);object.set({clipPath:layerMaskFromPage(object,mode==='hide'?invertMask(pixels):pixels)});c.setActiveObject(object);
+      }
       setRegion(null);setTool('select');c.requestRenderAll();saveCanvas();syncSelection();
-      notify(mode==='copy'?'Cutout copied to a new layer.': 'Layer mask applied. Remove the mask to restore the original.');
+      notify(mode==='copy'?'Cutout copied to a new layer.': 'Layer mask applied. Paint it with the Mask brush, or remove it to restore the original.');
     } catch(error){fail(error);} finally {setBusy('');}
   }
   function setImageFilter(kind: string, value?: number) { const o=canvas.current?.getActiveObject(); if (!(o instanceof FabricImage) || o.lockMovementX) return; if(kind==='reset') o.filters=[]; else { const constructors: Record<string, any> = { grayscale: filters.Grayscale, sepia:filters.Sepia, invert:filters.Invert, brightness:filters.Brightness, contrast:filters.Contrast, saturation:filters.Saturation, blur:filters.Blur }; const Filter=constructors[kind]; o.filters=o.filters.filter(f=>f.type.toLowerCase()!==kind); if(Filter && value!==0) o.filters.push(new Filter(value===undefined ? {} : { [kind]:value })); } o.applyFilters(); canvas.current?.requestRenderAll(); saveCanvas(); }
@@ -754,8 +872,82 @@ export default function App() {
       commit({ ...current, pages }, true); setModal(null); notify(`Added ${options.kind === 'watermark' ? 'watermarks' : 'page numbers'} to ${indexes.length} pages.`);
     } catch (e) { fail(e); }
   }
+  // Layer masks -----------------------------------------------------------
+  function withLayer(run:(o:Obj,c:Canvas)=>void){const c=canvas.current,o=c?.getActiveObject() as Obj|undefined;if(!c||!o||o instanceof ActiveSelection)return;if(o.lockMovementX){notify('Unlock this layer first.');return;}run(o,c);c.requestRenderAll();saveCanvas();syncSelection();}
+  const addLayerMask=()=>withLayer(o=>{o.set({clipPath:blankLayerMask(o,true)});notify('Layer mask added. Paint it with the Mask brush (Q): Hide paints the layer away, Reveal brings it back.');});
+  const invertSelectedMask=()=>withLayer(o=>{if(!hasLayerMask(o))return;invertLayerMask(o.clipPath);o.clipPath.set('dirty',true);o.set('dirty',true);});
+  const deleteLayerMask=()=>withLayer(o=>{o.set({clipPath:undefined});});
+  // Apply: bake the mask into the layer's pixels (layer style stays live).
+  const applyLayerMask=()=>withLayer((o,c)=>{
+    if(!hasLayerMask(o))return;const style=o.layerStyle,index=c.getObjects().indexOf(o);o.layerStyle=undefined;
+    try{const image=rasterLayer(pageRaster(c,page.width,page.height,[o]),o.name||'Layer',uid()) as Obj|null;c.remove(o);if(image){image.set({globalCompositeOperation:o.globalCompositeOperation});image.layerStyle=style;c.insertAt(index,image);c.setActiveObject(image);}}
+    finally{o.layerStyle=style;}
+  });
+  const setLayerStyle=(style:LayerStyle|undefined,save=true)=>updateObject({layerStyle:style},save);
+  const addEffect=(name:EffectName)=>{const o=canvas.current?.getActiveObject() as Obj|undefined;if(!o)return;setLayerStyle({...o.layerStyle,[name]:{...effectDefaults[name],...o.layerStyle?.[name],enabled:true}});};
+
+  // History panel: go back (negative) or forward (positive) several steps at once.
+  function toggleRulers(){setShowRulers(v=>{try{localStorage.setItem('bide-rulers',v?'hidden':'shown');}catch{/* per visit */}return !v;});}
+  function jumpHistory(steps:number){for(let i=0;i<Math.abs(steps);i++)undo(steps>0);}
+  // Guides live on the page, so they save with it and Undo covers them.
+  const guides:Guides=page.guides??{x:[],y:[]};
+  function setGuides(next:Guides){const id=pageIdRef.current;commit({...projectRef.current,pages:projectRef.current.pages.map(p=>p.id===id?{...p,guides:next.x.length||next.y.length?next:undefined}:p)});}
+  // Pen tool --------------------------------------------------------------
+  function finishPen(closed:boolean){
+    const st=penRef.current,c=canvas.current;penRef.current=null;setPenPreview(null);if(!st||!c)return;
+    const anchors=st.anchors.filter((p,i,a)=>i===0||Math.hypot(p.x-a[i-1].x,p.y-a[i-1].y)>.5);if(anchors.length<2)return;
+    const s=penSettings.current,path=new Path(penPathData(anchors,closed),{fill:closed&&s.fill?colorRef.current:'',stroke:s.strokeWidth>0?s.strokeColor:undefined,strokeWidth:s.strokeWidth,strokeLineJoin:'round',strokeLineCap:'round'});
+    Object.assign(path,{id:uid(),name:closed?'Shape':'Path'});c.add(path);c.requestRenderAll();saveCanvas();syncSelection();
+  }
+  // Point editing for a path: fabric's anchor and handle controls replace the box.
+  function togglePathEdit(){
+    const c=canvas.current,o=c?.getActiveObject();if(!c)return;const current=editingPath.current;
+    if(current){current.path.controls=current.controls;current.path.hasBorders=true;editingPath.current=null;}
+    if(o instanceof Path&&current?.path!==o){editingPath.current={path:o,controls:o.controls};o.controls=controlsUtils.createPathControls(o,{controlPointStyle:{controlFill:'#ffffff',controlStroke:'#00aeef'},pointStyle:{controlFill:'#00aeef',controlStroke:'#ffffff'}});o.hasBorders=false;}
+    // Control positions are cached; recompute them for the new set of controls.
+    current?.path.setCoords();if(o instanceof Path)o.setCoords();
+    c.requestRenderAll();refresh(v=>v+1);
+  }
+  // Canvas geometry: page size, crop, trim -----------------------------------
+  function pageGeometry(label:string,width:number,height:number,move:(o:FabricObject)=>void,guide:(g:Guides)=>Guides){
+    const c=canvas.current;if(!c||loading.current)return;
+    c.discardActiveObject();for(const o of c.getObjects()){move(o);o.setCoords();}
+    const current=capture(),id=pageIdRef.current,next=guide(guides);
+    commit({...current,pages:current.pages.map(p=>p.id===id?{...p,width,height,guides:next.x.length||next.y.length?next:undefined,thumb:undefined}:p)},true,label);
+  }
+  const designOnly=()=>{if(page.source){notify('This works on image and design pages. For a PDF page use Crop page, or Unlock Original PDF first.');return false;}return true;};
+  function resizeImage(width:number,height:number){
+    setModal(null);if(!designOnly())return;const sx=width/page.width,sy=height/page.height;
+    pageGeometry('Image size',width,height,o=>util.applyTransformToObject(o,util.multiplyTransformMatrices([sx,0,0,sy,0,0],o.calcOwnMatrix())),g=>({x:g.x.map(v=>Math.round(v*sx)),y:g.y.map(v=>Math.round(v*sy))}));
+    notify(`Image resized to ${width} × ${height}. Undo restores the original size.`);
+  }
+  function resizeCanvas(width:number,height:number,anchor:CanvasAnchor){
+    setModal(null);if(!designOnly())return;const dx=(width-page.width)*anchor[0],dy=(height-page.height)*anchor[1];
+    pageGeometry('Canvas size',width,height,o=>o.set({left:o.left+dx,top:o.top+dy}),g=>({x:g.x.map(v=>v+dx),y:g.y.map(v=>v+dy)}));
+  }
+  // Crop to a page rectangle, optionally straightening the content first.
+  function cropTo(rect:{left:number;top:number;width:number;height:number},angle=0){
+    const r={left:Math.round(rect.left),top:Math.round(rect.top),width:Math.max(1,Math.round(rect.width)),height:Math.max(1,Math.round(rect.height))};setCrop(null);
+    if(page.source){
+      if(angle){notify('Straightening needs an image page. Unlock Original PDF first, or crop without an angle.');return;}
+      void runExport({format:'pdf',range:String(project.pages.findIndex(p=>p.id===pageId)+1),crop:{left:r.left,top:r.top,right:Math.max(0,page.width-r.left-r.width),bottom:Math.max(0,page.height-r.top-r.height)},reimport:true});return;
+    }
+    const pivot=new Point(r.left+r.width/2,r.top+r.height/2),rad=util.degreesToRadians(angle);
+    pageGeometry(angle?'Crop and straighten':'Crop',r.width,r.height,o=>{
+      if(angle){const center=o.getCenterPoint().rotate(rad,pivot);o.rotate((o.angle+angle)%360);o.setPositionByOrigin(center,'center','center');}
+      o.set({left:o.left-r.left,top:o.top-r.top});
+    },g=>({x:g.x.map(v=>v-r.left).filter(v=>v>=0&&v<=r.width),y:g.y.map(v=>v-r.top).filter(v=>v>=0&&v<=r.height)}));
+    setTool('select');notify(`Cropped to ${r.width} × ${r.height}${angle?`, straightened ${angle}°`:''}. Undo restores the page.`);
+  }
+  function trimToContent(){
+    const c=canvas.current;if(!c||!designOnly())return;
+    const t=trimRaster(pageRaster(c,page.width,page.height,c.getObjects().filter(o=>o.visible)));if(t.empty){notify('The page is empty; nothing to trim to.');return;}
+    cropTo({left:t.left,top:t.top,width:t.canvas.width,height:t.canvas.height});
+  }
+  function openPerspective(){openWarp();setWarp(w=>w&&{...w,mode:'perspective'});}
+
   function setClip(kind: string) {
-    const o = canvas.current?.getActiveObject(); if (!o || o.lockMovementX) return;
+    const o = canvas.current?.getActiveObject(); if (!o || o.lockMovementX || kind==='layer' || kind==='selection') return;
     const common = { originX: 'center' as const, originY: 'center' as const, left: 0, top: 0 };
     updateObject({ clipPath: kind === 'ellipse' ? new Ellipse({ ...common, rx: o.width / 2, ry: o.height / 2 }) : kind === 'rounded' ? new Rect({ ...common, width: o.width, height: o.height, rx: Math.min(o.width, o.height) * .16, ry: Math.min(o.width, o.height) * .16 }) : undefined });
   }
@@ -792,6 +984,11 @@ export default function App() {
     {label:'Unlock Original PDF as image layer',hint:'Marquee · Lasso · rasterize',icon:UnlockKeyhole,disabled:!page.source?'This page is already editable':undefined,run:()=>void unlockOriginalPdf()},
     {label:'Rectangular layer selection',hint:'M',icon:SquareDashed,run:()=>setTool('marquee')},
     {label:'Freehand lasso selection',hint:'L',icon:LassoSelect,run:()=>setTool('lasso')},
+    {label:'Magic wand',hint:'W',icon:Wand2,keywords:'select colour color similar tolerance',run:()=>setTool('wand')},
+    {label:'Select all pixels',hint:'',icon:SquareDashed,run:()=>runSelection('all')},
+    {label:'Inverse selection',hint:'Ctrl Shift I',icon:SquareDashed,disabled:region?undefined:'Make a selection first',run:()=>runSelection('inverse')},
+    {label:'Select subject with AI',hint:'',icon:Sparkles,keywords:'person object cut out isolate',disabled:aiReady?undefined:'AI models are not bundled in this build.',run:()=>void selectSubject()},
+    {label:'Select color range',hint:'',icon:SquareDashed,keywords:'similar colour sky background',run:openColorRange},
     { label:'Draw with brush', hint:'B', icon:PenLine, run:()=>setTool('brush') },
     { label:'Erase artwork', hint:'E', icon:Eraser, run:()=>setTool('eraser') },
     {label:'Clone Stamp',hint:'S',icon:Copy,keywords:'sample retouch texture alt click',run:()=>setTool('clone')},
@@ -809,12 +1006,36 @@ export default function App() {
   const clearSelection=()=>{setRegion(null);canvas.current?.discardActiveObject();canvas.current?.requestRenderAll();syncSelection();setTool('select');};
   const copyLayers=copyToClipboard;
   const pasteLayers=()=>void pasteFromClipboard();
-  const focusSetting=(label:string)=>{setMobilePanel('properties');requestAnimationFrame(()=>{const input=document.querySelector<HTMLElement>(`[aria-label="${label}"]`);input?.scrollIntoView({block:'nearest'});input?.focus();});};
+  const focusSetting=(label:string)=>{setMobilePanel('properties');requestAnimationFrame(()=>{const input=document.querySelector<HTMLElement>(`[aria-label="${label}"]`);/* Settings tucked into a closed menu open first. */for(let d=input?.closest('details');d;d=d.parentElement?.closest('details')??null)d.open=true;input?.scrollIntoView({block:'nearest'});input?.focus();});};
   const moreActions:PaletteAction[] = [
+    {label:'Pen tool',hint:'P',icon:PenTool,keywords:'path bezier curve vector shape draw',run:()=>setTool('pen')},
+    {label:'Edit path points',hint:'',icon:PenTool,keywords:'node anchor handle bezier',disabled:selected instanceof Path?requireLayer:'Select a path or pen shape first',run:()=>{setTool('select');togglePathEdit();}},
+    {label:'Crop tool',hint:'C',icon:Crop,keywords:'straighten trim rotate page',run:()=>setTool('crop')},
+    {label:'Image size…',hint:'',icon:Scaling,keywords:'resample resize scale pixels dimensions',run:()=>setModal('imagesize')},
+    {label:'Canvas size…',hint:'',icon:Scaling,keywords:'extend border space anchor',run:()=>setModal('canvassize')},
+    {label:'Trim to content',hint:'',icon:Crop,keywords:'transparent pixels crop auto',run:trimToContent},
+    {label:'Crop to selection',hint:'',icon:Crop,disabled:region?undefined:'Make a selection first',run:()=>{const b=region&&maskBounds(selectionPixels(region));if(b){setRegion(null);cropTo(b);}}},
+    {label:'Toggle rulers',hint:'Ctrl R',icon:Ruler,run:toggleRulers},
+    {label:'Toggle guides',hint:'Ctrl ;',icon:Ruler,run:()=>setShowGuides(v=>!v)},
+    {label:'Clear guides',hint:'',icon:Ruler,disabled:guides.x.length||guides.y.length?undefined:'This page has no guides',run:()=>setGuides({x:[],y:[]})},
+    {label:'Show history',hint:'',icon:HistoryIcon,keywords:'undo steps states',run:()=>{setSidePanel('history');setMobilePanel('properties');}},
+    {label:'Perspective distort',hint:'',icon:Scaling,keywords:'free transform corners keystone',disabled:requireLayer,run:openPerspective},
+    {label:'Gradient tool',hint:'G',icon:Blend,keywords:'fill blend fade linear radial',run:()=>setTool('gradient')},
+    {label:'Paint bucket',hint:'K',icon:PaintBucket,keywords:'fill flood colour color area',run:()=>setTool('bucket')},
+    {label:'Mask brush',hint:'Q',icon:Brush,keywords:'paint layer mask hide reveal',run:()=>setTool('mask')},
+    {label:'Add layer mask',hint:'',icon:Layers,disabled:requireLayer??(hasLayerMask(selected)?'This layer already has a mask':undefined),run:addLayerMask},
+    {label:'Invert layer mask',hint:'',icon:Layers,disabled:requireLayer??(hasLayerMask(selected)?undefined:'Add a layer mask first'),run:invertSelectedMask},
+    {label:'Apply layer mask',hint:'',icon:Layers,disabled:requireLayer??(hasLayerMask(selected)?undefined:'Add a layer mask first'),run:applyLayerMask},
+    {label:'Delete layer mask',hint:'',icon:Layers,disabled:requireLayer??(hasLayerMask(selected)?undefined:'Add a layer mask first'),run:deleteLayerMask},
+    ...(Object.keys(effectLabels) as EffectName[]).map(name=>({label:`Add layer style: ${effectLabels[name]}`,hint:'',icon:Sparkles,keywords:'effect fx shadow glow outline stroke overlay',disabled:requireLayer,run:()=>addEffect(name)})),
+    {label:'Clear layer style',hint:'',icon:Sparkles,disabled:requireLayer??((selected as Obj|null)?.layerStyle?undefined:'This layer has no style'),run:()=>setLayerStyle(undefined)},
+    {label:'Select layer pixels',hint:'',icon:SquareDashed,keywords:'transparency alpha load selection',disabled:requireLayer,run:()=>{const c=canvas.current,o=c?.getActiveObject() as Obj|undefined;if(!c||!o)return;selectionTarget.current=o.id||null;showMask(o.id!,layerPixelsMask(c,page,o));setTool('marquee');}},
+    {label:'Remove background with AI',hint:'',icon:Eraser,keywords:'cut out subject transparent isolate',disabled:!aiReady?'AI models are not bundled in this build.':requireImage,run:()=>void removeBackground()},
     {label:'Export text as transparent PNG',hint:'',icon:Download,disabled:requireText,run:()=>void exportTransparentPng(true)},
     {label:'Export page as transparent PNG',hint:'',icon:Download,disabled:page.source?'Unlock Original PDF first':undefined,run:()=>void exportTransparentPng()},
     {label:'Sharpen image layer with AI (2×)',hint:'',keywords:'upscale enhance super resolution blurry esrgan',icon:SlidersHorizontal,disabled:!aiReady?'AI models are not bundled in this build.':requireImage,run:()=>void aiSharpenSelected()},
     {label:'Remove selection with AI fill',hint:'',keywords:'inpaint erase object content aware lama',icon:Eraser,disabled:!aiReady?'AI models are not bundled in this build.':region?undefined:'Draw a Marquee or Lasso selection first',run:()=>void aiRemove()},
+    {label:'Find and replace in image text',hint:'',keywords:'ocr rename typo correct name word everywhere',icon:Type,disabled:textRegions.some(r=>r.kind==='ocr')?undefined:'Open an image or scanned page with detected text first.',run:()=>setFindOpen(true)},
     {label:'Convert all detected text',hint:'',keywords:'ocr sharpen crisp blurry replace every line all text',icon:Type,disabled:textRegions.some(r=>r.kind==='ocr')?undefined:'Open an image or scanned page with detected text first.',run:()=>void convertAllDetectedText()},
     {label:'Choose OCR languages',hint:'',keywords:'german deutsch spanish español italian italiano dutch nederlands portuguese português english french language',icon:Type,run:()=>focusSetting('OCR languages')},
     {label:'Choose OCR scan depth',hint:'',keywords:'thorough sparse buttons badges labels screenshot',icon:Type,run:()=>focusSetting('OCR scan depth')},
@@ -925,10 +1146,15 @@ export default function App() {
       if (modal || palette || warp || busy || loading.current) return;
       if (input || (canvas.current?.getActiveObject() as Obj)?.isEditing) return;
       const k=e.key.toLowerCase();
+      if(toolRef.current==='pen'&&penRef.current&&(e.key==='Enter'||e.key==='Escape')){e.preventDefault();if(e.key==='Enter')finishPen(false);else{penRef.current=null;setPenPreview(null);}return;}
+      if(toolRef.current==='crop'&&cropRef.current&&(e.key==='Enter'||e.key==='Escape')){e.preventDefault();if(e.key==='Enter')cropTo(cropRef.current.rect,cropRef.current.angle);else setCrop(null);return;}
+      if((e.ctrlKey||e.metaKey)&&k==='r'){e.preventDefault();toggleRulers();return;}
+      if((e.ctrlKey||e.metaKey)&&k===';'){e.preventDefault();setShowGuides(v=>!v);return;}
       if(e.ctrlKey || e.metaKey) {
         const shortcuts: Record<string,string> = { n:'New document', o:'Open PDF, image or Office file', s:'Save editable project', e:e.shiftKey?'Export PDF':'Merge Down', z:e.shiftKey?'Redo':'Undo', y:'Redo', d:'Duplicate selection', g:e.shiftKey?'Ungroup selection':'Group selection', '0':'Fit page to window', '1':'Actual size (100%)', '=':'Zoom in', '+':'Zoom in', '-':'Zoom out', '_':'Zoom out' };
         if(shortcuts[k]) { e.preventDefault(); actionRef.current.find(a=>a.label===shortcuts[k])?.run(); }
         if(k==='a') { e.preventDefault(); const c=canvas.current!; c.setActiveObject(new ActiveSelection(c.getObjects().filter(o=>!o.lockMovementX && o.visible),{canvas:c})); c.requestRenderAll(); syncSelection(); }
+        if(k==='i'&&e.shiftKey){e.preventDefault();if(region)runSelection('inverse');return;}
         if(k==='c') {e.preventDefault();copyToClipboard();}
         if(k==='v') {e.preventDefault();void pasteFromClipboard();}
         return;
@@ -950,31 +1176,38 @@ export default function App() {
   const selectedImage = selected instanceof FabricImage;
   const pdfTools: PdfTool[] = [{category:'Organize',title:'Merge documents',desc:'Combine PDFs and images into one.',icon:Merge,run:()=>openFiles(true)},{category:'Organize',title:'Split & extract',desc:'Save individual pages or a page range.',icon:Scissors,run:()=>exportDialog('split')},{category:'Organize',title:'Compress PDF',desc:'Balance file size and image quality.',icon:Scaling,run:()=>exportDialog('pdf','balanced')},{category:'Convert',title:'Convert to PDF',desc:PUBLIC_DEMO?'Images & text. Office: local edition.':'Word, Excel, PowerPoint, images & text.',icon:FileText,run:()=>openFiles()},{category:'Convert',title:'PDF to images',desc:'Export sharp PNG, JPEG or SVG pages.',icon:FileImage,run:()=>exportDialog('png')},{category:'Convert',title:'PDF to Word',desc:'Extract editable text into a DOCX file.',icon:FileText,run:()=>exportDialog('docx')},{category:'Edit',title:'Sign a document',desc:'Draw or type your signature.',icon:PenLine,run:()=>setModal('signature')},{category:'Edit',title:'Add & edit text',desc:'Place, style and resize a text box.',icon:Type,run:()=>{setModal(null);addText();}},{category:'Edit',title:'Watermarks',desc:'Stamp editable text across a page range.',icon:Type,run:()=>setModal('watermark')},{category:'Edit',title:'Page numbers',desc:'Headers, footers and custom numbering.',icon:FileText,run:()=>setModal('numbers')},{category:'Edit',title:'Crop page',desc:'Trim the visible boundary of a page.',icon:Scissors,run:()=>setModal('crop')},{category:'Security',title:'Protect PDF',desc:'Require a password to open the export.',icon:LockKeyhole,run:()=>{exportDialog();setProtect(true);}},{category:'Security',title:'Unlock PDF',desc:'Open an encrypted PDF with its password.',icon:UnlockKeyhole,run:()=>openFiles()},{category:'Organize',title:'Organize pages',desc:'Add pages. Drag thumbnails to reorder.',icon:Layers,run:()=>{setModal(null);setLeftOpen(true);notify('Drag page thumbnails to reorder. Right-click a page to rotate, duplicate or delete.');}}];
 
-  const menus: Record<string, string[]> = { File:['New document','Open PDF, image or Office file','Open editable project','Save editable project','Export PDF','Export current design as PSD'], Edit:['Undo','Redo','Duplicate selection','Group selection','Ungroup selection','Warp selected layer','Merge Down'], Insert:['Add text box','Place image','Add signature','Add blank page'], Page:['Duplicate current page','Rotate current page clockwise','Fit page to window','Crop current page'], PDF:['Merge documents','Split PDF into pages','Compress PDF','Convert Office or images to PDF','Extract text to Word','Extract plain text','Add watermarks','Add page numbers','Protect PDF with password','Unlock password PDF'], Help:['Keyboard shortcuts'] };
+  const menus: Record<string, string[]> = { File:['New document','Open PDF, image or Office file','Open editable project','Save editable project','Export PDF','Export current design as PSD'], Edit:['Undo','Redo','Duplicate selection','Group selection','Ungroup selection','Warp selected layer','Merge Down'], Image:['Image size…','Canvas size…','Crop tool','Crop to selection','Trim to content','Perspective distort'], View:['Toggle rulers','Toggle guides','Clear guides','Show history','Fit page to window','Actual size (100%)'], Layer:['Add layer mask','Invert layer mask','Apply layer mask','Delete layer mask','Add layer style: Drop shadow','Add layer style: Stroke','Add layer style: Outer glow','Clear layer style','Merge Down'], Select:['Select all pixels','Inverse selection','Select subject with AI','Select color range','Select layer pixels','Magic wand','Deselect everything'], Insert:['Add text box','Place image','Add signature','Add blank page'], Page:['Duplicate current page','Rotate current page clockwise','Fit page to window','Crop current page'], PDF:['Merge documents','Split PDF into pages','Compress PDF','Convert Office or images to PDF','Extract text to Word','Extract plain text','Add watermarks','Add page numbers','Protect PDF with password','Unlock password PDF'], Help:['Keyboard shortcuts'] };
   return <div className={`app workspace-${view}`} onDragOver={e=>{ if(view!=='diagrams'&&e.dataTransfer.types.includes('Files')) { e.preventDefault(); setDraggingFile(true); } }} onDrop={e=>{ if(view!=='diagrams'&&e.dataTransfer.files.length) { e.preventDefault(); setDraggingFile(false); setPdfHome(false);void importFiles([...e.dataTransfer.files],true); } }}>
     <input ref={fileInput} type="file" multiple accept=".psd,.pdf,.png,.jpg,.jpeg,.webp,.bmp,.tif,.tiff,.doc,.docx,.odt,.rtf,.xls,.xlsx,.ods,.ppt,.pptx,.odp,.txt,.md,.svg,.bide,.folio" hidden onChange={e=>{ void importFiles([...e.target.files||[]],importMode.current==='append'); e.target.value=''; }}/>
     <input ref={imageInput} type="file" multiple accept="image/png,image/jpeg,image/webp" hidden onChange={e=>{ for(const file of [...e.target.files||[]]) void addImage(file); e.target.value=''; }}/>
     <input ref={projectInput} type="file" accept=".bide,.folio" hidden onChange={e=>{ if(e.target.files?.[0]) void loadProject(e.target.files[0]); e.target.value=''; }}/>
-    <header className="topbar"><div className="brand"><img className="barclays-logo" src="./barclays-eagle.svg" alt="Barclays"/><div className="brand-lockup"><span>bide</span><small>Barclays Image &amp; Document Editor</small></div><span className="beta">{PUBLIC_DEMO?'DEMO':'LOCAL'}</span></div><nav className="menubar" aria-label="Application menu" style={{display:view!=='diagrams'?undefined:'none'}}>{Object.keys(menus).map(label=><div className="menu-wrapper" key={label}><button className={menu===label?'open':''} onClick={()=>setMenu(menu===label?null:label)}>{label}</button>{menu===label && <div className="dropdown">{menus[label].map(name=>{const a=actions.find(a=>a.label===name)!;return <button key={name} onClick={()=>{setMenu(null);setPdfHome(false);a.run();}}><a.icon size={14}/><span>{name}</span><kbd>{a.hint}</kbd></button>;})}</div>}</div>)}</nav><div className="topbar-right"><button className="command-button" onClick={()=>{setPalette(true);setQuery('');setCommandIndex(0);}}><Search size={14}/><span>Find a tool…</span><kbd>Ctrl K</kbd></button><span className="local-status"><span/>On your device</span></div></header>
-    <WorkspaceNav active={view} onSelect={selectWorkspace}/>
+    <header className="topbar"><div className="brand"><img className="barclays-logo" src="./barclays-eagle.svg" alt="Barclays"/><div className="brand-lockup"><span>bide</span><small>Barclays Image &amp; Document Editor</small></div><span className="beta">{PUBLIC_DEMO?'DEMO':'LOCAL'}</span></div><WorkspaceNav active={view} onSelect={selectWorkspace}/><nav className="menubar" aria-label="Application menu" style={{display:view!=='diagrams'?undefined:'none'}}>{Object.keys(menus).map(label=><div className="menu-wrapper" key={label}><button className={menu===label?'open':''} onClick={()=>setMenu(menu===label?null:label)}>{label}</button>{menu===label && <div className="dropdown">{menus[label].map(name=>{const a=[...actions,...moreActions].find(a=>a.label===name)!;return <button key={name} onClick={()=>{setMenu(null);setPdfHome(false);a.run();}}><a.icon size={14}/><span>{name}</span><kbd>{a.hint}</kbd></button>;})}</div>}</div>)}</nav><div className="topbar-right"><button className="command-button" onClick={()=>{setPalette(true);setQuery('');setCommandIndex(0);}}><Search size={14}/><span>Find a tool…</span><kbd>Ctrl K</kbd></button><span className="local-status" title="Files stay on this computer"><span/>On your device</span></div></header>
     {menu && <div className="menu-dismiss" onClick={()=>setMenu(null)}/>}
-    {PUBLIC_DEMO&&<div className="demo-notice"><span>Public demo · Files stay in your browser. Office conversion is in the local edition.</span><a href={DOWNLOAD_URL}>Download bide</a><a href="https://github.com/AOSPAndroid/Bide" target="_blank" rel="noreferrer">Source</a></div>}
+    {PUBLIC_DEMO&&!demoHidden&&<div className="demo-notice"><span>Public demo · Files stay in your browser. Office conversion is in the local edition.</span><a href={DOWNLOAD_URL}>Download bide</a><a href="https://github.com/AOSPAndroid/Bide" target="_blank" rel="noreferrer">Source</a><button className="demo-close" aria-label="Hide demo notice" onClick={hideDemo}><X size={13}/></button></div>}
     {!PUBLIC_DEMO && health.ok && !health.office && <div className="hosting-notice" role="status">{!globalThis.isSecureContext ? 'HTTP sharing: editing is available. Use trusted HTTPS for Office conversion and reliable downloads; browsers may block HTTP downloads.' : 'Office conversion is unavailable. Ask the host to enable the hosting settings in HOSTING.md.'}</div>}
     <div className="editor-shell" style={{display:view!=='diagrams'&&!(view==='pdf'&&pdfHome)?'flex':'none'}}>
-    <div className="document-bar"><div className="document-name"><FileText size={16}/><input aria-label="Document name" value={project.name} onChange={e=>commit({...project,name:e.target.value})}/><span className="save-state">{saved?<><Check size={12}/>Saved locally</>:<><span className="unsaved-dot"/>Editing</>}</span></div><div className="document-actions"><button className="secondary open-document" onClick={()=>openFiles()} title="Open files (Ctrl O)"><FolderOpen size={15}/>Open files</button><button className="secondary save-project" onClick={saveProject} title="Download an editable .bide project (Ctrl S)"><Save size={15}/>Save project</button><span className="divider"/><IconButton icon={Undo2} label="Undo (Ctrl Z)" onClick={()=>undo()} disabled={!history.current.past.length}/><IconButton icon={Redo2} label="Redo (Ctrl Shift Z)" onClick={()=>undo(true)} disabled={!history.current.future.length}/><span className="divider"/><button className="secondary toolkit-btn" onClick={()=>view==='pdf'?selectWorkspace('pdf'):imageInput.current?.click()}>{view==='pdf'?<><SlidersHorizontal size={15}/>All PDF tools</>:<><ImagePlus size={15}/>Place image</>}</button><button className="primary" onClick={()=>exportDialog()}><Download size={15}/>Export file<ChevronDown size={13}/></button></div></div>
-    <div className="options-bar"><div className="tool-caption"><span className="tool-caption-label">Active tool</span>{TOOLS.find(t=>t.id===tool)?.label || 'Select'}</div><span className="divider"/>{selectedText ? <><select aria-label="Font family" value={selected.fontFamily} onChange={e=>void changeTextFont(e.target.value)}><optgroup label={`Bundled · ${bundledFonts.length} fonts available offline`}>{bundledFonts.map(font=><option key={font.family} value={font.family}>{font.family}</option>)}</optgroup><optgroup label="System fonts · must be installed">{systemFonts.map(x=><option key={x}>{x}</option>)}</optgroup>{selected.fontFamily&&!bundledFonts.some(f=>f.family===selected.fontFamily)&&!systemFonts.includes(selected.fontFamily)&&<option value={selected.fontFamily}>{(selected as Obj).pdfOriginalFont&&selected.fontFamily.startsWith('PDFfont-')?(selected as Obj).pdfOriginalFont+' (embedded)':selected.fontFamily}</option>}</select><input className="font-size" aria-label="Font size" type="number" min={4} max={500} value={selected.fontSize} onChange={e=>updateObject({fontSize:Math.max(4,Number(e.target.value))})}/><IconButton icon={Bold} label="Bold" active={selected.fontWeight==='bold'} onClick={()=>updateObject({fontWeight:selected.fontWeight==='bold'?'normal':'bold'})}/><IconButton icon={Italic} label="Italic" active={selected.fontStyle==='italic'} onClick={()=>updateObject({fontStyle:selected.fontStyle==='italic'?'normal':'italic'})}/><IconButton icon={Underline} label="Underline" active={selected.underline} onClick={()=>updateObject({underline:!selected.underline})}/></> : <><label className="check-label"><input type="checkbox" checked={snap} onChange={e=>setSnap(e.target.checked)}/>Snap to page</label><span className="options-hint">{tool==='select'?'Shift-click to select multiple layers':tool==='text'?'Click or drag on the page to add text':tool==='zoom'?'Click to zoom · Alt reverses · Drag right/left to zoom':tool==='hand'?'Drag to pan the workspace':'Click and drag on the page'}</span></>}<div className="options-end">{selected?.diagramXml&&<button className="secondary" onClick={editDiagram}>Edit diagram</button>}{tool==='zoom'?<><IconButton icon={Plus} label="Zoom tool: zoom in" active={!zoomOutMode} onClick={()=>setZoomOutMode(false)}/><IconButton icon={Minus} label="Zoom tool: zoom out" active={zoomOutMode} onClick={()=>setZoomOutMode(true)}/><button className="secondary" onClick={()=>changeZoom(1)}>100%</button></>:tool==='clone'||tool==='heal'?<><span className="muted">Alt-click to sample</span><label className="marker-setting">Size<input aria-label="Retouch size" className="font-size" type="number" min={1} max={200} value={retouchSize} onChange={e=>setRetouchSize(brushWidth(Number(e.target.value)))}/></label><label className="marker-setting">Soft edge<input aria-label="Retouch softness" className="font-size" type="number" min={0} max={100} value={softness} onChange={e=>setSoftness(Math.min(100,Math.max(0,Number(e.target.value))))}/></label><label className="marker-setting">Opacity<input aria-label="Retouch opacity" className="font-size" type="number" min={1} max={100} value={retouchOpacity} onChange={e=>setRetouchOpacity(Math.min(100,Math.max(1,Number(e.target.value))))}/>%</label></>:tool==='eraser'?<><span className="muted">Erase selected layer</span><label className="marker-setting">Soft edge<input className="font-size" type="number" aria-label="Eraser softness" min={0} max={100} value={softness} onChange={e=>setSoftness(Math.min(100,Math.max(0,Number(e.target.value))))}/>px</label><label className="marker-setting">Size<input aria-label="Eraser size" className="font-size" type="number" min={1} max={200} value={eraserSize} onChange={e=>setEraserSize(brushWidth(Number(e.target.value)))}/></label></>:tool==='highlight'?<><label className="marker-setting">Color<input type="color" aria-label="Highlight color" value={highlightColor} onChange={e=>setHighlightColor(e.target.value)}/></label><label className="marker-setting">Width<input className="font-size" aria-label="Highlight width" type="number" min={1} max={120} value={highlightSize} onChange={e=>setHighlightSize(Math.min(120,Math.max(1,Number(e.target.value))))}/></label><label className="marker-setting">Opacity<input className="font-size" aria-label="Highlight opacity" type="number" min={5} max={90} value={highlightOpacity} onChange={e=>setHighlightOpacity(Math.min(90,Math.max(5,Number(e.target.value))))}/> %</label></>:<><span className="muted">Fill</span><input type="color" aria-label="Fill color" value={selected && typeof selected.fill==='string' && /^#[0-9a-f]{6}$/i.test(selected.fill)?selected.fill:color} onChange={e=>{setColor(e.target.value);if(selected)updateObject({fill:e.target.value});}}/>{tool==='brush' && <><select aria-label="Brush style" value={brushKind} onChange={e=>setBrushKind(e.target.value as BrushKind)}>{Object.entries(brushNames).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select><label className="marker-setting">Size<input aria-label="Brush size" className="font-size" type="number" min={1} max={200} value={brushSize} onChange={e=>setBrushSize(brushWidth(Number(e.target.value)))}/></label><label className="marker-setting">Opacity<input aria-label="Brush opacity" className="font-size" type="number" min={5} max={100} value={brushOpacity} onChange={e=>setBrushOpacity(Math.min(100,Math.max(5,Number(e.target.value))))}/>%</label></>}</>}<span className="divider"/><div className="header-zoom"><IconButton icon={Minus} label="Decrease zoom" onClick={()=>changeZoom(zoomRef.current/1.2)}/><input key={zoom} aria-label="Zoom percentage" type="number" min={10} max={800} defaultValue={Math.round(zoom*100)} onBlur={e=>changeZoom(Number(e.target.value)/100)} onKeyDown={e=>{if(e.key==='Enter')e.currentTarget.blur();}}/><span>%</span><IconButton icon={Plus} label="Increase zoom" onClick={()=>changeZoom(zoomRef.current*1.2)}/></div><IconButton icon={Maximize} label="Fit page (Ctrl 0)" onClick={fit}/></div></div>
+    <div className="command-strip"><div className="document-bar"><div className="document-name"><FileText size={16}/><input aria-label="Document name" value={project.name} onChange={e=>commit({...project,name:e.target.value})}/><span className="save-state">{saved?<><Check size={12}/>Saved locally</>:<><span className="unsaved-dot"/>Editing</>}</span></div><div className="document-actions"><button className="secondary open-document" onClick={()=>openFiles()} title="Open files (Ctrl O)"><FolderOpen size={15}/><span className="btn-label">Open files</span></button><button className="secondary save-project" onClick={saveProject} title="Download an editable .bide project (Ctrl S)"><Save size={15}/><span className="btn-label">Save project</span></button><span className="divider"/><IconButton icon={Undo2} label="Undo (Ctrl Z)" onClick={()=>undo()} disabled={!history.current.past.length}/><IconButton icon={Redo2} label="Redo (Ctrl Shift Z)" onClick={()=>undo(true)} disabled={!history.current.future.length}/><span className="divider"/><button className="secondary toolkit-btn" onClick={()=>view==='pdf'?selectWorkspace('pdf'):imageInput.current?.click()}>{view==='pdf'?<><SlidersHorizontal size={15}/><span className="btn-label">All PDF tools</span></>:<><ImagePlus size={15}/><span className="btn-label">Place image</span></>}</button><button className="primary" onClick={()=>exportDialog()}><Download size={15}/><span className="btn-label">Export</span><ChevronDown size={13}/></button></div></div>
+    <div className="options-bar"><div className="tool-caption"><span className="tool-caption-label">Active tool</span>{TOOLS.find(t=>t.id===tool)?.label || 'Select'}</div><span className="divider"/>{selectedText ? <><select aria-label="Font family" value={selected.fontFamily} onChange={e=>void changeTextFont(e.target.value)}><optgroup label={`Bundled · ${bundledFonts.length} fonts available offline`}>{bundledFonts.map(font=><option key={font.family} value={font.family}>{font.family}</option>)}</optgroup><optgroup label="System fonts · must be installed">{systemFonts.map(x=><option key={x}>{x}</option>)}</optgroup>{selected.fontFamily&&!bundledFonts.some(f=>f.family===selected.fontFamily)&&!systemFonts.includes(selected.fontFamily)&&<option value={selected.fontFamily}>{(selected as Obj).pdfOriginalFont&&selected.fontFamily.startsWith('PDFfont-')?(selected as Obj).pdfOriginalFont+' (embedded)':selected.fontFamily}</option>}</select><input className="font-size" aria-label="Font size" type="number" min={4} max={500} value={selected.fontSize} onChange={e=>updateObject({fontSize:Math.max(4,Number(e.target.value))})}/><IconButton icon={Bold} label="Bold" active={selected.fontWeight==='bold'} onClick={()=>updateObject({fontWeight:selected.fontWeight==='bold'?'normal':'bold'})}/><IconButton icon={Italic} label="Italic" active={selected.fontStyle==='italic'} onClick={()=>updateObject({fontStyle:selected.fontStyle==='italic'?'normal':'italic'})}/><IconButton icon={Underline} label="Underline" active={selected.underline} onClick={()=>updateObject({underline:!selected.underline})}/></> : <><label className="check-label"><input type="checkbox" checked={snap} onChange={e=>setSnap(e.target.checked)}/>Snap to page</label><span className="options-hint">{tool==='select'?'Shift-click to select multiple layers':tool==='text'?'Click or drag on the page to add text':tool==='pen'?'Click to add points, drag for curves · click the first point to close · Enter finishes':tool==='crop'?'Enter applies · Esc cancels':tool==='wand'?'Click a colour to select it · Shift adds · Alt subtracts':tool==='gradient'?'Drag across the page; a selection limits the gradient':tool==='bucket'?'Click to fill a colour area with a new layer':tool==='mask'?'Paint the selected layer\'s mask':tool==='zoom'?'Click to zoom · Alt reverses · Drag right/left to zoom':tool==='hand'?'Drag to pan the workspace':'Click and drag on the page'}</span></>}<div className="options-end">{selected instanceof Path&&tool==='select'&&<button className={editingPath.current?.path===selected?'primary':'secondary'} aria-pressed={editingPath.current?.path===selected} onClick={togglePathEdit}>{editingPath.current?.path===selected?'Done editing points':'Edit points'}</button>}{selected?.diagramXml&&<button className="secondary" onClick={editDiagram}>Edit diagram</button>}{tool==='pen'?<><label className="check-label" title="Closed shapes are filled with the drawing colour"><input type="checkbox" checked={pen.fill} onChange={e=>setPen(p=>({...p,fill:e.target.checked}))}/>Fill</label><label className="marker-setting">Stroke<input type="color" aria-label="Pen stroke color" value={pen.strokeColor} onChange={e=>setPen(p=>({...p,strokeColor:e.target.value}))}/></label><label className="marker-setting">Width<input aria-label="Pen stroke width" className="font-size" type="number" min={0} max={100} value={pen.strokeWidth} onChange={e=>setPen(p=>({...p,strokeWidth:Math.max(0,Math.min(100,Number(e.target.value)||0))}))}/></label>{penPreview&&<button className="secondary" onClick={()=>finishPen(false)}>Finish path</button>}</>
+:tool==='crop'?<>{crop?<><span className="muted">{Math.round(crop.rect.width)} × {Math.round(crop.rect.height)}</span><label className="marker-setting" title="Rotate the content to straighten it">Straighten<input aria-label="Straighten angle" className="font-size" type="number" min={-45} max={45} step={.5} value={crop.angle} onChange={e=>setCrop(c=>c&&{...c,angle:Math.max(-45,Math.min(45,Number(e.target.value)||0))})}/>°</label><button className="primary" onClick={()=>cropTo(crop.rect,crop.angle)}>Apply crop</button><button className="secondary" onClick={()=>setCrop(null)}>Cancel</button></>:<span className="muted">Drag over the page to choose the area to keep</span>}</>
+:tool==='gradient'?<><select aria-label="Gradient type" value={gradient.type} onChange={e=>setGradient(g=>({...g,type:e.target.value as 'linear'|'radial'}))}><option value="linear">Linear</option><option value="radial">Radial</option></select><label className="marker-setting">From<input type="color" aria-label="Gradient start color" value={color} onChange={e=>setColor(e.target.value)}/></label><label className="marker-setting">To<input type="color" aria-label="Gradient end color" disabled={gradient.toTransparent} value={secondColor} onChange={e=>setSecondColor(e.target.value)}/></label><label className="check-label"><input type="checkbox" checked={gradient.toTransparent} onChange={e=>setGradient(g=>({...g,toTransparent:e.target.checked}))}/>To transparent</label><label className="marker-setting">Opacity<input aria-label="Gradient opacity" className="font-size" type="number" min={1} max={100} value={gradient.opacity} onChange={e=>setGradient(g=>({...g,opacity:Math.min(100,Math.max(1,Number(e.target.value)||1))}))}/>%</label></>
+:tool==='bucket'?<><label className="marker-setting">Fill<input type="color" aria-label="Bucket color" value={color} onChange={e=>setColor(e.target.value)}/></label><label className="marker-setting">Tolerance<input aria-label="Bucket tolerance" className="font-size" type="number" min={0} max={255} value={bucket.tolerance} onChange={e=>setBucket(b=>({...b,tolerance:Math.max(0,Math.min(255,Number(e.target.value)||0))}))}/></label><label className="check-label"><input type="checkbox" checked={bucket.contiguous} onChange={e=>setBucket(b=>({...b,contiguous:e.target.checked}))}/>Contiguous</label><label className="check-label"><input type="checkbox" checked={bucket.allLayers} onChange={e=>setBucket(b=>({...b,allLayers:e.target.checked}))}/>All layers</label><label className="marker-setting">Opacity<input aria-label="Bucket opacity" className="font-size" type="number" min={1} max={100} value={bucket.opacity} onChange={e=>setBucket(b=>({...b,opacity:Math.min(100,Math.max(1,Number(e.target.value)||1))}))}/>%</label></>
+:tool==='mask'?<><div className="mode-switch" role="group" aria-label="Mask brush mode"><button aria-pressed={!maskBrush.reveal} title="Paint the layer away" onClick={()=>setMaskBrush(m=>({...m,reveal:false}))}>Hide</button><button aria-pressed={maskBrush.reveal} title="Paint the layer back" onClick={()=>setMaskBrush(m=>({...m,reveal:true}))}>Reveal</button></div><label className="marker-setting">Size<input aria-label="Mask brush size" className="font-size" type="number" min={1} max={500} value={maskBrush.size} onChange={e=>setMaskBrush(m=>({...m,size:Math.max(1,Math.min(500,Number(e.target.value)||1))}))}/></label><label className="marker-setting">Soft edge<input aria-label="Mask brush softness" className="font-size" type="number" min={0} max={100} value={maskBrush.softness} onChange={e=>setMaskBrush(m=>({...m,softness:Math.max(0,Math.min(100,Number(e.target.value)||0))}))}/>%</label><label className="marker-setting">Opacity<input aria-label="Mask brush opacity" className="font-size" type="number" min={1} max={100} value={maskBrush.opacity} onChange={e=>setMaskBrush(m=>({...m,opacity:Math.max(1,Math.min(100,Number(e.target.value)||1))}))}/>%</label></>
+:tool==='wand'?<><label className="marker-setting" title="How different a colour may be and still be selected (0-255)">Tolerance<input aria-label="Wand tolerance" className="font-size" type="number" min={0} max={255} value={wand.tolerance} onChange={e=>setWand(w=>({...w,tolerance:Math.max(0,Math.min(255,Number(e.target.value)||0))}))}/></label><label className="check-label"><input type="checkbox" checked={wand.contiguous} onChange={e=>setWand(w=>({...w,contiguous:e.target.checked}))}/>Contiguous</label><label className="check-label"><input type="checkbox" checked={wand.antiAlias} onChange={e=>setWand(w=>({...w,antiAlias:e.target.checked}))}/>Anti-alias</label><label className="check-label" title="Off: sample only the target layer"><input type="checkbox" checked={wand.allLayers} onChange={e=>setWand(w=>({...w,allLayers:e.target.checked}))}/>All layers</label></>:tool==='zoom'?<><IconButton icon={Plus} label="Zoom tool: zoom in" active={!zoomOutMode} onClick={()=>setZoomOutMode(false)}/><IconButton icon={Minus} label="Zoom tool: zoom out" active={zoomOutMode} onClick={()=>setZoomOutMode(true)}/><button className="secondary" onClick={()=>changeZoom(1)}>100%</button></>:tool==='clone'||tool==='heal'?<><span className="muted">Alt-click to sample</span><label className="marker-setting">Size<input aria-label="Retouch size" className="font-size" type="number" min={1} max={200} value={retouchSize} onChange={e=>setRetouchSize(brushWidth(Number(e.target.value)))}/></label><label className="marker-setting">Soft edge<input aria-label="Retouch softness" className="font-size" type="number" min={0} max={100} value={softness} onChange={e=>setSoftness(Math.min(100,Math.max(0,Number(e.target.value))))}/></label><label className="marker-setting">Opacity<input aria-label="Retouch opacity" className="font-size" type="number" min={1} max={100} value={retouchOpacity} onChange={e=>setRetouchOpacity(Math.min(100,Math.max(1,Number(e.target.value))))}/>%</label></>:tool==='eraser'?<><span className="muted">Erase selected layer</span><label className="marker-setting">Soft edge<input className="font-size" type="number" aria-label="Eraser softness" min={0} max={100} value={softness} onChange={e=>setSoftness(Math.min(100,Math.max(0,Number(e.target.value))))}/>px</label><label className="marker-setting">Size<input aria-label="Eraser size" className="font-size" type="number" min={1} max={200} value={eraserSize} onChange={e=>setEraserSize(brushWidth(Number(e.target.value)))}/></label></>:tool==='highlight'?<><label className="marker-setting">Color<input type="color" aria-label="Highlight color" value={highlightColor} onChange={e=>setHighlightColor(e.target.value)}/></label><label className="marker-setting">Width<input className="font-size" aria-label="Highlight width" type="number" min={1} max={120} value={highlightSize} onChange={e=>setHighlightSize(Math.min(120,Math.max(1,Number(e.target.value))))}/></label><label className="marker-setting">Opacity<input className="font-size" aria-label="Highlight opacity" type="number" min={5} max={90} value={highlightOpacity} onChange={e=>setHighlightOpacity(Math.min(90,Math.max(5,Number(e.target.value))))}/> %</label></>:<><span className="muted">Fill</span><input type="color" aria-label="Fill color" value={selected && typeof selected.fill==='string' && /^#[0-9a-f]{6}$/i.test(selected.fill)?selected.fill:color} onChange={e=>{setColor(e.target.value);if(selected)updateObject({fill:e.target.value});}}/>{tool==='brush' && <><select aria-label="Brush style" value={brushKind} onChange={e=>setBrushKind(e.target.value as BrushKind)}>{Object.entries(brushNames).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select><label className="marker-setting">Size<input aria-label="Brush size" className="font-size" type="number" min={1} max={200} value={brushSize} onChange={e=>setBrushSize(brushWidth(Number(e.target.value)))}/></label><label className="marker-setting">Opacity<input aria-label="Brush opacity" className="font-size" type="number" min={5} max={100} value={brushOpacity} onChange={e=>setBrushOpacity(Math.min(100,Math.max(5,Number(e.target.value))))}/>%</label></>}</>}<span className="divider"/><div className="header-zoom"><IconButton icon={Minus} label="Decrease zoom" onClick={()=>changeZoom(zoomRef.current/1.2)}/><input key={zoom} aria-label="Zoom percentage" type="number" min={10} max={800} defaultValue={Math.round(zoom*100)} onBlur={e=>changeZoom(Number(e.target.value)/100)} onKeyDown={e=>{if(e.key==='Enter')e.currentTarget.blur();}}/><span>%</span><IconButton icon={Plus} label="Increase zoom" onClick={()=>changeZoom(zoomRef.current*1.2)}/></div><IconButton icon={Maximize} label="Fit page (Ctrl 0)" onClick={fit}/></div></div></div>
     <main className="workspace-layout" data-panel={mobilePanel||undefined}><aside className="tool-rail" aria-label="Drawing tools">
-      {([{name:'Select',ids:['select','marquee','lasso','hand','zoom']},{name:'Create',ids:['text','rect','ellipse','line']},{name:'Draw',ids:['brush','highlight','eraser']},{name:'Retouch',ids:['clone','heal']}] as {name:string;ids:Tool[]}[]).map(group=><div className="tool-group" key={group.name}><h3>{group.name}</h3><div>{group.ids.map(id=>{const t=TOOLS.find(item=>item.id===id)!;return <button key={id} title={`${t.label} (${t.key})`} aria-label={t.label} aria-pressed={tool===id} className={tool===id?'active':''} onClick={()=>setTool(id)}><t.icon size={18}/><span>{({zoom:'Zoom',select:'Move',marquee:'Marquee',lasso:'Lasso',hand:'Pan',text:'Text',rect:'Rectangle',ellipse:'Ellipse',line:'Line',brush:'Brush',highlight:'Highlight',eraser:'Eraser',clone:'Clone',heal:'Heal'} as Record<Tool,string>)[id]}</span><kbd>{t.key==='Space'?'Space':t.key}</kbd></button>;})}</div></div>)}
+      {([{name:'Select',ids:['select','marquee','lasso','wand','crop','hand','zoom']},{name:'Create',ids:['text','pen','rect','ellipse','line']},{name:'Draw',ids:['brush','highlight','eraser','gradient','bucket','mask']},{name:'Retouch',ids:['clone','heal']}] as {name:string;ids:Tool[]}[]).map(group=><div className="tool-group" key={group.name}><h3>{group.name}</h3><div>{group.ids.map(id=>{const t=TOOLS.find(item=>item.id===id)!;return <button key={id} title={`${t.label} (${t.key})`} aria-label={t.label} aria-pressed={tool===id} className={tool===id?'active':''} onClick={()=>setTool(id)}><t.icon size={18}/><span>{({zoom:'Zoom',select:'Move',wand:'Wand',pen:'Pen',crop:'Crop',marquee:'Marquee',lasso:'Lasso',hand:'Pan',text:'Text',rect:'Rectangle',ellipse:'Ellipse',line:'Line',brush:'Brush',highlight:'Highlight',eraser:'Eraser',gradient:'Gradient',bucket:'Bucket',mask:'Mask',clone:'Clone',heal:'Heal'} as Record<Tool,string>)[id]}</span><kbd>{t.key==='Space'?'Space':t.key}</kbd></button>;})}</div></div>)}
       <div className="tool-group"><h3>Insert</h3><div><button title="Place an image on this page" aria-label="Place image" onClick={()=>imageInput.current?.click()}><ImagePlus size={18}/><span>Image</span></button><button title="Draw or type a signature" aria-label="Add signature" onClick={()=>setModal('signature')}><PenLine size={18}/><span>Signature</span></button></div></div>
       <div className="rail-bottom"><label title="Default drawing color"><input aria-label="Drawing color" type="color" value={color} onChange={e=>setColor(e.target.value)}/><span>Color</span></label><button title="Keyboard shortcuts" aria-label="Keyboard shortcuts" onClick={()=>setModal('shortcuts')}><Command size={17}/><span>Shortcuts</span></button></div></aside>
     {leftOpen && <aside className="pages-panel"><div className="panel-heading"><span>Pages <b>{project.pages.length}</b></span><IconButton icon={PanelLeftClose} label="Hide pages" onClick={()=>{setLeftOpen(false);setMobilePanel(null);}}/></div><p className="panel-guide">Drag to reorder. Use the page menu for actions.</p><div className="page-list">{project.pages.map((p,i)=><div className="page-card-wrap" key={p.id}><button onContextMenu={e=>{e.preventDefault();if(!loading.current&&!busy)setPageMenu({id:p.id,x:e.clientX,y:e.clientY});}} className={`page-card ${p.id===pageId?'active':''}`} key={p.id} onClick={()=>{if(!loading.current){setPageId(p.id);setMobilePanel(null);}}} draggable onDragStart={()=>setPageDrag(p.id)} onDragOver={e=>e.preventDefault()} onDrop={e=>{e.preventDefault();if(pageDrag && pageDrag!==p.id)reorderPage(pageDrag,p.id);setPageDrag(null);}}><div className="page-preview" style={{aspectRatio:`${p.width}/${p.height}`,background:p.color}}>{p.source && <PDFPreview source={p.source} index={p.index} scale={0.25} lazy/>}{p.thumb && <img src={p.thumb} alt=""/>}{!p.source&&!p.thumb&&<span className="page-placeholder">{i===0?'Aa':''}</span>}</div><div className="page-caption"><span>{String(i+1).padStart(2,'0')}</span><span>{p.name}</span><GripVertical size={12}/></div></button><button className="page-more" aria-label={`Page ${i+1} actions`} onClick={e=>{const r=e.currentTarget.getBoundingClientRect();if(!loading.current&&!busy)setPageMenu({id:p.id,x:r.right,y:r.bottom});}}><MoreHorizontal size={16}/></button></div>)}</div><div className="page-panel-bottom"><button onClick={addPage}><Plus size={14}/>Add page</button><button onClick={()=>openFiles(true)}><Merge size={14}/>Import & merge</button></div></aside>}
-    <section className="canvas-area">{(page.source||textScanStatus)&&<TextDetectionBar ai={!!aiReady} status={textScanStatus} regions={textRegions} show={showDetectedText} onShow={setShowDetectedText} settings={ocr} onChange={patch=>{if(patch.font)ocrFontChosen.current=true;if(patch.languages)storeOcrLanguages(patch.languages);setOcr(o=>({...o,...patch}));}} scanning={!!busy||textScanStatus.includes('…')} onConvertAll={()=>void convertAllDetectedText()} onRescan={()=>{setShowDetectedText(true);setTextScanRevision(v=>v+1);}}/>}{(tool==='marquee'||tool==='lasso'||region)&&<div className="selection-toolbar"><span>{region?'Selection ready':'Select a layer, then drag a selection'}</span>{page.source&&<button disabled={!!busy} title="Convert PDF background to an editable image; Undo restores it." onClick={()=>void unlockOriginalPdf()}>Unlock PDF as image</button>}<button disabled={!region} onClick={copyToClipboard}>Copy area</button><button disabled={!clipboard.current&&!copyPending.current} onClick={()=>void pasteFromClipboard()}>Paste as layer</button><button disabled={!region} onClick={()=>void applySelection('keep')}>Keep inside</button><button disabled={!region} onClick={()=>void applySelection('hide')}>Hide inside</button><button disabled={!region} onClick={()=>void applySelection('copy')}>Copy to layer</button>{aiReady&&<button disabled={!region||!!busy} title="Fill the selection from its surroundings with AI (LaMa). Adds an undoable layer." onClick={()=>void aiRemove()}>Remove with AI</button>}<button onClick={()=>{setRegion(null);setTool('select');}}>Deselect</button></div>}<div className="canvas-tab"><button className="small-pages-button" onClick={()=>{setLeftOpen(true);setMobilePanel(mobilePanel==='pages'?null:'pages');}}><Layers size={14}/>Pages</button><button className="small-properties-button" onClick={()=>setMobilePanel(mobilePanel==='properties'?null:'properties')}><Settings2 size={14}/>Properties</button><FileText size={13}/><span>{project.name || 'Untitled'}</span><span className="tab-badge">{page.source?'PDF':'DESIGN'}</span><span className="tab-page">{project.pages.findIndex(p=>p.id===pageId)+1} / {project.pages.length}</span>{!leftOpen&&<button onClick={()=>setLeftOpen(true)}><Layers size={13}/>Show pages</button>}</div><div className="ruler"><span>0</span>{Array.from({length:12},(_,i)=><span key={i}>{(i+1)*100}</span>)}</div><div ref={workspace} className={`canvas-workspace ${tool==='hand'?'panning':''}`} ><div className="artboard-wrap"><div className="artboard-label"><span>{page.name}</span><span>{Math.round(page.width)} × {Math.round(page.height)}</span></div><div ref={artboard} className="artboard" style={{width:page.width*zoom,height:page.height*zoom,backgroundColor:page.color,backgroundImage:page.color==='transparent'?'conic-gradient(#e2e8ed 25%, white 0 50%, #e2e8ed 0 75%, white 0)':undefined,backgroundSize:'16px 16px'}}>{page.source&&<PDFPreview className="pdf-background" source={page.source} index={page.index} scale={editorPreviewScale(zoom,window.devicePixelRatio)} alt="Original PDF page"/>}<div className="canvas-host"><canvas ref={canvasEl}/></div>{showDetectedText&&(tool==='select'||tool==='text')&&!selected&&<div className="detected-text-overlay" aria-label="Detected text regions">{textRegions.map(r=><button key={r.id} className={isUncertain(r)?'uncertain':undefined} aria-label={`Edit detected text: ${r.text.slice(0,80)}`} title={`${r.text}${isUncertain(r)?` · Low OCR confidence (${Math.round(r.confidence!)}%), check the recognized text`:''} · ${r.fontData?'Embedded font: '+r.fontName:r.kind==='ocr'?'OCR: font needs matching':'Font: '+r.fontName+' (closest available match)'}`} style={{left:r.left*zoom,top:r.top*zoom,width:Math.max(8,r.width*zoom),height:Math.max(10,r.height*zoom)}} onClick={()=>void editDetectedText(r)}/>)}</div>}{layoutGrid&&<div aria-label="Layout grid guides" className="design-grid-overlay" style={{backgroundSize:`${gridSize*zoom}px ${gridSize*zoom}px`}}/>}{region&&<svg className="selection-outline" viewBox={`0 0 ${page.width} ${page.height}`} aria-label="Selection outline"><polygon points={region.points.map(p=>`${p.x},${p.y}`).join(" ")} fill="none" stroke="white" strokeWidth="3" vectorEffect="non-scaling-stroke"/><polygon points={region.points.map(p=>`${p.x},${p.y}`).join(" ")} fill="none" stroke="#00395d" strokeWidth="1.5" strokeDasharray="5 4" vectorEffect="non-scaling-stroke"/></svg>}</div><div className="artboard-below"><span>Double-click text to edit</span><span>Space to pan · Ctrl K for commands</span></div></div></div><div className="canvas-footer"><div><span className="engine-dot"/><span>{tool==='select'?'Select an object to start editing':TOOLS.find(t=>t.id===tool)?.label}</span></div><div className="zoom-controls"><IconButton icon={Minus} label="Zoom out" onClick={()=>changeZoom(zoomRef.current/1.2)}/><button onClick={()=>changeZoom(1)} title="Reset to 100%">{Math.round(zoom*100)}%</button><IconButton icon={Plus} label="Zoom in" onClick={()=>changeZoom(zoomRef.current*1.2)}/><span className="divider"/><IconButton icon={Maximize} label="Fit to screen" onClick={fit}/></div></div></section>
-    <aside className="inspector"><div className="panel-heading"><span><Settings2 size={14}/>Properties</span><span className="panel-context">{selected?'Selection':'Page'}</span><button className="close-small-properties" aria-label="Close properties" onClick={()=>setMobilePanel(null)}><X size={15}/></button></div><div className="properties-content"><DesignTools count={canvas.current?.getActiveObjects().length||0} locked={!!canvas.current?.getActiveObjects().some(o=>o.lockMovementX||o.lockMovementY)} grid={layoutGrid} gridSize={gridSize} gap={layoutGap} styles={colorStyles} color={typeof selected?.fill==='string'&&/^#[0-9a-f]{6}$/i.test(selected.fill)?selected.fill:color} onFrame={addArtboard} onLayout={layoutSelection} onGrid={()=>setLayoutGrid(v=>!v)} onGridSize={setGridSize} onGap={setLayoutGap} onColor={applyColorStyle} onSaveStyle={name=>storeColorStyles([...colorStyles,{name,color:typeof selected?.fill==='string'&&/^#[0-9a-f]{6}$/i.test(selected.fill)?selected.fill:color}])} onRemoveStyle={index=>storeColorStyles(colorStyles.filter((_,i)=>i!==index))}/>{selected ? <><div className="selected-heading"><span className="object-icon">{selectedText?<Type size={17}/>:selectedImage?<FileImage size={17}/>:<Square size={17}/>}</span><div><input aria-label="Layer name" value={selected.name||selected.type} onChange={e=>updateObject({name:e.target.value})}/><span>{selectedText?'Editable text':selectedImage?'Image layer':selected.type==='activeselection'?'Multiple layers':'Canvas object'}</span></div></div><div className="property-section"><div className="section-label">TRANSFORM<LockKeyhole size={11}/></div><div className="field-grid"><Field label="X" value={selected.left} onChange={v=>updateObject({left:v})}/><Field label="Y" value={selected.top} onChange={v=>updateObject({top:v})}/><Field label="Width" value={selected.getScaledWidth()} min={1} onChange={v=>updateObject(selectedText?{width:v/selected.scaleX}:{scaleX:v/(selected.width||1)})}/><Field label="Height" value={selected.getScaledHeight()} min={1} onChange={v=>updateObject({scaleY:v/(selected.height||1)})}/><Field label="Angle" value={selected.angle} onChange={v=>updateObject({angle:v})}/><Field label="Opacity %" value={selected.opacity*100} min={0} max={100} onChange={v=>updateObject({opacity:v/100})}/></div><div className="alignment-buttons"><button onClick={()=>align('left')} title="Align to page left">Left</button><button onClick={()=>align('center')} title="Center on page">Center</button><button onClick={()=>align('right')} title="Align to page right">Right</button><button onClick={()=>updateObject({flipX:!selected.flipX})} title="Flip horizontally">Flip H</button><button onClick={()=>updateObject({flipY:!selected.flipY})} title="Flip vertically">Flip V</button></div></div>
+    <section className="canvas-area">{(page.source||textScanStatus)&&<TextDetectionBar ai={!!aiReady} status={textScanStatus} regions={textRegions} show={showDetectedText} onShow={setShowDetectedText} settings={ocr} onChange={patch=>{if(patch.font)ocrFontChosen.current=true;if(patch.languages)storeOcrLanguages(patch.languages);setOcr(o=>({...o,...patch}));}} scanning={!!busy||textScanStatus.includes('…')} onConvertAll={()=>void convertAllDetectedText()} onFindReplace={()=>setFindOpen(true)} onRescan={()=>{setShowDetectedText(true);setTextScanRevision(v=>v+1);}}/>}{(tool==='marquee'||tool==='lasso'||tool==='wand'||region)&&<SelectionBar hasRegion={!!region} busy={!!busy} ai={!!aiReady} pdf={!!page.source} canPaste={!!clipboard.current||!!copyPending.current} mode={selectMode} onMode={setSelectMode} run={runSelection}/>}<div className="canvas-tab"><button className="small-pages-button" onClick={()=>{setLeftOpen(true);setMobilePanel(mobilePanel==='pages'?null:'pages');}}><Layers size={14}/>Pages</button><button className="small-properties-button" onClick={()=>setMobilePanel(mobilePanel==='properties'?null:'properties')}><Settings2 size={14}/>Properties</button><FileText size={13}/><span>{project.name || 'Untitled'}</span><span className="tab-badge">{page.source?'PDF':'DESIGN'}</span><span className="tab-page">{project.pages.findIndex(p=>p.id===pageId)+1} / {project.pages.length}</span>{!leftOpen&&<button onClick={()=>setLeftOpen(true)}><Layers size={13}/>Show pages</button>}</div><Rulers show={showRulers} zoom={zoom} width={page.width} height={page.height} workspace={workspace} artboard={artboard} onAdd={(axis,v)=>{setShowGuides(true);setGuides({...guides,[axis]:[...guides[axis],v]});}}><div ref={workspace} className={`canvas-workspace ${tool==='hand'?'panning':''}`} ><div className="artboard-wrap"><div className="artboard-label"><span>{page.name}</span><span>{Math.round(page.width)} × {Math.round(page.height)}</span></div><div ref={artboard} className="artboard" style={{width:page.width*zoom,height:page.height*zoom,backgroundColor:page.color,backgroundImage:page.color==='transparent'?'conic-gradient(#e2e8ed 25%, white 0 50%, #e2e8ed 0 75%, white 0)':undefined,backgroundSize:'16px 16px'}}>{page.source&&<PDFPreview className="pdf-background" source={page.source} index={page.index} scale={editorPreviewScale(zoom,window.devicePixelRatio)} alt="Original PDF page"/>}<div className="canvas-host"><canvas ref={canvasEl}/></div>{showGuides&&(guides.x.length>0||guides.y.length>0)&&<GuideLayer guides={guides} zoom={zoom} width={page.width} height={page.height} onChange={setGuides}/>}{penPreview&&<svg className="pen-preview" viewBox={`0 0 ${page.width} ${page.height}`} aria-label="Path being drawn"><path d={penPathData(penPreview.anchors)+(penPreview.cursor&&penRef.current&&!penRef.current.dragging?` L ${penPreview.cursor.x} ${penPreview.cursor.y}`:'')} fill="none" stroke="#00aeef" strokeWidth="1.5" vectorEffect="non-scaling-stroke"/>{penPreview.anchors.map((a,i)=><g key={i}>{a.out&&<><line x1={a.in!.x} y1={a.in!.y} x2={a.out.x} y2={a.out.y} stroke="#00aeef" strokeWidth="1" vectorEffect="non-scaling-stroke"/><circle cx={a.out.x} cy={a.out.y} r={3/zoom} fill="#00aeef"/><circle cx={a.in!.x} cy={a.in!.y} r={3/zoom} fill="#00aeef"/></>}<rect x={a.x-3.5/zoom} y={a.y-3.5/zoom} width={7/zoom} height={7/zoom} fill={i===0?'#00aeef':'white'} stroke="#00395d" strokeWidth="1" vectorEffect="non-scaling-stroke"/></g>)}</svg>}{crop&&(()=>{const r=crop.rect,cx=r.left+r.width/2,cy=r.top+r.height/2,a=-crop.angle*Math.PI/180,pts=[[r.left,r.top],[r.left+r.width,r.top],[r.left+r.width,r.top+r.height],[r.left,r.top+r.height]].map(([x,y])=>`${cx+(x-cx)*Math.cos(a)-(y-cy)*Math.sin(a)} ${cy+(x-cx)*Math.sin(a)+(y-cy)*Math.cos(a)}`);
+      return <svg className="crop-overlay" viewBox={`0 0 ${page.width} ${page.height}`} aria-label="Crop area"><path fillRule="evenodd" fill="#00203580" d={`M0 0H${page.width}V${page.height}H0Z M${pts.join('L')}Z`}/><path d={`M${pts.join('L')}Z`} fill="none" stroke="white" strokeWidth="1.5" strokeDasharray="6 4" vectorEffect="non-scaling-stroke"/></svg>;})()}{showDetectedText&&(tool==='select'||tool==='text')&&!selected&&<div className="detected-text-overlay" aria-label="Detected text regions">{textRegions.map(r=><button key={r.id} className={isUncertain(r)?'uncertain':undefined} aria-label={`Edit detected text: ${r.text.slice(0,80)}`} title={`${r.text}${isUncertain(r)?` · Low OCR confidence (${Math.round(r.confidence!)}%), check the recognized text`:''} · ${r.fontData?'Embedded font: '+r.fontName:r.kind==='ocr'?'OCR: font needs matching':'Font: '+r.fontName+' (closest available match)'}`} style={{left:r.left*zoom,top:r.top*zoom,width:Math.max(8,r.width*zoom),height:Math.max(10,r.height*zoom)}} onClick={()=>{if(r.kind==='ocr'&&ocr.editMode==='letters'&&r.glyphs)setTextEdit(r);else void editDetectedText(r);}}/>)}</div>}{layoutGrid&&<div aria-label="Layout grid guides" className="design-grid-overlay" style={{backgroundSize:`${gridSize*zoom}px ${gridSize*zoom}px`}}/>}{region&&<svg className="selection-outline" viewBox={`0 0 ${page.width} ${page.height}`} aria-label="Selection outline">{[region.outline,outlineOf(region.points)].filter(Boolean).map((d,i)=><g key={i}><path d={d} fill="none" stroke="white" strokeWidth="3" vectorEffect="non-scaling-stroke"/><path className="ants" d={d} fill="none" stroke="#00395d" strokeWidth="1.5" strokeDasharray="5 4" vectorEffect="non-scaling-stroke"/></g>)}</svg>}</div><div className="artboard-below"><span>Double-click text to edit</span><span>Space to pan · Ctrl K for commands</span></div></div></div></Rulers><div className="canvas-footer"><div><span className="engine-dot"/><span>{tool==='select'?'Select an object to start editing':TOOLS.find(t=>t.id===tool)?.label}</span></div><div className="zoom-controls"><IconButton icon={Minus} label="Zoom out" onClick={()=>changeZoom(zoomRef.current/1.2)}/><button onClick={()=>changeZoom(1)} title="Reset to 100%">{Math.round(zoom*100)}%</button><IconButton icon={Plus} label="Zoom in" onClick={()=>changeZoom(zoomRef.current*1.2)}/><span className="divider"/><IconButton icon={Maximize} label="Fit to screen" onClick={fit}/></div></div></section>
+    <aside className="inspector"><div className="panel-heading"><span><Settings2 size={14}/>Properties</span><span className="panel-context">{selected?'Selection':'Page'}</span><button className="close-small-properties" aria-label="Close properties" onClick={()=>setMobilePanel(null)}><X size={15}/></button></div><div className="properties-content"><DesignTools count={canvas.current?.getActiveObjects().length||0} locked={!!canvas.current?.getActiveObjects().some(o=>o.lockMovementX||o.lockMovementY)} grid={layoutGrid} gridSize={gridSize} gap={layoutGap} styles={colorStyles} color={typeof selected?.fill==='string'&&/^#[0-9a-f]{6}$/i.test(selected.fill)?selected.fill:color} onFrame={addArtboard} onLayout={layoutSelection} onGrid={()=>setLayoutGrid(v=>!v)} onGridSize={setGridSize} onGap={setLayoutGap} onColor={applyColorStyle} onSaveStyle={name=>storeColorStyles([...colorStyles,{name,color:typeof selected?.fill==='string'&&/^#[0-9a-f]{6}$/i.test(selected.fill)?selected.fill:color}])} onRemoveStyle={index=>storeColorStyles(colorStyles.filter((_,i)=>i!==index))}/>{selected ? <><div className="selected-heading"><span className="object-icon">{selectedText?<Type size={17}/>:selectedImage?<FileImage size={17}/>:<Square size={17}/>}</span><div><input aria-label="Layer name" value={selected.name||selected.type} onChange={e=>updateObject({name:e.target.value})}/><span>{selectedText?'Editable text':selectedImage?'Image layer':selected.type==='activeselection'?'Multiple layers':'Canvas object'}</span></div></div><div className="property-section"><div className="section-label">TRANSFORM<LockKeyhole size={11}/></div><div className="field-grid"><Field label="X" value={selected.left} onChange={v=>updateObject({left:v})}/><Field label="Y" value={selected.top} onChange={v=>updateObject({top:v})}/><Field label="Width" value={selected.getScaledWidth()} min={1} onChange={v=>updateObject(selectedText?{width:v/selected.scaleX}:{scaleX:v/(selected.width||1)})}/><Field label="Height" value={selected.getScaledHeight()} min={1} onChange={v=>updateObject({scaleY:v/(selected.height||1)})}/><Field label="Angle" value={selected.angle} onChange={v=>updateObject({angle:v})}/><Field label="Skew X" value={selected.skewX} min={-80} max={80} onChange={v=>updateObject({skewX:v})}/><Field label="Skew Y" value={selected.skewY} min={-80} max={80} onChange={v=>updateObject({skewY:v})}/><Field label="Opacity %" value={selected.opacity*100} min={0} max={100} onChange={v=>updateObject({opacity:v/100})}/></div><div className="alignment-buttons"><button onClick={()=>align('left')} title="Align to page left">Left</button><button onClick={()=>align('center')} title="Center on page">Center</button><button onClick={()=>align('right')} title="Align to page right">Right</button><button onClick={()=>updateObject({flipX:!selected.flipX})} title="Flip horizontally">Flip H</button><button onClick={()=>updateObject({flipY:!selected.flipY})} title="Flip vertically">Flip V</button></div></div>
     {selected instanceof Rect&&<div className="property-section"><Field label="Corner radius" min={0} max={Math.min(selected.width,selected.height)/2} value={selected.rx} onChange={v=>updateObject({rx:v,ry:v})}/></div>}{selectedText && <div className="property-section"><div className="section-label">TEXT</div>{systemFonts.includes(selected.fontFamily)&&<p className="fine-print">System fonts use this PC’s installation. Workplace font text is rasterized on PDF/SVG export to preserve its appearance; save .bide to keep it editable.</p>}{(selected as Obj).pdfOriginalFont&&<p className="fine-print">{selected.fontFamily.startsWith('PDFfont-')?'Original embedded font: ':'Suggested font for: '}{(selected as Obj).pdfOriginalFont}</p>}<label className="stacked-label">Text softness · {((selected as Obj).textSoftness||0).toFixed(2)} px<input aria-label="Text softness" type="range" min="0" max="2" step="0.05" value={(selected as Obj).textSoftness||0} onChange={e=>updateObject({textSoftness:Number(e.target.value),objectCaching:false})}/></label><div className="selection-actions"><button onClick={()=>updateObject({textSoftness:0,objectCaching:false})}>Crisp</button><button onClick={()=>updateObject({textSoftness:.35,objectCaching:false})}>Slightly soft</button></div><p className="fine-print">Match scanned text by adjusting softness and fill color. Softened text exports as an image; save .bide to keep it editable.</p><label className="color-field"><input type="color" aria-label="Text box background color" value={selected.textBackgroundColor&&/^#[a-f\d]{6}$/i.test(selected.textBackgroundColor)?selected.textBackgroundColor:'#ffffff'} onChange={e=>updateObject({textBackgroundColor:e.target.value})}/><span>Text background</span><button onClick={()=>updateObject({textBackgroundColor:''})}>Transparent</button></label><button onClick={()=>void exportTransparentPng(true)}>Export text as transparent PNG</button><textarea aria-label="Text content" value={selected.text||''} onChange={e=>updateObject({text:e.target.value})}/><div className="field-grid"><select aria-label="Text alignment" value={selected.textAlign} onChange={e=>updateObject({textAlign:e.target.value})}>{['left','center','right','justify'].map(x=><option key={x}>{x}</option>)}</select><Field label="Letter spacing" value={(selected as Textbox).charSpacing||0} min={-200} max={1000} step={10} onChange={v=>updateObject({charSpacing:v})}/><Field label="Line height" value={(selected as Textbox).lineHeight} min={0.6} max={4} step={0.1} onChange={v=>updateObject({lineHeight:v})}/></div></div>}
-    <div className="property-section"><div className="section-label">APPEARANCE</div><label className="stacked-label">Blend mode<select aria-label="Layer blend mode" disabled={!!page.source} value={selected.globalCompositeOperation} onChange={e=>updateObject({globalCompositeOperation:e.target.value})}>{Object.entries(blendModes).map(([name,value])=><option key={name} value={value}>{name}</option>)}</select></label><p className="fine-print">{page.source?'Blend modes are available on design pages.':'Blended pages are rasterized on PDF/image export; .bide keeps all layers.'}</p><label className="stacked-label">Shape mask<select aria-label="Shape mask" value={selected.clipPath instanceof Path?'selection':selected.clipPath instanceof Ellipse?'ellipse':selected.clipPath?'rounded':'none'} onChange={e=>setClip(e.target.value)}><option value="none">None · remove mask</option>{selected.clipPath instanceof Path&&<option value="selection">Selection mask</option>}<option value="ellipse">Ellipse</option><option value="rounded">Rounded rectangle</option></select></label><label className="color-field"><input type="color" aria-label="Object fill" value={typeof selected.fill==='string'&&/^#[a-f\d]{6}$/i.test(selected.fill)?selected.fill:'#173e33'} onChange={e=>updateObject({fill:e.target.value})}/><span>Fill color</span><button onClick={()=>updateObject({fill:'transparent'})}>None</button></label><div className="field-grid"><label className="color-field"><input type="color" aria-label="Stroke color" value={typeof selected.stroke==='string'&&/^#[a-f\d]{6}$/i.test(selected.stroke)?selected.stroke:'#173e33'} onChange={e=>updateObject({stroke:e.target.value,strokeWidth:Math.max(selected.strokeWidth,1)})}/><span>Stroke</span></label><Field label="Width" value={selected.strokeWidth} min={0} max={100} onChange={v=>updateObject({strokeWidth:v})}/></div></div>
+    <div className="property-section"><div className="section-label">APPEARANCE</div><label className="stacked-label">Blend mode<select aria-label="Layer blend mode" disabled={!!page.source} value={selected.globalCompositeOperation} onChange={e=>updateObject({globalCompositeOperation:e.target.value})}>{Object.entries(blendModes).map(([name,value])=><option key={name} value={value}>{name}</option>)}</select></label><p className="fine-print">{page.source?'Blend modes are available on design pages.':'Blended pages are rasterized on PDF/image export; .bide keeps all layers.'}</p><label className="stacked-label">Shape mask<select aria-label="Shape mask" value={hasLayerMask(selected)?'layer':selected.clipPath instanceof Path?'selection':selected.clipPath instanceof Ellipse?'ellipse':selected.clipPath?'rounded':'none'} onChange={e=>setClip(e.target.value)}><option value="none">None · remove mask</option>{hasLayerMask(selected)&&<option value="layer">Layer mask (painted)</option>}{selected.clipPath instanceof Path&&<option value="selection">Selection mask</option>}<option value="ellipse">Ellipse</option><option value="rounded">Rounded rectangle</option></select></label><label className="color-field"><input type="color" aria-label="Object fill" value={typeof selected.fill==='string'&&/^#[a-f\d]{6}$/i.test(selected.fill)?selected.fill:'#173e33'} onChange={e=>updateObject({fill:e.target.value})}/><span>Fill color</span><button onClick={()=>updateObject({fill:'transparent'})}>None</button></label><div className="field-grid"><label className="color-field"><input type="color" aria-label="Stroke color" value={typeof selected.stroke==='string'&&/^#[a-f\d]{6}$/i.test(selected.stroke)?selected.stroke:'#173e33'} onChange={e=>updateObject({stroke:e.target.value,strokeWidth:Math.max(selected.strokeWidth,1)})}/><span>Stroke</span></label><Field label="Width" value={selected.strokeWidth} min={0} max={100} onChange={v=>updateObject({strokeWidth:v})}/></div></div>
+    <LayerStylePanel style={selected.layerStyle} disabled={!!selected.lockMovementX} onChange={setLayerStyle}/>
+    {!(selected instanceof ActiveSelection)&&<div className="property-section"><div className="section-label">LAYER MASK</div>{hasLayerMask(selected)?<div className="selection-actions"><button onClick={()=>setTool('mask')} title="Paint the mask (Q)">Paint</button><button onClick={invertSelectedMask}>Invert</button><button onClick={applyLayerMask} title="Bake the mask into the pixels">Apply</button><button onClick={deleteLayerMask}>Delete</button></div>:<div className="selection-actions"><button disabled={!!selected.lockMovementX} onClick={addLayerMask}>Add mask</button><button disabled={!region||!!selected.lockMovementX} onClick={()=>runSelection('keep')}>From selection</button></div>}</div>}
     {selectedImage && <div className="property-section"><div className="section-label">IMAGE ADJUSTMENTS</div>{aiReady&&<button className="secondary" disabled={!!busy} title="Double the resolution and sharpen with AI (Real-ESRGAN). Best for small or blurry images." onClick={()=>void aiSharpenSelected()}>Sharpen with AI (2×)</button>}{['brightness','contrast','saturation','blur'].map(kind=><label className="slider-field" key={kind}><span>{kind}</span><input aria-label={kind} type="range" min={kind==='blur'?0:-1} max={1} step={0.05} value={(selected.filters.find(f=>f.type.toLowerCase()===kind) as any)?.[kind] || 0} onChange={e=>setImageFilter(kind,Number(e.target.value))}/></label>)}<div className="filter-buttons">{['grayscale','sepia','invert','reset'].map(kind=><button key={kind} onClick={()=>setImageFilter(kind)}>{kind}</button>)}</div><details><summary>Crop image</summary><div className="field-grid"><Field label="Crop X" value={selected.cropX} min={0} max={selected.getOriginalSize().width-1} onChange={v=>updateObject({cropX:v,width:Math.min(selected.width,selected.getOriginalSize().width-v)})}/><Field label="Crop Y" value={selected.cropY} min={0} max={selected.getOriginalSize().height-1} onChange={v=>updateObject({cropY:v,height:Math.min(selected.height,selected.getOriginalSize().height-v)})}/><Field label="Crop width" value={selected.width} min={1} max={selected.getOriginalSize().width-selected.cropX} onChange={v=>updateObject({width:v})}/><Field label="Crop height" value={selected.height} min={1} max={selected.getOriginalSize().height-selected.cropY} onChange={v=>updateObject({height:v})}/></div></details></div>}
     <div className="selection-actions"><button onClick={duplicate}><Copy size={13}/>Duplicate</button><button onClick={removeSelected}><Trash2 size={13}/>Delete</button></div></> : <><div className="selected-heading"><span className="object-icon"><FileText size={17}/></span><div><strong>Document canvas</strong><span>{page.source?'PDF page with editable overlays':'A space for your next idea'}</span></div></div><div className="property-section"><div className="section-label">PAGE</div><div className="field-grid"><Field label="Width" value={page.width} min={50} max={5000} onChange={v=>commit({...project,pages:project.pages.map(p=>p.id===pageId?{...p,width:v}:p)})}/><Field label="Height" value={page.height} min={50} max={5000} onChange={v=>commit({...project,pages:project.pages.map(p=>p.id===pageId?{...p,height:v}:p)})}/></div><label className="color-field"><input type="color" aria-label="Page background" value={page.color} disabled={!!page.source} onChange={e=>commit({...project,pages:project.pages.map(p=>p.id===pageId?{...p,color:e.target.value}:p)})}/><span>Page background</span></label></div><div className="quick-insert"><div className="section-label">MAKE IT YOURS</div><button onClick={addText}><Type size={16}/><span>Add a text box</span><Plus size={13}/></button><button onClick={()=>imageInput.current?.click()}><ImagePlus size={16}/><span>Place an image</span><Plus size={13}/></button><button onClick={()=>setModal('signature')}><PenLine size={16}/><span>Add your signature</span><Plus size={13}/></button></div><div className="tip-card"><Sparkles size={16}/><p>Your tools, one shortcut away.<br/><button onClick={()=>{setPalette(true);setQuery('');}}>Open command palette <kbd>Ctrl K</kbd></button></p></div></>}</div>
-    <div className="layer-retouch-actions"><button disabled={!selected} onClick={openWarp}>Warp</button><button disabled={!selected} onClick={mergeDown}>Merge Down</button>{selected&&<label>Opacity<input aria-label="Layer opacity" type="range" min={0} max={100} value={Math.round(selected.opacity*100)} onChange={e=>updateObject({opacity:Number(e.target.value)/100})}/><span>{Math.round(selected.opacity*100)}%</span></label>}</div><div className="layers-header"><span><Layers size={14}/>Layers <b>{layers.length+(page.source?1:0)}</b></span><div><IconButton icon={ArrowUp} label="Bring layer forward" onClick={()=>moveLayer('up')} disabled={!selected}/><IconButton icon={ArrowDown} label="Send layer backward" onClick={()=>moveLayer('down')} disabled={!selected}/><IconButton icon={Plus} label="Add text layer" onClick={addText}/></div></div><div className="layers-list">{layers.map(o=><div className={`layer-row ${selected===o || (selected instanceof ActiveSelection && selected.contains(o))?'selected':''}`} key={o.id} onContextMenu={e=>{e.preventDefault();openLayerMenu(o,e.clientX,e.clientY);}} onClick={()=>{canvas.current?.setActiveObject(o);canvas.current?.requestRenderAll();syncSelection();setTool('select');}}><button title={o.visible?'Hide layer':'Show layer'} aria-label={`${o.visible?'Hide':'Show'} ${o.name}`} onClick={e=>{e.stopPropagation();o.set({visible:!o.visible});canvas.current?.requestRenderAll();saveCanvas();}}>{o.visible?<Eye size={13}/>:<EyeOff size={13}/>}</button><span className="layer-type">{o instanceof Textbox?<Type size={13}/>:o instanceof FabricImage?<FileImage size={13}/>:<Square size={12}/>}</span><span className="layer-name">{o.name || o.type}</span><button aria-label={`${o.lockMovementX?'Unlock':'Lock'} ${o.name}`} title={o.lockMovementX?'Unlock layer':'Lock layer'} onClick={e=>{e.stopPropagation();toggleLock(o);}}>{o.lockMovementX?<LockKeyhole size={12}/>:<UnlockKeyhole size={12}/>}</button></div>)}{page.source&&<div className="layer-row background-layer"><Eye size={13}/><FileText size={13}/><span>Original PDF</span><button aria-label="Unlock Original PDF" title="Convert this page to an image layer for Marquee, Lasso and retouching. Original text and links become pixels; Undo restores the PDF." disabled={!!busy} onClick={()=>void unlockOriginalPdf()}><LockKeyhole size={12}/></button></div>}{!layers.length&&!page.source&&<div className="layers-empty">Add text, images, or shapes.<br/>Your layers will appear here.</div>}</div><div className="layer-footer"><span>{selected?'Layer selected':'No layer selected'}</span><IconButton icon={Trash2} label="Delete selected layer" onClick={removeSelected} disabled={!selected}/></div></aside></main>
+    <div className="layer-retouch-actions"><button disabled={!selected} onClick={openWarp}>Warp</button><button disabled={!selected} onClick={openPerspective}>Perspective</button><button disabled={!selected} onClick={mergeDown}>Merge Down</button>{selected&&<label>Opacity<input aria-label="Layer opacity" type="range" min={0} max={100} value={Math.round(selected.opacity*100)} onChange={e=>updateObject({opacity:Number(e.target.value)/100})}/><span>{Math.round(selected.opacity*100)}%</span></label>}</div><div className="layers-header"><span className="panel-tabs" role="tablist"><button role="tab" aria-selected={sidePanel==='layers'} onClick={()=>setSidePanel('layers')}><Layers size={14}/>Layers <b>{layers.length+(page.source?1:0)}</b></button><button role="tab" aria-selected={sidePanel==='history'} onClick={()=>setSidePanel('history')}><HistoryIcon size={13}/>History</button></span><div><IconButton icon={ArrowUp} label="Bring layer forward" onClick={()=>moveLayer('up')} disabled={!selected}/><IconButton icon={ArrowDown} label="Send layer backward" onClick={()=>moveLayer('down')} disabled={!selected}/><IconButton icon={Plus} label="Add text layer" onClick={addText}/></div></div>{sidePanel==='history'?<HistoryPanel past={historyLabels.current.past} future={[...historyLabels.current.future].reverse()} onJump={jumpHistory}/>:<div className="layers-list">{layers.map(o=><div className={`layer-row ${selected===o || (selected instanceof ActiveSelection && selected.contains(o))?'selected':''}`} key={o.id} onContextMenu={e=>{e.preventDefault();openLayerMenu(o,e.clientX,e.clientY);}} onClick={()=>{canvas.current?.setActiveObject(o);canvas.current?.requestRenderAll();syncSelection();setTool('select');}}><button title={o.visible?'Hide layer':'Show layer'} aria-label={`${o.visible?'Hide':'Show'} ${o.name}`} onClick={e=>{e.stopPropagation();o.set({visible:!o.visible});canvas.current?.requestRenderAll();saveCanvas();}}>{o.visible?<Eye size={13}/>:<EyeOff size={13}/>}</button><span className="layer-type">{o instanceof Textbox?<Type size={13}/>:o instanceof FabricImage?<FileImage size={13}/>:<Square size={12}/>}</span><span className="layer-name">{o.name || o.type}</span><button aria-label={`${o.lockMovementX?'Unlock':'Lock'} ${o.name}`} title={o.lockMovementX?'Unlock layer':'Lock layer'} onClick={e=>{e.stopPropagation();toggleLock(o);}}>{o.lockMovementX?<LockKeyhole size={12}/>:<UnlockKeyhole size={12}/>}</button></div>)}{page.source&&<div className="layer-row background-layer"><Eye size={13}/><FileText size={13}/><span>Original PDF</span><button aria-label="Unlock Original PDF" title="Convert this page to an image layer for Marquee, Lasso and retouching. Original text and links become pixels; Undo restores the PDF." disabled={!!busy} onClick={()=>void unlockOriginalPdf()}><LockKeyhole size={12}/></button></div>}{!layers.length&&!page.source&&<div className="layers-empty">Add text, images, or shapes.<br/>Your layers will appear here.</div>}</div>}<div className="layer-footer"><span>{selected?'Layer selected':'No layer selected'}</span><IconButton icon={Trash2} label="Delete selected layer" onClick={removeSelected} disabled={!selected}/></div></aside></main>
     {layerMenu&&selected&&<><div className="layer-menu-dismiss" onClick={()=>setLayerMenu(null)} onContextMenu={e=>{e.preventDefault();setLayerMenu(null);}}/><div className="page-context-menu text-context-menu" role="menu" aria-label={selectedText?'Text box actions':'Layer actions'} style={{left:layerMenu.x,top:layerMenu.y,width:248,maxHeight:'min(540px, calc(100vh - 16px))',overflowY:'auto'}} onKeyDown={e=>{if(e.key==='Escape'){e.preventDefault();e.stopPropagation();setLayerMenu(null);}if(['ArrowDown','ArrowUp','Home','End'].includes(e.key)){e.preventDefault();e.stopPropagation();const buttons=Array.from(e.currentTarget.querySelectorAll<HTMLButtonElement>('button:not(:disabled)'));const current=buttons.indexOf(document.activeElement as HTMLButtonElement);buttons[e.key==='Home'?0:e.key==='End'?buttons.length-1:(current+(e.key==='ArrowDown'?1:-1)+buttons.length)%buttons.length]?.focus();}}}>
       <strong>{selectedText?'Text box':'Layer'} actions</strong>
       {selectedText&&<>
@@ -995,10 +1228,9 @@ export default function App() {
     </div></>}
 
     {pageMenu&&<PageMenu position={pageMenu} count={project.pages.length} index={project.pages.findIndex(p=>p.id===pageMenu.id)} close={()=>setPageMenu(null)} run={action=>pageAction(action,pageMenu.id)}/>}
-    <footer className="statusbar"><span><ShieldCheck size={12}/>In your browser · Files stay on this computer</span><div><button onClick={()=>duplicatePage()}><Copy size={12}/>Duplicate page</button><button disabled={project.pages.length===1} onClick={()=>deletePage()}><Trash2 size={12}/>Delete page</button><span className="status-engine"><span className={health.ok?'online':'offline'}/>{health.ok?'Browser engine ready':'Loading PDF engine…'}</span></div></footer>
+    <footer className="statusbar"><span><ShieldCheck size={12}/>In your browser · Files stay on this computer</span><div><button aria-pressed={leftOpen} title={leftOpen?'Hide the page strip':'Show the page strip'} onClick={()=>{setLeftOpen(v=>!v);setMobilePanel(null);}}><Layers size={12}/>Pages · {project.pages.length}</button><button onClick={()=>duplicatePage()}><Copy size={12}/>Duplicate page</button><button disabled={project.pages.length===1} onClick={()=>deletePage()}><Trash2 size={12}/>Delete page</button><span className="status-engine"><span className={health.ok?'online':'offline'}/>{health.ok?'Browser engine ready':'Loading PDF engine…'}</span></div></footer>
     </div>
     {view==='pdf'&&pdfHome&&<PdfWorkspace tools={pdfTools} name={project.name} pages={project.pages.length} onOpen={()=>openFiles()} onEdit={()=>setPdfHome(false)} onRun={tool=>{setPdfHome(false);tool.run();}}/>}
-    <WorkspaceDock active={view} onSelect={selectWorkspace}/>
     {diagramsVisited&&<Diagrams onCommands={setNativeDiagramCommands} active={view==='diagrams'} commands={diagramCommands} onPlace={placeDiagram} onNew={()=>{diagramTarget.current=undefined;}} onPalette={()=>{setPalette(true);setQuery('');setCommandIndex(0);}}/>}
     {toast&&<div className="toast" role="status"><Check size={16}/>{toast}</div>}
     {error&&<ModalShell title="Something needs your attention" close={()=>setError('')}><p className="error-message">{error}</p><div className="dialog-actions"><button className="primary" onClick={()=>setError('')}>Got it</button></div></ModalShell>}
@@ -1010,9 +1242,14 @@ export default function App() {
     {modal==='crop'&&<ModalShell title="Crop page" close={()=>setModal(null)}><CropForm width={page.width} height={page.height} onApply={crop=>runExport({format:'pdf',range:String(project.pages.findIndex(p=>p.id===pageId)+1),crop,reimport:true})}/></ModalShell>}
     {modal==='signature'&&<ModalShell title="Your signature, your way" close={()=>setModal(null)}><Signature onAdd={(value,drawn,inkColor)=>{if(drawn)void addImage(value,'Signature');else addObject(new Textbox(value,{left:70,top:page.height-170,width:380,fontFamily:'cursive',fontStyle:'italic',fontSize:44,fill:inkColor}),'Signature');setModal(null);}}/></ModalShell>}
     {modal==='new'&&<ModalShell title="Start with a blank canvas" close={()=>setModal(null)}><p className="muted">Create a document, a design, or something in between. Your previous workspace remains available with Undo.</p><label className="stacked-label">Document name<input value={newName} onChange={e=>setNewName(e.target.value)}/></label><div className="preset-grid">{[{name:'A4 document',w:595,h:842,detail:'210 × 297 mm'},{name:'US Letter',w:612,h:792,detail:'8.5 × 11 in'},{name:'Square canvas',w:1080,h:1080,detail:'1080 × 1080'},{name:'Presentation',w:1280,h:720,detail:'16:9 landscape'}].map(p=><button className={newWidth===p.w&&newHeight===p.h?'active':''} key={p.name} onClick={()=>{setNewWidth(p.w);setNewHeight(p.h);}}><FileText size={22}/><strong>{p.name}</strong><span>{p.detail}</span></button>)}</div><div className="field-grid"><Field label="Width" value={newWidth} min={50} max={5000} onChange={setNewWidth}/><Field label="Height" value={newHeight} min={50} max={5000} onChange={setNewHeight}/></div><p className="fine-print">PDF dimensions use points (72 points = 1 inch).</p><div className="dialog-actions"><button className="secondary" onClick={()=>setModal(null)}>Cancel</button><button className="primary" onClick={()=>{const p=blankPage(newWidth,newHeight);p.name='Page 1';commit({version:1,name:newName||'Untitled',pages:[p],sources:{}},true);setPageId(p.id);setModal(null);}}>Create document<ArrowUpRight size={15}/></button></div></ModalShell>}
+    {textEdit&&<EditTextDialog region={textEdit} close={()=>setTextEdit(null)} apply={text=>editRegionText(textEdit,text)}/>}
+    {colorRange&&<ColorRangeDialog initial={color} preview={previewColorRange} apply={()=>{setColorRange(null);setTool(t=>['marquee','lasso','wand'].includes(t)?t:'wand');}} close={()=>{setRegion(colorRange.before);setColorRange(null);}}/>}
+    {modal==='imagesize'&&<ImageSizeDialog width={page.width} height={page.height} close={()=>setModal(null)} apply={resizeImage}/>}
+    {modal==='canvassize'&&<CanvasSizeDialog width={page.width} height={page.height} close={()=>setModal(null)} apply={resizeCanvas}/>}
+    {findOpen&&<FindReplaceDialog regions={textRegions} close={()=>setFindOpen(false)} apply={findAndReplace}/>}
     {modal==='export'&&<ModalShell title="Export document" close={()=>setModal(null)}><p className="muted">Export your work with the settings that fit.</p><label className="stacked-label">Format<select value={format} onChange={e=>setFormat(e.target.value)}><option value="pdf">PDF document</option><option value="psd">Photoshop PSD · current design page</option><option value="png">PNG images · ZIP</option><option value="jpg">JPEG images · ZIP</option><option value="svg">SVG pages · ZIP</option><option value="split">Separate PDF pages · ZIP</option><option value="txt">Plain text · TXT</option><option value="docx">Editable text · Word DOCX</option></select></label>{format!=='psd'&&<label className="stacked-label">Pages<input placeholder={`All ${project.pages.length} pages (or 1-3, 5)`} value={range} onChange={e=>setRange(e.target.value)}/></label>}{['pdf','split'].includes(format)&&<label className="stacked-label">Compression<select value={compression} onChange={e=>setCompression(e.target.value)}><option value="lossless">Original quality · lossless optimization</option><option value="balanced">Balanced · optimize large images</option><option value="small">Smaller file · reduce image quality</option></select></label>}{['png','jpg'].includes(format)&&<label className="stacked-label">Resolution<select value={dpi} onChange={e=>setDpi(Number(e.target.value))}><option value={72}>72 DPI · screen</option><option value={144}>144 DPI · standard</option><option value={300}>300 DPI · high resolution</option></select></label>}{format==='psd'&&<p className="notice">Exports the current design page as named raster layers, with opacity, visibility and blend modes. Supported groups retain their hierarchy. Text, vectors and masks are rasterized within each layer. Pages containing eraser strokes export as one merged layer to preserve appearance. Use Unlock Original PDF in Layers to convert a PDF page into an editable image first.</p>}{format==='pdf'&&<><label className="check-label"><input type="checkbox" checked={protect} onChange={e=>setProtect(e.target.checked)}/>Require a password to open the exported PDF</label>{protect&&<><label className="stacked-label">PDF password<input type="password" autoComplete="new-password" value={exportPassword} onChange={e=>setExportPassword(e.target.value)}/></label><label className="stacked-label">Confirm PDF password<input type="password" autoComplete="new-password" value={passwordConfirmation} onChange={e=>setPasswordConfirmation(e.target.value)}/></label><p className="fine-print">AES-256 encryption applies to the exported PDF. Workspace autosaves and .bide projects stay unencrypted.</p></>}</>}{format==='docx'&&<p className="notice">Extracts text in reading order. Page breaks are retained; complex layouts and images are not reconstructed. Scans require OCR before text can be extracted.</p>}{format==='pdf'&&<div className="export-note"><ShieldCheck size={18}/><span>Normal layers keep text and vectors. Blend effects rasterize design pages; forms are flattened.<br/><small>Save a .bide project to keep added layers editable.</small></span></div>}<div className="dialog-actions"><button className="secondary" onClick={saveProject}><Save size={14}/>Save project</button><button className="primary" onClick={()=>runExport()} disabled={!health.ok||(format==='psd'&&!!page.source)||(format==='pdf'&&protect&&(!exportPassword||exportPassword!==passwordConfirmation))}><Download size={15}/>Export {format==='split'?'pages':format.toUpperCase()}</button></div></ModalShell>}
     {modal==='shortcuts'&&<ModalShell title="Stay in your flow" close={()=>setModal(null)}><p className="muted">A few shortcuts that make a big difference.</p><div className="shortcut-list">{[['Command palette','Ctrl K'],['Open document','Ctrl O'],['Save editable project','Ctrl S'],['Export','Ctrl Shift E'],['Undo / Redo','Ctrl Z / Ctrl Shift Z'],['Duplicate selection','Ctrl D'],['Group / Ungroup','Ctrl G / Ctrl Shift G'],['Select / Text / Rectangle','V / T / R'],['Ellipse / Line / Brush','O / U / B'],['Pan workspace','Hold Space'],['Fit page / Actual size','Ctrl 0 / Ctrl 1'],['Zoom tool','Z'],['Zoom out with Zoom tool','Alt + click'],['Smooth zoom','Drag right / left with Z tool'],['Zoom in / out','Ctrl + / Ctrl -'],['Zoom at pointer','Ctrl or Alt + wheel'],['Freehand highlighter','H'],['Soft eraser (selected layer)','E'],['Rectangle / lasso selection','M / L'],['Copy / Paste area','Ctrl C / Ctrl V'],['Clone / Healing brush','S / J'],['Sample background','Alt + click'],['Merge Down','Ctrl E'],['Brush / eraser size','[ / ]'],['Nudge / Larger nudge','Arrows / Shift + Arrows'],['Delete selection','Delete']].map(([name,key])=><div key={name}><span>{name}</span><kbd>{key}</kbd></div>)}</div></ModalShell>}
-    {warp&&<ModalShell title="Warp layer" wide close={()=>setWarp(null)}><WarpEditor source={warp.source} onApply={applyWarp}/></ModalShell>}
+    {warp&&<ModalShell title={warp.mode==='perspective'?'Perspective':'Warp layer'} wide close={()=>setWarp(null)}>{warp.mode==='perspective'?<PerspectiveEditor source={warp.source} onApply={applyWarp}/>:<WarpEditor source={warp.source} onApply={source=>applyWarp(source)}/>}</ModalShell>}
     {palette&&<ModalShell title="What would you like to do?" close={()=>setPalette(false)}><div className="palette-search"><Search size={20}/><input aria-label="Search commands" placeholder="Try visio, draw, PDF, font, page or export…" value={query} onChange={e=>{setQuery(e.target.value);setCommandIndex(0);}} autoFocus onKeyDown={e=>{if(e.key==='ArrowDown'){e.preventDefault();setCommandIndex(i=>Math.min(Math.max(0,filteredActions.length-1),i+1));}if(e.key==='ArrowUp'){e.preventDefault();setCommandIndex(i=>Math.max(0,i-1));}if(e.key==='Enter'){e.preventDefault();runCommand(filteredActions[commandIndex]);}}}/><kbd>Esc</kbd></div><div className="palette-count" role="status">{filteredActions.length} commands · {view==='diagrams'?'Diagrams':'Document editor'}</div><div className="command-list">{filteredActions.map((a,i)=><button key={a.label} className={i===commandIndex?'active':''} onMouseEnter={()=>setCommandIndex(i)} aria-disabled={!!a.disabled} onClick={()=>runCommand(a)}><a.icon size={17}/><span><strong>{a.label}</strong><small>{a.disabled||a.category}</small></span><kbd>{a.hint}</kbd></button>)}{!filteredActions.length&&<p className="muted">No matching commands. Try “visio”, “text”, “page”, or “export”.</p>}</div><div className="palette-footer"><span>↑ ↓ Navigate</span><span>↵ Select</span></div></ModalShell>}
   </div>;
 }

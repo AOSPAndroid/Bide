@@ -1,0 +1,4 @@
+{
+  "contains": ["Nom du client:"],
+  "edits": [{"find": "Daliil", "replace": "Dalil", "letters": true}]
+}

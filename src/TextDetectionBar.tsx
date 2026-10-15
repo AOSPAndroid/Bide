@@ -2,22 +2,30 @@ import {bundledFonts,systemFonts} from './font-catalog';
 import type {OcrGrouping} from './ocr-segmentation';
 import type {ReplacementBackground} from './detected-text';
 import type {TextRegion} from './text-regions';
-import {useEffect,useState} from 'react';
+import {useEffect,useRef,useState} from 'react';
 import {bundledOcrLanguages,defaultOcrLanguages,languageLabel,type OcrLanguage} from './ocr-languages';
 
-export type OcrSettings={font:string;style:string;grouping:OcrGrouping;background:ReplacementBackground;color:string;padding:number;thorough:boolean;languages:string[];matchBlur:boolean;engine:'tesseract'|'paddle';aiSharpen:boolean};
-export const defaultOcrSettings:OcrSettings={font:'Liberation Sans',style:'auto',grouping:'smart',background:'sampled',color:'#ffffff',padding:-1,thorough:false,languages:defaultOcrLanguages,matchBlur:true,engine:'paddle',aiSharpen:false};
+export type OcrSettings={font:string;style:string;grouping:OcrGrouping;background:ReplacementBackground;color:string;padding:number;thorough:boolean;languages:string[];matchBlur:boolean;engine:'tesseract'|'paddle';aiSharpen:boolean;editMode:'letters'|'font'};
+export const defaultOcrSettings:OcrSettings={font:'Liberation Sans',style:'auto',grouping:'smart',background:'sampled',color:'#ffffff',padding:-1,thorough:false,languages:defaultOcrLanguages,matchBlur:true,engine:'paddle',aiSharpen:false,editMode:'letters'};
 
-type Props={ai:boolean;status:string;regions:TextRegion[];show:boolean;onShow:(show:boolean)=>void;settings:OcrSettings;onChange:(patch:Partial<OcrSettings>)=>void;scanning:boolean;onRescan:()=>void;onConvertAll:()=>void};
+type Props={ai:boolean;status:string;regions:TextRegion[];show:boolean;onShow:(show:boolean)=>void;settings:OcrSettings;onChange:(patch:Partial<OcrSettings>)=>void;scanning:boolean;onRescan:()=>void;onConvertAll:()=>void;onFindReplace:()=>void};
 
-export default function TextDetectionBar({ai,status,regions,show,onShow,settings,onChange,scanning,onRescan,onConvertAll}:Props){
+export default function TextDetectionBar({ai,status,regions,show,onShow,settings,onChange,scanning,onRescan,onConvertAll,onFindReplace}:Props){
  const [available,setAvailable]=useState<OcrLanguage[]>([]);
  useEffect(()=>{let live=true;void bundledOcrLanguages().then(list=>{if(live)setAvailable(list);});return()=>{live=false;};},[]);
+ const ocr=regions.some(r=>r.kind==='ocr'),menu=useRef<HTMLDetailsElement>(null);
+ // The settings dropdown closes on a click or Escape outside it, like a menu.
+ useEffect(()=>{const close=(e:Event)=>{const d=menu.current;if(d?.open&&(e instanceof KeyboardEvent?e.key==='Escape':!d.contains(e.target as Node)))d.open=false;};document.addEventListener('pointerdown',close);document.addEventListener('keydown',close);return()=>{document.removeEventListener('pointerdown',close);document.removeEventListener('keydown',close);};},[]);
  const toggle=(code:string,on:boolean)=>{const next=available.map(l=>l.code).filter(c=>c===code?on:settings.languages.includes(c));if(next.length)onChange({languages:next});};
  return <div className="text-detection-bar">
   <label><input type="checkbox" checked={show} onChange={e=>onShow(e.target.checked)}/>Edit detected text</label>
-  <span>{status||'Open a page to detect its text'}</span>
-  {regions.some(r=>r.kind==='ocr')&&<>
+  <span title={status}>{status||'Open a page to detect its text'}</span>
+  {ocr&&<>
+   <button disabled={scanning} title="Replace a word or phrase everywhere it was detected, in one step." onClick={onFindReplace}>Find & replace</button>
+   <button disabled={scanning} title="Replace every detected line with crisp editable text in one step. Undo restores the original." onClick={onConvertAll}>Convert all</button>
+  </>}
+  <details ref={menu} className="ocr-settings"><summary title="OCR font, weight, engine, languages and background cleanup">OCR settings</summary><div className="ocr-settings-panel">
+  {ocr&&<>
    <label title="Images contain no font metadata. Choose the closest appearance before editing; use Font family afterward.">OCR font<select aria-label="OCR replacement font" value={settings.font} onChange={e=>onChange({font:e.target.value})}>
     <optgroup label="Bundled · available offline">{bundledFonts.map(f=><option key={f.family} value={f.family}>{f.family}</option>)}</optgroup>
     <optgroup label="Workplace / system · must be installed">{systemFonts.map(f=><option key={f} value={f}>{f}</option>)}</optgroup>
@@ -26,7 +34,9 @@ export default function TextDetectionBar({ai,status,regions,show,onShow,settings
     <option value="auto">Auto (match strokes)</option><option value="regular">Regular</option><option value="bold">Bold</option><option value="italic">Italic</option><option value="bold-italic">Bold italic</option>
    </select></label>
    <label title="Soften each replacement to match the blur measured on the original letters, so it blends in. Convert all always makes crisp text."><input type="checkbox" aria-label="Match original blur" checked={settings.matchBlur} onChange={e=>onChange({matchBlur:e.target.checked})}/>Match blur</label>
-   <button disabled={scanning} title="Replace every detected line with crisp editable text in one step. Undo restores the original." onClick={onConvertAll}>Convert all</button>
+   <label title="Original letters: clicking a line opens a text box; changes are rebuilt from the image's own letters (exact font). New font: the line becomes editable text in the OCR font.">Edit with<select aria-label="Edit image text with" value={settings.editMode} onChange={e=>onChange({editMode:e.target.value as OcrSettings['editMode']})}>
+    <option value="letters">Original letters</option><option value="font">New font</option>
+   </select></label>
   </>}
   <label title="Smart splits large gaps such as avatar initials beside a message. Words lets you edit each word separately.">OCR selection<select aria-label="OCR selection grouping" value={settings.grouping} onChange={e=>onChange({grouping:e.target.value as OcrGrouping})}>
    <option value="smart">Smart groups</option><option value="words">Individual words</option><option value="lines">Whole lines</option>
@@ -44,6 +54,7 @@ export default function TextDetectionBar({ai,status,regions,show,onShow,settings
   </select></label>
   <label title="Leave blank for the automatic 0.8.6 cleanup margin, or set a custom pixel margin">Cleanup padding<input aria-label="Text cleanup padding" type="number" min="0" max="20" step="1" placeholder="Auto" value={settings.padding<0?'':settings.padding} onChange={e=>onChange({padding:e.target.value===''?-1:Math.max(0,Math.min(20,Number(e.target.value)||0))})}/></label>
   {settings.background==='solid'&&<input type="color" aria-label="Replacement background color" value={settings.color} onChange={e=>onChange({color:e.target.value})}/>}
+  </div></details>
   <button disabled={scanning} onClick={onRescan}>Rescan</button>
  </div>;
 }

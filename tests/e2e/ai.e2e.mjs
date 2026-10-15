@@ -3,6 +3,8 @@
 import {test} from 'node:test';import assert from 'node:assert/strict';
 import {createServer} from 'vite';import {chromium} from 'playwright-core';
 import {mkdtemp} from 'node:fs/promises';import {tmpdir} from 'node:os';import {join} from 'node:path';
+// OCR options sit in the "OCR settings" dropdown; open it before using one.
+const ocrSetting=async(page,label)=>{await page.locator('.ocr-settings').waitFor({state:'attached',timeout:120000});await page.evaluate(()=>{const d=document.querySelector('.ocr-settings');if(d)d.open=true;});return page.getByLabel(label);};
 
 // A map-like texture with a road sign and a soft two-line label, like a booking screenshot header.
 const fixture=`<body style="margin:0"><svg width="520" height="300" xmlns="http://www.w3.org/2000/svg" style="filter:blur(.5px)"><rect width="520" height="300" fill="#e8ece6"/>${Array.from({length:14},(_,i)=>`<path d="M${-20+i*40} 0 C ${60+i*30} 120, ${i*35} 180, ${80+i*38} 300" stroke="${i%3?'#c9d2dc':'#b8c4cf'}" stroke-width="${6+i%4*3}" fill="none"/>`).join('')}<rect x="300" y="40" width="90" height="34" rx="6" fill="#d33"/><text x="345" y="64" font-family="sans-serif" font-weight="bold" font-size="20" fill="#fff" text-anchor="middle">A-387</text><text x="260" y="190" font-family="sans-serif" font-weight="bold" font-size="30" fill="#333" text-anchor="middle">HUERTO DE</text><text x="260" y="228" font-family="sans-serif" font-weight="bold" font-size="30" fill="#333" text-anchor="middle">LOS NARANJOS</text></svg></body>`;
@@ -19,13 +21,13 @@ test('AI OCR, AI background fill, AI removal and AI sharpening work offline in t
   await page.waitForFunction(()=>/OCR regions/.test(document.querySelector('.text-detection-bar span')?.textContent||''),null,{timeout:180000});
 
   // PaddleOCR reads both label lines.
-  await page.getByLabel('OCR engine').selectOption('paddle');
+  await (await ocrSetting(page,'OCR engine')).selectOption('paddle');
   await page.waitForFunction(()=>/regions · AI OCR/.test(document.querySelector('.text-detection-bar span')?.textContent||''),null,{timeout:300000});
   const read=await page.evaluate(()=>[...document.querySelectorAll('.detected-text-overlay button')].map(b=>b.getAttribute('aria-label')));
   assert.ok(read.some(l=>/HUERTO DE/.test(l))&&read.some(l=>/LOS NARANJOS/.test(l)),'AI OCR read: '+read.join(' | '));
 
   // LaMa fills the background behind replaced text.
-  await page.getByLabel('Text replacement background').selectOption('ai');
+  await (await ocrSetting(page,'Text replacement background')).selectOption('ai');await (await ocrSetting(page,'Edit image text with')).selectOption('font');
   await page.locator('button[aria-label*="LOS NARANJOS"]').click();await page.getByText('OCR text is editable',{exact:false}).waitFor({timeout:300000});
   assert.ok((await layers()).some(l=>l.name==='AI-filled background'),'AI background patch layer');
 
