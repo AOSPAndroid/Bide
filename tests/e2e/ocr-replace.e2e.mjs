@@ -3,6 +3,8 @@
 import {test} from 'node:test';import assert from 'node:assert/strict';
 import {createServer} from 'vite';import {chromium} from 'playwright-core';import * as mupdf from 'mupdf';
 import {mkdtemp,writeFile} from 'node:fs/promises';import {tmpdir} from 'node:os';import {join} from 'node:path';
+// OCR options sit in the "OCR settings" dropdown; open it before using one.
+const ocrSetting=async(page,label)=>{await page.locator('.ocr-settings').waitFor({state:'attached',timeout:120000});await page.evaluate(()=>{const d=document.querySelector('.ocr-settings');if(d)d.open=true;});return page.getByLabel(label);};
 
 function fixture(){
  const doc=new mupdf.PDFDocument(),font=new mupdf.Font('Helvetica'),ref=doc.addSimpleFont(font);
@@ -28,16 +30,16 @@ test('OCR text on an imported image becomes an editable layer',{timeout:240000},
   await region.waitFor({timeout:180000});
   assert.ok(await page.locator('button[aria-label^="Edit detected text: Revenue"]').count(),'second line detected');
   await page.waitForFunction(()=>/closest font: /.test(document.querySelector('.text-detection-bar')?.textContent||''),null,{timeout:60000});
-  assert.equal(await page.getByLabel('OCR replacement font').inputValue(),'Liberation Sans','Helvetica scan suggests its metric twin');
+  assert.equal(await (await ocrSetting(page,'OCR replacement font')).inputValue(),'Liberation Sans','Helvetica scan suggests its metric twin');
   // The thorough sparse-text pass belongs to the standard (Tesseract) engine.
-  await page.getByLabel('OCR engine').selectOption('tesseract');
-  await page.getByLabel('OCR scan depth').selectOption('thorough');
+  await (await ocrSetting(page,'OCR engine')).selectOption('tesseract');
+  await (await ocrSetting(page,'OCR scan depth')).selectOption('thorough');
   await sawStatus(page,/Thorough pass… \d+%/);
   await region.waitFor({timeout:120000});
   assert.equal(await page.locator('button[aria-label^="Edit detected text: Quarterly"]').count(),1,'second pass adds no duplicates');
-  await page.getByLabel('Text replacement background').selectOption('sampled');
+  await (await ocrSetting(page,'Text replacement background')).selectOption('sampled');
   // This test covers replacement with editable font text.
-  await page.getByLabel('Edit image text with').selectOption('font');
+  await (await ocrSetting(page,'Edit image text with')).selectOption('font');
   await region.click();
   await page.getByText('OCR text is editable',{exact:false}).waitFor({timeout:30000});
   await page.locator('button[aria-label^="Edit detected text: Quarterly"]').waitFor({state:'detached'});
@@ -59,11 +61,11 @@ test('enabling German re-scans with the German model',{timeout:240000},async()=>
   await page.goto(server.resolvedUrls.local[0]);
   await page.locator('input[type=file][accept*=".psd"]').setInputFiles(image);
   // Tesseract's language models are what this test exercises (AI OCR covers Latin languages at once).
-  await page.getByLabel('OCR engine').selectOption('tesseract');
+  await (await ocrSetting(page,'OCR engine')).selectOption('tesseract');
   await page.waitForFunction(()=>/English \+ Français · /.test(document.querySelector('.text-detection-bar span')?.textContent||''),null,{timeout:180000});
   await page.locator('button[aria-label^="Edit detected text: Gr"]').waitFor({timeout:180000});
   assert.equal(await page.locator('button[aria-label*="Straßenbahnen"]').count(),0,'English + French misreads ß');
-  await page.getByLabel('OCR languages').click();await page.getByLabel('OCR language Deutsch').check();
+  await (await ocrSetting(page,'OCR languages')).click();await page.getByLabel('OCR language Deutsch').check();
   await page.locator('button[aria-label*="Größere Übungen für Straßenbahnen"]').waitFor({timeout:180000});
   assert.match(await page.locator('.text-detection-bar').innerText(),/English \+ Français \+ Deutsch/);
   assert.deepEqual(errors,[]);
@@ -82,7 +84,7 @@ test('a bold label and a regular value on one line keep their own weights',{time
   await page.goto(server.resolvedUrls.local[0]);
   await page.locator('input[type=file][accept*=".psd"]').setInputFiles(image);
   const region=page.locator('button[aria-label^="Edit detected text: Nom du client: Dalil"]');await region.waitFor({timeout:180000});
-  await page.getByLabel('Edit image text with').selectOption('font');
+  await (await ocrSetting(page,'Edit image text with')).selectOption('font');
   // The confirmation toast is brief; the saved text layer below is the real check.
   await region.click();
   // Read the saved text layer and the weight of every character.

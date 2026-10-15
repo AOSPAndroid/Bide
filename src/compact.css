@@ -1,0 +1,129 @@
+/* Compact layout: chrome sized like a desktop image editor so the document
+   gets the room. Loaded last; overrides the earlier layout sheets. */
+
+/* Header: brand, workspace switcher, menus and search in one 40px row. */
+.topbar{height:40px;min-height:40px;gap:14px;padding-top:0;padding-bottom:0;border-top-width:2px}
+.menu-dismiss{top:40px}
+.brand .barclays-logo{width:22px;height:24px}
+.brand-lockup>span{font-size:17px}
+.brand-lockup small{display:none}
+.brand .beta{font-size:8px;padding:1px 5px}
+.menubar>.menu-wrapper>button{padding:5px 8px;font-size:12px}
+.command-button{height:28px;min-width:150px}
+.local-status{font-size:10px}
+
+.topbar .workspace-nav{border:0;padding:0;gap:2px;background:none;flex-shrink:0;align-self:center}
+.topbar .workspace-nav>button{min-width:0;padding:4px 9px;gap:6px;border-radius:6px;height:28px}
+.topbar .workspace-nav small,.topbar .workspace-nav-note{display:none}
+.topbar .workspace-nav strong{font-size:11.5px;font-weight:600;white-space:nowrap}
+.topbar .workspace-nav svg{width:15px;height:15px}
+
+.demo-notice{padding:3px 12px;font-size:11px;gap:10px}
+.demo-close{display:flex;padding:2px;border-radius:4px;color:var(--navy)}
+.demo-close:hover{background:#00395d14}
+
+/* Document name, file actions and tool options share one 38px strip. */
+.command-strip{display:flex;align-items:center;flex-shrink:0;min-width:0;background:var(--soft);border-bottom:1px solid var(--line)}
+.command-strip>.document-bar{display:contents}
+.command-strip .document-name{order:0;flex-shrink:0;display:flex;align-items:center;gap:6px;padding:0 10px 0 12px;height:38px;border-right:1px solid var(--line)}
+.command-strip .document-name>input{width:150px;max-width:150px;font-size:12px;font-weight:600}
+.command-strip .document-name>svg{width:14px;height:14px}
+.command-strip .save-state{font-size:10px;white-space:nowrap}
+.command-strip>.options-bar{order:1;flex:1;min-width:0;min-height:38px;height:38px;padding:0 10px;border:0;background:none;gap:8px;flex-wrap:nowrap}
+.command-strip .document-actions{order:2;flex-shrink:0;flex-wrap:nowrap;gap:4px;padding:0 10px;height:38px;border-left:1px solid var(--line)}
+.command-strip .document-actions>.secondary,.command-strip .document-actions>.primary{min-height:28px;height:28px;padding:4px 9px;font-size:12px;gap:6px}
+.command-strip .document-actions>.secondary .btn-label{display:none}
+.command-strip .document-actions>.secondary{width:30px;padding:0;justify-content:center}
+.command-strip .document-actions .icon-button{width:28px;height:28px}
+.command-strip .document-actions .divider{height:18px}
+.options-bar .tool-caption{min-width:0;flex-direction:row;align-items:center;gap:6px;font-size:11.5px;font-weight:600;white-space:nowrap}
+.options-bar .tool-caption-label{display:none}
+.options-bar select{height:26px}
+.options-bar input[type=number]{height:26px}
+.options-bar .options-hint{font-size:10.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex-shrink:1}
+
+/* OCR: one 30px row; the detailed settings sit in a dropdown. */
+.text-detection-bar{flex-wrap:nowrap;gap:8px;padding:3px 10px;min-height:30px}
+.text-detection-bar>span{min-width:80px}
+.text-detection-bar button{padding:3px 8px;white-space:nowrap}
+.ocr-settings{position:relative;flex-shrink:0}
+.ocr-settings>summary{cursor:pointer;list-style:none;border:1px solid #bad7e6;border-radius:5px;background:white;padding:3px 8px;white-space:nowrap}
+.ocr-settings>summary::-webkit-details-marker{display:none}
+.ocr-settings>summary:after{content:' ▾';font-size:9px}
+.ocr-settings[open]>summary{background:var(--selected)}
+.ocr-settings-panel{position:absolute;right:0;top:calc(100% + 6px);z-index:30;display:grid;grid-template-columns:minmax(0,1fr);gap:9px;width:340px;max-height:min(70vh,560px);overflow:auto;padding:12px;background:white;border:1px solid #bad7e6;border-radius:8px;box-shadow:0 10px 28px #00395d2e}
+.ocr-settings-panel>label{display:grid;grid-template-columns:130px minmax(0,1fr);align-items:center;gap:10px;white-space:nowrap}
+.ocr-settings-panel>label:has(>input[type=checkbox]){display:flex;justify-content:flex-start;gap:8px}
+.ocr-settings-panel select,.ocr-settings-panel>label>input[type=number]{max-width:none;width:100%;min-width:0}
+.ocr-settings-panel .ocr-languages>div{position:static;box-shadow:none;margin-top:6px}
+
+.selection-toolbar{padding:3px 10px;min-height:30px}
+.selection-toolbar button{padding:3px 8px}
+
+/* Canvas: no duplicate tab or hint rows; a thin ruler. */
+.canvas-tab{display:none}
+.artboard-below{display:none}
+.artboard-label{font-size:10px}
+.ruler{height:16px;font-size:8px}
+
+/* Tool rail: one column of icons; names show as tooltips. */
+.tool-rail{width:44px;padding:6px 4px;gap:0;align-items:center}
+.tool-group{width:100%;padding:5px 0;border-bottom:1px solid var(--line)}
+.tool-group:last-of-type{border-bottom:0}
+.tool-group h3{display:none}
+.tool-group>div{grid-template-columns:1fr;gap:2px}
+.tool-group button{min-height:32px;height:32px;padding:0;gap:0;border-radius:6px}
+.tool-group button>span{display:none}
+.tool-group button>kbd{font-size:7px;right:1px;top:1px}
+.rail-bottom{gap:4px;padding-top:6px;align-items:center}
+.rail-bottom label,.rail-bottom button{width:32px;height:30px;padding:0;justify-content:center;font-size:0}
+.rail-bottom label span{display:none}
+.rail-bottom input{width:22px;height:22px}
+
+/* Side panels: narrower, tighter. */
+.pages-panel{width:124px}
+.panel-guide{display:none}
+.panel-heading{height:34px}
+.page-list{padding-top:8px}
+.page-panel-bottom button{min-height:28px;font-size:10.5px}
+.inspector{width:252px}
+.property-section{padding-top:10px;padding-bottom:10px}
+.layers-header{height:34px}
+.layer-row{height:30px}
+.layer-footer{height:30px}
+.design-tools{padding:8px 12px}
+
+/* One 24px status row; the zoom lives in the tool strip. */
+.canvas-footer{display:none}
+.statusbar{height:24px;font-size:10px}
+.statusbar>div{gap:10px}
+.statusbar button[aria-pressed=true]{color:var(--blue-strong)}
+
+@media(max-width:1200px){
+ .command-strip .document-name>input{width:110px}
+ .command-strip .save-state{display:none}
+ .topbar .workspace-nav strong{font-size:11px}
+ .command-button{min-width:0;width:30px;padding:0;justify-content:center}.command-button span,.command-button kbd{display:none}
+}
+@media(max-width:1000px){
+ .topbar .workspace-nav strong{display:none}
+ .command-strip .document-actions>.primary .btn-label{display:none}
+}
+/* Phones and small tablets keep their touch layout, with the shorter header. */
+@media(max-width:820px){
+ .command-strip{flex-wrap:wrap}
+ .command-strip>.options-bar{order:3;flex-basis:100%;border-top:1px solid var(--line)}
+ .command-strip .document-name{flex:1;border-right:0}
+ .canvas-tab{display:flex}
+ .canvas-tab>button:last-child:not(.small-properties-button):not(.small-pages-button){display:none}
+ .canvas-footer{display:flex}
+ .tool-rail{width:44px}
+ .pages-panel{width:auto}
+}
+@media(max-width:600px){
+ .topbar{gap:8px}
+ .menubar{display:none}
+ .tool-rail{width:40px}
+ .text-detection-bar>label:first-child{font-size:0}
+ .ocr-settings-panel{position:fixed;left:8px;right:8px;width:auto;top:120px}
+}

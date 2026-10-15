@@ -5,3 +5,4 @@ import './styles.css';
 import './theme.css';
 createRoot(document.getElementById('root')!).render(<ErrorBoundary><App /></ErrorBoundary>);
 import './workspace-ui.css';
+import './compact.css';
