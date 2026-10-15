@@ -29,9 +29,9 @@ Checked against the [Photopea manual](https://www.photopea.com/learn/) and [iLov
 | Draggable/resizable/rotatable text | Implemented | Text boxes, typography controls, color, alignment, property inspector |
 | Layers | Partial | Ordering, names, groups, visibility, lock, duplication and 16 blend modes on design pages; layer styles (drop shadow, inner shadow, outer and inner glow, stroke outside/center/inside, colour and gradient overlays) rendered live and kept in .bide, PSD and image exports, and as pixels in PDF/SVG; no clipping masks between layers or adjustment layers |
 | Painting tools | Partial | Brush styles, highlighter and eraser; Gradient tool (G: linear or radial, drawing colour to a second colour or to transparent, limited to the selection) as an editable vector layer; Paint bucket (K: tolerance, contiguous, all layers, opacity) as a new layer; no pattern fills or blend-mode painting |
-| Transform and alignment | Partial | Move, scale, rotate, flip, page alignment and snapping; no perspective/warp transform |
-| Shapes and paths | Partial | Rectangles, ellipses, lines, brush strokes; no Pen tool, node editing or Boolean operations |
-| Raster image import, resizing and crop | Partial | Common image formats; object crop/resize; no full raster editing engine |
+| Transform and alignment | Partial | Move, scale, rotate, skew X/Y, flip, page alignment, snapping to the page and to guides; nine-point Warp and four-corner Perspective (rasterize the layer); no live (non-destructive) distort |
+| Shapes and paths | Partial | Rectangles, ellipses, lines, brush strokes; Pen tool (P: click for corners, drag for curves, close on the first point, Enter to finish; fill and stroke) and point editing of anchors and Bézier handles; no Boolean operations |
+| Raster image import, resizing and crop | Partial | Common image formats; object crop/resize; Image size (resample page and layers), Canvas size with anchor, Crop tool (C) with straighten angle, crop to selection, trim to content; PDF pages crop by margins |
 | Adjustments and filters | Partial | Brightness, contrast, saturation, blur, grayscale, sepia, invert; no curves, levels, adjustment layers or full filter gallery |
 | Selections | Implemented | Marquee, lasso and magic wand (tolerance, contiguous, anti-alias, all layers or one); Shift adds, Alt subtracts, Shift+Alt intersects (or New/Add/Subtract/Intersect buttons); select all, inverse (Ctrl Shift I), colour range with live preview and screen eyedropper, layer pixels, and AI Select subject (ISNet); Refine: feather, expand, contract, smooth; marching-ants outline. Selections are soft pixel masks; no quick mask mode or saved channels |
 | Masks and clipping masks | Partial | Raster layer masks from any selection (Keep inside / Hide inside) or added blank, painted with the Mask brush (Q: Hide / Reveal, size, soft edge, opacity), inverted, applied or deleted; soft edges kept, following the layer when moved or scaled; AI Remove background as a mask; ellipse and rounded-rectangle shape masks; no clipping masks between layers or Photoshop-compatible mask stacks |
@@ -41,8 +41,9 @@ Checked against the [Photopea manual](https://www.photopea.com/learn/) and [iLov
 | RAW, advanced design formats | Missing | No RAW development, AI/CDR/XD/Sketch compatibility guarantee |
 | Color management | Missing | No editable ICC/CMYK/Lab workflow, channels, or 16/32-bit editing |
 | Text layout | Partial | Basic multiline boxes; no advanced OpenType, text-on-path or font import workflow |
-| Artboards and guides | Partial | Multiple pages and page snapping; no full artboard/guide system |
+| Artboards and guides | Partial | Multiple pages, artboard presets, layout grid; rulers that follow zoom and scroll (Ctrl R); guides dragged from the rulers, moved or dragged off to delete, saved per page, with snapping (Ctrl ; hides them) |
 | Animation / video | Missing | No timeline, frame animation, video editing or animated exports |
+| History | Implemented | History tab beside Layers names each step (move, transform, add, delete, style, mask, crop, resize…); click a step to go back or forward; 45 steps |
 | Automation / actions / scripts | Missing | Command palette is interactive; no recorded macros or batch action engine |
 | Templates, cloud storage, collaboration | Missing | Local project save/autosave only |
 
