@@ -4,6 +4,19 @@ A Photopea-inspired visual editor, PDF toolkit, and bundled draw.io diagram edit
 
 **This is not full Photopea or iLovePDF feature parity.** Diagrams use the actual open-source draw.io editor with its remote integrations disabled. See [FEATURES.md](FEATURES.md) for supported features and remaining work.
 
+![Photo editor: layer style (drop shadow and outer glow) on a headline, with rulers and a guide](docs/screenshots/photo-editor.png)
+
+| | |
+|---|---|
+| ![Editing text inside an image: the guest name was fixed with the image's own letters](docs/screenshots/image-text.png) | ![Magic wand selection of two areas, with the selection bar](docs/screenshots/selection.png) |
+| **Edit text in images.** Detected lines are outlined; a typo in a screenshot ("Martinn") was fixed with the image's own letters. | **Selections.** Magic wand with Shift to add, plus Subject (AI), colour range, refine and layer masks. |
+| ![Pen tool shape over a gradient, with the History panel](docs/screenshots/pen-history.png) | ![PDF MasterTool home with searchable PDF tools](docs/screenshots/pdf-tools.png) |
+| **Pen, gradient and History.** A pen shape on a gradient layer; every step is named in History. | **PDF MasterTool.** Merge, split, compress, convert, sign, watermark and protect, all in the browser. |
+| ![Bundled draw.io diagram editor](docs/screenshots/diagrams.png) | |
+| **Diagrams.** The bundled draw.io editor, offline, with *Place in document*. | |
+
+Screenshots are generated from the app with `node scripts/readme-screenshots.mjs` (demo content only).
+
 ## Start on Windows
 
 1. Get the [prebuilt bide-browser.zip](https://github.com/AOSPAndroid/Bide/releases/download/v0.8.13/bide-browser.zip) and extract the entire ZIP into a **new writable folder**. The app and conversion engines are already included. You should see a `site` folder beside the BAT files.
