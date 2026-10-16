@@ -6,7 +6,7 @@ A Photopea-inspired visual editor, PDF toolkit, and bundled draw.io diagram edit
 
 ## Start on Windows
 
-1. Get the [prebuilt bide-browser.zip](https://github.com/AOSPAndroid/Bide/releases/download/v0.8.12/bide-browser.zip) and extract the entire ZIP into a **new writable folder**. The app and conversion engines are already included. You should see a `site` folder beside the BAT files.
+1. Get the [prebuilt bide-browser.zip](https://github.com/AOSPAndroid/Bide/releases/download/v0.8.13/bide-browser.zip) and extract the entire ZIP into a **new writable folder**. The app and conversion engines are already included. You should see a `site` folder beside the BAT files.
 2. Use your existing **Node.js 22 or newer**. bide detects `C:\devhome\tools\node24\current\node.exe` or `node.exe` on PATH. With this ZIP, **Install Dependencies.bat is optional**: it only checks your installation and bundled files, with no downloads.
 3. Double-click **launch bide.bat**. It starts the local server in the background and opens the editor in your default browser (use Edge or Chrome).
 
@@ -26,9 +26,9 @@ PDF and image editing runs over HTTP, but browsers may block downloads from HTTP
 
 Every visitor has an independent workspace stored in their own browser. Sharing the app does not share documents or provide live collaboration. This is an internal static server without user accounts; use it on your trusted LAN/VPN, with no router port forwarding.
 
-## Workspaces and dock
+## Workspaces
 
-The interface uses warm white panels, burnt-orange accents (`#C44C28`), graphite text (`#25272D`), and an original B monogram. The bide wordmark carries the tagline “Image & Document Editor”. Move the pointer to the **Workspaces** tab at the bottom center to reveal the animated dock. Its three icons open **Photo editor**, **PDF MasterTool** and **Drawio**. Icons lift and show their labels on hover; the active workspace has an orange icon. Click/tap the tab to keep the dock open, or focus it with Tab and press Up to reach the icons. Escape dismisses keyboard access. Reduced-motion preferences disable the animations.
+The interface uses warm white panels, burnt-orange accents (`#C44C28`), graphite text (`#25272D`), and an original B monogram. The bide wordmark carries the tagline “Image & Document Editor”. Compact chrome gives the document most of the screen. The top row holds the workspace switcher (**Photo editor**, **PDF MasterTool**, **Diagrams**), the menus and **Find a tool** (Ctrl+K). The second row holds the document name, Open/Save/Export, undo/redo, the active tool's options and zoom. Tools sit in an icon rail on the left (hover for names and shortcuts); the page strip opens for multi-page documents or with **Pages** in the status bar; Properties, Layers and History are on the right.
 
 Photo editor and PDF MasterTool share your current document, layers and undo history. The PDF home has searchable tools grouped under Organize, Convert, Edit and Security; **Continue editing** returns to the document. Drawio keeps its own diagram draft, and **Place in document** returns to the photo/PDF workspace you came from. Ctrl+K can also switch workspaces.
 
@@ -40,12 +40,16 @@ Photo editor and PDF MasterTool share your current document, layers and undo his
 - Order, rename, hide, lock, duplicate and group layers. Apply 16 blend modes on design pages, ellipse/rounded-rectangle shape masks, and image blur. Shift-click for multiple selection.
 - Zoom from 10% to 800% using the toolbar percentage (type a value and press Enter), plus/minus buttons, Ctrl +/−, or Ctrl/Alt + mouse wheel. Ctrl+1 resets to 100%, Ctrl+0 fits the page. Wheel zoom keeps the pointer position anchored. Pan with Space, snap to page edges/center and undo/redo. Drag page thumbnails to reorder.
 - Ctrl+K opens the command palette; Ctrl+O opens files; Ctrl+S saves a project; Ctrl+Shift+E exports; Ctrl+0 fits the page.
+- **Selections:** marquee (M), lasso (L) and magic wand (W); Shift adds, Alt subtracts, Shift+Alt intersects. Select all, inverse (Ctrl+Shift+I), colour range, layer pixels and AI **Subject**; Refine feathers, expands, contracts or smooths. **Keep inside** / **Hide inside** make a paintable layer mask; **Remove background** (AI) masks the subject.
+- **Layer styles:** drop shadow, inner shadow, outer/inner glow, stroke, colour and gradient overlays in the Properties panel.
+- **Painting:** gradient (G), paint bucket (K) and mask brush (Q, Hide/Reveal) besides brush, highlighter and eraser.
+- **Paths and canvas:** pen tool (P) with point editing; rulers (Ctrl+R) and guides dragged from them; crop (C) with straighten; Image size, Canvas size and Trim in the **Image** menu; skew fields and Perspective for layers; a **History** tab to jump to any step.
 
 Basic 8-bit RGB PSD import preserves raster layer names, positions, opacity and supported blend modes. Complex documents use their saved composite preview with an explicit notice. PSD export writes the current design page as raster layers; text, groups and shapes are not native Photoshop objects. `.bide` retains the editable editor objects. PSB and 16/32-bit or non-RGB PSD files are not supported.
 
 ## Diagrams
 
-Choose **Drawio** from the bottom dock. The bundled draw.io 31.4.5 editor supplies draggable/resizable shapes, attached connectors, labels, flowchart/UML/network shape libraries, layers, pages, alignment/layout tools, grouping, undo/redo, and its own zoom/pan controls. Start from a blank canvas, process flow, team structure, or system overview. The **More Shapes** button opens additional bundled libraries.
+Choose **Diagrams** in the workspace switcher at the top. The bundled draw.io 31.4.5 editor supplies draggable/resizable shapes, attached connectors, labels, flowchart/UML/network shape libraries, layers, pages, alignment/layout tools, grouping, undo/redo, and its own zoom/pan controls. Start from a blank canvas, process flow, team structure, or system overview. The **More Shapes** button opens additional bundled libraries.
 
 - Open and save native `.drawio` / draw.io XML files, including multiple pages. The current diagram also autosaves locally, independently of your photo/PDF document.
 - Export the current diagram page as SVG, PNG (with editable XML embedded), or PDF. The PDF button produces a high-resolution image PDF; text is not searchable. Use draw.io's File → Print for its browser printing workflow.

@@ -68,11 +68,11 @@
 
 /* Tool rail: one column of icons; names show as tooltips. */
 .tool-rail{width:44px;padding:6px 4px;gap:0;align-items:center}
-.tool-group{width:100%;padding:5px 0;border-bottom:1px solid var(--line)}
+.tool-group{width:100%;padding:4px 0;border-bottom:1px solid var(--line)}
 .tool-group:last-of-type{border-bottom:0}
 .tool-group h3{display:none}
 .tool-group>div{grid-template-columns:1fr;gap:2px}
-.tool-group button{min-height:32px;height:32px;padding:0;gap:0;border-radius:6px}
+.tool-group button{min-height:30px;height:30px;padding:0;gap:0;border-radius:6px}
 .tool-group button>span{display:none}
 .tool-group button>kbd{font-size:7px;right:1px;top:1px}
 .rail-bottom{gap:4px;padding-top:6px;align-items:center}

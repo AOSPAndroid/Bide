@@ -1,3 +1,13 @@
+## v0.8.13 — Independent branding and editor improvements
+
+- Original B logo and favicon, warm white/graphite interface, burnt-orange accents, and “Image & Document Editor” tagline. Retired bank logo assets are removed.
+- Compact workspace layout and shorter tool rail, with navigation in the header and more room for documents.
+- OCR appearance matching and original-letter replacement, Find & replace, better bold/symbol weights, and a guard against making replacement text blurrier than the source. Exact matching still depends on the source image and available glyphs/fonts.
+- Offline AI OCR, image removal/fill, sharpening and subject selection in the full Windows package; seven bundled OCR languages. The hosted demo omits the AI model pack and Office engine.
+- Magic wand, combined selections, colour range/refine, layer styles, gradients, paint bucket and paintable masks.
+- Pen and path editing, rulers/guides, crop/straighten, image/canvas size, perspective and named History steps.
+- Prebuilt ZIP retains install, launch, LAN sharing and Stop BAT files and uses existing Node.js 22+ without setup downloads.
+
 ## Current app identity
 
 - Original B monogram and independent warm white, graphite, and burnt-orange identity, with “Image & Document Editor” beneath bide.
@@ -29,7 +39,7 @@ Checked against the [Photopea manual](https://www.photopea.com/learn/) and [iLov
 
 | Feature family | bide status | Actual scope / remaining work |
 |---|---|---|
-| Local GUI, canvas navigation, command search | Implemented | Warm white/graphite interface with burnt-orange accents, animated three-workspace dock, searchable PDF tools, zoom, pan, Ctrl+K palette and keyboard shortcuts |
+| Local GUI, canvas navigation, command search | Implemented | Warm white/graphite compact interface with burnt-orange accents, workspace switcher in the header, searchable PDF tools, zoom, pan, Ctrl+K palette and keyboard shortcuts |
 | Draggable/resizable/rotatable text | Implemented | Text boxes, typography controls, color, alignment, property inspector |
 | Layers | Partial | Ordering, names, groups, visibility, lock, duplication and 16 blend modes on design pages; layer styles (drop shadow, inner shadow, outer and inner glow, stroke outside/center/inside, colour and gradient overlays) rendered live and kept in .bide, PSD and image exports, and as pixels in PDF/SVG; no clipping masks between layers or adjustment layers |
 | Painting tools | Partial | Brush styles, highlighter and eraser; Gradient tool (G: linear or radial, drawing colour to a second colour or to transparent, limited to the selection) as an editable vector layer; Paint bucket (K: tolerance, contiguous, all layers, opacity) as a new layer; no pattern fills or blend-mode painting |
