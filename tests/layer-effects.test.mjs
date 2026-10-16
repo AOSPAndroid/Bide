@@ -1,5 +1,7 @@
 import {test} from 'node:test';import assert from 'node:assert/strict';
 import {applyLayerStyle,effectDefaults,effectExtent,hasEffects,lightOffset,hexRgb} from '../tmp/layer-effects.mjs';
+import {Rect,Group} from 'fabric';
+import {needsRasterExport,rasterExportBounds} from '../tmp/layer-style-render.mjs';
 
 // W×H transparent buffer with an opaque white square [x0,x1)×[y0,y1).
 function square(w,h,x0,y0,x1,y1,rgb=[255,255,255]){
@@ -59,4 +61,29 @@ test('inner shadow darkens the edge facing the light',()=>{
  assert.deepEqual(px(s,W,30,21),[0,0,0,255],'top inside edge shadowed');
  assert.deepEqual(px(s,W,30,38),[255,255,255,255],'bottom edge lit');
  assert.equal(px(s,W,30,10)[3],0,'clipped to the layer');
+});
+
+test('SVG/PDF rasterizes styles and painted masks nested inside groups',()=>{
+ const plain=()=>new Rect({left:20,top:20,width:30,height:40,strokeWidth:0});
+ assert.equal(needsRasterExport(new Group([new Group([plain()])])),false,'ordinary groups retain vector export');
+ const dormant=plain();dormant.layerStyle={dropShadow:{...effectDefaults.dropShadow,enabled:false}};
+ assert.equal(needsRasterExport(new Group([dormant])),false,'disabled effects retain vector export');
+ const styled=plain();styled.layerStyle={colorOverlay:{...effectDefaults.colorOverlay}};
+ assert.equal(needsRasterExport(new Group([new Group([styled])])),true,'a grandchild overlay must survive SVG/PDF export');
+ const masked=plain();masked.clipPath=Object.assign(new Rect({width:30,height:40}),{layerMask:true});
+ assert.equal(needsRasterExport(new Group([new Group([masked])])),true,'a grandchild painted mask requires raster export');
+});
+
+test('group export bounds include transformed child effects without changing layer appearance settings',()=>{
+ const child=new Rect({left:20,top:20,width:30,height:40,strokeWidth:0});
+ child.layerStyle={outerGlow:{...effectDefaults.outerGlow,size:10}};
+ const group=new Group([new Group([child])],{scaleX:2,scaleY:2,angle:30,opacity:.4,globalCompositeOperation:'multiply'});
+ group.setCoords();
+ const before=group.toObject(),bounds=rasterExportBounds(group),shape=child.getBoundingRect();
+ // A 10-unit glow has a 17-unit reach; the group's 2x scale doubles it.
+ assert.ok(bounds.left<=shape.left-34&&bounds.top<=shape.top-34,'top/left glow is not clipped by the group geometry');
+ assert.ok(bounds.left+bounds.width>=shape.left+shape.width+34&&bounds.top+bounds.height>=shape.top+shape.height+34,'bottom/right glow is not clipped');
+ assert.deepEqual(group.toObject(),before,'bounds calculation leaves transforms, opacity, blend mode and children unchanged');
+ assert.equal(group.opacity,.4);assert.equal(group.globalCompositeOperation,'multiply');
+ assert.equal(child.layerStyle.outerGlow.size,10,'effect remains editable at its original size');
 });

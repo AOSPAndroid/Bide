@@ -3,7 +3,7 @@
 // resolution, its effects are computed from those pixels, and the result is
 // drawn in its place. Results are cached until the layer changes; moving a
 // layer reuses them.
-import {FabricImage,FabricObject} from 'fabric';
+import {FabricImage,FabricObject,Group} from 'fabric';
 import {applyLayerStyle,effectExtent,hasEffects,type LayerStyle} from './layer-effects';
 
 type Styled=FabricObject&{layerStyle?:LayerStyle;_styleCache?:{key:string;canvas:HTMLCanvasElement;x:number;y:number}};
@@ -51,6 +51,18 @@ export function installLayerStyles(){
  };
 }
 
-// True when the layer needs pixels to look right in SVG/PDF output (layer
-// styles and painted masks have no vector equivalent here).
-export const needsRasterExport=(o:FabricObject)=>hasEffects((o as Styled).layerStyle)||!!(o.clipPath as {layerMask?:boolean}|undefined)?.layerMask;
+// A group's SVG also needs pixels when any descendant has a layer style or
+// painted mask: SVG serialization does not call the canvas render hook above.
+export const needsRasterExport=(o:FabricObject):boolean=>hasEffects((o as Styled).layerStyle)||!!(o.clipPath as {layerMask?:boolean}|undefined)?.layerMask||(o instanceof Group&&o.getObjects().some(needsRasterExport));
+
+// Include effects on descendants as well as the group's own geometry. Fabric's
+// group bounds omit a child's shadow/glow, and effects scale with the layer.
+export function rasterExportBounds(o:FabricObject):{left:number;top:number;width:number;height:number}{
+ const b=o.getBoundingRect(),m=o.calcTransformMatrix(),scale=Math.sqrt(Math.abs(m[0]*m[3]-m[1]*m[2]));
+ const reach=effectExtent((o as Styled).layerStyle??{})*scale;
+ let left=b.left-reach,top=b.top-reach,right=b.left+b.width+reach,bottom=b.top+b.height+reach;
+ if(o instanceof Group)for(const child of o.getObjects()){
+  const c=rasterExportBounds(child);left=Math.min(left,c.left);top=Math.min(top,c.top);right=Math.max(right,c.left+c.width);bottom=Math.max(bottom,c.top+c.height);
+ }
+ return {left,top,width:right-left,height:bottom-top};
+}

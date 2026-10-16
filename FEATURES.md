@@ -1,3 +1,7 @@
+## Current app identity
+
+- Original B monogram and independent warm white, graphite, and burnt-orange identity, with “Image & Document Editor” beneath bide.
+
 ## v0.4.7 — Searchable command palette
 
 - Workspace aliases: visio/draw/diagram/drawio/flowchart, photoshop/photopea, PDF/ilovepdf. Exact aliases rank first; search accepts multiple words and punctuation.
@@ -25,7 +29,7 @@ Checked against the [Photopea manual](https://www.photopea.com/learn/) and [iLov
 
 | Feature family | bide status | Actual scope / remaining work |
 |---|---|---|
-| Local GUI, canvas navigation, command search | Implemented | White/blue compact interface, workspace switcher in the header, searchable PDF tools, zoom, pan, Ctrl+K palette and keyboard shortcuts |
+| Local GUI, canvas navigation, command search | Implemented | Warm white/graphite compact interface with burnt-orange accents, workspace switcher in the header, searchable PDF tools, zoom, pan, Ctrl+K palette and keyboard shortcuts |
 | Draggable/resizable/rotatable text | Implemented | Text boxes, typography controls, color, alignment, property inspector |
 | Layers | Partial | Ordering, names, groups, visibility, lock, duplication and 16 blend modes on design pages; layer styles (drop shadow, inner shadow, outer and inner glow, stroke outside/center/inside, colour and gradient overlays) rendered live and kept in .bide, PSD and image exports, and as pixels in PDF/SVG; no clipping masks between layers or adjustment layers |
 | Painting tools | Partial | Brush styles, highlighter and eraser; Gradient tool (G: linear or radial, drawing colour to a second colour or to transparent, limited to the selection) as an editable vector layer; Paint bucket (K: tolerance, contiguous, all layers, opacity) as a new layer; no pattern fills or blend-mode painting |
@@ -142,7 +146,6 @@ There is no full-parity completion claim or committed delivery date. The checkli
 
 ### v0.4.4 — Branding and selection masks
 
-- Barclays eagle logo stored locally, with “Barclays Image & Document Editor” beneath bide.
 - M selects rectangular selection; Q selects freehand lasso. Select an unlocked layer first, then draw on the canvas. Keep inside / Hide inside apply a reversible mask; Copy to layer creates an independently editable cutout without changing the source layer. Each action replaces that layer's previous mask. Choose Shape mask → None to recover the original pixels, or Undo.
 - Masks follow layer rotation, scale and flipping and persist in .bide projects. This is a foundation for photo compositing, not Photoshop feature parity. Original PDF page content is not a selectable image layer.
 - Browser verified mask placement, mask removal, copying a cutout and hiding the source. Automated geometry checks cover rotated, scaled and flipped layers and serialized inverse masks.
@@ -237,3 +240,7 @@ Roboto and Inter are already bundled for offline text and OCR editing. SF Pro, S
 - Replaced font text keeps its original line length: width sets the size (height only when it agrees within 3%) and letter spacing absorbs the rest.
 - Image preparation runs in a worker and the status bar shows recognition progress.
 - `npm run test:e2e` drives the app in Chromium: imports a rendered PNG, waits for OCR, checks the suggested font and the thorough pass, replaces a region (text layer and background patch), and verifies that enabling German re-scans ß and umlauts correctly. The Vite dev server now loads the PDF engine (mupdf is excluded from dependency pre-bundling).
+
+### OCR accuracy and language release (0.8.12)
+
+Merged claude/lucid-fermat-jvmf9l: better preparation for small and dark-mode text, progress reporting, optional thorough scan, uncertain-region indicators, suggested bundled font matching and selectable offline English, French, German, Spanish, Italian, Dutch and Portuguese models. OCR geometry maps back to the original page and replacement sizing keeps proportional fitting. Source-map-js build dependency updated to the patched 1.2.2 release.

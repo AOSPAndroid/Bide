@@ -20,16 +20,17 @@ function rendered(text:string,family:string,weight:string):Mask|undefined{
  return normalizeMask(inkMask(ctx.getImageData(0,0,w,h).data,w,h,[255,255,255]));
 }
 
-export async function suggestOcrFont(samples:FontSample[],candidates=[...fontCandidates,...systemCandidates]):Promise<{family:string;score:number}|undefined>{
+export async function rankOcrFonts(samples:FontSample[],candidates=[...fontCandidates,...systemCandidates]):Promise<{family:string;score:number}[]>{
  const sources=samples.map(s=>({text:s.text,mask:normalizeMask(inkMask(s.pixels.data,s.pixels.width,s.pixels.height,s.background))})).filter((s):s is {text:string;mask:Mask}=>!!s.mask);
- if(!sources.length)return undefined;
- let best:{family:string;score:number}|undefined;
+ if(!sources.length)return [];
+ const ranked:{family:string;score:number}[]=[];
  for(const family of candidates){
   if(systemCandidates.includes(family)&&!await isInstalled(family))continue;
   try{await ensureFont(family);}catch{continue;}
   let total=0;
   for(const s of sources)total+=Math.max(...['normal','bold'].map(weight=>{const mask=rendered(s.text,family,weight);return mask?shapeScore(s.mask,mask):0;}));
-  const score=total/sources.length;if(!best||score>best.score)best={family,score};
+  const score=total/sources.length;ranked.push({family,score});
  }
- return best;
+ return ranked.sort((a,b)=>b.score-a.score);
 }
+export async function suggestOcrFont(samples:FontSample[],candidates=[...fontCandidates,...systemCandidates]){return (await rankOcrFonts(samples,candidates))[0];}

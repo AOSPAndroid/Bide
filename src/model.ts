@@ -4,7 +4,7 @@ import { uuid } from './browser/crypto';
 
 FabricObject.customProperties = ['id', 'name', 'diagramXml','pdfFontData','pdfOriginalFont','pdfFontFallback','pdfFontBold','pdfFontItalic','recognizedKey','objectCaching','textSoftness','layerMask','layerStyle'];
 // The editor's coordinates use top-left anchors. Fabric 7 defaults to centered anchors.
-Object.assign(FabricObject.ownDefaults, { originX: 'left', originY: 'top', cornerColor: '#ffffff', cornerStrokeColor: '#0076a8', borderColor: '#00aeef', cornerSize: 9, transparentCorners: false, padding: 3 });
+Object.assign(FabricObject.ownDefaults, { originX: 'left', originY: 'top', cornerColor: '#ffffff', cornerStrokeColor: '#a83c1c', borderColor: '#c44c28', cornerSize: 9, transparentCorners: false, padding: 3 });
 
 export type Page = { id: string; name: string; width: number; height: number; color: string; source?: string; index: number; canvas: Record<string, unknown>; thumb?: string; guides?: { x: number[]; y: number[] } };
 export type Project = { version: 1; name: string; pages: Page[]; sources: Record<string, string> };

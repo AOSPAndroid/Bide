@@ -15,8 +15,8 @@ export default function PerspectiveEditor({source,onApply}:{source:HTMLCanvasEle
    onPointerMove={e=>{if(drag.current===null)return;const r=e.currentTarget.getBoundingClientRect(),x=(e.clientX-r.left)/r.width*(w+2*pad)-pad,y=(e.clientY-r.top)/r.height*(h+2*pad)-pad,i=drag.current;setCorners(c=>c.map((p,j)=>j===i?{x:Math.max(-pad,Math.min(w+pad,x)),y:Math.max(-pad,Math.min(h+pad,y))}:p));}}
    onPointerUp={()=>{drag.current=null;}}>
    <image href={output.canvas.toDataURL()} x={output.left} y={output.top} width={output.canvas.width} height={output.canvas.height}/>
-   <polygon points={corners.map(p=>`${p.x},${p.y}`).join(' ')} fill="none" stroke="#00aeef" strokeWidth={Math.max(1,w/300)}/>
-   {corners.map((p,i)=><circle key={i} cx={p.x} cy={p.y} r={Math.max(6,Math.max(w,h)/60)} fill="white" stroke="#00395d" strokeWidth={Math.max(1,w/300)} tabIndex={0} role="slider" aria-label={`Corner ${names[i]}`} aria-valuetext={`${Math.round(p.x)}, ${Math.round(p.y)}`}
+   <polygon points={corners.map(p=>`${p.x},${p.y}`).join(' ')} fill="none" stroke="#c44c28" strokeWidth={Math.max(1,w/300)}/>
+   {corners.map((p,i)=><circle key={i} cx={p.x} cy={p.y} r={Math.max(6,Math.max(w,h)/60)} fill="white" stroke="#25272d" strokeWidth={Math.max(1,w/300)} tabIndex={0} role="slider" aria-label={`Corner ${names[i]}`} aria-valuetext={`${Math.round(p.x)}, ${Math.round(p.y)}`}
     onPointerDown={e=>{(e.currentTarget.ownerSVGElement as SVGSVGElement).setPointerCapture(e.pointerId);drag.current=i;}}
     onKeyDown={e=>{const s=e.shiftKey?10:1,d={ArrowLeft:[-s,0],ArrowRight:[s,0],ArrowUp:[0,-s],ArrowDown:[0,s]}[e.key];if(d){e.preventDefault();nudge(i,d[0],d[1]);}}}/>)}
   </svg>

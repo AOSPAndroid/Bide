@@ -19,7 +19,7 @@ Screenshots are generated from the app with `node scripts/readme-screenshots.mjs
 
 ## Start on Windows
 
-1. Get the [prebuilt bide-browser.zip](https://github.com/AOSPAndroid/Bide/releases/download/v0.8.11/bide-browser.zip) and extract the entire ZIP into a **new writable folder**. The app and conversion engines are already included. You should see a `site` folder beside the BAT files.
+1. Get the [prebuilt bide-browser.zip](https://github.com/AOSPAndroid/Bide/releases/download/v0.8.12/bide-browser.zip) and extract the entire ZIP into a **new writable folder**. The app and conversion engines are already included. You should see a `site` folder beside the BAT files.
 2. Use your existing **Node.js 22 or newer**. bide detects `C:\devhome\tools\node24\current\node.exe` or `node.exe` on PATH. With this ZIP, **Install Dependencies.bat is optional**: it only checks your installation and bundled files, with no downloads.
 3. Double-click **launch bide.bat**. It starts the local server in the background and opens the editor in your default browser (use Edge or Chrome).
 
@@ -29,7 +29,7 @@ The BAT files run directly through Node: **PowerShell and execution-policy chang
 
 GitHub's **Code → Download ZIP** creates a source folder such as `Bide-main`. A source build must be explicitly requested with `"Install Dependencies.bat" --build-source`; it needs npm packages and the browser Office/diagram runtimes, which may require network access. Use the prebuilt release ZIP on a PC where proxy authentication blocks dependency downloads. Its root launchers run offline using your existing Node; the `source` folder is only for rebuilding.
 
-The local edition works without internet after setup. A hosted edition needs only a browser and no Node runtime on the work PC; see [HOSTING.md](HOSTING.md). A public [bide demo](https://bide-demo.dalilooksk.chatgpt.site) is hosted with Sites. The demo includes the photo editor, PDF tools and draw.io; Office-to-PDF conversion is available only in the local download because the Office assets exceed the host's 25 MiB file limit. Files and drafts stay in each visitor's browser. The previous `Setup.cmd` and `start bide.cmd` now forward to these BAT files.
+The local edition works without internet after setup. A hosted edition needs only a browser and no Node runtime on the work PC; see [HOSTING.md](HOSTING.md). A public [bide demo](https://bide-demo.daaalil.chatgpt.site) is hosted with Sites. The demo includes the photo editor, PDF tools and draw.io; Office-to-PDF conversion is available only in the local download because the Office assets exceed the host's 25 MiB file limit. Files and drafts stay in each visitor's browser. The previous `Setup.cmd` and `start bide.cmd` now forward to these BAT files.
 
 ## Share internally using IP:port
 
@@ -41,7 +41,7 @@ Every visitor has an independent workspace stored in their own browser. Sharing 
 
 ## Workspaces
 
-The interface uses white panels, Barclays blue accents (`#00AEEF`) and navy text (`#00395D`), with compact chrome so the document gets most of the screen. The top row holds the workspace switcher (**Photo editor**, **PDF MasterTool**, **Diagrams**), the menus and **Find a tool** (Ctrl+K). The second row holds the document name, Open/Save/Export, undo/redo, the active tool's options and zoom. Tools sit in an icon rail on the left (hover for names and shortcuts); the page strip opens for multi-page documents or with **Pages** in the status bar; Properties, Layers and History are on the right.
+The interface uses warm white panels, burnt-orange accents (`#C44C28`), graphite text (`#25272D`) and an original B monogram (the bide wordmark carries the tagline “Image & Document Editor”), with compact chrome so the document gets most of the screen. The top row holds the workspace switcher (**Photo editor**, **PDF MasterTool**, **Diagrams**), the menus and **Find a tool** (Ctrl+K). The second row holds the document name, Open/Save/Export, undo/redo, the active tool's options and zoom. Tools sit in an icon rail on the left (hover for names and shortcuts); the page strip opens for multi-page documents or with **Pages** in the status bar; Properties, Layers and History are on the right.
 
 Photo editor and PDF MasterTool share your current document, layers and undo history. The PDF home has searchable tools grouped under Organize, Convert, Edit and Security; **Continue editing** returns to the document. Drawio keeps its own diagram draft, and **Place in document** returns to the photo/PDF workspace you came from. Ctrl+K can also switch workspaces.
 
@@ -152,7 +152,7 @@ OCR recognizes English and French together by default, including mixed-language 
 
 **Edit with: Original letters** (default): clicking a detected line opens a text box; changes are rebuilt from the image's own letters, so the font, weight, size and sharpness match exactly (for example fixing a misspelt name). Letters missing from the line are borrowed from same-size text elsewhere on the page; if a letter appears nowhere, the line uses the OCR font instead. **Find & replace** fixes a word or phrase on every detected line in one step. Choose **Edit with: New font** to turn a line into editable font text.
 
-**Convert all** turns every detected line into crisp editable text in one step (Undo restores the image text), which sharpens a blurry screenshot. For single edits, **Match blur** softens the new text to the measured blur of the original so it blends in; untick it for crisp text. **OCR scan: Thorough** adds a slower second pass for isolated labels such as buttons and badges. Regions below 70% confidence have a dashed amber outline: check their wording.
+**Convert all** turns every detected line into crisp editable text in one step (Undo restores the image text), which sharpens a blurry screenshot. For single edits, bide compares candidate text with the original pixels at their actual resolution, using nearby words where possible. It automatically adjusts the closest available font, size, ink colour and fractional alignment; **Match blur** also fits softness instead of relying only on an edge threshold. Choosing an **OCR font** manually keeps that font; untick **Match blur** for crisp text. Low-confidence appearance matches retain the earlier estimate. **OCR scan: Thorough** adds a slower second pass for isolated labels such as buttons and badges. Regions below 70% confidence have a dashed amber outline: check their wording.
 
 After a scan, bide compares the clearest recognized words with common fonts and pre-selects the closest match in **OCR font** (unless you already picked one); the status bar names it. It identifies the font family's style, not the exact original font, and works best on clean, confidently recognized text. Afterward use **Font family**. There are 80 offline font families, including Liberation Sans/Serif/Mono, Carlito and Caladea.
 

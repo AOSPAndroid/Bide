@@ -7,8 +7,7 @@ import {pdfFallbackStyle} from './text-regions';
 import {ensureFont,ensureDocumentFonts,documentEmbeddedFonts} from './fonts';
 import {fontSupportsText} from './browser/engine';
 import {hasBlending} from './browser/layer-utils';
-import {needsRasterExport} from './layer-style-render';
-import {effectExtent,type LayerStyle} from './layer-effects';
+import {needsRasterExport,rasterExportBounds} from './layer-style-render';
 
 type PdfText={pdfFontData?:string;pdfFontFallback?:string;pdfFontBold?:boolean;pdfFontItalic?:boolean;pdfOriginalFont?:string};
 
@@ -50,11 +49,11 @@ export async function exportPayload(current:Project){
    await c.loadFromJSON(p.canvas);
    for(const object of c.getObjects()){const o=object as Textbox&PdfText;if(o instanceof Textbox&&o.pdfFontData&&o.fontFamily.startsWith('PDFfont-')&&!await fontSupportsText(o.pdfFontData,o.text)){const family=o.pdfFontFallback||'Lato';await ensureFont(family);o.set({fontFamily:family,...pdfFallbackStyle(o)});o.initDimensions();}}
    // Layer styles and painted masks have no SVG form here: those layers go in as pixels.
-   const objects=c.getObjects();
+   const objects=c.getObjects(),flattenBlends=hasBlending(objects);
    for(let i=0;i<objects.length;i++){
     const o=objects[i];if(!needsRasterExport(o))continue;
-    const reach=effectExtent((o as {layerStyle?:LayerStyle}).layerStyle??{}),b=o.getBoundingRect();
-    const left=Math.floor(b.left-reach),top=Math.floor(b.top-reach),width=Math.ceil(b.width+2*reach)+1,height=Math.ceil(b.height+2*reach)+1;
+    const b=rasterExportBounds(o);
+    const left=Math.floor(b.left),top=Math.floor(b.top),width=Math.ceil(b.width)+1,height=Math.ceil(b.height)+1;
     const k=Math.max(1,Math.min(3,Math.sqrt(16000000/Math.max(1,width*height))));
     c.backgroundColor='';const pixels=c.toCanvasElement(k,{left,top,width,height,filter:x=>x===o});
     const image=Object.assign(new FabricImage(pixels,{left,top,scaleX:1/k,scaleY:1/k,globalCompositeOperation:o.globalCompositeOperation}),{name:(o as {name?:string}).name});
@@ -62,7 +61,7 @@ export async function exportPayload(current:Project){
    }
    c.backgroundColor = p.source ? '' : p.color;
    let svg = c.toSVG({ width: String(p.width), height: String(p.height), viewBox: { x:0,y:0,width:p.width,height:p.height } });
-   if (hasBlending(c.getObjects())) {
+   if (flattenBlends) {
     const png = c.toDataURL({ format: 'png', multiplier: Math.min(2, 4096 / Math.max(p.width, p.height)) });
     svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${p.width}" height="${p.height}"><image href="${png}" width="${p.width}" height="${p.height}"/></svg>`;
    }
