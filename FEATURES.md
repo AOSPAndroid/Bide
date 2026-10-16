@@ -1,3 +1,13 @@
+## v0.8.13 — Independent branding and editor improvements
+
+- Original B logo and favicon, warm white/graphite interface, burnt-orange accents, and “Image & Document Editor” tagline. Retired bank logo assets are removed.
+- Compact workspace layout and shorter tool rail, with navigation in the header and more room for documents.
+- OCR appearance matching and original-letter replacement, Find & replace, better bold/symbol weights, and a guard against making replacement text blurrier than the source. Exact matching still depends on the source image and available glyphs/fonts.
+- Offline AI OCR, image removal/fill, sharpening and subject selection in the full Windows package; seven bundled OCR languages. The hosted demo omits the AI model pack and Office engine.
+- Magic wand, combined selections, colour range/refine, layer styles, gradients, paint bucket and paintable masks.
+- Pen and path editing, rulers/guides, crop/straighten, image/canvas size, perspective and named History steps.
+- Prebuilt ZIP retains install, launch, LAN sharing and Stop BAT files and uses existing Node.js 22+ without setup downloads.
+
 ## Current app identity
 
 - Original B monogram and independent warm white, graphite, and burnt-orange identity, with “Image & Document Editor” beneath bide.

@@ -19,7 +19,7 @@ Screenshots are generated from the app with `node scripts/readme-screenshots.mjs
 
 ## Start on Windows
 
-1. Get the [prebuilt bide-browser.zip](https://github.com/AOSPAndroid/Bide/releases/download/v0.8.12/bide-browser.zip) and extract the entire ZIP into a **new writable folder**. The app and conversion engines are already included. You should see a `site` folder beside the BAT files.
+1. Get the [prebuilt bide-browser.zip](https://github.com/AOSPAndroid/Bide/releases/download/v0.8.13/bide-browser.zip) and extract the entire ZIP into a **new writable folder**. The app and conversion engines are already included. You should see a `site` folder beside the BAT files.
 2. Use your existing **Node.js 22 or newer**. bide detects `C:\devhome\tools\node24\current\node.exe` or `node.exe` on PATH. With this ZIP, **Install Dependencies.bat is optional**: it only checks your installation and bundled files, with no downloads.
 3. Double-click **launch bide.bat**. It starts the local server in the background and opens the editor in your default browser (use Edge or Chrome).
 
@@ -41,7 +41,7 @@ Every visitor has an independent workspace stored in their own browser. Sharing 
 
 ## Workspaces
 
-The interface uses warm white panels, burnt-orange accents (`#C44C28`), graphite text (`#25272D`) and an original B monogram (the bide wordmark carries the tagline “Image & Document Editor”), with compact chrome so the document gets most of the screen. The top row holds the workspace switcher (**Photo editor**, **PDF MasterTool**, **Diagrams**), the menus and **Find a tool** (Ctrl+K). The second row holds the document name, Open/Save/Export, undo/redo, the active tool's options and zoom. Tools sit in an icon rail on the left (hover for names and shortcuts); the page strip opens for multi-page documents or with **Pages** in the status bar; Properties, Layers and History are on the right.
+The interface uses warm white panels, burnt-orange accents (`#C44C28`), graphite text (`#25272D`), and an original B monogram. The bide wordmark carries the tagline “Image & Document Editor”. Compact chrome gives the document most of the screen. The top row holds the workspace switcher (**Photo editor**, **PDF MasterTool**, **Diagrams**), the menus and **Find a tool** (Ctrl+K). The second row holds the document name, Open/Save/Export, undo/redo, the active tool's options and zoom. Tools sit in an icon rail on the left (hover for names and shortcuts); the page strip opens for multi-page documents or with **Pages** in the status bar; Properties, Layers and History are on the right.
 
 Photo editor and PDF MasterTool share your current document, layers and undo history. The PDF home has searchable tools grouped under Organize, Convert, Edit and Security; **Continue editing** returns to the document. Drawio keeps its own diagram draft, and **Place in document** returns to the photo/PDF workspace you came from. Ctrl+K can also switch workspaces.
 
