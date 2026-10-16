@@ -25,7 +25,7 @@ Checked against the [Photopea manual](https://www.photopea.com/learn/) and [iLov
 
 | Feature family | bide status | Actual scope / remaining work |
 |---|---|---|
-| Local GUI, canvas navigation, command search | Implemented | White/blue interface, animated three-workspace dock, searchable PDF tools, zoom, pan, Ctrl+K palette and keyboard shortcuts |
+| Local GUI, canvas navigation, command search | Implemented | White/blue compact interface, workspace switcher in the header, searchable PDF tools, zoom, pan, Ctrl+K palette and keyboard shortcuts |
 | Draggable/resizable/rotatable text | Implemented | Text boxes, typography controls, color, alignment, property inspector |
 | Layers | Partial | Ordering, names, groups, visibility, lock, duplication and 16 blend modes on design pages; layer styles (drop shadow, inner shadow, outer and inner glow, stroke outside/center/inside, colour and gradient overlays) rendered live and kept in .bide, PSD and image exports, and as pixels in PDF/SVG; no clipping masks between layers or adjustment layers |
 | Painting tools | Partial | Brush styles, highlighter and eraser; Gradient tool (G: linear or radial, drawing colour to a second colour or to transparent, limited to the selection) as an editable vector layer; Paint bucket (K: tolerance, contiguous, all layers, opacity) as a new layer; no pattern fills or blend-mode painting |
