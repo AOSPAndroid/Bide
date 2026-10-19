@@ -149,6 +149,20 @@
     "bytes": 44305203,
     "sha256": "52cf411bce5420531233e2e1422cfd5ccdd38ff3f2adf31f1d965f0a3e15f4f5"
    }
+  },
+  "sam-encoder.onnx": {
+   "url": "https://huggingface.co/Xenova/slimsam-77-uniform/resolve/5850ab45f587c112167512ffef949107115e26a0/onnx/vision_encoder_quantized.onnx",
+   "bytes": 8882165,
+   "sha256": "cce23c7b2e5d4f330932738fb67ba518e04b0d99ccdd1cccd22a7da4e01f2971",
+   "license": "Apache-2.0",
+   "source": "https://huggingface.co/Xenova/slimsam-77-uniform"
+  },
+  "sam-decoder.onnx": {
+   "url": "https://huggingface.co/Xenova/slimsam-77-uniform/resolve/5850ab45f587c112167512ffef949107115e26a0/onnx/prompt_encoder_mask_decoder_quantized.onnx",
+   "bytes": 4903810,
+   "sha256": "cb90b279f549d2cab7fd6e20c38522438c65d84bdcca3d2a764cff7d857fdce2",
+   "license": "Apache-2.0",
+   "source": "https://huggingface.co/Xenova/slimsam-77-uniform"
   }
  }
 }

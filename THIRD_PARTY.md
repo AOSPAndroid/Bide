@@ -28,5 +28,6 @@ The source bundle accompanies this local handoff. Public or commercial redistrib
   - Real-ESRGAN realesr-general-x4v3 (ONNX export of xinntao/Real-ESRGAN): BSD-3-Clause.
   - ISNet general-use (xuebinqin/DIS, Apache-2.0; ONNX export from the rembg project, MIT; dynamic int8 build from Ko033/isnet-general-use-onnx, Apache-2.0) for Select subject and Remove background.
   - PaddleOCR PP-OCRv5 mobile and server text detection, and mobile recognition for Latin, Cyrillic, Greek, Arabic, Korean and Chinese/Japanese (official PaddlePaddle ONNX exports): Apache-2.0. The server detector is converted to float16 weights at build time, like LaMa.
+  - SlimSAM-77 (Segment Anything, Apache-2.0; uniform int8 ONNX export from Xenova/slimsam-77-uniform) for Object select.
   - PaddleX PP-LCNet_x1_0_doc_ori (page orientation) and UVDoc (flattening photographed pages), official PaddlePaddle ONNX exports: Apache-2.0.
 

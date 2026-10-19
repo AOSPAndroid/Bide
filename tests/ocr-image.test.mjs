@@ -45,3 +45,10 @@ test('a line\'s outer word edges grow over the ink they cut through, but not acr
  assert.equal(growToInk(columns,5,1,10),7,'right edge stops at the gap');
  assert.equal(growToInk(columns,1,-1,10),1,'no ink beside it, no change');
 });
+
+test('the clicked object wins over a higher-scoring whole-scene mask',async()=>{
+ const {pickMask}=await import('../tmp/ai-image.mjs');
+ assert.equal(pickMask([.98,.914,.961],[233621,69721,35179]),2,'rectangle, not the background');
+ assert.equal(pickMask([.913,1.013,.988],[264342,31220,30850]),2,'circle: either object mask is close');
+ assert.equal(pickMask([.5,.9,.6],[10,0,20]),1,'empty masks are skipped unless nothing else qualifies');
+});

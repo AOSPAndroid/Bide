@@ -1,7 +1,7 @@
 // Real-ESRGAN upscaling, LaMa inpainting and PaddleOCR recognition on canvases.
 import {runModel} from './ai';
 import {segmentGlyphs,type Glyph} from '../glyph-edit';
-import {tilePlan,toPlanar,dbBoxes,ctcDecode,ctcWords,trimToInk,growToInk,inkBand,inpaintWindows,resizeBilinear,snapToGap,rtlReorder,separateLetters,ocrScripts,type Rect,type OcrScript} from '../ai-image';
+import {tilePlan,toPlanar,dbBoxes,ctcDecode,ctcWords,trimToInk,growToInk,inkBand,inpaintWindows,resizeBilinear,snapToGap,rtlReorder,separateLetters,ocrScripts,pickMask,type Rect,type OcrScript} from '../ai-image';
 
 type Progress=(fraction:number)=>void;
 const canvas=(width:number,height:number)=>Object.assign(document.createElement('canvas'),{width,height});
@@ -90,12 +90,15 @@ export async function paddleOcr(source:HTMLCanvasElement,onProgress?:Progress,si
   };
   let best=await read(pageScript??'latin');
   // An empty read (only spaces) is unsure too, however confident, and so is
-  // one with non-Latin letters (the Latin model knows Greek for formulas).
-  if(script==='auto'&&(!best.text||best.confidence<sureRead||/(?!\p{Script=Latin})\p{L}/u.test(best.text))){
+  // one with non-Latin letters (the Latin model knows Greek for formulas). A
+  // single look-alike letter (a circle read as Ο) is not enough to switch.
+  if(script==='auto'&&(!best.text||best.confidence<sureRead||(best.text.match(/(?!\p{Script=Latin})\p{L}/gu)?.length??0)>=2)){
    const others=pageScript?['latin' as const]:probes++<4?ocrScripts.filter(s=>s!=='latin'):[];
    for(const s of others){const next=await read(s);if(next.text&&(!best.text||next.confidence>best.confidence+.05))best=next;}
-   if(!pageScript&&best.script!=='latin'&&best.confidence>=sureRead)pageScript=best.script;
+   if(!pageScript&&best.script!=='latin'&&best.confidence>=sureRead&&(best.text.match(/\p{L}/gu)?.length??0)>=3)pageScript=best.script;
   }
+  // Digits and punctuation read by another alphabet's model are still Latin text.
+  if(best.script!=='latin'&&!/(?!\p{Script=Latin})\p{L}/u.test(best.text))best={...best,script:'latin'};
   const decoded=best,steps=best.steps,rtl=best.script==='arabic';
   if(decoded.text){
    // Column ink inside the line (contrast with the line's corner colour) to tighten word boxes.
@@ -162,4 +165,31 @@ export async function flattenPage(source:HTMLCanvasElement,signal?:AbortSignal){
  const out=Object.values(await runModel('uvdoc',{image:{data:toPlanar(rgba.data,w,h),dims:[1,3,h,w]}},signal))[0],n=w*h;
  for(let i=0;i<n;i++){for(let c=0;c<3;c++)rgba.data[i*4+c]=Math.max(0,Math.min(255,out.data[c*n+i]*255));rgba.data[i*4+3]=255;}
  f.putImageData(rgba,0,0);return flat;
+}
+
+// SlimSAM (Segment Anything, int8): the image is encoded once (a few seconds
+// on a CPU), then each click is decoded in a fraction of a second.
+export type ObjectEmbedding={image:Float32Array;positional:Float32Array;scale:number;width:number;height:number};
+export async function embedForObjects(source:HTMLCanvasElement,signal?:AbortSignal):Promise<ObjectEmbedding>{
+ const S=1024,scale=S/Math.max(source.width,source.height),w=Math.round(source.width*scale),h=Math.round(source.height*scale);
+ const c=canvas(w,h),g=context(c);g.fillStyle='#fff';g.fillRect(0,0,w,h);g.imageSmoothingQuality='high';g.drawImage(source,0,0,w,h);
+ const rgba=g.getImageData(0,0,w,h).data,mean=[.485,.456,.406],std=[.229,.224,.225],input=new Float32Array(3*S*S);// padding stays 0
+ for(let y=0;y<h;y++)for(let x=0;x<w;x++){const i=(y*w+x)*4;for(let k=0;k<3;k++)input[k*S*S+y*S+x]=(rgba[i+k]/255-mean[k])/std[k];}
+ const out=await runModel('sam-encoder',{pixel_values:{data:input,dims:[1,3,S,S]}},signal);
+ return {image:out.image_embeddings.data,positional:out.image_positional_embeddings.data,scale,width:source.width,height:source.height};
+}
+// The object under `points` (source pixels; positive adds, negative excludes)
+// as a 0/255 map covering the source at a quarter of the 1024 px model scale.
+export async function objectMask(e:ObjectEmbedding,points:{x:number;y:number;positive:boolean}[],signal?:AbortSignal){
+ const out=await runModel('sam-decoder',{
+  input_points:{data:new Float32Array(points.flatMap(p=>[p.x*e.scale,p.y*e.scale])),dims:[1,1,points.length,2]},
+  input_labels:{data:new BigInt64Array(points.map(p=>p.positive?1n:0n)),dims:[1,1,points.length]},
+  image_embeddings:{data:e.image.slice(),dims:[1,256,64,64]},image_positional_embeddings:{data:e.positional.slice(),dims:[1,256,64,64]},
+ },signal);
+ const logits=out.pred_masks.data,scores=Array.from(out.iou_scores.data),M=256,mw=Math.min(M,Math.ceil(e.width*e.scale/4)),mh=Math.min(M,Math.ceil(e.height*e.scale/4));
+ const areas=scores.map((_,k)=>{let a=0;for(let y=0;y<mh;y++)for(let x=0;x<mw;x++)if(logits[k*M*M+y*M+x]>0)a++;return a;});
+ const k=pickMask(scores,areas),values=new Uint8ClampedArray(mw*mh);
+ // SAM's own threshold; scaling the map up to the page smooths its edges.
+ for(let y=0;y<mh;y++)for(let x=0;x<mw;x++)values[y*mw+x]=logits[k*M*M+y*M+x]>0?255:0;
+ return {values,width:mw,height:mh};
 }

@@ -163,3 +163,12 @@ export function rtlReorder(text:string){
  if(run)parts.push(run);
  return parts.reverse().join('');
 }
+
+// Segment Anything returns three masks for a click (part, object, whole).
+// The highest score often goes to the whole scene; take the smallest mask
+// scoring within `margin` of the best, which is the clicked object.
+export function pickMask(scores:number[],areas:number[],margin=.05){
+ const best=Math.max(...scores);let pick=-1;
+ for(let i=0;i<scores.length;i++)if(scores[i]>=best-margin&&areas[i]>0&&(pick<0||areas[i]<areas[pick]))pick=i;
+ return pick<0?scores.indexOf(best):pick;
+}
