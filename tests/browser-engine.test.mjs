@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdir, writeFile, readFile } from 'node:fs/promises';
 import * as mupdf from 'mupdf';
 import { unzipSync, strFromU8 } from 'fflate';
-import { importBytes, exportDocument, restore, render, selectPages, detectPdfText, removePdfText, fontSupportsText, findPdfText, redactPdf } from '../tmp/browser-core.mjs';
+import { importBytes, exportDocument, restore, render, selectPages, detectPdfText, removePdfText, fontSupportsText, findPdfText, redactPdf, pdfFormFields, fillPdfField } from '../tmp/browser-core.mjs';
 await mkdir('tmp/pdfs',{recursive:true});
 const original=new mupdf.PDFDocument(),font=new mupdf.Font('Helvetica'),fontRef=original.addSimpleFont(font);
 for(const label of ['Original first page','Original second page']){const p=original.addPage([0,0,595,842],0,{Font:{helv:fontRef}},`BT /helv 22 Tf 50 772 Td (${label}) Tj ET 0.2 0.7 0.5 rg 50 642 200 100 re f`);original.insertPage(-1,p);p.destroy();}
@@ -160,4 +160,38 @@ test('redaction removes the text, image pixels and links under the boxes, not be
   // No copy of the original picture remains in the file.
   const raw=new TextDecoder('latin1').decode(Uint8Array.from(atob(redacted.data),c=>c.charCodeAt(0)));assert.ok(!raw.includes('alex@example.com'));
  }finally{q.destroy();out.destroy();}
+});
+
+test('PDF forms: fields are listed, filled, and exported fillable or flattened',async()=>{
+ const {PDFDocument}=await import('pdf-lib');
+ const made=await PDFDocument.create(),pg=made.addPage([400,300]),form=made.getForm();
+ const name=form.createTextField('Full name');name.addToPage(pg,{x:40,y:220,width:200,height:22});
+ const agree=form.createCheckBox('Agree');agree.addToPage(pg,{x:40,y:180,width:14,height:14});
+ const city=form.createDropdown('City');city.addOptions(['Lyon','Paris']);city.addToPage(pg,{x:40,y:140,width:120,height:22});
+ const size=form.createRadioGroup('Size');size.addOptionToPage('S',pg,{x:40,y:100,width:14,height:14});size.addOptionToPage('L',pg,{x:70,y:100,width:14,height:14});
+ const source=await importBytes(await made.save(),'form.pdf');
+ const fields=pdfFormFields(source.id,0);
+ assert.deepEqual(fields.map(f=>[f.type,f.name]),[['text','Full name'],['checkbox','Agree'],['dropdown','City'],['radio','Size'],['radio','Size']]);
+ const top=fields[0];assert.ok(Math.abs(top.left-40)<1&&Math.abs(top.top-(300-220-22))<1,`top-left geometry ${JSON.stringify(top)}`);
+ assert.deepEqual(fields[2].options,['Lyon','Paris']);assert.deepEqual(fields.slice(3).map(f=>f.option),['S','L']);
+ let id=source.id;
+ for(const [widget,value] of [[0,'Alex Martin'],[1,'Yes'],[2,'Paris'],[4,'Yes']])id=(await fillPdfField(id,0,widget,value)).id;
+ const filled=pdfFormFields(id,0);assert.deepEqual(filled.map(f=>f.value),['Alex Martin','Yes','Paris','Off','Yes']);
+ const blank='<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300"/>';
+ const extra={id:'new',type:'text',name:'Signature date',left:200,top:250,width:120,height:20,value:'19/10/2026'};
+ // Fillable: every field (and the new one) is a real field with its value.
+ const keep=await exportDocument({pages:[{width:400,height:300,index:0,source:id,svg:blank,forms:[extra]}],title:'Form',format:'pdf',compression:'lossless',range:'',dpi:144,keepForms:true});
+ const kept=(await PDFDocument.load(keep.bytes)).getForm();
+ assert.deepEqual(kept.getFields().map(f=>f.getName()).sort(),['Agree','City','Full name','Signature date','Size']);
+ assert.equal(kept.getTextField('Full name').getText(),'Alex Martin');assert.equal(kept.getCheckBox('Agree').isChecked(),true);
+ assert.deepEqual(kept.getDropdown('City').getSelected(),['Paris']);assert.equal(kept.getRadioGroup('Size').getSelected(),'L');
+ assert.equal(kept.getTextField('Signature date').getText(),'19/10/2026');
+ // Flattened (default): no fields left, the values are part of the page.
+ const flat=await exportDocument({pages:[{width:400,height:300,index:0,source:id,svg:blank,forms:[extra]}],title:'Form',format:'pdf',compression:'lossless',range:'',dpi:144});
+ assert.equal((await PDFDocument.load(flat.bytes)).getForm().getFields().length,0);
+ const d=mupdf.Document.openDocument(flat.bytes,'application/pdf'),text=d.loadPage(0).toStructuredText('').asText();
+ assert.match(text,/Alex Martin/);assert.match(text,/19\/10\/2026/);
+ // Password and fields together.
+ const locked=await exportDocument({pages:[{width:400,height:300,index:0,source:id,svg:blank}],title:'Form',format:'pdf',compression:'lossless',range:'',dpi:144,keepForms:true,password:'s3cret'});
+ const ld=mupdf.Document.openDocument(locked.bytes,'application/pdf');assert.ok(ld.needsPassword());
 });

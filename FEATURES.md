@@ -1,6 +1,7 @@
 ## Unreleased — searchable PDFs, proofreading and letter reuse
 
 - **Make PDF searchable**: PDF export can add an invisible OCR text layer at each line's position, so scanned pages can be searched, copied and read by screen readers. TXT and Word export of scanned pages use the same text. Pages that already have real PDF text are left alone.
+- PDF forms: **Form fields** in page properties lists a PDF's own text fields, checkboxes, dropdowns and radio buttons and fills them in place. **Add form field** (Text, Checkbox, Dropdown, Radio button) adds fields of bide's own, which can be dragged and resized on the page, renamed and given options. Export draws the values into the page, or with **Keep form fields fillable** recreates every field with pdf-lib so the PDF stays fillable, password protection included.
 - Adjustment layers: **Levels**, **Curves** (monotone curve through shadow, midtone and highlight points; drag them on the graph) and **Hue/Saturation**, from the Layer menu or the command palette. Each is a click-through layer that re-processes everything below it whenever the page renders, so the layers underneath stay editable. Opacity weakens the effect and hiding the layer compares before and after. Saved in projects; SVG and PDF export flatten the page to pixels, like blend modes.
 - True redaction: **Redact** on the selection bar, or **Find & redact**, which searches the page's text for words and for email addresses, phone numbers, IBANs (mod-97 checked) and card numbers (Luhn checked); matches are listed to review first. On PDF pages MuPDF removes the text, image pixels and drawings under each box, plus links and annotations touching it, and draws a black box. Every layer under a box is burned in: rasterized with the box painted black, or deleted if it lies entirely inside. Sources no page uses are dropped, so a saved project holds no unredacted copy, and the page's cached OCR text is discarded and rescanned.
 - Straighten before OCR: after a scan, an image page that is tilted (measured from its text lines, without AI, to 0.1°) or turned 90/180/270° (PP-LCNet orientation model) gets a **Straighten** button in the text bar. One undoable step rotates every layer, swaps width and height for quarter turns, and scans again. **Straighten page** in the command palette works on any image page. **Flatten photographed page (AI)** runs UVDoc on the main image layer to remove perspective and page curl; on a test photo it turned "Ivoice total 14 EUR" into "Invoice total 1284 EUR".
@@ -102,7 +103,7 @@ The catalogue includes [organization, conversion, editing, security and intellig
 | Watermarks | Partial | Batch editable text watermarks with angle, opacity, color and page range; image placement is manual |
 | Crop PDF | Partial | Current-page crop margins with dimension preview and Undo; crop hides content and does not redact it |
 | Edit PDF | Partial | Editable overlays, text, images, shapes and freehand marks; original text is not directly rewritten |
-| PDF forms | Missing | No form-field authoring/detection/filling; exported interactive fields are flattened |
+| PDF forms | Implemented | A PDF's text, checkbox, dropdown and radio fields are listed under Form fields and filled in place (MuPDF). New fields can be added, dragged, resized, renamed and given options. Export flattens the values into the page, or keeps every field fillable (pdf-lib, MIT) |
 | Unlock / protect PDF | Implemented | Known-password import with retry/cancel; AES-256 password PDF export; no password recovery/cracking or permission-policy editor |
 | Sign PDF | Partial | Drawn/typed visual marks only; no certificate signing, signature requests or audit trail |
 | Redact PDF | Implemented | Selection or Find & redact (text, emails, phones, IBANs, cards); removes PDF text, image pixels and drawings under the box, burns layers in |
@@ -146,7 +147,7 @@ These checks use representative fixtures. They do not establish identical behavi
 
 Both the visual editor and PDF toolkit have equal priority. The numbered groups below organize remaining work; they are not a commitment to finish one product before the other.
 
-1. PDF completeness: embedded-image extraction, forms, richer password permissions, and batch crop/image-watermark workflows.
+1. PDF completeness: embedded-image extraction, richer password permissions, and batch crop/image-watermark workflows.
 2. Conversion fidelity: document corpus tests, layout-preserving PDF-to-Office, PDF/A validation and repair workflows.
 3. Raster editing foundation: selections, painted masks, layer effects, advanced brush/retouch tools (content-aware fill, dodge/burn) and color management.
 4. Full PSD/PSB compatibility, smart objects, advanced typography/paths, animation and automation.

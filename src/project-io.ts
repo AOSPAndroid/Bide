@@ -65,7 +65,7 @@ export async function exportPayload(current:Project,ocr?:Map<string,{text:string
     const png = c.toDataURL({ format: 'png', multiplier: Math.min(2, 4096 / Math.max(p.width, p.height)) });
     svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${p.width}" height="${p.height}"><image href="${png}" width="${p.width}" height="${p.height}"/></svg>`;
    }
-   pages.push({ width: p.width, height: p.height, source: p.source, index: p.index, svg, fonts:documentEmbeddedFonts(p.canvas), ocr:ocr?.get(p.id) });
+   pages.push({ width: p.width, height: p.height, source: p.source, index: p.index, svg, fonts:documentEmbeddedFonts(p.canvas), ocr:ocr?.get(p.id), forms:p.forms });
   }
   finally { await c.dispose(); }
  }

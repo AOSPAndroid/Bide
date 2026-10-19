@@ -12,8 +12,10 @@ async function svgToPdf(...args:Parameters<typeof import('./svg-pdf').svgToPdf>)
 
 // `ocr` lines (page units, top-left origin) become an invisible text layer, so
 // scanned and image pages can be searched, selected and read aloud.
+import type { FormField, PdfFormField } from '../forms';
+import { pdfBox, isChecked } from '../forms';
 export type OcrLine = { text: string; left: number; top: number; width: number; height: number };
-export type PageSpec = { width: number; height: number; source?: string; index: number; svg: string; fonts?:Record<string,string>; ocr?: OcrLine[] };
+export type PageSpec = { width: number; height: number; source?: string; index: number; svg: string; fonts?:Record<string,string>; ocr?: OcrLine[]; forms?: FormField[] };
 
 // Windows-1252 codes for the characters it maps outside Latin-1.
 const cp1252: Record<number, number> = {0x20ac:0x80,0x201a:0x82,0x0192:0x83,0x201e:0x84,0x2026:0x85,0x2020:0x86,0x2021:0x87,0x02c6:0x88,0x2030:0x89,0x0160:0x8a,0x2039:0x8b,0x0152:0x8c,0x017d:0x8e,0x2018:0x91,0x2019:0x92,0x201c:0x93,0x201d:0x94,0x2022:0x95,0x2013:0x96,0x2014:0x97,0x02dc:0x98,0x2122:0x99,0x0161:0x9a,0x203a:0x9b,0x0153:0x9c,0x017e:0x9e,0x0178:0x9f};
@@ -47,7 +49,7 @@ export function ocrTextCommands(lines: OcrLine[], pageHeight: number, font: mupd
   return out;
 }
 
-export type ExportSpec = { pages: PageSpec[]; title: string; format: string; compression: string; range: string; dpi: number; rotation?: number; password?: string; crop?: { left: number; top: number; right: number; bottom: number } };
+export type ExportSpec = { pages: PageSpec[]; title: string; format: string; compression: string; range: string; dpi: number; rotation?: number; password?: string; keepForms?: boolean; crop?: { left: number; top: number; right: number; bottom: number } };
 
 const sources = new Map<string, Uint8Array>();
 
@@ -252,6 +254,7 @@ export async function compose(spec: ExportSpec) {
  if(!spec.pages?.length||spec.pages.length>1000)throw new Error('Choose between 1 and 1000 pages.');
 
  const result=new mupdf.PDFDocument();let ocrFont:{font:mupdf.Font;ref:mupdf.PDFObject}|undefined,ocrUnicode:{font:mupdf.Font;ref:mupdf.PDFObject}|undefined;
+ const pageForms:FormField[][]=[];
 
  try {
 
@@ -263,13 +266,18 @@ export async function compose(spec: ExportSpec) {
 
    const xobjects:Record<string,mupdf.PDFObject>={},commands:string[]=[],links:{bounds:mupdf.Rect;uri:string}[]=[];
 
+   const fields:FormField[]=[...(entry.forms??[])];
    const add=(data:Uint8Array,index:number,name:string)=>{
 
     const source=open(data) as mupdf.PDFDocument;
 
     try {
 
-     source.bake(true,true);
+     // Fillable export: the source's fields are recreated (pdf-lib, below)
+     // instead of being drawn into the page.
+     if(spec.keepForms&&name==='Source'){const b=source.loadPage(index).getBounds(),sx=entry.width/(b[2]-b[0]),sy=entry.height/(b[3]-b[1]);
+      for(const f of readFields(source,index))fields.push({...f,left:f.left*sx,top:f.top*sy,width:f.width*sx,height:f.height*sy});}
+     source.bake(true,!spec.keepForms);
 
      const embedded=embedPage(result,source,index,entry.width,entry.height);
 
@@ -296,7 +304,7 @@ export async function compose(spec: ExportSpec) {
    }
    const pageObj=result.addPage([0,0,entry.width,entry.height],rotation,resources as never,commands.join('\n'));
 
-   result.insertPage(-1,pageObj);pageObj.destroy();for(const o of Object.values(xobjects))o.destroy();
+   result.insertPage(-1,pageObj);pageObj.destroy();for(const o of Object.values(xobjects))o.destroy();pageForms.push(fields);
 
    const page=result.loadPage(result.countPages()-1);
 
@@ -315,6 +323,7 @@ export async function compose(spec: ExportSpec) {
 
   // The built-in CJK font is 1.7 MB; keep only the glyphs the OCR text uses.
   if(ocrUnicode)result.subsetFonts();
+  composedForms.set(result,pageForms);
   result.setMetaData('info:Title',spec.title||'Untitled');result.setMetaData('info:Creator','bide — Browser Edition');
 
   return result;
@@ -389,6 +398,13 @@ export async function exportDocument(spec: ExportSpec) {
         if (new TextEncoder().encode(spec.password).length > 127 || /[\x00-\x1f\x7f]/.test(spec.password)) throw new Error('Use a password of at most 127 UTF-8 bytes without control characters.');
         const quoted = '"' + spec.password.replaceAll('"', '""') + '"';
         options += `,encrypt=aes-256,user-password=${quoted},owner-password=${quoted}`;
+      }
+      const forms=composedForms.get(doc);
+      if(forms?.some(f=>f.length)){
+        // Fields are added to the saved file, which MuPDF then saves again:
+        // that drops references pdf-lib's flattening leaves dangling, and encrypts.
+        const filled=await addFormFields(bytesOf(doc.saveToBuffer(opts)),forms,!spec.keepForms);
+        const again=open(filled) as mupdf.PDFDocument;try{return {bytes:bytesOf(again.saveToBuffer(options)),mime:'application/pdf'};}finally{again.destroy();}
       }
       return {bytes:bytesOf(doc.saveToBuffer(options)),mime:'application/pdf'};
     }
@@ -492,4 +508,65 @@ export async function redactPdf(source: string, index: number, rects: PageRect[]
     page.applyRedactions(true, mupdf.PDFPage.REDACT_IMAGE_PIXELS, mupdf.PDFPage.REDACT_LINE_ART_REMOVE_IF_COVERED, mupdf.PDFPage.REDACT_TEXT_REMOVE);
     return await register(bytesOf(doc.saveToBuffer(opts)));
   } finally { page.destroy(); doc.destroy(); }
+}
+
+const composedForms=new WeakMap<mupdf.PDFDocument,FormField[][]>();
+
+// Form fields of a source page, geometry in page units (top-left origin).
+function readFields(doc:mupdf.PDFDocument,index:number):PdfFormField[]{
+  const page=doc.loadPage(index) as mupdf.PDFPage;
+  try{
+    const [x0,y0]=page.getBounds();
+    return page.getWidgets().flatMap((w,widget)=>{
+      const kind=w.getFieldType(),type=kind==='text'?'text':kind==='checkbox'?'checkbox':kind==='radiobutton'?'radio':kind==='combobox'||kind==='listbox'?'dropdown':undefined;if(!type)return [];
+      const r=w.getRect(),value=w.getValue();
+      // A radio button's option is the name of its "on" appearance.
+      const states:string[]=[];if(type==='radio')w.getObject().get('AP','N').forEach((_,key)=>{if(typeof key==='string')states.push(key);});
+      // pdf-lib and others name states "0", "1"… and keep the labels in /Opt.
+      const state=states.find(k=>k!=='Off'),labels=type==='radio'?w.getObject().get('Parent','Opt'):undefined;
+      const label=state&&/^\d+$/.test(state)&&labels?.isArray()&&+state<labels.length?labels.get(+state).asString():state;
+      const option=type==='radio'?label??`Option ${widget+1}`:undefined;
+      return [{id:`pdf-${index}-${widget}`,widget,type,name:w.getName(),left:r[0]-x0,top:r[1]-y0,width:r[2]-r[0],height:r[3]-r[1],
+        value:type==='radio'?(state&&value===state||value===option?'Yes':'Off'):value,...(type==='dropdown'?{options:w.getOptions()}:{}),...(option?{option}:{}),...(type==='text'&&w.isMultiline()?{multiline:true}:{}),...(w.isReadOnly()?{readOnly:true}:{})} as PdfFormField];
+    });
+  }finally{page.destroy();}
+}
+export function pdfFormFields(source:string,index:number){
+  const data=sources.get(source);if(!data)throw new Error('This PDF is no longer open.');
+  const doc=open(data) as mupdf.PDFDocument;try{return readFields(doc,index);}finally{doc.destroy();}
+}
+// Fills one field of a source PDF; returns the new source.
+export async function fillPdfField(source:string,index:number,widget:number,value:string){
+  const data=sources.get(source);if(!data)throw new Error('This PDF is no longer open.');
+  const doc=open(data) as mupdf.PDFDocument,page=doc.loadPage(index) as mupdf.PDFPage;
+  try{
+    const w=page.getWidgets()[widget];if(!w)throw new Error('This form field is no longer on the page.');
+    if(w.isReadOnly())throw new Error('This form field is read-only.');
+    if(w.isText())w.setTextValue(value);
+    else if(w.isChoice())w.setChoiceValue(value);
+    else if(w.isCheckbox()||w.isRadioButton()){if(isChecked(w.getValue())!==isChecked(value))w.toggle();}
+    w.update();page.update();
+    return await register(bytesOf(doc.saveToBuffer(opts)));
+  }finally{page.destroy();doc.destroy();}
+}
+
+// Adds `forms[page]` as real AcroForm fields with pdf-lib, then flattens them
+// into the page when `flatten`. Radio buttons sharing a name form one group.
+async function addFormFields(bytes:Uint8Array,forms:FormField[][],flatten:boolean){
+  const {PDFDocument,StandardFonts}=await import('pdf-lib');
+  const pdf=await PDFDocument.load(bytes),form=pdf.getForm(),font=await pdf.embedFont(StandardFonts.Helvetica),pages=pdf.getPages(),taken=new Set<string>();
+  const unique=(name:string)=>{let n=name||'Field',k=2;while(taken.has(n))n=`${name} ${k++}`;taken.add(n);return n;};
+  const groups=new Map<string,ReturnType<typeof form.createRadioGroup>>();
+  forms.forEach((fields,i)=>{
+    const page=pages[i];if(!page)return;const height=page.getHeight();
+    for(const f of fields){
+      const box={...pdfBox(f,height),font,borderWidth:1};
+      if(f.type==='text'){const t=form.createTextField(unique(f.name));if(f.multiline)t.enableMultiline();if(f.value)t.setText(f.value);t.addToPage(page,box);if(f.readOnly)t.enableReadOnly();}
+      else if(f.type==='checkbox'){const c=form.createCheckBox(unique(f.name));c.addToPage(page,box);if(isChecked(f.value))c.check();if(f.readOnly)c.enableReadOnly();}
+      else if(f.type==='dropdown'){const d=form.createDropdown(unique(f.name));d.addOptions(f.options?.length?f.options:['']);if(f.value&&f.options?.includes(f.value))d.select(f.value);d.addToPage(page,box);if(f.readOnly)d.enableReadOnly();}
+      else{let g=groups.get(f.name);if(!g){g=form.createRadioGroup(unique(f.name));groups.set(f.name,g);}const option=f.option||`Option ${g.getOptions().length+1}`;g.addOptionToPage(option,page,box);if(isChecked(f.value))g.select(option);}
+    }
+  });
+  form.updateFieldAppearances(font);if(flatten)form.flatten();
+  return await pdf.save();
 }

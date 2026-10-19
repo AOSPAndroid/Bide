@@ -11,6 +11,6 @@ export default defineConfig(({mode}) => ({
   }}] : [])],
   build: {target:'esnext',outDir:mode === 'demo' ? 'out' : 'dist'},
   // Lazily imported deps are listed so the dev server doesn't reload the page mid-session on first use.
-  optimizeDeps: {exclude:['mupdf'], include:['docx','fflate','onnxruntime-web/webgpu','nspell'], esbuildOptions:{target:'esnext'}},
+  optimizeDeps: {exclude:['mupdf'], include:['docx','fflate','onnxruntime-web/webgpu','nspell','pdf-lib'], esbuildOptions:{target:'esnext'}},
   worker: {format:'es'}, server:{headers}, preview:{headers},
 }));
