@@ -28,7 +28,8 @@ export function findDoubts(text:string,checkers:Checker[],unsure:Set<number>=new
   let j=i;while(j<chars.length&&/[\p{L}\p{M}'’-]/u.test(chars[j]))j++;
   const word=chars.slice(i,j).join('').replace(/['’-]+$/,''),end=i+Array.from(word).length,focus=new Set([...unsure].filter(k=>k>=i&&k<end).map(k=>k-i));
   // Short words, all-caps acronyms and words next to digits are left alone.
-  const skip=Array.from(word).length<3||/^\p{Lu}{2,}$/u.test(word)||/\d/.test(chars[i-1]??'')||/\d/.test(chars[end]??'');
+  // The dictionaries are English and French: other alphabets are not checked.
+  const skip=!/^\p{Script=Latin}/u.test(word)||Array.from(word).length<3||/^\p{Lu}{2,}$/u.test(word)||/\d/.test(chars[i-1]??'')||/\d/.test(chars[end]??'');
   if(!skip&&checkers.length&&!known(checkers,word)){
    const fixes=confusionVariants(word,focus.size?focus:undefined).filter(v=>known(checkers,v));
    const dict=checkers.flatMap(c=>c.suggest(word)).filter(s=>!fixes.includes(s));

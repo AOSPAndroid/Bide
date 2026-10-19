@@ -16,6 +16,7 @@ import {mixedWeights,attachNumberParts,recognitionKey,scaleRegions,unconvertedRe
 import type {OcrGrouping} from './ocr-segmentation';
 import {uid,type Page} from './model';
 import {bundledOcrLanguages,languageLabel} from './ocr-languages';
+import {scriptLabels,type OcrScript} from './ai-image';
 
 type Tagged=FabricObject&{recognizedKey?:string;id?:string;name?:string};
 export type ReplacementBackground='repair'|'ai'|'sampled'|'solid'|'transparent';
@@ -35,7 +36,7 @@ async function ocrRaster(p:Page,c:Canvas){
 // Text lines for a searchable PDF: OCR of the page's pictures (a scanned PDF
 // page, or the image layers of a design page), in page units. Pages whose PDF
 // already has real text, and pages without pictures, get none.
-export async function searchableText(p:Page,{engine,languages,signal,known}:{engine:'tesseract'|'paddle';languages:string[];signal?:AbortSignal;known?:TextRegion[]}){
+export async function searchableText(p:Page,{engine,languages,signal,known,script,accurate}:{engine:'tesseract'|'paddle';languages:string[];signal?:AbortSignal;known?:TextRegion[];script?:OcrScript|'auto';accurate?:boolean}){
  if(p.source&&(await detectPdfText(p.source,p.index)).regions.length)return [];
  const c=new StaticCanvas(undefined,{width:p.width,height:p.height});
  try{
@@ -44,7 +45,7 @@ export async function searchableText(p:Page,{engine,languages,signal,known}:{eng
   let regions=known?.filter(r=>r.kind==='ocr');
   if(!regions?.length){
    const raster=await ocrRaster(p,c as unknown as Canvas),{recognizeImage}=await import('./browser/ocr');
-   regions=scaleRegions(await recognizeImage(raster,{signal,grouping:'lines',languages,engine}),p.width/raster.width,p.height/raster.height);
+   regions=scaleRegions(await recognizeImage(raster,{signal,grouping:'lines',languages,engine,script,accurate}),p.width/raster.width,p.height/raster.height);
   }
   return regions.filter(r=>r.text.trim()).map(r=>({text:r.text,left:r.left,top:r.top,width:r.width,height:r.height}));
  }finally{await c.dispose();}
@@ -52,7 +53,12 @@ export async function searchableText(p:Page,{engine,languages,signal,known}:{eng
 
 export function hasScannableContent(p:Page,c:Canvas){return !!p.source||c.getObjects().some(o=>o instanceof FabricImage);}
 
-export async function scanPageText(p:Page,c:Canvas,{signal,grouping,thorough,languages,engine='tesseract',aiSharpen=false,onStatus}:{signal:AbortSignal;grouping:OcrGrouping;thorough:boolean;languages:string[];engine?:'tesseract'|'paddle';aiSharpen?:boolean;onStatus:(status:string)=>void}):Promise<{regions:TextRegion[];all?:TextRegion[];status:string;suggestedFont?:string}>{
+// "AI OCR (Latin languages)", or the alphabets the page was read in.
+function aiOcrLabel(regions:TextRegion[]){
+ const scripts=[...new Set(regions.map(r=>r.script).filter((s):s is OcrScript=>!!s))];
+ return scripts.length?`AI OCR (${scripts.map(s=>scriptLabels[s]).join(' + ')})`:'AI OCR (Latin languages)';
+}
+export async function scanPageText(p:Page,c:Canvas,{signal,grouping,thorough,languages,engine='tesseract',aiSharpen=false,script='auto',accurate=false,onStatus}:{signal:AbortSignal;grouping:OcrGrouping;thorough:boolean;languages:string[];engine?:'tesseract'|'paddle';aiSharpen?:boolean;script?:OcrScript|'auto';accurate?:boolean;onStatus:(status:string)=>void}):Promise<{regions:TextRegion[];all?:TextRegion[];status:string;suggestedFont?:string}>{
  onStatus('Detecting text…');
  if(p.source){const detected=await detectPdfText(p.source,p.index);signal.throwIfAborted();if(detected.regions.length)return {regions:detected.regions,status:`${detected.regions.length} editable text regions${detected.skipped?' · rotated text kept unchanged':''}`};}
  onStatus('Recognizing image text locally…');
@@ -63,12 +69,12 @@ export async function scanPageText(p:Page,c:Canvas,{signal,grouping,thorough,lan
   const probe=raster.getContext('2d',{willReadFrequently:true})!.getImageData(0,0,raster.width,raster.height);prepareOcrPixels(probe);const line=estimateLineHeight(probe);
   if(line!==undefined&&line<20){const {upscaleCanvas}=await import('./browser/ai-tools');raster=await upscaleCanvas(raster,2,f=>onStatus(`Sharpening with AI… ${Math.round(f*100)}%`),signal);}
  }
- const {recognizeImage}=await import('./browser/ocr');const detected=await recognizeImage(raster,{signal,grouping,thorough,languages,engine,onProgress:(fraction,label)=>onStatus(`${label}… ${Math.round(fraction*100)}%`)});signal.throwIfAborted();
+ const {recognizeImage}=await import('./browser/ocr');const detected=await recognizeImage(raster,{signal,grouping,thorough,languages,engine,script,accurate,onProgress:(fraction,label)=>onStatus(`${label}… ${Math.round(fraction*100)}%`)});signal.throwIfAborted();
  const layers=c.getObjects().map(o=>({recognizedKey:(o as Tagged).recognizedKey,bounds:o.getBoundingRect()}));
  const all=scaleRegions(detected,p.width/raster.width,p.height/raster.height),regions=unconvertedRegions(all,layers);
  let suggestedFont:string|undefined;
  if(regions.length){onStatus('Matching font…');try{suggestedFont=await suggestFont(raster,detected);}catch{}signal.throwIfAborted();}
- return {regions,all,suggestedFont,status:ocrScanStatus(regions.length,engine==='paddle'?'AI OCR (Latin languages)':languageLabel(languages,await bundledOcrLanguages()),layers.some(l=>l.recognizedKey),regions.filter(isUncertain).length)+(suggestedFont?` · closest font: ${suggestedFont}`:'')};
+ return {regions,all,suggestedFont,status:ocrScanStatus(regions.length,engine==='paddle'?aiOcrLabel(detected):languageLabel(languages,await bundledOcrLanguages()),layers.some(l=>l.recognizedKey),regions.filter(isUncertain).length)+(suggestedFont?` · closest font: ${suggestedFont}`:'')};
 }
 
 // Compare the clearest recognized words against bundled fonts. Only confident

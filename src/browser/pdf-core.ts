@@ -18,18 +18,31 @@ export type PageSpec = { width: number; height: number; source?: string; index: 
 // Windows-1252 codes for the characters it maps outside Latin-1.
 const cp1252: Record<number, number> = {0x20ac:0x80,0x201a:0x82,0x0192:0x83,0x201e:0x84,0x2026:0x85,0x2020:0x86,0x2021:0x87,0x02c6:0x88,0x2030:0x89,0x0160:0x8a,0x2039:0x8b,0x0152:0x8c,0x017d:0x8e,0x2018:0x91,0x2019:0x92,0x201c:0x93,0x201d:0x94,0x2022:0x95,0x2013:0x96,0x2014:0x97,0x02dc:0x98,0x2122:0x99,0x0161:0x9a,0x203a:0x9b,0x0153:0x9c,0x017e:0x9e,0x0178:0x9f};
 const winAnsi = (cp: number) => (cp >= 0x20 && cp < 0x7f) || (cp >= 0xa0 && cp <= 0xff) ? cp : cp1252[cp] ?? 0x3f;
+// Lines with characters outside Windows-1252 (Cyrillic, Greek, Arabic, CJK…).
+const isWinAnsi = (cp: number) => winAnsi(cp) !== 0x3f || cp === 0x3f;
+export const needsUnicodeFont = (lines: OcrLine[]) => lines.some(l => Array.from(l.text).some(c => !isWinAnsi(c.codePointAt(0)!)));
+const utf16 = (text: string) => 'FEFF' + Array.from(text, c => { const cp = c.codePointAt(0)!; if (cp < 0x10000) return cp.toString(16).padStart(4, '0'); const v = cp - 0x10000; return ((v >> 10) + 0xd800).toString(16) + ((v & 0x3ff) + 0xdc00).toString(16); }).join('');
 // Content-stream commands drawing `lines` as invisible (render mode 3) text,
 // each stretched horizontally to the width the line occupies on the page.
-export function ocrTextCommands(lines: OcrLine[], pageHeight: number, font: mupdf.Font, name = 'OCR') {
+// Windows-1252 lines use the simple `font`; others use `unicode`, a Type0
+// (Identity-H) font. Characters it has no glyph for (Arabic in the built-in
+// CJK font) are carried by ActualText, which search and copy read instead.
+export function ocrTextCommands(lines: OcrLine[], pageHeight: number, font: mupdf.Font, name = 'OCR', unicode?: { font: mupdf.Font; name: string }) {
   const out: string[] = [];
   for (const line of lines) {
     const text = line.text.replace(/\s+/g, ' ').trim(); if (!text || !(line.width > 0 && line.height > 0)) continue;
-    const size = Math.max(1, line.height * 0.8), cps = Array.from(text, c => c.codePointAt(0)!);
-    const em = cps.reduce((w, cp) => w + font.advanceGlyph(font.encodeCharacter(cp), 0), 0);
+    const size = Math.max(1, line.height * 0.8), cps = Array.from(text, c => c.codePointAt(0)!), wide = unicode && cps.some(cp => !isWinAnsi(cp));
+    const face = wide ? unicode.font : font, gids = cps.map(cp => face.encodeCharacter(cp));
+    const em = gids.reduce((w, gid) => w + (gid || !wide ? face.advanceGlyph(gid, 0) : 0.5), 0);
     const scale = em > 0 ? Math.max(1, Math.min(1000, 100 * line.width / (em * size))) : 100;
+    const baseline = pageHeight - (line.top + line.height * 0.8), at = `${scale.toFixed(2)} Tz 1 0 0 1 ${line.left.toFixed(2)} ${baseline.toFixed(2)} Tm`;
+    if (wide) {
+      const draw = `BT 3 Tr /${unicode.name} ${size.toFixed(2)} Tf ${at} <${gids.map(g => g.toString(16).padStart(4, '0')).join('')}> Tj ET`;
+      out.push(gids.includes(0) ? `/Span <</ActualText <${utf16(text)}>>> BDC ${draw} EMC` : draw);
+      continue;
+    }
     const bytes = cps.map(winAnsi).map(b => b < 0x20 || b > 0x7e || b === 0x28 || b === 0x29 || b === 0x5c ? '\\' + b.toString(8).padStart(3, '0') : String.fromCharCode(b)).join('');
-    const baseline = pageHeight - (line.top + line.height * 0.8);
-    out.push(`BT 3 Tr /${name} ${size.toFixed(2)} Tf ${scale.toFixed(2)} Tz 1 0 0 1 ${line.left.toFixed(2)} ${baseline.toFixed(2)} Tm (${bytes}) Tj ET`);
+    out.push(`BT 3 Tr /${name} ${size.toFixed(2)} Tf ${at} (${bytes}) Tj ET`);
   }
   return out;
 }
@@ -238,7 +251,7 @@ export async function compose(spec: ExportSpec) {
 
  if(!spec.pages?.length||spec.pages.length>1000)throw new Error('Choose between 1 and 1000 pages.');
 
- const result=new mupdf.PDFDocument();let ocrFont:{font:mupdf.Font;ref:mupdf.PDFObject}|undefined;
+ const result=new mupdf.PDFDocument();let ocrFont:{font:mupdf.Font;ref:mupdf.PDFObject}|undefined,ocrUnicode:{font:mupdf.Font;ref:mupdf.PDFObject}|undefined;
 
  try {
 
@@ -275,7 +288,12 @@ export async function compose(spec: ExportSpec) {
    const rotation=(((spec.rotation||0)%360+360)%360) as mupdf.Rotate;
 
    const resources:Record<string,unknown>={XObject:xobjects};
-   if(entry.ocr?.length){ocrFont??={font:new mupdf.Font('Helvetica'),ref:result.addSimpleFont(new mupdf.Font('Helvetica'),'Latin')};resources.Font={OCR:ocrFont.ref};commands.push(...ocrTextCommands(entry.ocr,entry.height,ocrFont.font));}
+   if(entry.ocr?.length){
+    ocrFont??={font:new mupdf.Font('Helvetica'),ref:result.addSimpleFont(new mupdf.Font('Helvetica'),'Latin')};resources.Font={OCR:ocrFont.ref};
+    // MuPDF's built-in CJK font also covers Cyrillic, Greek and Hangul; it is subset below.
+    if(needsUnicodeFont(entry.ocr)){if(!ocrUnicode){const font=new mupdf.Font('zh-Hans');ocrUnicode={font,ref:result.addFont(font)};}(resources.Font as Record<string,unknown>).OCRU=ocrUnicode.ref;}
+    commands.push(...ocrTextCommands(entry.ocr,entry.height,ocrFont.font,'OCR',ocrUnicode&&needsUnicodeFont(entry.ocr)?{font:ocrUnicode.font,name:'OCRU'}:undefined));
+   }
    const pageObj=result.addPage([0,0,entry.width,entry.height],rotation,resources as never,commands.join('\n'));
 
    result.insertPage(-1,pageObj);pageObj.destroy();for(const o of Object.values(xobjects))o.destroy();
@@ -295,6 +313,8 @@ export async function compose(spec: ExportSpec) {
 
   }
 
+  // The built-in CJK font is 1.7 MB; keep only the glyphs the OCR text uses.
+  if(ocrUnicode)result.subsetFonts();
   result.setMetaData('info:Title',spec.title||'Untitled');result.setMetaData('info:Creator','bide — Browser Edition');
 
   return result;

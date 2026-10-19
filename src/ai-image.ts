@@ -136,3 +136,21 @@ export function snapToGap(columns:ArrayLike<number>,x:number,minGap:number,maxDi
  }
  return best??x;
 }
+
+// Scripts with a bundled PP-OCRv5 recognizer. Letter cells (glyph-edit.ts)
+// only work for alphabets written left to right with separate letters.
+export const ocrScripts=['latin','cyrillic','greek','arabic','korean','cjk'] as const;
+export type OcrScript=typeof ocrScripts[number];
+export const scriptLabels:Record<OcrScript,string>={latin:'Latin',cyrillic:'Cyrillic',greek:'Greek',arabic:'Arabic',korean:'Korean',cjk:'Chinese & Japanese'};
+export const separateLetters=(script:OcrScript)=>script==='latin'||script==='cyrillic'||script==='greek';
+
+// The recognizer reads right-to-left text in visual (left-to-right) order.
+// Reverse it to reading order, keeping runs of Latin letters, digits and
+// common symbols the way they read (PaddleOCR's pred_reverse, with spaces
+// kept between runs rather than inside them).
+export function rtlReorder(text:string){
+ const parts:string[]=[];let run='';
+ for(const c of text){if(/[a-zA-Z0-9:*./%+-]/.test(c))run+=c;else{if(run)parts.push(run);parts.push(c);run='';}}
+ if(run)parts.push(run);
+ return parts.reverse().join('');
+}

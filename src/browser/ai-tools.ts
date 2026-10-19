@@ -1,7 +1,7 @@
 // Real-ESRGAN upscaling, LaMa inpainting and PaddleOCR recognition on canvases.
 import {runModel} from './ai';
 import {segmentGlyphs,type Glyph} from '../glyph-edit';
-import {tilePlan,toPlanar,dbBoxes,ctcDecode,ctcWords,trimToInk,inkBand,inpaintWindows,resizeBilinear,snapToGap,type Rect} from '../ai-image';
+import {tilePlan,toPlanar,dbBoxes,ctcDecode,ctcWords,trimToInk,inkBand,inpaintWindows,resizeBilinear,snapToGap,rtlReorder,separateLetters,ocrScripts,type Rect,type OcrScript} from '../ai-image';
 
 type Progress=(fraction:number)=>void;
 const canvas=(width:number,height:number)=>Object.assign(document.createElement('canvas'),{width,height});
@@ -52,18 +52,29 @@ export async function inpaintCanvas(source:HTMLCanvasElement,mask:HTMLCanvasElem
  return patches;
 }
 
-export type AiOcrLine={text:string;confidence:number;bbox:{x0:number;y0:number;x1:number;y1:number};words:{text:string;confidence:number;bbox:{x0:number;y0:number;x1:number;y1:number};chars?:Glyph[]}[]};
-let dictionary:Promise<string[]>|undefined;
+export type AiOcrLine={script:OcrScript;text:string;confidence:number;bbox:{x0:number;y0:number;x1:number;y1:number};words:{text:string;confidence:number;bbox:{x0:number;y0:number;x1:number;y1:number};chars?:Glyph[]}[]};
+const dictionaries=new Map<OcrScript,Promise<string[]>>();
+const dictionary=(script:OcrScript)=>{
+ let d=dictionaries.get(script);
+ if(!d){d=fetch(new URL(`ai/models/ppocr-${script}-dict.json`,document.baseURI)).then(r=>{if(!r.ok)throw new Error('PaddleOCR dictionary is not bundled with this build.');return r.json();});d.catch(()=>dictionaries.delete(script));dictionaries.set(script,d);}
+ return d;
+};
+// A line the Latin model reads with less confidence than this is also tried
+// with the other alphabets when the script is automatic.
+const sureRead=.8;
 
-// PaddleOCR PP-OCRv5: DB text detection, then Latin recognition per line with
-// word boxes recovered from CTC time steps and trimmed to the inked columns.
-export async function paddleOcr(source:HTMLCanvasElement,onProgress?:Progress,signal?:AbortSignal):Promise<AiOcrLine[]>{
- const dict=await(dictionary??=fetch(new URL('ai/models/ppocr-latin-dict.json',document.baseURI)).then(r=>{if(!r.ok)throw new Error('PaddleOCR dictionary is not bundled with this build.');return r.json();}).catch(e=>{dictionary=undefined;throw e;}));
+// PaddleOCR PP-OCRv5: DB text detection (mobile, or the larger server model
+// for high accuracy), then recognition per line with word boxes recovered
+// from CTC time steps and trimmed to the inked columns. With `script` 'auto'
+// the first unsure lines are tried with every alphabet, and the page's
+// alphabet, once found, is tried first for the rest.
+export async function paddleOcr(source:HTMLCanvasElement,onProgress?:Progress,signal?:AbortSignal,{script='auto',accurate=false}:{script?:OcrScript|'auto';accurate?:boolean}={}):Promise<AiOcrLine[]>{
  const {width,height}=source,src=context(source).getImageData(0,0,width,height);
  const scale=Math.min(1,1600/Math.max(width,height)),dw=Math.max(32,Math.round(width*scale/32)*32),dh=Math.max(32,Math.round(height*scale/32)*32);
  const detInput={data:resizeBilinear(src.data,width,height,dw,dh)};
- const prob=(await runModel('ppocr-det',{x:{data:toPlanar(detInput.data,dw,dh,{mean:[.485,.456,.406],std:[.229,.224,.225],bgr:true}),dims:[1,3,dh,dw]}},signal));
+ const prob=(await runModel(accurate?'ppocr-det-server':'ppocr-det',{x:{data:toPlanar(detInput.data,dw,dh,{mean:[.485,.456,.406],std:[.229,.224,.225],bgr:true}),dims:[1,3,dh,dw]}},signal));
  const boxes=dbBoxes(Object.values(prob)[0].data,dw,dh),lines:AiOcrLine[]=[];onProgress?.(.1);
+ let pageScript:OcrScript|undefined=script==='auto'?undefined:script,probes=0;
  for(const [k,b] of boxes.entries()){
    // Widen the crop a little: on soft or textured backgrounds the detector can
   // start a line just inside its first letter.
@@ -72,9 +83,20 @@ export async function paddleOcr(source:HTMLCanvasElement,onProgress?:Progress,si
   if(w<4||h<4)continue;
   const rw=Math.max(16,Math.min(3200,Math.round(w*48/h))),region=new Uint8ClampedArray(w*h*4);
   for(let y=0;y<h;y++)region.set(src.data.subarray(((y0+y)*width+x0)*4,((y0+y)*width+x1)*4),y*w*4);
-  const crop={data:resizeBilinear(region,w,h,rw,48)};
-  const out=Object.values(await runModel('ppocr-latin-rec',{x:{data:toPlanar(crop.data,rw,48,{mean:[.5,.5,.5],std:[.5,.5,.5],bgr:true}),dims:[1,3,48,rw]}},signal))[0];
-  const [,steps,classes]=out.dims,decoded=ctcDecode(out.data,steps,classes,dict);
+  const input=toPlanar(resizeBilinear(region,w,h,rw,48),rw,48,{mean:[.5,.5,.5],std:[.5,.5,.5],bgr:true});
+  const read=async(s:OcrScript)=>{
+   const dict=await dictionary(s),out=Object.values(await runModel(`ppocr-${s}-rec`,{x:{data:input.slice(),dims:[1,3,48,rw]}},signal))[0];
+   const [,steps,classes]=out.dims;return {script:s,steps,...ctcDecode(out.data,steps,classes,dict)};
+  };
+  let best=await read(pageScript??'latin');
+  // An empty read (only spaces) is unsure too, however confident, and so is
+  // one with non-Latin letters (the Latin model knows Greek for formulas).
+  if(script==='auto'&&(!best.text||best.confidence<sureRead||/(?!\p{Script=Latin})\p{L}/u.test(best.text))){
+   const others=pageScript?['latin' as const]:probes++<4?ocrScripts.filter(s=>s!=='latin'):[];
+   for(const s of others){const next=await read(s);if(next.text&&(!best.text||next.confidence>best.confidence+.05))best=next;}
+   if(!pageScript&&best.script!=='latin'&&best.confidence>=sureRead)pageScript=best.script;
+  }
+  const decoded=best,steps=best.steps,rtl=best.script==='arabic';
   if(decoded.text){
    // Column ink inside the line (contrast with the line's corner colour) to tighten word boxes.
    // The detector pads its boxes; trim lines and words to inked rows/columns
@@ -89,7 +111,7 @@ export async function paddleOcr(source:HTMLCanvasElement,onProgress?:Progress,si
    // Columns over the line's own rows only, so a neighbouring line inside the
    // padded box does not fill the blank columns between letters.
    const bandColumns=new Float32Array(w);for(let y=top;y<bottom;y++)for(let x=x0;x<x1;x++){const p=(y*width+x)*4;bandColumns[x-x0]+=Math.max(Math.abs(src.data[p]-bg[0]),Math.abs(src.data[p+1]-bg[1]),Math.abs(src.data[p+2]-bg[2]))>60?1:0;}
-   const lineHeight=bottom-top,gap=Math.max(2,Math.round(lineHeight*.15)),raw=ctcWords(decoded.chars,rw/steps,rw);
+   const lineHeight=bottom-top,gap=Math.max(2,Math.round(lineHeight*.15)),raw=ctcWords(decoded.chars,rw/steps,rw).map(w=>rtl?{...w,text:rtlReorder(w.text)}:w);
    const edges=raw.map((word,i)=>({x0:i?snapToGap(columns,word.x0*w/rw,gap,lineHeight):word.x0*w/rw,x1:i<raw.length-1?snapToGap(columns,word.x1*w/rw,gap,lineHeight):word.x1*w/rw}));
    const words=raw.map((word,i)=>{
     const t=trimToInk(columns,edges[i].x0,edges[i].x1),wordRows=new Float32Array(h);
@@ -97,10 +119,10 @@ export async function paddleOcr(source:HTMLCanvasElement,onProgress?:Progress,si
     const v=trimToInk(wordRows,top-y0,bottom-y0);
     // Character cells, for editing with the image's own letters (glyph-edit.ts).
     // Each letter keeps the recognizer's probability, to flag doubtful ones.
-    const chars=segmentGlyphs(word.text,word.centers.map(c=>c*w/rw),t.x0,t.x1,bandColumns)?.map((g,k)=>({...g,x0:x0+g.x0,x1:x0+g.x1,p:word.probs[k]}));
+    const chars=separateLetters(best.script)?segmentGlyphs(word.text,word.centers.map(c=>c*w/rw),t.x0,t.x1,bandColumns)?.map((g,k)=>({...g,x0:x0+g.x0,x1:x0+g.x1,p:word.probs[k]})):undefined;
     return {text:word.text,confidence:word.confidence,bbox:{x0:x0+t.x0,y0:y0+v.x0,x1:x0+t.x1,y1:y0+v.x1},chars};
    });
-   lines.push({text:decoded.text,confidence:decoded.confidence*100,bbox:{x0:words.length?Math.min(...words.map(w=>w.bbox.x0)):x0,y0:top,x1:words.length?Math.max(...words.map(w=>w.bbox.x1)):x1,y1:bottom},words});
+   lines.push({script:best.script,text:rtl?rtlReorder(decoded.text):decoded.text,confidence:decoded.confidence*100,bbox:{x0:words.length?Math.min(...words.map(w=>w.bbox.x0)):x0,y0:top,x1:words.length?Math.max(...words.map(w=>w.bbox.x1)):x1,y1:bottom},words});
   }
   onProgress?.(.1+.9*(k+1)/boxes.length);
  }

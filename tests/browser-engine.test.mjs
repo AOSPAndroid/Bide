@@ -123,3 +123,16 @@ test('OCR lines become an invisible, searchable text layer at their page positio
   assert.deepEqual(pix(bytes),pix(plainPdf.bytes));
  }finally{text.destroy();page.destroy();doc.destroy();}
 });
+
+test('OCR text in other alphabets is searchable too, with a small subset font',async()=>{
+ const blank='<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300"><rect width="400" height="300" fill="#eeeeee"/></svg>';
+ const ocr=[{text:'Привет мир',left:40,top:40,width:150,height:20},{text:'Καλημέρα',left:40,top:80,width:120,height:20},{text:'你好世界 안녕',left:40,top:120,width:140,height:20},{text:'مرحبا بالعالم',left:40,top:160,width:150,height:20},{text:'Total 12 €',left:40,top:200,width:100,height:20}];
+ const {bytes}=await exportDocument({pages:[{width:400,height:300,index:0,svg:blank,ocr}],title:'Scan',format:'pdf',compression:'lossless',range:'',dpi:144});
+ assert.ok(bytes.length<200000,`subset font keeps the file small (${bytes.length} bytes)`);
+ const doc=mupdf.Document.openDocument(bytes,'application/pdf'),page=doc.loadPage(0);
+ try{
+  const plain=page.toStructuredText('').asText();
+  for(const t of ['Привет мир','Καλημέρα','你好世界 안녕','مرحبا بالعالم','Total 12 €'])assert.ok(plain.includes(t),`"${t}" in ${JSON.stringify(plain)}`);
+  assert.equal(page.search('بالعالم').length,1);assert.equal(page.search('世界').length,1);
+ }finally{page.destroy();doc.destroy();}
+});

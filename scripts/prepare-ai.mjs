@@ -46,7 +46,7 @@ if(process.argv[1]?.endsWith('prepare-ai.mjs'))try{
    await rename(temporary,target);}finally{await rm(temporary,{force:true});}
   if(entry.convert)await convert(name,entry,target);
  }
- await writeFile('public/ai/models/ppocr-latin-dict.json',JSON.stringify(characterDict(await readFile('public/ai/models/ppocr-latin-rec.yml','utf8'))));
+ for(const script of ['latin','cyrillic','greek','arabic','korean','cjk'])await writeFile(`public/ai/models/ppocr-${script}-dict.json`,JSON.stringify(characterDict(await readFile(`public/ai/models/ppocr-${script}-rec.yml`,'utf8'))));
  await mkdir('public/ai/ort',{recursive:true});
  for(const file of ['ort-wasm-simd-threaded.jsep.mjs','ort-wasm-simd-threaded.jsep.wasm'])await cp(`node_modules/onnxruntime-web/dist/${file}`,`public/ai/ort/${file}`);
  console.log('bide AI models are ready.');

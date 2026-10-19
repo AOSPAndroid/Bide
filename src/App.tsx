@@ -499,10 +499,10 @@ export default function App() {
     if(!ready||initializing||loading.current||aiReady===undefined)return;const scanController=new AbortController(),signal=scanController.signal;setTextRegions([]);const p=page,c=canvas.current!;
     // The bar stays up while rescanning, so its settings menu does not close mid-change.
     if(!hasScannableContent(p,c)){setTextScanStatus('');return;}setTextScanStatus(s=>s?'Looking for text…':s);
-    const scan=async()=>{try{const {regions,all,status,suggestedFont}=await scanPageText(p,c,{signal,grouping:ocr.grouping,thorough:ocr.thorough,languages:ocr.languages,engine:aiReady?ocr.engine:'tesseract',aiSharpen:aiReady&&ocr.aiSharpen,onStatus:s=>{if(!signal.aborted)setTextScanStatus(s);}});if(signal.aborted)return;if(all?.length&&!pageOcrRegions.current.has(p.id))pageOcrRegions.current.set(p.id,all);setTextRegions(regions);setTextScanStatus(status);if(suggestedFont&&!ocrFontChosen.current)setOcr(o=>({...o,font:suggestedFont}));}
+    const scan=async()=>{try{const {regions,all,status,suggestedFont}=await scanPageText(p,c,{signal,grouping:ocr.grouping,thorough:ocr.thorough,languages:ocr.languages,engine:aiReady?ocr.engine:'tesseract',aiSharpen:aiReady&&ocr.aiSharpen,script:ocr.script,accurate:ocr.accurate,onStatus:s=>{if(!signal.aborted)setTextScanStatus(s);}});if(signal.aborted)return;if(all?.length&&!pageOcrRegions.current.has(p.id))pageOcrRegions.current.set(p.id,all);setTextRegions(regions);setTextScanStatus(status);if(suggestedFont&&!ocrFontChosen.current)setOcr(o=>({...o,font:suggestedFont}));}
       catch(e){if(!signal.aborted)setTextScanStatus('Text detection unavailable: '+(e instanceof Error?e.message:String(e)));}};
     const scanTimer=setTimeout(()=>void scan(),120);return()=>{clearTimeout(scanTimer);scanController.abort();};
-  },[ready,initializing,page.id,page.source,textScanRevision,ocr.grouping,ocr.thorough,ocr.languages.join('+'),ocr.engine,ocr.aiSharpen,aiReady]);
+  },[ready,initializing,page.id,page.source,textScanRevision,ocr.grouping,ocr.thorough,ocr.languages.join('+'),ocr.engine,ocr.aiSharpen,ocr.script,ocr.accurate,aiReady]);
   // A turned or tilted photo of a page is offered a one-click straighten (image
   // pages only; shown once OCR finds text, so ordinary photos get no hint).
   useEffect(()=>{
@@ -814,7 +814,7 @@ export default function App() {
       let ocrText:Map<string,{text:string;left:number;top:number;width:number;height:number}[]>|undefined;
       if(searchable&&!options?.reimport&&['pdf','split','txt','docx'].includes(options?.format??format)){
         ocrText=new Map();const all=capture().pages,chosen=[...new Set(selectPages(options?.range??range,all.length))];
-        for(const [n,i] of chosen.entries()){const p=all[i];setBusy(`Reading text for search · page ${n+1} of ${chosen.length}…`);ocrText.set(p.id,await searchableText(p,{engine:aiReady?ocr.engine:'tesseract',languages:ocr.languages,known:pageOcrRegions.current.get(p.id)}));}
+        for(const [n,i] of chosen.entries()){const p=all[i];setBusy(`Reading text for search · page ${n+1} of ${chosen.length}…`);ocrText.set(p.id,await searchableText(p,{engine:aiReady?ocr.engine:'tesseract',languages:ocr.languages,script:ocr.script,accurate:ocr.accurate,known:pageOcrRegions.current.get(p.id)}));}
       }
       const body = { ...await exportPayload(capture(),ocrText), format, compression, range, dpi, ...options, ...(options?.reimport ? { compression: 'lossless' } : {}), password: !options?.reimport && format === 'pdf' && protect ? exportPassword : undefined };
       const blob = await exportInBrowser(body);

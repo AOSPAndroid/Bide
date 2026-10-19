@@ -27,3 +27,12 @@ test('background ignores a stray pixel and text colour ignores anti-aliasing',()
  assert.deepEqual(bg,[245,240,230]);assert.equal(toHex(estimateTextColor(img,box,bg)),toHex(blue));
  assert.equal(estimateTextColor(image(30,20,[245,240,230],()=>undefined),box,bg),undefined);
 });
+
+test('right-to-left OCR text is put in reading order, keeping numbers as they read',async()=>{
+ const {rtlReorder,separateLetters}=await import('../tmp/ai-image.mjs');
+ // Visual order as the recognizer reads Arabic: last letter first.
+ assert.equal(rtlReorder('ملاس'),'سالم');
+ assert.equal(rtlReorder('2024 ماع'),'عام 2024');
+ assert.equal(rtlReorder('PDF فلم'),'ملف PDF');
+ assert.equal(separateLetters('cyrillic'),true);assert.equal(separateLetters('arabic'),false);
+});
