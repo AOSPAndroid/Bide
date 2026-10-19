@@ -1,7 +1,7 @@
 // Real-ESRGAN upscaling, LaMa inpainting and PaddleOCR recognition on canvases.
 import {runModel} from './ai';
 import {segmentGlyphs,type Glyph} from '../glyph-edit';
-import {tilePlan,toPlanar,dbBoxes,ctcDecode,ctcWords,trimToInk,inkBand,inpaintWindows,resizeBilinear,snapToGap,rtlReorder,separateLetters,ocrScripts,type Rect,type OcrScript} from '../ai-image';
+import {tilePlan,toPlanar,dbBoxes,ctcDecode,ctcWords,trimToInk,growToInk,inkBand,inpaintWindows,resizeBilinear,snapToGap,rtlReorder,separateLetters,ocrScripts,type Rect,type OcrScript} from '../ai-image';
 
 type Progress=(fraction:number)=>void;
 const canvas=(width:number,height:number)=>Object.assign(document.createElement('canvas'),{width,height});
@@ -112,7 +112,7 @@ export async function paddleOcr(source:HTMLCanvasElement,onProgress?:Progress,si
    // padded box does not fill the blank columns between letters.
    const bandColumns=new Float32Array(w);for(let y=top;y<bottom;y++)for(let x=x0;x<x1;x++){const p=(y*width+x)*4;bandColumns[x-x0]+=Math.max(Math.abs(src.data[p]-bg[0]),Math.abs(src.data[p+1]-bg[1]),Math.abs(src.data[p+2]-bg[2]))>60?1:0;}
    const lineHeight=bottom-top,gap=Math.max(2,Math.round(lineHeight*.15)),raw=ctcWords(decoded.chars,rw/steps,rw).map(w=>rtl?{...w,text:rtlReorder(w.text)}:w);
-   const edges=raw.map((word,i)=>({x0:i?snapToGap(columns,word.x0*w/rw,gap,lineHeight):word.x0*w/rw,x1:i<raw.length-1?snapToGap(columns,word.x1*w/rw,gap,lineHeight):word.x1*w/rw}));
+   const edges=raw.map((word,i)=>({x0:i?snapToGap(columns,word.x0*w/rw,gap,lineHeight):growToInk(columns,word.x0*w/rw,-1,lineHeight/2),x1:i<raw.length-1?snapToGap(columns,word.x1*w/rw,gap,lineHeight):growToInk(columns,word.x1*w/rw,1,lineHeight/2)}));
    const words=raw.map((word,i)=>{
     const t=trimToInk(columns,edges[i].x0,edges[i].x1),wordRows=new Float32Array(h);
     for(let y=top;y<bottom;y++)for(let x=x0+t.x0;x<x0+t.x1;x++){const p=(y*width+x)*4;wordRows[y-y0]+=Math.max(Math.abs(src.data[p]-bg[0]),Math.abs(src.data[p+1]-bg[1]),Math.abs(src.data[p+2]-bg[2]))>60?1:0;}

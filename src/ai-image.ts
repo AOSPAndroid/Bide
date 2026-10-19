@@ -71,6 +71,15 @@ export function ctcWords(chars:{ch:string;t:number;p:number}[],stepWidth:number,
 }
 
 // Shrink [x0,x1) to the columns that carry ink (column ink totals per x).
+// Move an outer word edge over inked columns that adjoin it (at most `limit`
+// columns): recognizer timing can start a line's first letter, or end its
+// last, inside the letter, leaving a serif or stem outside the word.
+export function growToInk(columns:ArrayLike<number>,x:number,direction:-1|1,limit:number,min=.5){
+ let edge=Math.round(x),steps=0;
+ if(direction<0)while(edge>0&&steps<limit&&columns[edge-1]>=min){edge--;steps++;}
+ else while(edge<columns.length&&steps<limit&&columns[edge]>=min){edge++;steps++;}
+ return edge;
+}
 export function trimToInk(columns:ArrayLike<number>,x0:number,x1:number,min=.5){
  let a=Math.max(0,Math.floor(x0)),b=Math.min(columns.length,Math.ceil(x1));
  while(a<b&&columns[a]<min)a++;while(b>a&&columns[b-1]<min)b--;

@@ -36,3 +36,12 @@ test('right-to-left OCR text is put in reading order, keeping numbers as they re
  assert.equal(rtlReorder('PDF فلم'),'ملف PDF');
  assert.equal(separateLetters('cyrillic'),true);assert.equal(separateLetters('arabic'),false);
 });
+
+test('a line\'s outer word edges grow over the ink they cut through, but not across gaps',async()=>{
+ const {growToInk}=await import('../tmp/ai-image.mjs');
+ const columns=[0,0,2,3,4,9,9,0,9];
+ assert.equal(growToInk(columns,5,-1,10),2,'left edge moves to the start of the serif');
+ assert.equal(growToInk(columns,3,-1,1),2,'at most `limit` columns');
+ assert.equal(growToInk(columns,5,1,10),7,'right edge stops at the gap');
+ assert.equal(growToInk(columns,1,-1,10),1,'no ink beside it, no change');
+});
