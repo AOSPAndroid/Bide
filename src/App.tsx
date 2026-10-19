@@ -25,7 +25,7 @@ import { Canvas, Rect, Ellipse, Line, FabricImage, FabricObject, PencilBrush, Pa
 import { LassoSelect, SquareDashed, Wand2, PaintBucket, Blend, Brush, PenTool, Crop, Ruler, History as HistoryIcon, ArrowDown, ArrowUp, ArrowUpRight, Bold, Check, ChevronDown, ChevronLeft, ChevronRight, Circle, Command, Copy, Download, Eraser, Eye, EyeOff, FileImage, FilePlus2, FileText, FolderOpen, GripVertical, Hand, Highlighter, ImagePlus, Italic, Layers, LockKeyhole, Maximize, Merge, Minus, MoreHorizontal, MousePointer2, PanelLeftClose, PenLine, Plus, Redo2, RotateCw, Save, Scaling, Scissors, Search, Settings2, ShieldCheck, SlidersHorizontal, Sparkles, Square, Trash2, Type, Underline, Undo2, UnlockKeyhole, X, ZoomIn } from 'lucide-react';
 import { autosave, blankPage, demoProject, download, restoreLocal, safeName, uid, type Page, type Project } from './model';
 import Signature from './Signature';
-import { engineHealth, restoreSources, importDocument, exportInBrowser, detectPdfText, removePdfText, pagePreview, fontSupportsText } from './browser/engine';
+import { engineHealth, restoreSources, importDocument, exportInBrowser, detectPdfText, removePdfText, pagePreview, fontSupportsText, findPdfText, redactPdf } from './browser/engine';
 import PDFPreview from './browser/PDFPreview';
 import { StampForm, CropForm, PasswordForm, type StampOptions, type CropMargins } from './DocumentTools';
 import { selectPages } from './page-range';
@@ -49,6 +49,9 @@ import DesignTools,{type ColorStyle} from './DesignTools';
 import {framePresets,layoutLabels,layoutOffsets,type LayoutAction} from './design-layout';
 import {pageRaster,trimRaster,rasterLayer} from './retouch-canvas';
 import {detectTilt,tiltLabel,type Tilt} from './browser/straighten';
+import {burnRedactions} from './redact-canvas';
+import {ocrMatchRect,type Rect as PageRect} from './redaction';
+import RedactDialog,{type RedactionHit} from './RedactDialog';
 import {createRetouchController} from './retouch-controller';
 import {useWorkspaceTools} from './workspace-tools';
 
@@ -134,7 +137,7 @@ export default function App() {
   // undefined until the model pack check finishes, so the first scan already uses the right engine.
   const [aiReady,setAiReady]=useState<boolean>();
   useEffect(()=>{void import('./browser/ai').then(m=>m.aiAvailable()).then(setAiReady);},[]);
-  const [textEdit,setTextEdit]=useState<TextRegion|null>(null),[findOpen,setFindOpen]=useState(false),[proofOpen,setProofOpen]=useState(false),[tilt,setTilt]=useState<{pageId:string;tilt:Tilt}|null>(null);
+  const [textEdit,setTextEdit]=useState<TextRegion|null>(null),[findOpen,setFindOpen]=useState(false),[proofOpen,setProofOpen]=useState(false),[tilt,setTilt]=useState<{pageId:string;tilt:Tilt}|null>(null),[redactOpen,setRedactOpen]=useState(false);
   // Glyph boxes of the letters the recognizer was unsure of, for underlines.
   const doubtMarks=(r:TextRegion)=>(r.glyphs??[]).filter(g=>g.p!==undefined&&g.p<DOUBT);
   const [ocr,setOcr]=useState<OcrSettings>(()=>({...defaultOcrSettings,languages:storedOcrLanguages()}));
@@ -617,6 +620,7 @@ export default function App() {
       case 'layer':void applySelection('copy');return;
       case 'mask':void applySelection('keep');return;
       case 'ai-remove':void aiRemove();return;
+      case 'redact':{const b=r&&maskBounds(selectionPixels(r),1);if(b){setRegion(null);void redactAreas([b]);}return;}
       case 'subject':void selectSubject();return;
       case 'color-range':openColorRange();return;
       case 'deselect':setRegion(null);setTool('select');return;
@@ -662,6 +666,34 @@ export default function App() {
       c.remove(image);c.insertAt(index,next);c.requestRenderAll();saveCanvas();setTextScanRevision(r=>r+1);
       notify('Page flattened with AI. Undo restores the original photo.');
     }catch(e){fail(e);}finally{setBusy('');}
+  }
+  // True redaction of page areas: the PDF page itself (MuPDF removes text,
+  // image pixels and drawings) and every layer under the boxes (burned in).
+  // Sources no page uses any more are dropped, so a saved project cannot keep
+  // the original, and cached OCR text is discarded.
+  async function redactAreas(rects:PageRect[]){
+    const c=canvas.current,original=page;if(!c||!rects.length||busy||loading.current)return;setBusy('Redacting…');
+    try{
+      let nextSource=original.source,nextData:string|undefined;
+      if(original.source){const result=await redactPdf(original.source,original.index,rects);nextSource=result.id;nextData=result.data;}
+      if(pageIdRef.current!==original.id)return;
+      const {removed,burned}=burnRedactions(c,rects),current=capture();
+      const pages=current.pages.map(p=>p.id===original.id?{...p,source:nextSource}:p),all={...current.sources,...(nextSource&&nextData?{[nextSource]:nextData}:{})};
+      pageOcrRegions.current.delete(original.id);setTextRegions([]);
+      commit({...current,pages,sources:Object.fromEntries(Object.entries(all).filter(([id])=>pages.some(p=>p.source===id)))},true,'Redact');setTextScanRevision(r=>r+1);
+      notify(`${rects.length} area${rects.length===1?'':'s'} redacted${original.source?' in the PDF':''}${removed+burned?`, ${removed+burned} layer${removed+burned===1?'':'s'} burned in`:''}. The content underneath is removed from exports and saved projects; Undo restores it while this page is open.`);
+    }catch(e){fail(e);}finally{setBusy('');}
+  }
+  // Rectangles for text matches: exact PDF search boxes, or OCR letter positions.
+  async function redactHits(hits:RedactionHit[]){
+    setRedactOpen(false);const rects:PageRect[]=[];
+    const pdfTexts=[...new Set(hits.filter(h=>h.region.kind==='pdf').map(h=>h.match.text))];
+    const found=page.source&&pdfTexts.length?await findPdfText(page.source,page.index,pdfTexts):[];
+    for(const h of hits){
+      if(h.region.kind==='pdf'){const boxes=found[pdfTexts.indexOf(h.match.text)]??[];rects.push(...(boxes.length?boxes.map(b=>({left:b.left-1,top:b.top-1,width:b.width+2,height:b.height+2})):[{left:h.region.left,top:h.region.top,width:h.region.width,height:h.region.height}]));}
+      else rects.push(ocrMatchRect(h.region,h.match));
+    }
+    await redactAreas(rects);
   }
   // Real-ESRGAN doubles the image layer's resolution; its size on the page is unchanged.
   async function aiSharpenSelected(){
@@ -1100,6 +1132,7 @@ export default function App() {
     {label:'Remove selection with AI fill',hint:'',keywords:'inpaint erase object content aware lama',icon:Eraser,disabled:!aiReady?'AI models are not bundled in this build.':region?undefined:'Draw a Marquee or Lasso selection first',run:()=>void aiRemove()},
     {label:'Straighten page (fix tilt and rotation)',hint:'',keywords:'deskew skew tilt rotate upright orientation scan photo ocr level',icon:RotateCw,disabled:page.source?'Unlock Original PDF first':undefined,run:()=>void straightenPage()},
     ...(aiReady?[{label:'Flatten photographed page (AI)',hint:'',keywords:'dewarp perspective curved curl unwarp document photo scan keystone',icon:Wand2,disabled:page.source?'Unlock Original PDF first':undefined,run:()=>void flattenPageAi()}]:[]),
+    {label:'Find & redact (remove personal data)',hint:'',keywords:'redact redaction black out censor hide remove personal data privacy gdpr email phone iban card name confidential',icon:EyeOff,disabled:textRegions.length?undefined:'Open a page with text first',run:()=>setRedactOpen(true)},
     {label:'Proofread image text',hint:'',keywords:'spelling spell check ocr mistakes typo misread dictionary',icon:Type,disabled:textRegions.some(r=>r.kind==='ocr')?undefined:'Open an image or scanned page with text first',run:()=>setProofOpen(true)},
     {label:'Find and replace in image text',hint:'',keywords:'ocr rename typo correct name word everywhere',icon:Type,disabled:textRegions.some(r=>r.kind==='ocr')?undefined:'Open an image or scanned page with detected text first.',run:()=>setFindOpen(true)},
     {label:'Convert all detected text',hint:'',keywords:'ocr sharpen crisp blurry replace every line all text',icon:Type,disabled:textRegions.some(r=>r.kind==='ocr')?undefined:'Open an image or scanned page with detected text first.',run:()=>void convertAllDetectedText()},
@@ -1311,6 +1344,7 @@ export default function App() {
     {colorRange&&<ColorRangeDialog initial={color} preview={previewColorRange} apply={()=>{setColorRange(null);setTool(t=>['marquee','lasso','wand'].includes(t)?t:'wand');}} close={()=>{setRegion(colorRange.before);setColorRange(null);}}/>}
     {modal==='imagesize'&&<ImageSizeDialog width={page.width} height={page.height} close={()=>setModal(null)} apply={resizeImage}/>}
     {modal==='canvassize'&&<CanvasSizeDialog width={page.width} height={page.height} close={()=>setModal(null)} apply={resizeCanvas}/>}
+    {redactOpen&&<RedactDialog regions={textRegions} close={()=>setRedactOpen(false)} apply={hits=>void redactHits(hits)}/>}
     {proofOpen&&<ProofreadDialog regions={textRegions} close={()=>setProofOpen(false)} apply={(region,text)=>replaceOcrRegions([{region,text}],{letters:true,done:lettersNote})}/>}
     {findOpen&&<FindReplaceDialog regions={textRegions} close={()=>setFindOpen(false)} apply={findAndReplace}/>}
     {modal==='export'&&<ModalShell title="Export document" close={()=>setModal(null)}><p className="muted">Export your work with the settings that fit.</p><label className="stacked-label">Format<select value={format} onChange={e=>setFormat(e.target.value)}><option value="pdf">PDF document</option><option value="psd">Photoshop PSD · current design page</option><option value="png">PNG images · ZIP</option><option value="jpg">JPEG images · ZIP</option><option value="svg">SVG pages · ZIP</option><option value="split">Separate PDF pages · ZIP</option><option value="txt">Plain text · TXT</option><option value="docx">Editable text · Word DOCX</option></select></label>{format!=='psd'&&<label className="stacked-label">Pages<input placeholder={`All ${project.pages.length} pages (or 1-3, 5)`} value={range} onChange={e=>setRange(e.target.value)}/></label>}{['pdf','split'].includes(format)&&<label className="stacked-label">Compression<select value={compression} onChange={e=>setCompression(e.target.value)}><option value="lossless">Original quality · lossless optimization</option><option value="balanced">Balanced · optimize large images</option><option value="small">Smaller file · reduce image quality</option></select></label>}{['png','jpg'].includes(format)&&<label className="stacked-label">Resolution<select value={dpi} onChange={e=>setDpi(Number(e.target.value))}><option value={72}>72 DPI · screen</option><option value={144}>144 DPI · standard</option><option value={300}>300 DPI · high resolution</option></select></label>}{format==='psd'&&<p className="notice">Exports the current design page as named raster layers, with opacity, visibility and blend modes. Supported groups retain their hierarchy. Text, vectors and masks are rasterized within each layer. Pages containing eraser strokes export as one merged layer to preserve appearance. Use Unlock Original PDF in Layers to convert a PDF page into an editable image first.</p>}{['pdf','split','txt','docx'].includes(format)&&<label className="check-label" title="Reads the text in scanned pages and pictures (OCR, on this device) and adds it as an invisible layer, so the PDF can be searched, copied and read aloud. Pages that already have text are left as they are."><input type="checkbox" aria-label="Make text searchable" checked={searchable} onChange={e=>setSearchable(e.target.checked)}/>Make text searchable (OCR)</label>}{format==='pdf'&&<><label className="check-label"><input type="checkbox" checked={protect} onChange={e=>setProtect(e.target.checked)}/>Require a password to open the exported PDF</label>{protect&&<><label className="stacked-label">PDF password<input type="password" autoComplete="new-password" value={exportPassword} onChange={e=>setExportPassword(e.target.value)}/></label><label className="stacked-label">Confirm PDF password<input type="password" autoComplete="new-password" value={passwordConfirmation} onChange={e=>setPasswordConfirmation(e.target.value)}/></label><p className="fine-print">AES-256 encryption applies to the exported PDF. Workspace autosaves and .bide projects stay unencrypted.</p></>}</>}{format==='docx'&&<p className="notice">Extracts text in reading order. Page breaks are retained; complex layouts and images are not reconstructed. Scans require OCR before text can be extracted.</p>}{format==='pdf'&&<div className="export-note"><ShieldCheck size={18}/><span>Normal layers keep text and vectors. Blend effects rasterize design pages; forms are flattened.<br/><small>Save a .bide project to keep added layers editable.</small></span></div>}<div className="dialog-actions"><button className="secondary" onClick={saveProject}><Save size={14}/>Save project</button><button className="primary" onClick={()=>runExport()} disabled={!health.ok||(format==='psd'&&!!page.source)||(format==='pdf'&&protect&&(!exportPassword||exportPassword!==passwordConfirmation))}><Download size={15}/>Export {format==='split'?'pages':format.toUpperCase()}</button></div></ModalShell>}

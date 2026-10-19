@@ -1,6 +1,7 @@
 ## Unreleased — searchable PDFs, proofreading and letter reuse
 
 - **Make PDF searchable**: PDF export can add an invisible OCR text layer at each line's position, so scanned pages can be searched, copied and read by screen readers. TXT and Word export of scanned pages use the same text. Pages that already have real PDF text are left alone.
+- True redaction: **Redact** on the selection bar, or **Find & redact**, which searches the page's text for words and for email addresses, phone numbers, IBANs (mod-97 checked) and card numbers (Luhn checked); matches are listed to review first. On PDF pages MuPDF removes the text, image pixels and drawings under each box, plus links and annotations touching it, and draws a black box. Every layer under a box is burned in: rasterized with the box painted black, or deleted if it lies entirely inside. Sources no page uses are dropped, so a saved project holds no unredacted copy, and the page's cached OCR text is discarded and rescanned.
 - Straighten before OCR: after a scan, an image page that is tilted (measured from its text lines, without AI, to 0.1°) or turned 90/180/270° (PP-LCNet orientation model) gets a **Straighten** button in the text bar. One undoable step rotates every layer, swaps width and height for quarter turns, and scans again. **Straighten page** in the command palette works on any image page. **Flatten photographed page (AI)** runs UVDoc on the main image layer to remove perspective and page curl; on a test photo it turned "Ivoice total 14 EUR" into "Invoice total 1284 EUR".
 - More alphabets in AI OCR: PP-OCRv5 recognizers for Cyrillic, Greek, Arabic, Korean, and Chinese & Japanese, next to Latin. **Alphabet: Auto** (default) reads Latin and tries the other alphabets when a line comes back unsure, empty or with non-Latin letters. The page's alphabet, once found, is tried first. Arabic is put in reading order with numbers kept as they read. Original-letter editing and spelling stay with the separate-letter Latin, Cyrillic and Greek alphabets. Searchable PDFs carry these alphabets: a Type0 font subset from MuPDF's built-in CJK font, or ActualText for Arabic (about 10 KB per document).
 - **High accuracy** (AI OCR setting) finds text with the PP-OCRv5 server detector, stored with float16 weights (44 MB): better on busy photos, small print and low contrast, but slower.
@@ -93,6 +94,7 @@ The catalogue includes [organization, conversion, editing, security and intellig
 | PDF to Excel | Missing | No table detection or structured spreadsheet conversion |
 | PDF to PDF/A | Missing | No archival-profile validation or certified conversion |
 | Scan to PDF | Missing | No camera/scanner capture workflow |
+| Redact | Implemented | Selection or Find & redact (text, emails, phones, IBANs, cards); removes PDF text, image pixels and drawings under the box, burns layers in |
 | OCR PDF | Partial | Local offline OCR (English, French, German, Spanish, Italian, Dutch, Portuguese) turns image and scanned-page text into editable text layers; **Make PDF searchable**: export adds an invisible OCR text layer at each line's position (search, copy, screen readers), also used by TXT/Word export of scanned pages |
 | Repair PDF | Missing | Parser recovery may open some files, but no dedicated repair/recovery workflow |
 | Rotate PDF | Partial | Rotate current page and undo; no multi-document batch rotation panel |
@@ -144,7 +146,7 @@ These checks use representative fixtures. They do not establish identical behavi
 
 Both the visual editor and PDF toolkit have equal priority. The numbered groups below organize remaining work; they are not a commitment to finish one product before the other.
 
-1. PDF completeness: proper redaction, embedded-image extraction, forms, richer password permissions, and batch crop/image-watermark workflows.
+1. PDF completeness: embedded-image extraction, forms, richer password permissions, and batch crop/image-watermark workflows.
 2. Conversion fidelity: document corpus tests, layout-preserving PDF-to-Office, PDF/A validation and repair workflows.
 3. Raster editing foundation: selections, painted masks, layer effects, advanced brush/retouch tools (content-aware fill, dodge/burn) and color management.
 4. Full PSD/PSB compatibility, smart objects, advanced typography/paths, animation and automation.

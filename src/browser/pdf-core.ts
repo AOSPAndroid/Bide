@@ -462,3 +462,34 @@ export async function removePdfText(source:string,index:number,regionId:string){
  const region=detectPdfText(source,index).regions.find(r=>r.id===regionId);if(!region)throw new Error('Text changed. Select the detected text again.');const data=sources.get(source)!;const doc=open(data) as mupdf.PDFDocument;const page=doc.loadPage(index);
  try{if(page.getAnnotations().some(a=>a.getType()==='Redact'))throw new Error('This page has pending redactions. Resolve them before editing text.');const links=page.getLinks().map(link=>({bounds:link.getBounds(),uri:link.getURI()}));const annotation=page.createAnnotation('Redact');annotation.setQuadPoints(region.quads as mupdf.Quad[]);page.applyRedactions(false,mupdf.PDFPage.REDACT_IMAGE_NONE,mupdf.PDFPage.REDACT_LINE_ART_NONE,mupdf.PDFPage.REDACT_TEXT_REMOVE);const remaining=page.getLinks().map(link=>({bounds:link.getBounds(),uri:link.getURI()}));for(const link of links)if(!remaining.some(other=>other.uri===link.uri&&other.bounds.every((v,i)=>v===link.bounds[i])))page.createLink(link.bounds,link.uri).destroy();return await register(bytesOf(doc.saveToBuffer(opts)));}finally{page.destroy();doc.destroy();}
 }
+
+export type PageRect = { left: number; top: number; width: number; height: number };
+// Where `needles` occur on a PDF page, as rectangles in page units (top-left origin).
+export function findPdfText(source: string, index: number, needles: string[]): PageRect[][] {
+  const data = sources.get(source); if (!data) throw new Error('This PDF is no longer open.');
+  const doc = open(data), page = doc.loadPage(index);
+  try {
+    const [x0, y0] = page.getBounds();
+    return needles.map(needle => needle.trim() ? page.search(needle, '').flat().map(q => {
+      const xs = [q[0], q[2], q[4], q[6]], ys = [q[1], q[3], q[5], q[7]], left = Math.min(...xs), top = Math.min(...ys);
+      return { left: left - x0, top: top - y0, width: Math.max(...xs) - left, height: Math.max(...ys) - top };
+    }) : []);
+  } finally { page.destroy(); doc.destroy(); }
+}
+
+// True redaction: text, images (their pixels) and vector art under each
+// rectangle are removed from the PDF and a black box is drawn in their place.
+// Links and annotations touching a rectangle are deleted with them.
+export async function redactPdf(source: string, index: number, rects: PageRect[]) {
+  const data = sources.get(source); if (!data) throw new Error('This PDF is no longer open.');
+  const doc = open(data) as mupdf.PDFDocument, page = doc.loadPage(index) as mupdf.PDFPage;
+  try {
+    const [x0, y0] = page.getBounds(), boxes = rects.map(r => [r.left + x0, r.top + y0, r.left + x0 + r.width, r.top + y0 + r.height] as mupdf.Rect);
+    const touches = (b: mupdf.Rect) => boxes.some(r => b[0] < r[2] && b[2] > r[0] && b[1] < r[3] && b[3] > r[1]);
+    for (const link of page.getLinks()) { if (touches(link.getBounds())) page.deleteLink(link); link.destroy(); }
+    for (const annotation of page.getAnnotations()) if (annotation.getType() !== 'Redact' && touches(annotation.getBounds())) page.deleteAnnotation(annotation);
+    for (const box of boxes) page.createAnnotation('Redact').setRect(box);
+    page.applyRedactions(true, mupdf.PDFPage.REDACT_IMAGE_PIXELS, mupdf.PDFPage.REDACT_LINE_ART_REMOVE_IF_COVERED, mupdf.PDFPage.REDACT_TEXT_REMOVE);
+    return await register(bytesOf(doc.saveToBuffer(opts)));
+  } finally { page.destroy(); doc.destroy(); }
+}

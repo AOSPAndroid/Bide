@@ -14,6 +14,8 @@ self.onmessage=(event:MessageEvent)=>{
         case 'render':result=engine.render(args.source,args.index,args.scale);break;
         case 'detectText':result=engine.detectPdfText(args.source,args.index);break;
         case 'removeText':result=await engine.removePdfText(args.source,args.index,args.regionId);break;
+        case 'findText':result=engine.findPdfText(args.source,args.index,args.needles);break;
+        case 'redact':result=await engine.redactPdf(args.source,args.index,args.rects);break;
         case 'fontSupports':result=engine.fontSupportsText(args.data,args.text);break;
         case 'export':result=await engine.exportDocument(args);break;
         default:throw new Error('Unknown document operation.');

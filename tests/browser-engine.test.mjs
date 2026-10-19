@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdir, writeFile, readFile } from 'node:fs/promises';
 import * as mupdf from 'mupdf';
 import { unzipSync, strFromU8 } from 'fflate';
-import { importBytes, exportDocument, restore, render, selectPages, detectPdfText, removePdfText, fontSupportsText } from '../tmp/browser-core.mjs';
+import { importBytes, exportDocument, restore, render, selectPages, detectPdfText, removePdfText, fontSupportsText, findPdfText, redactPdf } from '../tmp/browser-core.mjs';
 await mkdir('tmp/pdfs',{recursive:true});
 const original=new mupdf.PDFDocument(),font=new mupdf.Font('Helvetica'),fontRef=original.addSimpleFont(font);
 for(const label of ['Original first page','Original second page']){const p=original.addPage([0,0,595,842],0,{Font:{helv:fontRef}},`BT /helv 22 Tf 50 772 Td (${label}) Tj ET 0.2 0.7 0.5 rg 50 642 200 100 re f`);original.insertPage(-1,p);p.destroy();}
@@ -135,4 +135,29 @@ test('OCR text in other alphabets is searchable too, with a small subset font',a
   for(const t of ['Привет мир','Καλημέρα','你好世界 안녕','مرحبا بالعالم','Total 12 €'])assert.ok(plain.includes(t),`"${t}" in ${JSON.stringify(plain)}`);
   assert.equal(page.search('بالعالم').length,1);assert.equal(page.search('世界').length,1);
  }finally{page.destroy();doc.destroy();}
+});
+
+test('redaction removes the text, image pixels and links under the boxes, not beside them',async()=>{
+ const doc=new mupdf.PDFDocument(),font=doc.addSimpleFont(new mupdf.Font('Helvetica'),'Latin');
+ // A red 40×40 image at (300,40)-(340,80) (top-left page units), and two text lines.
+ const pix=new mupdf.Pixmap(mupdf.ColorSpace.DeviceRGB,[0,0,40,40],false);pix.clear(0);const px=pix.getPixels();for(let i=0;i<px.length;i+=3)px[i]=255;
+ const img=doc.addImage(new mupdf.Image(pix));
+ const page=doc.addPage([0,0,400,200],0,{Font:{F:font},XObject:{I:img}},'BT /F 14 Tf 30 150 Td (Email: alex@example.com) Tj ET BT /F 14 Tf 30 110 Td (Keep this line) Tj ET q 40 0 0 40 300 120 cm /I Do Q');doc.insertPage(-1,page);
+ const p0=doc.loadPage(0);p0.createLink([30,40,200,60],'mailto:alex@example.com').destroy();p0.destroy();
+ const source=await importBytes(doc.saveToBuffer('').asUint8Array().slice(),'private.pdf');
+ const [hits]=findPdfText(source.id,0,['alex@example.com']);assert.equal(hits.length,1);
+ assert.ok(hits[0].left>60&&hits[0].top>30&&hits[0].top<55,`match box ${JSON.stringify(hits[0])}`);
+ const redacted=await redactPdf(source.id,0,[...hits,{left:310,top:50,width:20,height:20}]);
+ const out=mupdf.Document.openDocument(Uint8Array.from(atob(redacted.data),c=>c.charCodeAt(0)),'application/pdf'),q=out.loadPage(0);
+ try{
+  const text=q.toStructuredText('').asText();
+  assert.ok(!text.includes('alex'),`email removed: ${JSON.stringify(text)}`);assert.match(text,/Email:/);assert.match(text,/Keep this line/);
+  assert.equal(q.getLinks().length,0,'the mailto link went with the text');
+  // The image keeps its pixels outside the box; inside, they are gone (black box drawn over a cleared area).
+  const m=q.toPixmap(mupdf.Matrix.identity,mupdf.ColorSpace.DeviceRGB,false,true),w=m.getWidth(),at=(x,y)=>Array.from(m.getPixels().slice((y*w+x)*3,(y*w+x)*3+3));
+  assert.deepEqual(at(304,44),[255,0,0],'image outside the box');assert.deepEqual(at(320,60),[0,0,0],'black box');
+  m.destroy();
+  // No copy of the original picture remains in the file.
+  const raw=new TextDecoder('latin1').decode(Uint8Array.from(atob(redacted.data),c=>c.charCodeAt(0)));assert.ok(!raw.includes('alex@example.com'));
+ }finally{q.destroy();out.destroy();}
 });

@@ -27,4 +27,7 @@ export function pagePreview(source:string,index:number,scale:number){const key=`
 
 export const detectPdfText=(source:string,index:number)=>rpc<{regions:import('../text-regions').TextRegion[];skipped:number}>('detectText',{source,index});
 export const removePdfText=(source:string,index:number,regionId:string)=>rpc<{id:string;data:string}>('removeText',{source,index,regionId});
+type PageRect=import('./pdf-core').PageRect;
+export const findPdfText=(source:string,index:number,needles:string[])=>rpc<PageRect[][]>('findText',{source,index,needles});
+export const redactPdf=(source:string,index:number,rects:PageRect[])=>rpc<{id:string;data:string}>('redact',{source,index,rects});
 export const fontSupportsText=(data:string,text:string)=>rpc<boolean>('fontSupports',{data,text});
