@@ -212,3 +212,9 @@
 .redact-list{display:grid;gap:4px;max-height:320px;overflow:auto;margin:8px 0;padding:6px;border:1px solid var(--line);border-radius:6px}
 .redact-hit .line-text{font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .redact-hit mark{background:#25272d;color:#fff;border-radius:2px;padding:0 2px}
+.adjustment-panel .adjust-row{display:grid;grid-template-columns:78px 1fr 34px;align-items:center;gap:6px;font-size:11px}
+.adjustment-panel .adjust-row output{text-align:right;color:var(--muted)}
+.adjust-graph{width:100%;max-width:180px;aspect-ratio:1;display:block;margin:4px auto 8px;background:linear-gradient(#fff,#fff) padding-box;border:1px solid var(--line);border-radius:4px;touch-action:none;cursor:crosshair}
+.adjust-graph .adjust-diagonal{stroke:#d9d6cf;stroke-width:1;fill:none}
+.adjust-graph .adjust-curve{stroke:var(--ink);stroke-width:2;fill:none;vector-effect:non-scaling-stroke}
+.adjust-graph .adjust-point{fill:#fff;stroke:var(--accent);stroke-width:2;vector-effect:non-scaling-stroke}

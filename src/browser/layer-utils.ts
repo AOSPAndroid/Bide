@@ -7,5 +7,6 @@ export const blendModes: Record<string, GlobalCompositeOperation> = {
 };
 
 export function hasBlending(objects: FabricObject[]): boolean {
-  return objects.some(o => o.globalCompositeOperation !== 'source-over' || ('getObjects' in o && hasBlending((o as unknown as { getObjects(): FabricObject[] }).getObjects())));
+  // Adjustment layers act on the pixels beneath them, like a blend mode.
+  return objects.some(o => o.globalCompositeOperation !== 'source-over' || o.type?.toLowerCase() === 'adjustmentlayer' || ('getObjects' in o && hasBlending((o as unknown as { getObjects(): FabricObject[] }).getObjects())));
 }

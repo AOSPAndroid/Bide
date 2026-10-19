@@ -1,6 +1,8 @@
 import {Textbox} from './text-appearance';
 import { Circle, Rect, FabricObject } from 'fabric';
 import { uuid } from './browser/crypto';
+// Registers the adjustment layer class so saved pages load it.
+import './adjustment-layer';
 
 FabricObject.customProperties = ['id', 'name', 'diagramXml','pdfFontData','pdfOriginalFont','pdfFontFallback','pdfFontBold','pdfFontItalic','recognizedKey','objectCaching','textSoftness','layerMask','layerStyle'];
 // The editor's coordinates use top-left anchors. Fabric 7 defaults to centered anchors.
