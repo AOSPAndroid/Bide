@@ -66,11 +66,20 @@ export function ctcWords(chars:{ch:string;t:number;p:number}[],stepWidth:number,
  return words.map((w,i)=>{
   const prev=words[i-1],next=words[i+1];
   const x0=prev?(prev.last+w.first+1)/2*stepWidth:Math.max(0,(w.first-1)*stepWidth),x1=next?(w.last+next.first+1)/2*stepWidth:Math.min(lineWidth,(w.last+2)*stepWidth);
-  return {text:w.text,x0,x1,confidence:100*w.p.reduce((s,p)=>s+p,0)/w.p.length,centers:w.t.map(t=>(t+.5)*stepWidth)};
+  return {text:w.text,x0,x1,confidence:100*w.p.reduce((s,p)=>s+p,0)/w.p.length,centers:w.t.map(t=>(t+.5)*stepWidth),probs:w.p};
  });
 }
 
 // Shrink [x0,x1) to the columns that carry ink (column ink totals per x).
+// Move an outer word edge over inked columns that adjoin it (at most `limit`
+// columns): recognizer timing can start a line's first letter, or end its
+// last, inside the letter, leaving a serif or stem outside the word.
+export function growToInk(columns:ArrayLike<number>,x:number,direction:-1|1,limit:number,min=.5){
+ let edge=Math.round(x),steps=0;
+ if(direction<0)while(edge>0&&steps<limit&&columns[edge-1]>=min){edge--;steps++;}
+ else while(edge<columns.length&&steps<limit&&columns[edge]>=min){edge++;steps++;}
+ return edge;
+}
 export function trimToInk(columns:ArrayLike<number>,x0:number,x1:number,min=.5){
  let a=Math.max(0,Math.floor(x0)),b=Math.min(columns.length,Math.ceil(x1));
  while(a<b&&columns[a]<min)a++;while(b>a&&columns[b-1]<min)b--;
@@ -135,4 +144,31 @@ export function snapToGap(columns:ArrayLike<number>,x:number,minGap:number,maxDi
   run=0;
  }
  return best??x;
+}
+
+// Scripts with a bundled PP-OCRv5 recognizer. Letter cells (glyph-edit.ts)
+// only work for alphabets written left to right with separate letters.
+export const ocrScripts=['latin','cyrillic','greek','arabic','korean','cjk'] as const;
+export type OcrScript=typeof ocrScripts[number];
+export const scriptLabels:Record<OcrScript,string>={latin:'Latin',cyrillic:'Cyrillic',greek:'Greek',arabic:'Arabic',korean:'Korean',cjk:'Chinese & Japanese'};
+export const separateLetters=(script:OcrScript)=>script==='latin'||script==='cyrillic'||script==='greek';
+
+// The recognizer reads right-to-left text in visual (left-to-right) order.
+// Reverse it to reading order, keeping runs of Latin letters, digits and
+// common symbols the way they read (PaddleOCR's pred_reverse, with spaces
+// kept between runs rather than inside them).
+export function rtlReorder(text:string){
+ const parts:string[]=[];let run='';
+ for(const c of text){if(/[a-zA-Z0-9:*./%+-]/.test(c))run+=c;else{if(run)parts.push(run);parts.push(c);run='';}}
+ if(run)parts.push(run);
+ return parts.reverse().join('');
+}
+
+// Segment Anything returns three masks for a click (part, object, whole).
+// The highest score often goes to the whole scene; take the smallest mask
+// scoring within `margin` of the best, which is the clicked object.
+export function pickMask(scores:number[],areas:number[],margin=.05){
+ const best=Math.max(...scores);let pick=-1;
+ for(let i=0;i<scores.length;i++)if(scores[i]>=best-margin&&areas[i]>0&&(pick<0||areas[i]<areas[pick]))pick=i;
+ return pick<0?scores.indexOf(best):pick;
 }

@@ -27,3 +27,28 @@ test('background ignores a stray pixel and text colour ignores anti-aliasing',()
  assert.deepEqual(bg,[245,240,230]);assert.equal(toHex(estimateTextColor(img,box,bg)),toHex(blue));
  assert.equal(estimateTextColor(image(30,20,[245,240,230],()=>undefined),box,bg),undefined);
 });
+
+test('right-to-left OCR text is put in reading order, keeping numbers as they read',async()=>{
+ const {rtlReorder,separateLetters}=await import('../tmp/ai-image.mjs');
+ // Visual order as the recognizer reads Arabic: last letter first.
+ assert.equal(rtlReorder('ملاس'),'سالم');
+ assert.equal(rtlReorder('2024 ماع'),'عام 2024');
+ assert.equal(rtlReorder('PDF فلم'),'ملف PDF');
+ assert.equal(separateLetters('cyrillic'),true);assert.equal(separateLetters('arabic'),false);
+});
+
+test('a line\'s outer word edges grow over the ink they cut through, but not across gaps',async()=>{
+ const {growToInk}=await import('../tmp/ai-image.mjs');
+ const columns=[0,0,2,3,4,9,9,0,9];
+ assert.equal(growToInk(columns,5,-1,10),2,'left edge moves to the start of the serif');
+ assert.equal(growToInk(columns,3,-1,1),2,'at most `limit` columns');
+ assert.equal(growToInk(columns,5,1,10),7,'right edge stops at the gap');
+ assert.equal(growToInk(columns,1,-1,10),1,'no ink beside it, no change');
+});
+
+test('the clicked object wins over a higher-scoring whole-scene mask',async()=>{
+ const {pickMask}=await import('../tmp/ai-image.mjs');
+ assert.equal(pickMask([.98,.914,.961],[233621,69721,35179]),2,'rectangle, not the background');
+ assert.equal(pickMask([.913,1.013,.988],[264342,31220,30850]),2,'circle: either object mask is close');
+ assert.equal(pickMask([.5,.9,.6],[10,0,20]),1,'empty masks are skipped unless nothing else qualifies');
+});

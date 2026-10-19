@@ -1,10 +1,23 @@
 // Editing image text with its own letters: character cells measured on the
 // original line, and a plan that rebuilds edited text from those cells (or
 // matching letters elsewhere on the page) instead of a substitute font.
-export type Glyph={ch:string;x0:number;x1:number};
+// `p`: the recognizer's confidence in this letter (0-1), when known.
+export type Glyph={ch:string;x0:number;x1:number;p?:number};
 export type Cell=Glyph&{space?:boolean};
-export type LibraryGlyph=Glyph&{y0:number;y1:number;source:string};
-export type Piece={x0:number;x1:number;y0?:number;y1?:number;source?:string;blank?:boolean};
+// Borrowed letters carry their line's band and baseline (page units) and the page they come from.
+export type LibraryGlyph=Glyph&{y0:number;y1:number;source:string;baseline?:number;page?:string};
+export type Piece={x0:number;x1:number;y0?:number;y1?:number;source?:string;blank?:boolean;baseline?:number;page?:string};
+
+// Baseline and x-height of a text line from its ink per row (top to bottom).
+// Lowercase bodies hold most of the ink: rows above 40% of the busiest row form
+// the x-height band; its last row is the baseline, so descenders (g, y, p) and
+// capitals do not move it. Returns row offsets within `rows`.
+export function lineMetrics(rows:ArrayLike<number>){
+ let max=0;for(let i=0;i<rows.length;i++)max=Math.max(max,rows[i]);
+ if(!max)return undefined;
+ let first=-1,last=-1;for(let i=0;i<rows.length;i++)if(rows[i]>=max*.4){if(first<0)first=i;last=i;}
+ return {xTop:first,baseline:last+1,xHeight:last+1-first};
+}
 
 // Split a word into characters. Letters are first taken from the inked
 // column runs (at small sizes they are usually separated by blank columns);
@@ -90,7 +103,7 @@ export function planGlyphEdit(text:string,cells:Cell[],next:string,library:Libra
   const own=cells.map((c,i)=>({c,i})).filter(({c})=>!c.space&&c.ch===ch).sort((x,y)=>Math.abs(x.i-Math.min(j,a.length-1))-Math.abs(y.i-Math.min(j,a.length-1)))[0];
   if(own){pieces.push({x0:own.c.x0,x1:own.c.x1});continue;}
   const borrowed=library.find(g=>g.ch===ch);if(!borrowed)return undefined;
-  pieces.push({x0:borrowed.x0,x1:borrowed.x1,y0:borrowed.y0,y1:borrowed.y1,source:borrowed.source});
+  pieces.push({x0:borrowed.x0,x1:borrowed.x1,y0:borrowed.y0,y1:borrowed.y1,source:borrowed.source,...borrowed.baseline===undefined?{}:{baseline:borrowed.baseline},...borrowed.page===undefined?{}:{page:borrowed.page}});
  }
  const startX=p<cells.length?cells[p].x0:cells[cells.length-1].x1;
  return {startX,oldEnd:cells[cells.length-1].x1,pieces};

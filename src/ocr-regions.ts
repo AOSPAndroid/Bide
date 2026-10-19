@@ -73,3 +73,12 @@ export function attachNumberParts(texts:string[],bold:(boolean|undefined)[]){
  });
  return out;
 }
+
+// Code-point indexes (in region.text) of letters the recognizer was unsure of.
+// Glyphs follow the non-space characters of the text in order.
+export const DOUBT=0.6;
+export function doubtfulLetters(region:{text:string;glyphs?:{p?:number}[]},threshold=DOUBT){
+ const out:number[]=[];if(!region.glyphs)return out;let g=0;
+ Array.from(region.text).forEach((ch,i)=>{if(/\s/.test(ch))return;const p=region.glyphs![g++]?.p;if(p!==undefined&&p<threshold)out.push(i);});
+ return out;
+}

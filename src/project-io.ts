@@ -40,7 +40,7 @@ export async function imageFilePage(file:File):Promise<Page>{
 // Every page rendered to SVG for the export engine. Embedded PDF fonts that
 // lack typed characters fall back to their bundled match; pages with blend
 // modes are flattened to a PNG inside the SVG.
-export async function exportPayload(current:Project){
+export async function exportPayload(current:Project,ocr?:Map<string,{text:string;left:number;top:number;width:number;height:number}[]>){
  const pages = [];
  for (const p of current.pages) {
   const c = new StaticCanvas(undefined, { width: p.width, height: p.height, backgroundColor: p.source ? '' : p.color });
@@ -65,7 +65,7 @@ export async function exportPayload(current:Project){
     const png = c.toDataURL({ format: 'png', multiplier: Math.min(2, 4096 / Math.max(p.width, p.height)) });
     svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${p.width}" height="${p.height}"><image href="${png}" width="${p.width}" height="${p.height}"/></svg>`;
    }
-   pages.push({ width: p.width, height: p.height, source: p.source, index: p.index, svg, fonts:documentEmbeddedFonts(p.canvas) });
+   pages.push({ width: p.width, height: p.height, source: p.source, index: p.index, svg, fonts:documentEmbeddedFonts(p.canvas), ocr:ocr?.get(p.id), forms:p.forms });
   }
   finally { await c.dispose(); }
  }

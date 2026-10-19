@@ -5,6 +5,7 @@
 // layer reuses them.
 import {FabricImage,FabricObject,Group} from 'fabric';
 import {applyLayerStyle,effectExtent,hasEffects,type LayerStyle} from './layer-effects';
+import {isAdjustment} from './adjustment-layer';
 
 type Styled=FabricObject&{layerStyle?:LayerStyle;_styleCache?:{key:string;canvas:HTMLCanvasElement;x:number;y:number}};
 const elementIds=new WeakMap<object,number>();let nextId=0;
@@ -53,7 +54,9 @@ export function installLayerStyles(){
 
 // A group's SVG also needs pixels when any descendant has a layer style or
 // painted mask: SVG serialization does not call the canvas render hook above.
-export const needsRasterExport=(o:FabricObject):boolean=>hasEffects((o as Styled).layerStyle)||!!(o.clipPath as {layerMask?:boolean}|undefined)?.layerMask||(o instanceof Group&&o.getObjects().some(needsRasterExport));
+// Adjustments (including masked ones) must stay in the stack until the whole
+// page is flattened. Rasterizing one alone would discard its backdrop.
+export const needsRasterExport=(o:FabricObject):boolean=>!isAdjustment(o)&&(hasEffects((o as Styled).layerStyle)||!!(o.clipPath as {layerMask?:boolean}|undefined)?.layerMask||(o instanceof Group&&o.getObjects().some(needsRasterExport)));
 
 // Include effects on descendants as well as the group's own geometry. Fabric's
 // group bounds omit a child's shadow/glow, and effects scale with the layer.

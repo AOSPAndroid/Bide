@@ -39,3 +39,30 @@ test('small mid-line bullets misread as letters become bullets again',async()=>{
  const l={text:'Salle e Balcon',bbox:{x0:0,x1:130,y0:10,y1:30},words:words.slice(0,3)};
  assert.deepEqual(segmentOcrLine(l).map(g=>g.text),['Salle • Balcon']);
 });
+
+test('Arabic CTC words retain reading order through every OCR grouping mode',async()=>{
+ const {ctcWords,rtlReorder}=await import('../tmp/ai-image.mjs');
+ for(const expected of ['مرحبا بالعالم','عام 2024','ملف PDF']){
+  // The recognizer walks the image left to right; ai-tools decodes each word
+  // but retains its original visual position for segmentation.
+  const visual=rtlReorder(expected),chars=Array.from(visual,(ch,t)=>({ch,t,p:1}));
+  const words=ctcWords(chars,2,chars.length*2).map(w=>word(rtlReorder(w.text),w.x0,w.x1));
+  const l={script:'arabic',text:rtlReorder(visual),bbox:{x0:0,x1:chars.length*2,y0:10,y1:30},words};
+  const before=JSON.stringify(l);
+  for(const mode of ['lines','smart','words']){
+   const groups=segmentOcrLine(l,mode);
+   assert.equal(groups.map(g=>g.text).join(' '),expected,mode+' reads the complete phrase in order');
+   assert.deepEqual(groups.flatMap(g=>g.words).map(w=>w.text),expected.split(' '));
+   for(const g of groups)for(const w of g.words)assert.ok(words.includes(w),'word stays attached to its original box');
+  }
+  assert.equal(JSON.stringify(l),before,'grouping does not mutate visual input');
+ }
+});
+
+test('Arabic smart grouping splits visual gaps and returns groups in reading order',()=>{
+ const l={script:'arabic',text:'AM مرحبا بالعالم',bbox:{x0:10,x1:225,y0:10,y1:30},words:[word('بالعالم',10,70),word('مرحبا',78,120),word('AM',200,225)]};
+ const groups=segmentOcrLine(l);
+ assert.deepEqual(groups.map(g=>g.text),['AM','مرحبا بالعالم']);
+ assert.deepEqual(groups.map(g=>[g.bbox.x0,g.bbox.x1]),[[200,225],[10,120]]);
+ assert.deepEqual(groups[1].words.map(w=>[w.text,w.bbox.x0]),[['مرحبا',78],['بالعالم',10]]);
+});

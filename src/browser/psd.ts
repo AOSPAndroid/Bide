@@ -3,6 +3,7 @@ import { FabricImage, FabricObject, Group, StaticCanvas } from 'fabric';
 import { blankPage, uid, type Page } from '../model';
 
 import { blendModes } from './layer-utils';
+import {isAdjustment} from '../adjustment-layer';
 
 // Limit imports before image allocation. This editor currently operates on 8-bit RGB rasters.
 export function validatePsdHeader(bytes: Uint8Array) {
@@ -23,7 +24,9 @@ export function requiresComposite(psd: Psd): boolean {
   return !!psd.children?.some(advanced);
 }
 export function needsFlattenedPsd(objects:FabricObject[]):boolean {
-  return objects.some(o=>!Object.values(blendModes).includes(o.globalCompositeOperation)||(o instanceof Group&&needsFlattenedPsd(o.getObjects())));
+  // A backdrop adjustment has no standalone raster preview. Until native PSD
+  // adjustment records are written, preserve its appearance in one composite.
+  return objects.some(o=>isAdjustment(o)||!Object.values(blendModes).includes(o.globalCompositeOperation)||(o instanceof Group&&needsFlattenedPsd(o.getObjects())));
 }
 
 export async function importPsd(file: File): Promise<{ page: Page; notice: string }> {
@@ -61,7 +64,7 @@ export async function exportPsd(page: Page): Promise<Blob> {
     const all:FabricObject[]=[];const collect=(o:FabricObject)=>{all.push(o);if(o instanceof Group)o.getObjects().forEach(collect);};objects.forEach(collect);
     if (width * height * (all.length + 2) > 64000000) throw new Error('This layered PSD would use too much memory. Reduce canvas size or merge layers first.');
     const composite = canvas.toCanvasElement(1);
-    if(needsFlattenedPsd(objects))return new Blob([writePsd({width,height,canvas:composite,children:[{name:'Merged appearance (eraser/compositing)',canvas:composite,top:0,left:0}]},{trimImageData:true,noBackground:true})],{type:'image/vnd.adobe.photoshop'});
+    if(needsFlattenedPsd(objects))return new Blob([writePsd({width,height,canvas:composite,children:[{name:'Merged appearance (adjustments/compositing)',canvas:composite,top:0,left:0}]},{trimImageData:true,noBackground:true})],{type:'image/vnd.adobe.photoshop'});
     const state=new Map(all.map(o=>[o,{visible:o.visible,opacity:o.opacity,globalCompositeOperation:o.globalCompositeOperation}]));
     objects.forEach(o=>o.set({visible:false}));canvas.renderAll();
     const background:Layer={name:'Page background',canvas:canvas.toCanvasElement(1),top:0,left:0};canvas.backgroundColor='';

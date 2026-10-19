@@ -2,7 +2,7 @@ import {useEffect,useRef,useState} from 'react';
 import {ModalShell} from './ui-kit';
 import type {MaskOp} from './pixel-mask';
 
-export type SelectionAction='unlock'|'copy'|'paste'|'keep'|'hide'|'layer'|'mask'|'ai-remove'|'subject'|'inverse'|'all'|'color-range'|'deselect'|'feather'|'expand'|'contract'|'smooth';
+export type SelectionAction='unlock'|'copy'|'paste'|'keep'|'hide'|'layer'|'mask'|'ai-remove'|'redact'|'subject'|'inverse'|'all'|'color-range'|'deselect'|'feather'|'expand'|'contract'|'smooth';
 type Props={hasRegion:boolean;busy:boolean;ai:boolean;pdf:boolean;canPaste:boolean;mode:MaskOp;onMode:(mode:MaskOp)=>void;run:(action:SelectionAction,amount?:number)=>void};
 
 const modes:{id:MaskOp;label:string;title:string}[]=[
@@ -37,6 +37,7 @@ export default function SelectionBar({hasRegion,busy,ai,pdf,canPaste,mode,onMode
   <button disabled={!hasRegion} aria-label="Hide inside" title="Hide inside: mask the selected area" onClick={()=>run('hide')}>Hide</button>
   <button disabled={!hasRegion} aria-label="Copy to layer" title="Copy the selected pixels to a new layer" onClick={()=>run('layer')}>To layer</button>
   {ai&&<button disabled={!hasRegion||busy} title="Fill the selection from its surroundings with AI (LaMa). Adds an undoable layer." aria-label="Remove with AI" onClick={()=>run('ai-remove')}>AI remove</button>}
+  <button disabled={!hasRegion||busy} aria-label="Redact selection" title="Redact: permanently remove everything inside the selection (PDF text, image pixels, layers) and leave a black box" onClick={()=>run('redact')}>Redact</button>
   <button onClick={()=>run('deselect')}>Deselect</button>
  </div>;
 }

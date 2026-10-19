@@ -2,7 +2,7 @@
 // used when the browser offers it, otherwise multithreaded WebAssembly on the
 // CPU; a model that fails on WebGPU is reloaded on the CPU.
 import * as ort from 'onnxruntime-web/webgpu';
-type Feeds=Record<string,{data:Float32Array;dims:number[]}>;
+type Feeds=Record<string,{data:Float32Array|BigInt64Array;dims:number[]}>;
 type Loaded={session:ort.InferenceSession;backend:'webgpu'|'wasm'};
 const sessions=new Map<string,Promise<Loaded>>();let base='';
 
@@ -21,7 +21,7 @@ function load(model:string,cpuOnly=false){
 async function run(model:string,feeds:Feeds,cpuOnly=false):Promise<{outputs:Feeds;backend:string}>{
  const {session,backend}=await load(model,cpuOnly);
  try{
-  const result=await session.run(Object.fromEntries(Object.entries(feeds).map(([k,v])=>[k,new ort.Tensor('float32',v.data,v.dims)])));
+  const result=await session.run(Object.fromEntries(Object.entries(feeds).map(([k,v])=>[k,v.data instanceof BigInt64Array?new ort.Tensor('int64',v.data,v.dims):new ort.Tensor('float32',v.data,v.dims)])));
   return {backend,outputs:Object.fromEntries(Object.entries(result).map(([k,t])=>[k,{data:t.data as Float32Array,dims:[...t.dims]}]))};
  }catch(e){if(backend==='webgpu'&&!cpuOnly)return run(model,feeds,true);throw e;}
 }

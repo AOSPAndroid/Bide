@@ -1,3 +1,30 @@
+## v0.8.14 — Searchable documents, forms and advanced editing
+
+- Latest OCR improvements: searchable PDF/TXT/DOCX export, English/French proofreading dictionaries, character confidence, cross-page letter borrowing, faster appearance matching, additional AI OCR alphabets and a high-accuracy detector.
+- Page straightening/orientation and AI flattening; SlimSAM click-based object selection; editable Levels, Curves and Hue/Saturation layers.
+- PDF redaction and Find & redact, existing PDF form filling, new movable text/checkbox/dropdown/radio fields, and fillable or flattened PDF export.
+- Release fixes remove redacted native field values and intersecting vector paths, sanitize retained project PDF sources, honor chosen match occurrences, read current visible text for searchable export, preserve adjustments in masked rendering/PSD fallback, fix Arabic reading order and radio switching.
+- Searchable export reads the current visible composite; the original OCR scan remains only an appearance reference. Rasterized softened/system-font text is OCR'd; native text is not duplicated.
+- Redaction rebuilds project PDF sources from retained pages. Supported form fields are recreated with the export appearance; unsupported widgets flatten. Original form styling/signatures are not preserved through this destructive cleanup. Undo retains originals while the document remains open.
+- Form export supports the bundled Liberation Sans glyphs, including French, Greek and Cyrillic. Other unsupported scripts report a clear font-coverage error rather than silently changing values.
+- Full offline model pack and seven Tesseract languages are bundled in the ZIP. Hosted demo omits Office and AI model assets.
+
+## v0.8.14 details — searchable PDFs, proofreading and letter reuse
+
+- **Make PDF searchable**: PDF export can add an invisible OCR text layer at each line's position, so scanned pages can be searched, copied and read by screen readers. TXT and Word export of scanned pages use the same text. Pages that already have real PDF text are left alone.
+- Code structure: App.tsx's canvas event handlers moved to canvas-events.ts, the command palette and menu commands to editor-commands.ts, and shared types and the tool list to editor-types.ts. Each gets its dependencies through a typed interface generated from the compiler's own types. App.tsx went from 1,421 to 1,118 lines.
+- **Object select (AI)** (A): click an object and SlimSAM (Segment Anything, int8, 14 MB) selects it. Shift-click adds another, Alt-click removes one, and the selection works with every selection action (Keep, Hide, To layer, Redact…). The page is encoded once per version of its layers, starting as soon as the tool is picked; each click then takes a fraction of a second. On a test picture it selected a 200 px circle to within 1% of its area.
+- PDF forms: **Form fields** in page properties lists a PDF's own text fields, checkboxes, dropdowns and radio buttons and fills them in place. **Add form field** (Text, Checkbox, Dropdown, Radio button) adds fields of bide's own, which can be dragged and resized on the page, renamed and given options. Export draws the values into the page, or with **Keep form fields fillable** recreates every field with pdf-lib so the PDF stays fillable, password protection included.
+- Adjustment layers: **Levels**, **Curves** (monotone curve through shadow, midtone and highlight points; drag them on the graph) and **Hue/Saturation**, from the Layer menu or the command palette. Each is a click-through layer that re-processes everything below it whenever the page renders, so the layers underneath stay editable. Opacity weakens the effect and hiding the layer compares before and after. Saved in projects; SVG and PDF export flatten the page to pixels, like blend modes.
+- True redaction: **Redact** on the selection bar, or **Find & redact**, which searches the page's text for words and for email addresses, phone numbers, IBANs (mod-97 checked) and card numbers (Luhn checked); matches are listed to review first. On PDF pages MuPDF removes the text, image pixels and drawings under each box, plus links and annotations touching it, and draws a black box. Every layer under a box is burned in: rasterized with the box painted black, or deleted if it lies entirely inside. Sources no page uses are dropped, so a saved project holds no unredacted copy, and the page's cached OCR text is discarded and rescanned.
+- Straighten before OCR: after a scan, an image page that is tilted (measured from its text lines, without AI, to 0.1°) or turned 90/180/270° (PP-LCNet orientation model) gets a **Straighten** button in the text bar. One undoable step rotates every layer, swaps width and height for quarter turns, and scans again. **Straighten page** in the command palette works on any image page. **Flatten photographed page (AI)** runs UVDoc on the main image layer to remove perspective and page curl; on a test photo it turned "Ivoice total 14 EUR" into "Invoice total 1284 EUR".
+- More alphabets in AI OCR: PP-OCRv5 recognizers for Cyrillic, Greek, Arabic, Korean, and Chinese & Japanese, next to Latin. **Alphabet: Auto** (default) reads Latin and tries the other alphabets when a line comes back unsure, empty or with non-Latin letters. The page's alphabet, once found, is tried first. Arabic is put in reading order with numbers kept as they read. Original-letter editing and spelling stay with the separate-letter Latin, Cyrillic and Greek alphabets. Searchable PDFs carry these alphabets: a Type0 font subset from MuPDF's built-in CJK font, or ActualText for Arabic (about 10 KB per document).
+- **High accuracy** (AI OCR setting) finds text with the PP-OCRv5 server detector, stored with float16 weights (44 MB): better on busy photos, small print and low contrast, but slower.
+- Per-letter confidence: both OCR engines report how sure they are of each character. Letters under 60% are underlined on the page, and the line's tooltip says to check them.
+- Offline spelling suggestions (English and French, Hunspell dictionaries in a worker): the edit dialog offers corrections for doubtful words, including typical OCR confusions such as rn→m, l→I and 0→O. **Proofread** lists every line with a suspect word and fixes it with one click, using the image's own letters.
+- Original-letter edits borrow a missing letter from any line of the same x-height, aligned on the baseline (lines with descenders used to be excluded), and from other pages of the document when this page doesn't have it.
+- Font-text replacement fits size and position on crisp renders first, then tries blur only around the best size, and skips fonts that trail far behind. The matched result is the same as before, 4–8× faster: about 15 s instead of more than 2 minutes in headless Chromium.
+
 ## v0.8.13 — Independent branding and editor improvements
 
 - Original B logo and favicon, warm white/graphite interface, burnt-orange accents, and “Image & Document Editor” tagline. Retired bank logo assets are removed.
@@ -82,17 +109,17 @@ The catalogue includes [organization, conversion, editing, security and intellig
 | PDF to Excel | Missing | No table detection or structured spreadsheet conversion |
 | PDF to PDF/A | Missing | No archival-profile validation or certified conversion |
 | Scan to PDF | Missing | No camera/scanner capture workflow |
-| OCR PDF | Partial | Local offline OCR (English, French, German, Spanish, Italian, Dutch, Portuguese) turns image and scanned-page text into editable text layers; no searchable invisible-text PDF output |
+| OCR PDF | Partial | Local offline OCR (English, French, German, Spanish, Italian, Dutch, Portuguese) turns image and scanned-page text into editable text layers; **Make PDF searchable**: export adds an invisible OCR text layer at each line's position (search, copy, screen readers), also used by TXT/Word export of scanned pages |
 | Repair PDF | Missing | Parser recovery may open some files, but no dedicated repair/recovery workflow |
 | Rotate PDF | Partial | Rotate current page and undo; no multi-document batch rotation panel |
 | Page numbers | Implemented | Editable numbering layers across selected pages; template, start number and header/footer controls |
 | Watermarks | Partial | Batch editable text watermarks with angle, opacity, color and page range; image placement is manual |
 | Crop PDF | Partial | Current-page crop margins with dimension preview and Undo; crop hides content and does not redact it |
 | Edit PDF | Partial | Editable overlays, text, images, shapes and freehand marks; original text is not directly rewritten |
-| PDF forms | Missing | No form-field authoring/detection/filling; exported interactive fields are flattened |
+| PDF forms | Implemented | A PDF's text, checkbox, dropdown and radio fields are listed under Form fields and filled in place (MuPDF). New fields can be added, dragged, resized, renamed and given options. Export flattens the values into the page, or keeps every field fillable (pdf-lib, MIT) |
 | Unlock / protect PDF | Implemented | Known-password import with retry/cancel; AES-256 password PDF export; no password recovery/cracking or permission-policy editor |
 | Sign PDF | Partial | Drawn/typed visual marks only; no certificate signing, signature requests or audit trail |
-| Redact PDF | Missing | Overlay rectangles do not remove underlying content and must not be treated as redaction |
+| Redact PDF | Implemented | Selection or Find & redact (text, emails, phones, IBANs, cards); removes PDF text, image pixels and drawings under the box, burns layers in |
 | Compare PDF | Missing | No visual/text comparison workflow |
 | AI summaries / translation | Missing | No AI model/service integration |
 | PDF to Markdown | Missing | Plain text export does not reconstruct Markdown structure |
@@ -133,7 +160,7 @@ These checks use representative fixtures. They do not establish identical behavi
 
 Both the visual editor and PDF toolkit have equal priority. The numbered groups below organize remaining work; they are not a commitment to finish one product before the other.
 
-1. PDF completeness: proper redaction, embedded-image extraction, searchable OCR PDF output, forms, richer password permissions, and batch crop/image-watermark workflows.
+1. PDF completeness: embedded-image extraction, richer password permissions, and batch crop/image-watermark workflows.
 2. Conversion fidelity: document corpus tests, layout-preserving PDF-to-Office, PDF/A validation and repair workflows.
 3. Raster editing foundation: selections, painted masks, layer effects, advanced brush/retouch tools (content-aware fill, dodge/burn) and color management.
 4. Full PSD/PSB compatibility, smart objects, advanced typography/paths, animation and automation.
@@ -235,7 +262,7 @@ OCR weight defaults to Auto (match strokes), comparing foreground coverage with 
 
 Roboto and Inter are already bundled for offline text and OCR editing. SF Pro, SF Pro Text and SF Pro Display are now offered as installed-font choices in both font menus and the command palette. Apple font files are not bundled or downloaded; use requires a local installation and compliance with Apple licensing. Missing SF Pro fonts report an error recommending bundled Inter instead of silently substituting a different face. Installed-font text retains the existing raster-text PDF/SVG export behavior.
 
-## Unreleased — OCR accuracy, languages and font matching
+## v0.8.14 details — OCR accuracy, languages and font matching
 
 - Small text is enlarged before recognition, based on line height measured from the image (lines under 24 px, up to 3x), and light-on-dark images are inverted. Already-large text is left at native size: enlarging it or stretching contrast measurably hurt accents and ß. PDF pages are rendered for OCR at up to 3600 px. On rendered test text at 72 DPI, character errors fell from about 18% to 0–3% at 9 pt and from about 92% to under 8% at 7 pt.
 - Replacement text color comes from the glyph pixels and the background from a ring around the region, instead of black/white text and a single corner pixel.

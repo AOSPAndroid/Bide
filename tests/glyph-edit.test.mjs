@@ -43,3 +43,11 @@ test('new letters come from the same line, then the page library; missing letter
  assert.equal(planGlyphEdit(text,cells,text),undefined,'no change');
  const spaced=planGlyphEdit(text,cells,'Nom Dal iil Re');assert.ok(spaced.pieces.some(p=>p.blank&&p.x1===4),"new space uses the line's space width");
 });
+
+test('line metrics find the baseline and x-height whatever the descenders',async()=>{
+ const {lineMetrics}=await import('../tmp/glyph-edit.mjs');
+ // Rows: caps/ascenders (light), x-height band (heavy), descenders (light).
+ const plain=[2,2,3,9,10,10,9,0,0];assert.deepEqual(lineMetrics(plain),{xTop:3,baseline:7,xHeight:4});
+ const descending=[2,2,3,9,10,10,9,3,2,2];assert.deepEqual(lineMetrics(descending),{xTop:3,baseline:7,xHeight:4},'descenders do not move the baseline');
+ assert.equal(lineMetrics([0,0]),undefined);
+});
