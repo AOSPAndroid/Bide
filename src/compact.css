@@ -46,6 +46,7 @@
 .text-detection-bar{flex-wrap:nowrap;gap:8px;padding:3px 10px;min-height:30px}
 .text-detection-bar>span{min-width:80px}
 .text-detection-bar button{padding:3px 8px;white-space:nowrap}
+.text-detection-bar .straighten-hint{border-color:var(--accent);color:var(--accent);font-weight:600}
 .ocr-settings{position:relative;flex-shrink:0}
 .ocr-settings>summary{cursor:pointer;list-style:none;border:1px solid var(--line);border-radius:5px;background:white;padding:3px 8px;white-space:nowrap}
 .ocr-settings>summary::-webkit-details-marker{display:none}

@@ -53,6 +53,20 @@
    "sha256": "5039225b9a4ac3df55f185d24b7a92d640c86cc4747002d7f23351e394de03a6",
    "license": "Apache-2.0",
    "source": "https://huggingface.co/Ko033/isnet-general-use-onnx"
+  },
+  "doc-ori.onnx": {
+   "url": "https://huggingface.co/PaddlePaddle/PP-LCNet_x1_0_doc_ori_onnx/resolve/7330ab7039123e46af2dc03154b9969aa412c61d/inference.onnx",
+   "bytes": 6788069,
+   "sha256": "af9a0a4f317ff0709ce752067807f819cb15d883f8ecad89f28df1c6ee2d9c92",
+   "license": "Apache-2.0",
+   "source": "https://huggingface.co/PaddlePaddle/PP-LCNet_x1_0_doc_ori_onnx"
+  },
+  "uvdoc.onnx": {
+   "url": "https://huggingface.co/PaddlePaddle/UVDoc_onnx/resolve/3bcf535371727d11e783101f79a504c68848aae3/inference.onnx",
+   "bytes": 31684150,
+   "sha256": "54cab30dc2cf347b4f3d6971c833b1c3d84f5ef17280f1f6d15796bff20e63d6",
+   "license": "Apache-2.0",
+   "source": "https://huggingface.co/PaddlePaddle/UVDoc_onnx"
   }
  }
 }

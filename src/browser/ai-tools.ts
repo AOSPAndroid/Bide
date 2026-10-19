@@ -118,3 +118,26 @@ export async function segmentSubject(source:HTMLCanvasElement,signal?:AbortSigna
  const values=new Uint8ClampedArray(S*S),range=hi-lo||1;for(let i=0;i<values.length;i++)values[i]=(out[i]-lo)/range*255;
  return {values,width:S,height:S};
 }
+
+// PP-LCNet document orientation: how far the page content is turned clockwise
+// (0, 90, 180 or 270 degrees) and the model's probability for it. The model
+// sees a 224 px centre crop of the page with its short side at 256 px.
+export async function detectOrientation(source:HTMLCanvasElement,signal?:AbortSignal){
+ const k=256/Math.min(source.width,source.height),w=Math.max(224,Math.round(source.width*k)),h=Math.max(224,Math.round(source.height*k));
+ const flat=canvas(w,h),f=context(flat);f.fillStyle='#fff';f.fillRect(0,0,w,h);f.imageSmoothingQuality='high';f.drawImage(source,0,0,w,h);
+ const crop=f.getImageData(Math.floor((w-224)/2),Math.floor((h-224)/2),224,224).data;
+ const out=Object.values(await runModel('doc-ori',{x:{data:toPlanar(crop,224,224,{mean:[.485,.456,.406],std:[.229,.224,.225]}),dims:[1,3,224,224]}},signal))[0].data;
+ let best=0;for(let i=1;i<4;i++)if(out[i]>out[best])best=i;
+ return {turn:([0,90,180,270] as const)[best],confidence:out[best]};
+}
+
+// UVDoc flattens a photographed page (perspective, curl and tilt) to fill the
+// frame. Large photos are processed at up to 2400 px on the long side.
+export async function flattenPage(source:HTMLCanvasElement,signal?:AbortSignal){
+ const k=Math.min(1,2400/Math.max(source.width,source.height)),w=Math.round(source.width*k),h=Math.round(source.height*k);
+ const flat=canvas(w,h),f=context(flat);f.fillStyle='#fff';f.fillRect(0,0,w,h);f.imageSmoothingQuality='high';f.drawImage(source,0,0,w,h);
+ const rgba=f.getImageData(0,0,w,h);
+ const out=Object.values(await runModel('uvdoc',{image:{data:toPlanar(rgba.data,w,h),dims:[1,3,h,w]}},signal))[0],n=w*h;
+ for(let i=0;i<n;i++){for(let c=0;c<3;c++)rgba.data[i*4+c]=Math.max(0,Math.min(255,out.data[c*n+i]*255));rgba.data[i*4+3]=255;}
+ f.putImageData(rgba,0,0);return flat;
+}
