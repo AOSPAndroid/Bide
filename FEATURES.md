@@ -94,7 +94,6 @@ The catalogue includes [organization, conversion, editing, security and intellig
 | PDF to Excel | Missing | No table detection or structured spreadsheet conversion |
 | PDF to PDF/A | Missing | No archival-profile validation or certified conversion |
 | Scan to PDF | Missing | No camera/scanner capture workflow |
-| Redact | Implemented | Selection or Find & redact (text, emails, phones, IBANs, cards); removes PDF text, image pixels and drawings under the box, burns layers in |
 | OCR PDF | Partial | Local offline OCR (English, French, German, Spanish, Italian, Dutch, Portuguese) turns image and scanned-page text into editable text layers; **Make PDF searchable**: export adds an invisible OCR text layer at each line's position (search, copy, screen readers), also used by TXT/Word export of scanned pages |
 | Repair PDF | Missing | Parser recovery may open some files, but no dedicated repair/recovery workflow |
 | Rotate PDF | Partial | Rotate current page and undo; no multi-document batch rotation panel |
@@ -105,7 +104,7 @@ The catalogue includes [organization, conversion, editing, security and intellig
 | PDF forms | Missing | No form-field authoring/detection/filling; exported interactive fields are flattened |
 | Unlock / protect PDF | Implemented | Known-password import with retry/cancel; AES-256 password PDF export; no password recovery/cracking or permission-policy editor |
 | Sign PDF | Partial | Drawn/typed visual marks only; no certificate signing, signature requests or audit trail |
-| Redact PDF | Missing | Overlay rectangles do not remove underlying content and must not be treated as redaction |
+| Redact PDF | Implemented | Selection or Find & redact (text, emails, phones, IBANs, cards); removes PDF text, image pixels and drawings under the box, burns layers in |
 | Compare PDF | Missing | No visual/text comparison workflow |
 | AI summaries / translation | Missing | No AI model/service integration |
 | PDF to Markdown | Missing | Plain text export does not reconstruct Markdown structure |
