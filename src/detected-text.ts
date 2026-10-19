@@ -1,6 +1,6 @@
 // Detecting page text (PDF text layer, else local OCR) and turning a detected
 // region into an editable text layer with a background patch.
-import {FabricImage,Rect,type Canvas,type FabricObject} from 'fabric';
+import {FabricImage,Rect,StaticCanvas,type Canvas,type FabricObject} from 'fabric';
 import {growMask,maskBounds,type Mask} from './pixel-mask';
 import {maskToCanvas} from './selection-canvas';
 import {Textbox,clampTextSoftness} from './text-appearance';
@@ -29,6 +29,24 @@ async function ocrRaster(p:Page,c:Canvas){
  const source=p.source?await previewCanvas(p.source,p.index,Math.min(4,3600/Math.max(p.width,p.height))):pageRaster(c,p.width,p.height,c.getObjects().filter(o=>o instanceof FabricImage),2400);
  const ratio=Math.min(1,3600/Math.max(source.width,source.height)),reduced=document.createElement('canvas');reduced.width=Math.round(source.width*ratio);reduced.height=Math.round(source.height*ratio);
  const ctx=reduced.getContext('2d')!;ctx.fillStyle=p.color==='transparent'?'#ffffff':p.color;ctx.fillRect(0,0,reduced.width,reduced.height);ctx.drawImage(source,0,0,reduced.width,reduced.height);return reduced;
+}
+
+// Text lines for a searchable PDF: OCR of the page's pictures (a scanned PDF
+// page, or the image layers of a design page), in page units. Pages whose PDF
+// already has real text, and pages without pictures, get none.
+export async function searchableText(p:Page,{engine,languages,signal,known}:{engine:'tesseract'|'paddle';languages:string[];signal?:AbortSignal;known?:TextRegion[]}){
+ if(p.source&&(await detectPdfText(p.source,p.index)).regions.length)return [];
+ const c=new StaticCanvas(undefined,{width:p.width,height:p.height});
+ try{
+  await c.loadFromJSON(p.canvas);
+  if(!hasScannableContent(p,c as unknown as Canvas))return [];
+  let regions=known?.filter(r=>r.kind==='ocr');
+  if(!regions?.length){
+   const raster=await ocrRaster(p,c as unknown as Canvas),{recognizeImage}=await import('./browser/ocr');
+   regions=scaleRegions(await recognizeImage(raster,{signal,grouping:'lines',languages,engine}),p.width/raster.width,p.height/raster.height);
+  }
+  return regions.filter(r=>r.text.trim()).map(r=>({text:r.text,left:r.left,top:r.top,width:r.width,height:r.height}));
+ }finally{await c.dispose();}
 }
 
 export function hasScannableContent(p:Page,c:Canvas){return !!p.source||c.getObjects().some(o=>o instanceof FabricImage);}

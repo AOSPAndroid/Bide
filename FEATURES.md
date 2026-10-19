@@ -82,7 +82,7 @@ The catalogue includes [organization, conversion, editing, security and intellig
 | PDF to Excel | Missing | No table detection or structured spreadsheet conversion |
 | PDF to PDF/A | Missing | No archival-profile validation or certified conversion |
 | Scan to PDF | Missing | No camera/scanner capture workflow |
-| OCR PDF | Partial | Local offline OCR (English, French, German, Spanish, Italian, Dutch, Portuguese) turns image and scanned-page text into editable text layers; no searchable invisible-text PDF output |
+| OCR PDF | Partial | Local offline OCR (English, French, German, Spanish, Italian, Dutch, Portuguese) turns image and scanned-page text into editable text layers; no searchable invisible-text PDF output; **Make PDF searchable**: export adds an invisible OCR text layer at each line's position (search, copy, screen readers), also used by TXT/Word export of scanned pages |
 | Repair PDF | Missing | Parser recovery may open some files, but no dedicated repair/recovery workflow |
 | Rotate PDF | Partial | Rotate current page and undo; no multi-document batch rotation panel |
 | Page numbers | Implemented | Editable numbering layers across selected pages; template, start number and header/footer controls |

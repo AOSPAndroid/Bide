@@ -104,3 +104,22 @@ test('native PDF detection retains separate regular and bold faces',async()=>{
  assert.equal(regions.find(r=>r.text.includes('Regular')).bold,false);assert.equal(regions.find(r=>r.text.includes('Bold')).bold,true);
  buffer.destroy();page.destroy();n.destroy();b.destroy();normal.destroy();bold.destroy();doc.destroy();
 });
+
+test('OCR lines become an invisible, searchable text layer at their page positions',async()=>{
+ const blank='<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300"><rect width="400" height="300" fill="#eeeeee"/></svg>';
+ const ocr=[{text:'Invoice total 284,50 €',left:40,top:60,width:220,height:20},{text:'Naïve café (été)',left:40,top:120,width:160,height:16}];
+ const {bytes}=await exportDocument({pages:[{width:400,height:300,index:0,svg:blank,ocr}],title:'Scan',format:'pdf',compression:'lossless',range:'',dpi:144});
+ const doc=mupdf.Document.openDocument(bytes,'application/pdf'),page=doc.loadPage(0),text=page.toStructuredText('preserve-whitespace');
+ try{
+  const plain=text.asText();
+  assert.match(plain,/Invoice total 284,50 €/);assert.match(plain,/Naïve café \(été\)/);
+  // Stretched to the measured width: the first line spans x 40..260 near y 60..80.
+  const json=JSON.parse(text.asJSON()),line=json.blocks.flatMap(b=>b.lines||[]).find(l=>/Invoice/.test(l.text));
+  assert.ok(Math.abs(line.bbox.x-40)<2&&Math.abs(line.bbox.x+line.bbox.w-260)<4,`line box ${JSON.stringify(line.bbox)}`);
+  assert.ok(line.bbox.y>50&&line.bbox.y<75,`line top ${line.bbox.y}`);
+  // Invisible: the page renders exactly as without the layer.
+  const plainPdf=await exportDocument({pages:[{width:400,height:300,index:0,svg:blank}],title:'Scan',format:'pdf',compression:'lossless',range:'',dpi:144});
+  const pix=a=>{const d=mupdf.Document.openDocument(a,'application/pdf'),p=d.loadPage(0),m=p.toPixmap(mupdf.Matrix.identity,mupdf.ColorSpace.DeviceRGB,false,true),s=m.getPixels().slice();m.destroy();p.destroy();d.destroy();return s;};
+  assert.deepEqual(pix(bytes),pix(plainPdf.bytes));
+ }finally{text.destroy();page.destroy();doc.destroy();}
+});

@@ -10,7 +10,29 @@ async function svgToPdf(...args:Parameters<typeof import('./svg-pdf').svgToPdf>)
 
 
 
-export type PageSpec = { width: number; height: number; source?: string; index: number; svg: string; fonts?:Record<string,string> };
+// `ocr` lines (page units, top-left origin) become an invisible text layer, so
+// scanned and image pages can be searched, selected and read aloud.
+export type OcrLine = { text: string; left: number; top: number; width: number; height: number };
+export type PageSpec = { width: number; height: number; source?: string; index: number; svg: string; fonts?:Record<string,string>; ocr?: OcrLine[] };
+
+// Windows-1252 codes for the characters it maps outside Latin-1.
+const cp1252: Record<number, number> = {0x20ac:0x80,0x201a:0x82,0x0192:0x83,0x201e:0x84,0x2026:0x85,0x2020:0x86,0x2021:0x87,0x02c6:0x88,0x2030:0x89,0x0160:0x8a,0x2039:0x8b,0x0152:0x8c,0x017d:0x8e,0x2018:0x91,0x2019:0x92,0x201c:0x93,0x201d:0x94,0x2022:0x95,0x2013:0x96,0x2014:0x97,0x02dc:0x98,0x2122:0x99,0x0161:0x9a,0x203a:0x9b,0x0153:0x9c,0x017e:0x9e,0x0178:0x9f};
+const winAnsi = (cp: number) => (cp >= 0x20 && cp < 0x7f) || (cp >= 0xa0 && cp <= 0xff) ? cp : cp1252[cp] ?? 0x3f;
+// Content-stream commands drawing `lines` as invisible (render mode 3) text,
+// each stretched horizontally to the width the line occupies on the page.
+export function ocrTextCommands(lines: OcrLine[], pageHeight: number, font: mupdf.Font, name = 'OCR') {
+  const out: string[] = [];
+  for (const line of lines) {
+    const text = line.text.replace(/\s+/g, ' ').trim(); if (!text || !(line.width > 0 && line.height > 0)) continue;
+    const size = Math.max(1, line.height * 0.8), cps = Array.from(text, c => c.codePointAt(0)!);
+    const em = cps.reduce((w, cp) => w + font.advanceGlyph(font.encodeCharacter(cp), 0), 0);
+    const scale = em > 0 ? Math.max(1, Math.min(1000, 100 * line.width / (em * size))) : 100;
+    const bytes = cps.map(winAnsi).map(b => b < 0x20 || b > 0x7e || b === 0x28 || b === 0x29 || b === 0x5c ? '\\' + b.toString(8).padStart(3, '0') : String.fromCharCode(b)).join('');
+    const baseline = pageHeight - (line.top + line.height * 0.8);
+    out.push(`BT 3 Tr /${name} ${size.toFixed(2)} Tf ${scale.toFixed(2)} Tz 1 0 0 1 ${line.left.toFixed(2)} ${baseline.toFixed(2)} Tm (${bytes}) Tj ET`);
+  }
+  return out;
+}
 
 export type ExportSpec = { pages: PageSpec[]; title: string; format: string; compression: string; range: string; dpi: number; rotation?: number; password?: string; crop?: { left: number; top: number; right: number; bottom: number } };
 
@@ -216,7 +238,7 @@ export async function compose(spec: ExportSpec) {
 
  if(!spec.pages?.length||spec.pages.length>1000)throw new Error('Choose between 1 and 1000 pages.');
 
- const result=new mupdf.PDFDocument();
+ const result=new mupdf.PDFDocument();let ocrFont:{font:mupdf.Font;ref:mupdf.PDFObject}|undefined;
 
  try {
 
@@ -252,7 +274,9 @@ export async function compose(spec: ExportSpec) {
 
    const rotation=(((spec.rotation||0)%360+360)%360) as mupdf.Rotate;
 
-   const pageObj=result.addPage([0,0,entry.width,entry.height],rotation,{XObject:xobjects},commands.join('\n'));
+   const resources:Record<string,unknown>={XObject:xobjects};
+   if(entry.ocr?.length){ocrFont??={font:new mupdf.Font('Helvetica'),ref:result.addSimpleFont(new mupdf.Font('Helvetica'),'Latin')};resources.Font={OCR:ocrFont.ref};commands.push(...ocrTextCommands(entry.ocr,entry.height,ocrFont.font));}
+   const pageObj=result.addPage([0,0,entry.width,entry.height],rotation,resources as never,commands.join('\n'));
 
    result.insertPage(-1,pageObj);pageObj.destroy();for(const o of Object.values(xobjects))o.destroy();
 
