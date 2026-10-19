@@ -1,14 +1,18 @@
-import {useState} from 'react';
+import {useEffect,useState} from 'react';
+import type {Doubt} from './spelling';
+import {applySuggestion} from './spelling';
+import {doubtfulLetters} from './ocr-regions';
 import {ModalShell} from './ui-kit';
 import type {TextRegion} from './text-regions';
 
 // Edit one detected line: the new text is drawn with the image's own letters
 // when they are all available, otherwise with the OCR font.
 export function EditTextDialog({region,close,apply}:{region:TextRegion;close:()=>void;apply:(text:string)=>void}){
- const [value,setValue]=useState(region.text);
+ const [value,setValue]=useState(region.text),doubts=useDoubts(value,value===region.text?doubtfulLetters(region):[]);
  return <ModalShell title="Edit image text" close={close}>
   <p className="muted">Changed letters are rebuilt from the image's own letters, so the font matches exactly. If a letter does not appear anywhere on the page, the line uses the OCR font instead.</p>
   <label className="stacked-label">Text<input aria-label="New text" value={value} onChange={e=>setValue(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&value!==region.text)apply(value);}}/></label>
+  <DoubtList doubts={doubts} onPick={(d,s)=>setValue(v=>applySuggestion(v,d,s))}/>
   <div className="dialog-actions"><button className="secondary" onClick={close}>Cancel</button><button className="primary" disabled={!value.trim()||value===region.text} onClick={()=>apply(value)}>Apply</button></div>
  </ModalShell>;
 }
@@ -29,5 +33,31 @@ export function FindReplaceDialog({regions,close,apply}:{regions:TextRegion[];cl
   <label className="check-label"><input type="checkbox" checked={matchCase} onChange={e=>setMatchCase(e.target.checked)}/>Match case</label>
   <p className="muted" aria-live="polite">{find?`${matches.length} detected ${matches.length===1?'line contains':'lines contain'} "${find}".`:'Type the text to find in the detected lines.'}{matches.length?' Letters are reused from the image where possible; Undo restores everything.':''}</p>
   <div className="dialog-actions"><button className="secondary" onClick={close}>Cancel</button><button className="primary" disabled={!matches.length||find===replacement} onClick={()=>apply(find,replacement,matchCase)}>Replace all</button></div>
+ </ModalShell>;
+}
+
+// Proofread `text` in the background (spelling worker), again after typing pauses.
+export function useDoubts(text:string,unsure:number[]){
+ const [doubts,setDoubts]=useState<Doubt[]>([]),key=unsure.join(',');
+ useEffect(()=>{let live=true;const t=setTimeout(()=>{void import('./browser/spelling').then(m=>m.proofread(text,unsure)).then(d=>{if(live)setDoubts(d);}).catch(()=>{if(live)setDoubts([]);});},250);return()=>{live=false;clearTimeout(t);};},[text,key]);
+ return doubts;
+}
+
+export function DoubtList({doubts,onPick}:{doubts:Doubt[];onPick:(d:Doubt,replacement:string)=>void}){
+ if(!doubts.length)return null;
+ return <div className="doubts" aria-label="Check spelling"><span className="muted">Check spelling</span>
+  {doubts.map(d=><div key={d.start+d.word} className="doubt"><strong className={d.unsure?'unsure':''} title={d.unsure?'The recognizer was unsure of some letters':'Not in the dictionary'}>{d.word}</strong>
+   {d.suggestions.length?d.suggestions.map(s=><button key={s} onClick={()=>onPick(d,s)} aria-label={`Use ${s}`}>{s}</button>):<span className="muted">no suggestion</span>}</div>)}
+ </div>;
+}
+
+// Every doubtful word on the page, with one-click fixes rebuilt from the image's own letters.
+export function ProofreadDialog({regions,close,apply}:{regions:TextRegion[];close:()=>void;apply:(region:TextRegion,text:string)=>Promise<void>|void}){
+ const ocr=regions.filter(r=>r.kind==='ocr'),[items,setItems]=useState<{region:TextRegion;doubts:Doubt[]}[]|null>(null);
+ useEffect(()=>{let live=true;void import('./browser/spelling').then(async m=>{const out=[];for(const region of ocr){const doubts=await m.proofread(region.text,doubtfulLetters(region));if(doubts.length)out.push({region,doubts});}if(live)setItems(out);}).catch(()=>{if(live)setItems([]);});return()=>{live=false;};},[]);
+ return <ModalShell title="Proofread image text" close={close}>
+  <p className="muted">Words the dictionary does not know, or with letters the recognizer was unsure of. A fix rebuilds the word from the image's own letters; Undo restores it.</p>
+  {items===null?<p className="muted" aria-live="polite">Checking {ocr.length} lines…</p>:items.length?<div className="proofread-list">{items.map(({region,doubts})=><div key={region.id} className="proofread-line"><span className="line-text">{region.text}</span><DoubtList doubts={doubts} onPick={(d,s)=>{void Promise.resolve(apply(region,applySuggestion(region.text,d,s))).then(()=>setItems(list=>list&&list.filter(i=>i.region!==region)));}}/></div>)}</div>:<p className="muted" aria-live="polite">Nothing to check: every word is in the dictionary.</p>}
+  <div className="dialog-actions"><button className="secondary" onClick={close}>Close</button></div>
  </ModalShell>;
 }

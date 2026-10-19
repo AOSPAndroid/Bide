@@ -66,7 +66,7 @@ export function ctcWords(chars:{ch:string;t:number;p:number}[],stepWidth:number,
  return words.map((w,i)=>{
   const prev=words[i-1],next=words[i+1];
   const x0=prev?(prev.last+w.first+1)/2*stepWidth:Math.max(0,(w.first-1)*stepWidth),x1=next?(w.last+next.first+1)/2*stepWidth:Math.min(lineWidth,(w.last+2)*stepWidth);
-  return {text:w.text,x0,x1,confidence:100*w.p.reduce((s,p)=>s+p,0)/w.p.length,centers:w.t.map(t=>(t+.5)*stepWidth)};
+  return {text:w.text,x0,x1,confidence:100*w.p.reduce((s,p)=>s+p,0)/w.p.length,centers:w.t.map(t=>(t+.5)*stepWidth),probs:w.p};
  });
 }
 

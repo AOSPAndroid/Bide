@@ -8,9 +8,9 @@ import {bundledOcrLanguages,defaultOcrLanguages,languageLabel,type OcrLanguage} 
 export type OcrSettings={font:string;style:string;grouping:OcrGrouping;background:ReplacementBackground;color:string;padding:number;thorough:boolean;languages:string[];matchBlur:boolean;engine:'tesseract'|'paddle';aiSharpen:boolean;editMode:'letters'|'font'};
 export const defaultOcrSettings:OcrSettings={font:'Liberation Sans',style:'auto',grouping:'smart',background:'sampled',color:'#ffffff',padding:-1,thorough:false,languages:defaultOcrLanguages,matchBlur:true,engine:'paddle',aiSharpen:false,editMode:'letters'};
 
-type Props={ai:boolean;status:string;regions:TextRegion[];show:boolean;onShow:(show:boolean)=>void;settings:OcrSettings;onChange:(patch:Partial<OcrSettings>)=>void;scanning:boolean;onRescan:()=>void;onConvertAll:()=>void;onFindReplace:()=>void};
+type Props={ai:boolean;status:string;regions:TextRegion[];show:boolean;onShow:(show:boolean)=>void;settings:OcrSettings;onChange:(patch:Partial<OcrSettings>)=>void;scanning:boolean;onRescan:()=>void;onConvertAll:()=>void;onFindReplace:()=>void;onProofread:()=>void};
 
-export default function TextDetectionBar({ai,status,regions,show,onShow,settings,onChange,scanning,onRescan,onConvertAll,onFindReplace}:Props){
+export default function TextDetectionBar({ai,status,regions,show,onShow,settings,onChange,scanning,onRescan,onConvertAll,onFindReplace,onProofread}:Props){
  const [available,setAvailable]=useState<OcrLanguage[]>([]);
  useEffect(()=>{let live=true;void bundledOcrLanguages().then(list=>{if(live)setAvailable(list);});return()=>{live=false;};},[]);
  const ocr=regions.some(r=>r.kind==='ocr'),menu=useRef<HTMLDetailsElement>(null);
@@ -21,6 +21,7 @@ export default function TextDetectionBar({ai,status,regions,show,onShow,settings
   <label><input type="checkbox" checked={show} onChange={e=>onShow(e.target.checked)}/>Edit detected text</label>
   <span title={status}>{status||'Open a page to detect its text'}</span>
   {ocr&&<>
+   <button disabled={scanning} title="List words the dictionary does not know or letters the recognizer was unsure of, with one-click fixes." onClick={onProofread}>Proofread</button>
    <button disabled={scanning} title="Replace a word or phrase everywhere it was detected, in one step." onClick={onFindReplace}>Find & replace</button>
    <button disabled={scanning} title="Replace every detected line with crisp editable text in one step. Undo restores the original." onClick={onConvertAll}>Convert all</button>
   </>}

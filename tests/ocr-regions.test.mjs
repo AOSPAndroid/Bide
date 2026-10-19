@@ -48,3 +48,10 @@ test('a lone digit or currency sign takes the weight of its number',async()=>{
  assert.deepEqual(attachNumberParts(texts,[false,false,false,true,false,false]),[false,false,true,true,true,false]);
  assert.deepEqual(attachNumberParts(['pour','6','adultes'],[false,true,false]),[false,true,false],'no number next to it: unchanged');
 });
+
+test('doubtful letters map to text positions, skipping spaces',async()=>{
+ const {doubtfulLetters}=await import('../tmp/ocr-regions.mjs');
+ const region={text:'Dal iil',glyphs:[{p:.99},{p:.98},{p:.97},{p:.95},{p:.4},{p:.9}]};
+ assert.deepEqual(doubtfulLetters(region),[5]);
+ assert.deepEqual(doubtfulLetters({text:'abc'}),[]);
+});

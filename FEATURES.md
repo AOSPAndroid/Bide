@@ -1,3 +1,11 @@
+## Unreleased — searchable PDFs, proofreading and letter reuse
+
+- **Make PDF searchable**: PDF export can add an invisible OCR text layer at each line's position, so scanned pages can be searched, copied and read by screen readers. TXT and Word export of scanned pages use the same text. Pages that already have real PDF text are left alone.
+- Per-letter confidence: both OCR engines report how sure they are of each character. Letters under 60% are underlined on the page, and the line's tooltip says to check them.
+- Offline spelling suggestions (English and French, Hunspell dictionaries in a worker): the edit dialog offers corrections for doubtful words, including typical OCR confusions such as rn→m, l→I and 0→O. **Proofread** lists every line with a suspect word and fixes it with one click, using the image's own letters.
+- Original-letter edits borrow a missing letter from any line of the same x-height, aligned on the baseline (lines with descenders used to be excluded), and from other pages of the document when this page doesn't have it.
+- Font-text replacement fits size and position on crisp renders first, then tries blur only around the best size, and skips fonts that trail far behind. The matched result is the same as before, 4–8× faster: about 15 s instead of more than 2 minutes in headless Chromium.
+
 ## v0.8.13 — Independent branding and editor improvements
 
 - Original B logo and favicon, warm white/graphite interface, burnt-orange accents, and “Image & Document Editor” tagline. Retired bank logo assets are removed.
@@ -82,7 +90,7 @@ The catalogue includes [organization, conversion, editing, security and intellig
 | PDF to Excel | Missing | No table detection or structured spreadsheet conversion |
 | PDF to PDF/A | Missing | No archival-profile validation or certified conversion |
 | Scan to PDF | Missing | No camera/scanner capture workflow |
-| OCR PDF | Partial | Local offline OCR (English, French, German, Spanish, Italian, Dutch, Portuguese) turns image and scanned-page text into editable text layers; no searchable invisible-text PDF output; **Make PDF searchable**: export adds an invisible OCR text layer at each line's position (search, copy, screen readers), also used by TXT/Word export of scanned pages |
+| OCR PDF | Partial | Local offline OCR (English, French, German, Spanish, Italian, Dutch, Portuguese) turns image and scanned-page text into editable text layers; **Make PDF searchable**: export adds an invisible OCR text layer at each line's position (search, copy, screen readers), also used by TXT/Word export of scanned pages |
 | Repair PDF | Missing | Parser recovery may open some files, but no dedicated repair/recovery workflow |
 | Rotate PDF | Partial | Rotate current page and undo; no multi-document batch rotation panel |
 | Page numbers | Implemented | Editable numbering layers across selected pages; template, start number and header/footer controls |
@@ -133,7 +141,7 @@ These checks use representative fixtures. They do not establish identical behavi
 
 Both the visual editor and PDF toolkit have equal priority. The numbered groups below organize remaining work; they are not a commitment to finish one product before the other.
 
-1. PDF completeness: proper redaction, embedded-image extraction, searchable OCR PDF output, forms, richer password permissions, and batch crop/image-watermark workflows.
+1. PDF completeness: proper redaction, embedded-image extraction, forms, richer password permissions, and batch crop/image-watermark workflows.
 2. Conversion fidelity: document corpus tests, layout-preserving PDF-to-Office, PDF/A validation and repair workflows.
 3. Raster editing foundation: selections, painted masks, layer effects, advanced brush/retouch tools (content-aware fill, dodge/burn) and color management.
 4. Full PSD/PSB compatibility, smart objects, advanced typography/paths, animation and automation.

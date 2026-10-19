@@ -14,3 +14,6 @@ for(const name of await readdir('node_modules/tesseract.js-core'))if(name.endsWi
 for(const code of languages)await cp(`node_modules/@tesseract.js-data/${code}/4.0.0_best_int/${code}.traineddata.gz`,`public/ocr/lang/${code}.traineddata.gz`);
 await writeFile('public/ocr/lang/languages.json',JSON.stringify(languages.map(code=>({code,name:available[code]})))+'\n');
 await cp('node_modules/tesseract.js/LICENSE.md','public/licenses/tesseract-LICENSE.txt');await cp('node_modules/tesseract.js-core/LICENSE','public/licenses/tesseract-core-LICENSE.txt');
+// Spelling dictionaries for OCR proofreading (Hunspell format, read by nspell).
+await mkdir('public/ocr/spell',{recursive:true});
+for(const [code,pkg] of [['en','dictionary-en'],['fr','dictionary-fr']]){for(const ext of ['aff','dic'])await cp(`node_modules/${pkg}/index.${ext}`,`public/ocr/spell/${code}.${ext}`);await cp(`node_modules/${pkg}/license`,`public/licenses/${pkg}-LICENSE.txt`);}

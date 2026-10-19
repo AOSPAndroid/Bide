@@ -1,6 +1,6 @@
 export type OcrGrouping='smart'|'words'|'lines';
 type Box={x0:number;y0:number;x1:number;y1:number};
-type Word={text:string;bbox:Box;confidence?:number;chars?:{ch:string;x0:number;x1:number}[]};
+type Word={text:string;bbox:Box;confidence?:number;chars?:{ch:string;x0:number;x1:number;p?:number}[]};
 export type OcrGroup=Word&{words:Word[]};
 // Specks, borders and icons come back as low-confidence punctuation-only "words".
 const noise=(w:Word)=>(w.confidence??100)<25&&!/[\p{L}\p{N}]/u.test(w.text);

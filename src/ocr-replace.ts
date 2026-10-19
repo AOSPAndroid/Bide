@@ -6,16 +6,16 @@ import type {Textbox} from './text-appearance';
 import type {Page} from './model';
 import type {TextRegion} from './text-regions';
 import type {OcrSettings} from './TextDetectionBar';
-import {detectedTextbox,matchedDetectedTextbox,coverOcrText,pageInkLevel,glyphEditPatch} from './detected-text';
+import {detectedTextbox,matchedDetectedTextbox,coverOcrText,pageInkLevel,glyphEditPatch,type LetterSource} from './detected-text';
 
 export type OcrEdit={region:TextRegion;text?:string};
 
 // Everything is rendered before the page is touched; `apply` then adds the
 // result to the page's serialized objects (clearing the background under
 // font-rendered lines first), so the caller can commit it as one undo step.
-export async function planOcrReplacement(c:Canvas,page:Page,items:OcrEdit[],{settings,pageRegions,others,letters,autoFont}:{settings:OcrSettings;pageRegions:TextRegion[];others:TextRegion[];letters:boolean;autoFont:boolean}){
+export async function planOcrReplacement(c:Canvas,page:Page,items:OcrEdit[],{settings,pageRegions,others,letters,autoFont,otherPages=[]}:{settings:OcrSettings;pageRegions:TextRegion[];others:TextRegion[];letters:boolean;autoFont:boolean;otherPages?:LetterSource[]}){
  const patches:FabricObject[]=[],fonts:OcrEdit[]=[];
- for(const item of items){const patch=letters&&item.text!==undefined?await glyphEditPatch(c,page,item.region,item.text,pageRegions):undefined;if(patch)patches.push(patch);else fonts.push(item);}
+ for(const item of items){const patch=letters&&item.text!==undefined?await glyphEditPatch(c,page,item.region,item.text,pageRegions,otherPages):undefined;if(patch)patches.push(patch);else fonts.push(item);}
  const transparent=fonts.length>0&&settings.background==='transparent';
  if(transparent&&page.source)throw new Error('Unlock Original PDF first to clear scanned text to transparency.');
  // Single edits (including missing-letter fallbacks) keep the native-pixel
