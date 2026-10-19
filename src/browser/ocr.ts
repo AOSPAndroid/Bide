@@ -40,8 +40,8 @@ export async function recognizeImage(image:HTMLCanvasElement,{signal,grouping='s
   if(ocrEngine==='paddle'){
    // PaddleOCR (bundled AI models) reads the original pixels; its Latin model
    // covers all bundled languages at once, other alphabets have their own.
-   onProgress?.(0,'Loading AI OCR');const {paddleOcr}=await import('./ai-tools');
-   lines=(await paddleOcr(image,f=>onProgress?.(f,'Recognizing text (AI)'),signal,{script,accurate})).filter(l=>l.confidence>=35);
+   onProgress?.(0,'Loading AI OCR models');const {paddleOcr}=await import('./ai-tools');
+   lines=(await paddleOcr(image,(f,label)=>onProgress?.(f,label||'Recognizing text (AI)'),signal,{script,accurate})).filter(l=>l.confidence>=35);
   }else{
   onProgress?.(0,'Preparing image');
   let pass=0;const passes=thorough?2:1;

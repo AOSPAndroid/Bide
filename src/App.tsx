@@ -757,6 +757,21 @@ export default function App() {
     } catch(e) { fail(e); } finally { setBusy(''); }
   }
   function openFiles(append = false) { importMode.current = append ? 'append' : 'open'; fileInput.current?.click(); }
+  async function tryOcrExample(){
+    setBusy('Preparing OCR example…');
+    try{
+      await ensureFont('Liberation Sans');
+      const sample=document.createElement('canvas');sample.width=850;sample.height=320;
+      const ctx=sample.getContext('2d')!;ctx.fillStyle='#f8f7f4';ctx.fillRect(0,0,850,320);ctx.fillStyle='#25272d';
+      ctx.font='bold 42px "Liberation Sans"';ctx.fillText('Bonjour Martinn',42,82);
+      ctx.font='32px "Liberation Sans"';ctx.fillText('Réunion prévue lundi à 10 heures.',42,156);
+      ctx.font='28px "Liberation Sans"';ctx.fillStyle='#686b74';ctx.fillText('Document de démonstration',42,222);
+      const blob=await new Promise<Blob|null>(resolve=>sample.toBlob(resolve,'image/png'));if(!blob)throw new Error('The example image could not be created.');
+      selectWorkspace('photo');setShowDetectedText(true);
+      await importFiles([new File([blob],'OCR example.png',{type:'image/png'})],true);
+      notify('Example added. Click the detected “Martinn” text and change it to “Martin”.');
+    }catch(error){fail(error);}finally{setBusy('');}
+  }
   async function runExport(options?: { targetId?: string; format?: string; rotation?: number; range?: string; reimport?: boolean; crop?: CropMargins }) {
     const targetId = options?.targetId || pageId;
     setBusy(options?.reimport ? 'Updating page…' : 'Preparing your export…');
@@ -1048,7 +1063,7 @@ export default function App() {
     <input ref={projectInput} type="file" accept=".bide,.folio" hidden onChange={e=>{ if(e.target.files?.[0]) void loadProject(e.target.files[0]); e.target.value=''; }}/>
     <header className="topbar"><div className="brand"><img className="brand-logo" src="./brand-logo.svg" alt="bide B logo"/><div className="brand-lockup"><span>bide</span><small>Image &amp; Document Editor</small></div><span className="beta">{PUBLIC_DEMO?'DEMO':'LOCAL'}</span></div><WorkspaceNav active={view} onSelect={selectWorkspace}/><nav className="menubar" aria-label="Application menu" style={{display:view!=='diagrams'?undefined:'none'}}>{Object.keys(menus).map(label=><div className="menu-wrapper" key={label}><button className={menu===label?'open':''} onClick={()=>setMenu(menu===label?null:label)}>{label}</button>{menu===label && <div className="dropdown">{menus[label].map(name=>{const a=[...actions,...moreActions].find(a=>a.label===name)!;return <button key={name} onClick={()=>{setMenu(null);setPdfHome(false);a.run();}}><a.icon size={14}/><span>{name}</span><kbd>{a.hint}</kbd></button>;})}</div>}</div>)}</nav><div className="topbar-right"><button className="command-button" onClick={()=>{setPalette(true);setQuery('');setCommandIndex(0);}}><Search size={14}/><span>Find a tool…</span><kbd>Ctrl K</kbd></button><span className="local-status" title="Files stay on this computer"><span/>On your device</span></div></header>
     {menu && <div className="menu-dismiss" onClick={()=>setMenu(null)}/>}
-    {PUBLIC_DEMO&&!demoHidden&&<div className="demo-notice"><span>Public demo · Files stay in your browser. Office conversion is in the local edition.</span><a href={DOWNLOAD_URL}>Download bide</a><a href="https://github.com/AOSPAndroid/Bide" target="_blank" rel="noreferrer">Source</a><button className="demo-close" aria-label="Hide demo notice" onClick={hideDemo}><X size={13}/></button></div>}
+    {PUBLIC_DEMO&&!demoHidden&&<div className="demo-notice"><span>AI OCR available · Models download when needed. Files stay in your browser. Office: local edition.</span><button className="demo-try-ocr" disabled={!!busy} onClick={()=>void tryOcrExample()}>Try OCR</button><a href={DOWNLOAD_URL}>Download bide</a><a href="https://github.com/AOSPAndroid/Bide" target="_blank" rel="noreferrer">Source</a><button className="demo-close" aria-label="Hide demo notice" onClick={hideDemo}><X size={13}/></button></div>}
     {!PUBLIC_DEMO && health.ok && !health.office && <div className="hosting-notice" role="status">{!globalThis.isSecureContext ? 'HTTP sharing: editing is available. Use trusted HTTPS for Office conversion and reliable downloads; browsers may block HTTP downloads.' : 'Office conversion is unavailable. Ask the host to enable the hosting settings in HOSTING.md.'}</div>}
     <div className="editor-shell" style={{display:view!=='diagrams'&&!(view==='pdf'&&pdfHome)?'flex':'none'}}>
     <div className="command-strip"><div className="document-bar"><div className="document-name"><FileText size={16}/><input aria-label="Document name" value={project.name} onChange={e=>commit({...project,name:e.target.value})}/><span className="save-state">{saved?<><Check size={12}/>Saved locally</>:<><span className="unsaved-dot"/>Editing</>}</span></div><div className="document-actions"><button className="secondary open-document" onClick={()=>openFiles()} title="Open files (Ctrl O)"><FolderOpen size={15}/><span className="btn-label">Open files</span></button><button className="secondary save-project" onClick={saveProject} title="Download an editable .bide project (Ctrl S)"><Save size={15}/><span className="btn-label">Save project</span></button><span className="divider"/><IconButton icon={Undo2} label="Undo (Ctrl Z)" onClick={()=>undo()} disabled={!history.current.past.length}/><IconButton icon={Redo2} label="Redo (Ctrl Shift Z)" onClick={()=>undo(true)} disabled={!history.current.future.length}/><span className="divider"/><button className="secondary toolkit-btn" onClick={()=>view==='pdf'?selectWorkspace('pdf'):imageInput.current?.click()}>{view==='pdf'?<><SlidersHorizontal size={15}/><span className="btn-label">All PDF tools</span></>:<><ImagePlus size={15}/><span className="btn-label">Place image</span></>}</button><button className="primary" onClick={()=>exportDialog()}><Download size={15}/><span className="btn-label">Export</span><ChevronDown size={13}/></button></div></div>

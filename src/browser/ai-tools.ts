@@ -1,9 +1,10 @@
 // Real-ESRGAN upscaling, LaMa inpainting and PaddleOCR recognition on canvases.
 import {runModel} from './ai';
+import type {ModelProgress} from './ai-models';
 import {segmentGlyphs,type Glyph} from '../glyph-edit';
 import {tilePlan,toPlanar,dbBoxes,ctcDecode,ctcWords,trimToInk,growToInk,inkBand,inpaintWindows,resizeBilinear,snapToGap,rtlReorder,separateLetters,ocrScripts,pickMask,type Rect,type OcrScript} from '../ai-image';
 
-type Progress=(fraction:number)=>void;
+type Progress=(fraction:number,label?:string)=>void;
 const canvas=(width:number,height:number)=>Object.assign(document.createElement('canvas'),{width,height});
 const context=(c:HTMLCanvasElement)=>c.getContext('2d',{willReadFrequently:true})!;
 function scaled(source:CanvasImageSource,sx:number,sy:number,sw:number,sh:number,width:number,height:number,quality:ImageSmoothingQuality='high'){
@@ -69,10 +70,11 @@ const sureRead=.8;
 // the first unsure lines are tried with every alphabet, and the page's
 // alphabet, once found, is tried first for the rest.
 export async function paddleOcr(source:HTMLCanvasElement,onProgress?:Progress,signal?:AbortSignal,{script='auto',accurate=false}:{script?:OcrScript|'auto';accurate?:boolean}={}):Promise<AiOcrLine[]>{
+ const loading=(p:ModelProgress)=>onProgress?.(0,p.stage==='download'?`Downloading OCR model · ${(p.loaded/1e6).toFixed(1)} / ${(p.total/1e6).toFixed(1)} MB`:p.stage==='verify'?'Checking OCR model':'Preparing OCR model');
  const {width,height}=source,src=context(source).getImageData(0,0,width,height);
  const scale=Math.min(1,1600/Math.max(width,height)),dw=Math.max(32,Math.round(width*scale/32)*32),dh=Math.max(32,Math.round(height*scale/32)*32);
  const detInput={data:resizeBilinear(src.data,width,height,dw,dh)};
- const prob=(await runModel(accurate?'ppocr-det-server':'ppocr-det',{x:{data:toPlanar(detInput.data,dw,dh,{mean:[.485,.456,.406],std:[.229,.224,.225],bgr:true}),dims:[1,3,dh,dw]}},signal));
+ const prob=(await runModel(accurate?'ppocr-det-server':'ppocr-det',{x:{data:toPlanar(detInput.data,dw,dh,{mean:[.485,.456,.406],std:[.229,.224,.225],bgr:true}),dims:[1,3,dh,dw]}},signal,loading));
  const boxes=dbBoxes(Object.values(prob)[0].data,dw,dh),lines:AiOcrLine[]=[];onProgress?.(.1);
  let pageScript:OcrScript|undefined=script==='auto'?undefined:script,probes=0;
  for(const [k,b] of boxes.entries()){
@@ -85,7 +87,7 @@ export async function paddleOcr(source:HTMLCanvasElement,onProgress?:Progress,si
   for(let y=0;y<h;y++)region.set(src.data.subarray(((y0+y)*width+x0)*4,((y0+y)*width+x1)*4),y*w*4);
   const input=toPlanar(resizeBilinear(region,w,h,rw,48),rw,48,{mean:[.5,.5,.5],std:[.5,.5,.5],bgr:true});
   const read=async(s:OcrScript)=>{
-   const dict=await dictionary(s),out=Object.values(await runModel(`ppocr-${s}-rec`,{x:{data:input.slice(),dims:[1,3,48,rw]}},signal))[0];
+   const dict=await dictionary(s),out=Object.values(await runModel(`ppocr-${s}-rec`,{x:{data:input.slice(),dims:[1,3,48,rw]}},signal,loading))[0];
    const [,steps,classes]=out.dims;return {script:s,steps,...ctcDecode(out.data,steps,classes,dict)};
   };
   let best=await read(pageScript??'latin');

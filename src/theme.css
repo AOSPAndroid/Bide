@@ -152,6 +152,7 @@ h1,h2,.brand {color:var(--ink)}
 .demo-notice {display:flex;align-items:center;gap:14px;flex-shrink:0;padding:9px 18px;background:var(--accent-soft);border-bottom:1px solid var(--line);color:var(--ink);font-size:12px;line-height:1.5}
 .demo-notice>span {flex:1}
 .demo-notice a {color:var(--accent);white-space:nowrap;text-underline-offset:3px}
+.demo-try-ocr {color:var(--accent);font:inherit;font-weight:650;white-space:nowrap;padding:2px 7px;border:1px solid currentColor;border-radius:4px}
 .pdf-home {flex:1;min-height:0;overflow:auto;background:var(--soft)}
 .pdf-home-content {max-width:1230px;margin:0 auto;padding:44px 40px 95px}
 .pdf-home-heading {display:flex;justify-content:space-between;align-items:center;gap:35px;margin-bottom:34px}
