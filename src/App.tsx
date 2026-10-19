@@ -4,49 +4,48 @@ import TextDetectionBar,{defaultOcrSettings,type OcrSettings} from './TextDetect
 import {searchableText,hasScannableContent,scanPageText,matchedDetectedTextbox,coverOcrText,aiRemoveSelection,aiSharpenImage,pageComposite} from './detected-text';
 import SelectionBar,{ColorRangeDialog,type SelectionAction} from './SelectionBar';
 import LayerStylePanel from './LayerStylePanel';
-import Rulers,{GuideLayer,snapToGuides,type Guides} from './Rulers';
+import Rulers,{GuideLayer,type Guides} from './Rulers';
 import {ImageSizeDialog,CanvasSizeDialog,type Anchor as CanvasAnchor} from './CanvasDialogs';
 import PerspectiveEditor from './PerspectiveEditor';
 import HistoryPanel from './HistoryPanel';
 import {historyLabel} from './history-labels';
-import {penPathData,withHandles,nearPoint,type Anchor as PenAnchor} from './pen-path';
-import {effectDefaults,effectLabels,type EffectName,type LayerStyle} from './layer-effects';
-import {gradientLayer,bucketFill,createMaskBrush} from './paint-tools';
-import {createMask,combineMasks,invertMask,featherMask,growMask,smoothMask,floodSelect,colorRangeMask,maskOutline,maskOpFor,maskBounds,maskArea,type Mask,type MaskOp} from './pixel-mask';
-import {polygonMask,samplePage,layerPixelsMask,scaledMask,maskedCutout,layerMaskFromPage,hasLayerMask,maskSize,blankLayerMask,invertLayerMask} from './selection-canvas';
+import {penPathData,type Anchor as PenAnchor} from './pen-path';
+import {effectDefaults,type EffectName,type LayerStyle} from './layer-effects';
+import {createMask,combineMasks,invertMask,featherMask,growMask,smoothMask,colorRangeMask,maskOutline,maskBounds,maskArea,type Mask,type MaskOp} from './pixel-mask';
+import {polygonMask,samplePage,scaledMask,maskedCutout,layerMaskFromPage,hasLayerMask,maskSize,blankLayerMask,invertLayerMask} from './selection-canvas';
 import {planOcrReplacement,lettersNote,type OcrEdit} from './ocr-replace';
 import {readDataUrl,parseProject,imageFilePage,exportPayload} from './project-io';
 import {EditTextDialog,FindReplaceDialog,ProofreadDialog,findMatches,replaceText} from './TextEditDialogs';
 import {Textbox} from './text-appearance';
 import {unlockPdfPage} from './pdf-layer';
 import {thumbnailScale,editorPreviewScale} from './render-budget';
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
-import { Canvas, Rect, Ellipse, Line, FabricImage, FabricObject, PencilBrush, Path, Group, ActiveSelection, filters, controlsUtils, util, Point } from 'fabric';
-import { MousePointerClick, LassoSelect, SquareDashed, Wand2, PaintBucket, Blend, Brush, PenTool, Crop, Ruler, History as HistoryIcon, ArrowDown, ArrowUp, ArrowUpRight, Bold, Check, ChevronDown, ChevronLeft, ChevronRight, Circle, Command, Copy, Download, Eraser, Eye, EyeOff, FileImage, FilePlus2, FileText, FolderOpen, GripVertical, Hand, Highlighter, ImagePlus, Italic, Layers, LockKeyhole, Maximize, Merge, Minus, MoreHorizontal, MousePointer2, PanelLeftClose, PenLine, Plus, Redo2, RotateCw, Save, Scaling, Scissors, Search, Settings2, ShieldCheck, SlidersHorizontal, Sparkles, Square, Trash2, Type, Underline, Undo2, UnlockKeyhole, X, ZoomIn } from 'lucide-react';
-import { autosave, blankPage, demoProject, download, restoreLocal, safeName, uid, type Page, type Project } from './model';
+import {useEffect,useLayoutEffect,useRef,useState} from 'react';
+import {Canvas,Rect,Ellipse,FabricImage,FabricObject,PencilBrush,Path,Group,ActiveSelection,filters,controlsUtils,util,Point} from 'fabric';
+import {History as HistoryIcon,ArrowDown,ArrowUp,ArrowUpRight,Bold,Check,ChevronDown,Command,Copy,Download,Eye,EyeOff,FileImage,FileText,FolderOpen,GripVertical,ImagePlus,Italic,Layers,LockKeyhole,Maximize,Merge,Minus,MoreHorizontal,PanelLeftClose,PenLine,Plus,Redo2,Save,Scaling,Scissors,Search,Settings2,ShieldCheck,SlidersHorizontal,Sparkles,Square,Trash2,Type,Underline,Undo2,UnlockKeyhole,X} from 'lucide-react';
+import {autosave,blankPage,demoProject,download,restoreLocal,safeName,uid,type Page,type Project} from './model';
 import Signature from './Signature';
-import { engineHealth, restoreSources, importDocument, exportInBrowser, detectPdfText, removePdfText, pagePreview, fontSupportsText, findPdfText, redactPdf, pdfFormFields, fillPdfField } from './browser/engine';
+import {engineHealth,restoreSources,importDocument,exportInBrowser,removePdfText,pagePreview,fontSupportsText,findPdfText,redactPdf,pdfFormFields,fillPdfField} from './browser/engine';
 import PDFPreview from './browser/PDFPreview';
-import { StampForm, CropForm, PasswordForm, type StampOptions, type CropMargins } from './DocumentTools';
-import { selectPages } from './page-range';
-import { blendModes } from './browser/layer-utils';
-import Diagrams, {type DiagramCommands, type NativeDiagramCommand} from './Diagrams';
-import {clampZoom, fitZoom, markerColor} from './editor-tools';
-import {searchCommands, commandMetadata, type SearchableCommand} from './command-search';
+import {StampForm,CropForm,PasswordForm,type StampOptions,type CropMargins} from './DocumentTools';
+import {selectPages} from './page-range';
+import {blendModes} from './browser/layer-utils';
+import Diagrams,{type DiagramCommands,type NativeDiagramCommand} from './Diagrams';
+import {clampZoom,fitZoom,markerColor} from './editor-tools';
+import {searchCommands,commandMetadata} from './command-search';
 import WorkspaceNav from './WorkspaceNav';
 import {IconButton,Field,ModalShell} from './ui-kit';
 import {type Workspace} from './WorkspaceDock';
-import PdfWorkspace, {type PdfTool} from './PdfWorkspace';
-import {PUBLIC_DEMO, DOWNLOAD_URL} from './build-flags';
-import {bundledFonts, systemFonts} from './font-catalog';
-import {ensureFont, ensureDocumentFonts, ensureEmbeddedFont} from './fonts';
-import {rectanglePoints, type SelectionPoint} from './selection-mask';
-import {makeBrush, makeEraserStroke, brushWidth, brushNames, type BrushKind} from './brushes';
+import PdfWorkspace,{type PdfTool} from './PdfWorkspace';
+import {PUBLIC_DEMO,DOWNLOAD_URL} from './build-flags';
+import {bundledFonts,systemFonts} from './font-catalog';
+import {ensureFont,ensureDocumentFonts} from './fonts';
+import {type SelectionPoint} from './selection-mask';
+import {makeBrush,brushWidth,brushNames,type BrushKind} from './brushes';
 import PageMenu from './PageMenu';
 import WarpEditor from './WarpEditor';
 import {pdfFallbackStyle,type TextRegion} from './text-regions';
 import DesignTools,{type ColorStyle} from './DesignTools';
-import {framePresets,layoutLabels,layoutOffsets,type LayoutAction} from './design-layout';
+import {framePresets,layoutOffsets,type LayoutAction} from './design-layout';
 import {pageRaster,trimRaster,rasterLayer} from './retouch-canvas';
 import {detectTilt,tiltLabel,type Tilt} from './browser/straighten';
 import {burnRedactions} from './redact-canvas';
@@ -60,18 +59,9 @@ import {newField,type FormField,type FormFieldType,type PdfFormField} from './fo
 import {createRetouchController} from './retouch-controller';
 import {useWorkspaceTools} from './workspace-tools';
 
-type Obj = FabricObject & { layerStyle?:LayerStyle; textSoftness?:number; pdfFontData?:string;pdfOriginalFont?:string;pdfFontFallback?:string;pdfFontBold?:boolean;pdfFontItalic?:boolean;recognizedKey?:string; id?: string; name?: string; diagramXml?: string; text?: string; fontSize?: number; fontFamily?: string; fontWeight?: string | number; fontStyle?: string; underline?: boolean; textAlign?: string; isEditing?: boolean };
-type Tool = 'select' | 'pen' | 'crop' | 'wand' | 'object' | 'gradient' | 'bucket' | 'mask' | 'text' | 'rect' | 'ellipse' | 'line' | 'brush' | 'highlight' | 'eraser' | 'marquee' | 'lasso' | 'hand' | 'clone' | 'heal' | 'zoom';
-type PaletteAction = SearchableCommand & {hint:string;icon:typeof Type;run:()=>void};
-type Modal = 'imagesize' | 'canvassize' | 'new' | 'export' | 'signature' | 'shortcuts' | 'resize' | 'watermark' | 'numbers' | 'crop' | null;
-const TOOLS: { id: Tool; label: string; key: string; icon: typeof Type }[] = [
-  {id:'zoom',label:'Zoom tool',key:'Z',icon:ZoomIn},
-  {id:'clone',label:'Clone Stamp',key:'S',icon:Copy},{id:'heal',label:'Healing Brush',key:'J',icon:Sparkles},
-  { id: 'select', label: 'Move & select', key: 'V', icon: MousePointer2 }, { id: 'crop', label: 'Crop', key: 'C', icon: Crop }, { id: 'pen', label: 'Pen', key: 'P', icon: PenTool }, { id: 'wand', label: 'Magic wand', key: 'W', icon: Wand2 }, { id: 'object', label: 'Object select (AI)', key: 'A', icon: MousePointerClick }, { id: 'text', label: 'Text box', key: 'T', icon: Type },
-  { id: 'rect', label: 'Rectangle', key: 'R', icon: Square }, { id: 'ellipse', label: 'Ellipse', key: 'O', icon: Circle },
-  { id: 'line', label: 'Line', key: 'U', icon: Minus }, { id: 'brush', label: 'Brush', key: 'B', icon: PenLine },
-  { id: 'highlight', label: 'Highlight', key: 'H', icon: Highlighter }, { id: 'gradient', label: 'Gradient', key: 'G', icon: Blend }, { id: 'bucket', label: 'Paint bucket', key: 'K', icon: PaintBucket }, { id: 'mask', label: 'Mask brush', key: 'Q', icon: Brush }, { id: 'eraser', label: 'Eraser', key: 'E', icon: Eraser }, { id:'marquee',label:'Rectangular selection',key:'M',icon:SquareDashed }, { id:'lasso',label:'Lasso selection',key:'L',icon:LassoSelect }, { id: 'hand', label: 'Pan', key: 'Space', icon: Hand },
-];
+import {TOOLS,type Obj,type Tool,type PaletteAction,type Modal} from './editor-types';
+import {attachCanvasEvents} from './canvas-events';
+import {editorCommands} from './editor-commands';
 
 export default function App() {
   const [view, setView] = useState<Workspace>(()=>PUBLIC_DEMO && window.innerWidth<700 ? 'pdf' : 'photo');
@@ -347,136 +337,9 @@ export default function App() {
   useEffect(() => {
     const c = new Canvas(canvasEl.current!, { preserveObjectStacking: true, selection: true, backgroundColor: '', stopContextMenu: true });
     canvas.current = c;
-    retouch.current=createRetouchController(c,()=>({...retouchSettings.current,target:retouchTarget.current}),()=>{saveCanvasRef.current();syncSelection();},notify,uid);
-    c.on('selection:created', syncSelection); c.on('selection:updated', syncSelection); c.on('selection:cleared', syncSelection);
-    c.on('object:modified', () => saveCanvasRef.current());
-    c.on('text:editing:exited', e => {saveCanvasRef.current();void validateTextFont(e.target as Obj);});
-    let textTimer: ReturnType<typeof setTimeout>;
-    c.on('text:changed', () => { clearTimeout(textTimer); textTimer = setTimeout(() => saveCanvasRef.current(), 400); });
-    c.on('path:created', e => { const erase=toolRef.current==='eraser'; if(erase)makeEraserStroke(e.path); Object.assign(e.path, {id:uid(),name:erase?'Eraser stroke':toolRef.current==='highlight'?'Freehand highlight':'Brush stroke'}); c.requestRenderAll(); saveCanvasRef.current(); });
-    c.on('object:moving', e => {
-      if (!snapRef.current || e.e.altKey) return;
-      const o = e.target, p = projectRef.current.pages.find(p => p.id === pageIdRef.current)!;
-      if (!p) return;
-      if(p.guides){const b=o.getBoundingRect(),d=snapToGuides(b,p.guides,6/zoomRef.current);if(d.x)o.set('left',o.left+d.x);if(d.y)o.set('top',o.top+d.y);}
-      const center = o.getCenterPoint();
-      if (Math.abs(center.x - p.width / 2) < 5) o.set('left', o.left + p.width / 2 - center.x);
-      if (Math.abs(center.y - p.height / 2) < 5) o.set('top', o.top + p.height / 2 - center.y);
-      if (Math.abs(o.left) < 5) o.set('left', 0);
-      if (Math.abs(o.top) < 5) o.set('top', 0);
-    });
-    let zoomDrag:{x:number;y:number;initial:number;out:boolean;dragged:boolean}|null=null;
-    let selectionDrag:{id:string;points:SelectionPoint[];op:MaskOp;base:typeof region;baseOutline?:string}|null=null;
-    let gradientDrag:{start:SelectionPoint;line:Line}|null=null,maskStroke:ReturnType<typeof createMaskBrush>|null=null,cropStart:SelectionPoint|null=null;
-    let origin = { x: 0, y: 0 }, shape: Obj | null = null;
-    let pan: { x: number; y: number; left: number; top: number } | null = null;
-    c.on('mouse:dblclick',()=>{if(toolRef.current==='pen'&&penRef.current&&penRef.current.anchors.length>2)finishPenRef.current(false);});
-    c.on('contextmenu', e=>{
-      if(loading.current)return;const skip=c.skipTargetFind;c.skipTargetFind=false;
-      let target;try{target=c.findTarget(e.e as MouseEvent).target;}finally{c.skipTargetFind=skip;}
-      if(target)openLayerMenu(target as Obj,(e.e as MouseEvent).clientX,(e.e as MouseEvent).clientY);else setLayerMenu(null);
-    });
-    c.on('mouse:down', e => {
-      if (loading.current) return;
-      if((e.e as MouseEvent).button>0)return;
-      const t = toolRef.current;
-      if(t==='zoom'){const event=e.e as MouseEvent;if(event.button!==0)return;zoomDrag={x:event.clientX,y:event.clientY,initial:zoomRef.current,out:zoomOutRef.current!==!!event.altKey,dragged:false};return;}
-      if(retouch.current?.down({x:e.scenePoint.x,y:e.scenePoint.y},!!e.e.altKey))return;
-      if(t==='pen'){
-        const pt={x:e.scenePoint.x,y:e.scenePoint.y},st=penRef.current;
-        if(st&&st.anchors.length>=2&&nearPoint(pt,st.anchors[0],8/zoomRef.current)){finishPen(true);return;}
-        if(st){st.anchors.push(pt);st.dragging=true;}else penRef.current={anchors:[pt],dragging:true};
-        setPenPreview({anchors:[...penRef.current!.anchors],cursor:pt});return;
-      }
-      if(t==='crop'){const p=pageRef.current,pt={x:Math.max(0,Math.min(p.width,e.scenePoint.x)),y:Math.max(0,Math.min(p.height,e.scenePoint.y))};cropStart=pt;setCrop({rect:{left:pt.x,top:pt.y,width:0,height:0},angle:cropRef.current?.angle??0});return;}
-      if(t==='gradient'){const pt=e.scenePoint,line=new Line([pt.x,pt.y,pt.x,pt.y],{stroke:'#25272d',strokeWidth:1.5/zoomRef.current,strokeDashArray:[5/zoomRef.current,4/zoomRef.current],selectable:false,evented:false,excludeFromExport:true});gradientDrag={start:{x:pt.x,y:pt.y},line};c.add(line);return;}
-      if(t==='bucket'){
-        const p=pageRef.current,b=paintRef.current.bucket,target=retouchTarget.current&&c.getObjects().includes(retouchTarget.current)?retouchTarget.current:undefined;
-        if(p.source&&b.allLayers){notify('Unlock Original PDF in Layers first, so the bucket can see its pixels.');return;}
-        try{const layer=bucketFill(samplePage(c,p,b.allLayers||!target?undefined:[target]),{x:e.scenePoint.x,y:e.scenePoint.y},colorRef.current,b,regionRef.current?selectionPixels(regionRef.current):undefined);
-          if(!layer){notify('Nothing to fill there.');return;}
-          Object.assign(layer,{id:uid(),name:'Fill'});c.add(layer);c.requestRenderAll();saveCanvasRef.current();syncSelection();}
-        catch(error){notify(error instanceof Error?error.message:String(error));}
-        return;
-      }
-      if(t==='mask'){
-        const target=retouchTarget.current;
-        if(!target||target.lockMovementX||!c.getObjects().includes(target)||target instanceof ActiveSelection){notify('Select one unlocked layer, then paint its mask.');return;}
-        const m=paintRef.current.maskBrush;maskStroke=createMaskBrush(target,m);maskStroke.to({x:e.scenePoint.x,y:e.scenePoint.y});return;
-      }
-      if(t==='marquee'||t==='lasso'||t==='wand'||t==='object'){
-        const target=selectionLayer();
-        if(!target){notify(projectRef.current.pages.find(p=>p.id===pageIdRef.current)?.source?'Unlock Original PDF in Layers to select its pixels, or select an overlay layer.':'Select an unlocked layer before drawing a selection.');return;}
-        const op=e.e.shiftKey||e.e.altKey?maskOpFor(e.e.shiftKey,e.e.altKey):selectModeRef.current,base=op==='replace'?null:regionRef.current,pt={x:e.scenePoint.x,y:e.scenePoint.y};
-        if(t==='object'){void selectObjectRef.current(target.id!,pt,op,base);return;}
-        if(t==='wand'){
-          try{const p=pageRef.current,w=wandRef.current,sample=samplePage(c,p,w.allLayers?undefined:[target]);
-            showMask(target.id!,combineMasks(base?selectionPixels(base):null,floodSelect(sample.data,sample.width,sample.height,pt.x,pt.y,w),op));}
-          catch(error){notify(error instanceof Error?error.message:String(error));}
-          return;
-        }
-        selectionDrag={id:target.id!,points:[pt],op,base,baseOutline:base?base.outline??outlineOf(base.points):undefined};if(!base)setRegion(null);return;
-      }
-      if (t === 'hand') { const event = e.e as MouseEvent; pan = { x: event.clientX, y: event.clientY, left: workspace.current!.scrollLeft, top: workspace.current!.scrollTop }; return; }
-      if (['select','brush','highlight','eraser'].includes(t)) return;
-      const point = e.scenePoint; origin = { x: point.x, y: point.y };
-      const shared = { left: point.x, top: point.y, fill: colorRef.current, strokeWidth: 0 };
-      if (t === 'text') shape = new Textbox('Your text', { ...shared, width: 240, fontSize: 28, fontFamily: textFont.current });
-      if (t === 'rect') shape = new Rect({ ...shared, width: 1, height: 1 });
-      if (t === 'ellipse') shape = new Ellipse({ ...shared, rx: 1, ry: 1 });
-      if (t === 'line') shape = new Line([point.x,point.y,point.x,point.y], { stroke: colorRef.current, strokeWidth: 2 });
-      if (shape) { Object.assign(shape, { id: uid(), name: t === 'text' ? 'Text box' : t.charAt(0).toUpperCase()+t.slice(1) }); c.add(shape); c.setActiveObject(shape); }
-    });
-    c.on('mouse:move', e => {
-      if(toolRef.current==='zoom'){c.setCursor(zoomOutRef.current!==!!e.e.altKey?'zoom-out':'zoom-in');}
-      if(zoomDrag){if(toolRef.current!=='zoom'){zoomDrag=null;return;}const event=e.e as MouseEvent,dx=event.clientX-zoomDrag.x;if(Math.abs(dx)>4||zoomDrag.dragged){zoomDrag.dragged=true;changeZoom(zoomDrag.initial*Math.exp(Math.max(-600,Math.min(600,dx))*0.01),{x:zoomDrag.x,y:zoomDrag.y});}return;}
-      if(retouch.current?.move({x:e.scenePoint.x,y:e.scenePoint.y}))return;
-      if(gradientDrag){gradientDrag.line.set({x2:e.scenePoint.x,y2:e.scenePoint.y});c.requestRenderAll();return;}
-      if(toolRef.current==='pen'&&penRef.current){const st=penRef.current,pt={x:e.scenePoint.x,y:e.scenePoint.y};if(st.dragging){const i=st.anchors.length-1;st.anchors[i]=withHandles(st.anchors[i],pt);}setPenPreview({anchors:[...st.anchors],cursor:pt});return;}
-      if(cropStart){const p=pageRef.current,x=Math.max(0,Math.min(p.width,e.scenePoint.x)),y=Math.max(0,Math.min(p.height,e.scenePoint.y)),a=cropStart;setCrop(cr=>({rect:{left:Math.min(a.x,x),top:Math.min(a.y,y),width:Math.abs(x-a.x),height:Math.abs(y-a.y)},angle:cr?.angle??0}));return;}
-      if(maskStroke){maskStroke.to({x:e.scenePoint.x,y:e.scenePoint.y});return;}
-      if(selectionDrag){const pt={x:e.scenePoint.x,y:e.scenePoint.y};
-        const outline=selectionDrag.baseOutline;
-        if(toolRef.current==='marquee'){selectionDrag.points=[selectionDrag.points[0],pt];setRegion({id:selectionDrag.id,points:rectanglePoints(selectionDrag.points[0],pt),outline});}
-        else {const last=selectionDrag.points.at(-1)!;if(Math.hypot(pt.x-last.x,pt.y-last.y)>2&&selectionDrag.points.length<2000)selectionDrag.points.push(pt);setRegion({id:selectionDrag.id,points:[...selectionDrag.points],outline});}return;
-      }
-      if (pan) { const event = e.e as MouseEvent; workspace.current!.scrollLeft = pan.left - event.clientX + pan.x; workspace.current!.scrollTop = pan.top - event.clientY + pan.y; return; }
-      if (!shape) return;
-      const pt = e.scenePoint, dx = pt.x-origin.x, dy = pt.y-origin.y;
-      if (toolRef.current === 'text') shape.set({ width: Math.max(80, Math.abs(dx)) });
-      else if (shape instanceof Line) shape.set({ x2: pt.x, y2: pt.y });
-      else { const vals = { left: Math.min(origin.x, pt.x), top: Math.min(origin.y, pt.y) }; if (shape instanceof Ellipse) shape.set({ ...vals, rx: Math.abs(dx)/2, ry: Math.abs(dy)/2 }); else shape.set({ ...vals, width: Math.abs(dx), height: Math.abs(dy) }); }
-      c.requestRenderAll();
-    });
-    c.on('mouse:up', () => {
-      if(zoomDrag){const drag=zoomDrag;zoomDrag=null;if(toolRef.current==='zoom'&&!drag.dragged)changeZoom(drag.initial*(drag.out?1/1.25:1.25),{x:drag.x,y:drag.y});return;}
-      if(retouch.current?.up())return;
-      if(maskStroke){maskStroke=null;saveCanvasRef.current();return;}
-      if(penRef.current?.dragging){penRef.current.dragging=false;return;}
-      if(cropStart){cropStart=null;setCrop(cr=>cr&&cr.rect.width>=4&&cr.rect.height>=4?cr:null);return;}
-      if(gradientDrag){
-        const {start,line}=gradientDrag,end={x:line.x2,y:line.y2};gradientDrag=null;c.remove(line);
-        if(Math.hypot(end.x-start.x,end.y-start.y)<2){c.requestRenderAll();return;}
-        const g=paintRef.current,layer=gradientLayer(pageRef.current,start,end,{...g.gradient,from:colorRef.current,to:g.secondColor},regionRef.current?selectionPixels(regionRef.current):undefined);
-        Object.assign(layer,{id:uid(),name:'Gradient'});c.add(layer);c.setActiveObject(layer);c.requestRenderAll();saveCanvasRef.current();syncSelection();return;
-      }
-      if(selectionDrag){
-        // Shift/Alt drags combine with the previous selection into one mask.
-        const drag=selectionDrag;selectionDrag=null;const points=toolRef.current==='marquee'&&drag.points.length===2?rectanglePoints(drag.points[0],drag.points[1]):drag.points;
-        if(drag.base&&points.length>2)try{showMask(drag.id,combineMasks(selectionPixels(drag.base),polygonMask(points,pageRef.current),drag.op));}catch(error){notify(error instanceof Error?error.message:String(error));}
-        return;
-      }
-      pan = null;
-      if (!shape) return;
-      if (shape.width < 3 && shape.height < 3) {
-        if (shape instanceof Ellipse) shape.set({ rx: 70, ry: 50 });
-        else if (!(shape instanceof Line)) shape.set({ width: 160, height: 100 });
-        else shape.set({ x2: shape.x1 + 160 });
-      }
-      shape.setCoords(); c.setActiveObject(shape); c.requestRenderAll(); shape = null; setTool('select'); saveCanvasRef.current(); syncSelection();
-    });
+    const detachEvents=attachCanvasEvents(c,{retouch,retouchSettings,retouchTarget,saveCanvasRef,syncSelection,notify,validateTextFont,toolRef,snapRef,projectRef,pageIdRef,zoomRef,penRef,finishPenRef,loading,openLayerMenu,setLayerMenu,zoomOutRef,finishPen,setPenPreview,pageRef,setCrop,cropRef,paintRef,colorRef,regionRef,selectionPixels,selectionLayer,selectModeRef,selectObjectRef,wandRef,showMask,outlineOf,setRegion,workspace,textFont,changeZoom,setTool});
     setReady(true);
-    return () => { retouch.current?.cancel();clearTimeout(textTimer); void c.dispose(); canvas.current = null; };
+    return () => { retouch.current?.cancel();detachEvents(); void c.dispose(); canvas.current = null; };
   }, []);
 
   useEffect(() => {
@@ -570,7 +433,6 @@ export default function App() {
   const convertAllDetectedText=()=>replaceOcrRegions(textRegions.filter(r=>r.kind==='ocr').map(region=>({region})),{letters:false,done:(_,n)=>`${n} text regions are now crisp editable text. Undo restores the original.`});
   const editRegionText=(region:TextRegion,text:string)=>{setTextEdit(null);void replaceOcrRegions([{region,text}],{letters:true,done:lettersNote});};
   const findAndReplace=(find:string,replacement:string,matchCase:boolean)=>{setFindOpen(false);const matches=findMatches(textRegions,find,matchCase);void replaceOcrRegions(matches.map(region=>({region,text:replaceText(region.text,find,replacement,matchCase)})),{letters:ocr.editMode==='letters',done:(l,f)=>`Replaced in ${l+f} line${l+f===1?'':'s'}. `+(ocr.editMode==='letters'?lettersNote(l,f):'Undo restores the original.')});};
-
 
   // Selection helpers -----------------------------------------------------
   const outlineOf=(points:SelectionPoint[])=>points.length>2?'M'+points.map(p=>`${p.x} ${p.y}`).join('L')+'Z':'';
@@ -1009,7 +871,6 @@ export default function App() {
   function applyColorStyle(fill:string){setColor(fill);const c=canvas.current;if(!c)return;const objects=c.getActiveObjects();if(objects.some(o=>o.lockMovementX||o.lockMovementY)){notify('Unlock the selected layers first.');return;}objects.forEach(o=>{o.set({fill});o.dirty=true;});if(objects.length){c.requestRenderAll();saveCanvas();syncSelection();}}
   function align(where: string){const o=canvas.current?.getActiveObject();if(!o)return;const offset=layoutOffsets([o.getBoundingRect()],where as LayoutAction,{left:0,top:0,width:page.width,height:page.height})[0];updateObject({left:o.left+offset.x,top:o.top+offset.y});}
 
-
   function applyStamp(options: StampOptions) {
     try {
       const current = capture(), indexes = [...new Set(selectPages(options.range, current.pages.length))];
@@ -1103,175 +964,8 @@ export default function App() {
     const common = { originX: 'center' as const, originY: 'center' as const, left: 0, top: 0 };
     updateObject({ clipPath: kind === 'ellipse' ? new Ellipse({ ...common, rx: o.width / 2, ry: o.height / 2 }) : kind === 'rounded' ? new Rect({ ...common, width: o.width, height: o.height, rx: Math.min(o.width, o.height) * .16, ry: Math.min(o.width, o.height) * .16 }) : undefined });
   }
-  const actions: PaletteAction[] = [
-    { label:'Open photo editor', hint:'', icon:FileImage, run:()=>selectWorkspace('photo') },
-    { label:'Open PDF MasterTool', hint:'', icon:FileText, run:()=>selectWorkspace('pdf') },
-    { label:'Open diagram workspace', hint:'', icon:Layers, run:openDiagrams },
-    {label:'Recognize text on current page',hint:'',icon:Type,keywords:'ocr scan edit pdf image text font',run:()=>{setShowDetectedText(true);setTextScanRevision(v=>v+1);}},
-    {label:'Toggle detected text regions',hint:'',icon:Type,run:()=>setShowDetectedText(v=>!v)},
-    {label:'Zoom tool',hint:'Z',icon:ZoomIn,run:()=>setTool('zoom')},
-    { label:'Zoom in', hint:'Ctrl +', icon:ZoomIn, run:()=>changeZoom(zoomRef.current*1.2) },
-    { label:'Zoom out', hint:'Ctrl −', icon:Minus, run:()=>changeZoom(zoomRef.current/1.2) },
-    { label:'Actual size (100%)', hint:'Ctrl 1', icon:Maximize, run:()=>changeZoom(1) },
-    { label:'Freehand highlight', hint:'H', icon:Highlighter, run:()=>setTool('highlight') },
-    { label:'New document', hint:'Ctrl N', icon:FilePlus2, run:()=>setModal('new') }, { label:'Open PDF, image or Office file', hint:'Ctrl O', icon:FolderOpen, run:()=>openFiles() },
-    { label:'Open editable project', hint:'.bide', icon:FolderOpen, run:()=>projectInput.current?.click() }, { label:'Save editable project', hint:'Ctrl S', icon:Save, run:saveProject },
-    { label:'Export PDF', hint:'Ctrl Shift E', icon:Download, run:()=>exportDialog() }, { label:'Add text box', hint:'T', icon:Type, run:addText },
-    { label:'Place image', hint:'', icon:ImagePlus, run:()=>imageInput.current?.click() }, { label:'Add signature', hint:'', icon:PenLine, run:()=>setModal('signature') },
-    { label:'Merge documents', hint:'', icon:Merge, run:()=>openFiles(true) }, { label:'Split PDF into pages', hint:'', icon:Scissors, run:()=>exportDialog('split') },
-    { label:'Compress PDF', hint:'', icon:Scaling, run:()=>exportDialog('pdf','balanced') }, { label:'Convert Office or images to PDF', hint:'', icon:FileText, run:()=>openFiles() },
-    { label:'Export pages as PNG', hint:'', icon:FileImage, run:()=>exportDialog('png') }, { label:'Export pages as JPEG', hint:'', icon:FileImage, run:()=>exportDialog('jpg') },
-    { label:'Extract text to Word', hint:'', icon:FileText, run:()=>exportDialog('docx') },
-    { label:'Make PDF searchable (OCR)', hint:'', icon:Search, keywords:'scan text layer copy select find ocr pdf', run:()=>exportDialog('pdf','lossless',true) }, { label:'Extract plain text', hint:'', icon:FileText, run:()=>exportDialog('txt') },
-    { label:'Add blank page', hint:'', icon:Plus, run:addPage }, { label:'Duplicate current page', hint:'', icon:Copy, run:()=>duplicatePage() },
-    { label:'Rotate current page clockwise', hint:'', icon:RotateCw, run:()=>pageAction('right',pageId) },
-    { label:'Undo', hint:'Ctrl Z', icon:Undo2, run:()=>undo() }, { label:'Redo', hint:'Ctrl Shift Z', icon:Redo2, run:()=>undo(true) },
-    { label:'Duplicate selection', hint:'Ctrl D', icon:Copy, run:duplicate }, { label:'Group selection', hint:'Ctrl G', icon:Layers, run:groupLayers },
-    { label:'Ungroup selection', hint:'Ctrl Shift G', icon:Layers, run:ungroupLayers }, { label:'Fit page to window', hint:'Ctrl 0', icon:Maximize, run:fit },
-    { label:'Add watermarks', hint:'', icon:Type, run:()=>setModal('watermark') },
-    { label:'Add page numbers', hint:'', icon:FileText, run:()=>setModal('numbers') },
-    { label:'Crop current page', hint:'', icon:Scissors, run:()=>setModal('crop') },
-    { label:'Protect PDF with password', hint:'', icon:LockKeyhole, run:()=>{exportDialog();setProtect(true);} },
-    { label:'Unlock password PDF', hint:'', icon:UnlockKeyhole, run:()=>openFiles() },
-    { label:'Export current design as PSD', hint:'', icon:Layers, run:()=>exportDialog('psd') },
-    {label:'Unlock Original PDF as image layer',hint:'Marquee · Lasso · rasterize',icon:UnlockKeyhole,disabled:!page.source?'This page is already editable':undefined,run:()=>void unlockOriginalPdf()},
-    {label:'Rectangular layer selection',hint:'M',icon:SquareDashed,run:()=>setTool('marquee')},
-    {label:'Freehand lasso selection',hint:'L',icon:LassoSelect,run:()=>setTool('lasso')},
-    {label:'Magic wand',hint:'W',icon:Wand2,keywords:'select colour color similar tolerance',run:()=>setTool('wand')},
-    {label:'Select all pixels',hint:'',icon:SquareDashed,run:()=>runSelection('all')},
-    {label:'Inverse selection',hint:'Ctrl Shift I',icon:SquareDashed,disabled:region?undefined:'Make a selection first',run:()=>runSelection('inverse')},
-    {label:'Select subject with AI',hint:'',icon:Sparkles,keywords:'person object cut out isolate',disabled:aiReady?undefined:'AI models are not bundled in this build.',run:()=>void selectSubject()},
-    {label:'Select color range',hint:'',icon:SquareDashed,keywords:'similar colour sky background',run:openColorRange},
-    { label:'Draw with brush', hint:'B', icon:PenLine, run:()=>setTool('brush') },
-    { label:'Erase artwork', hint:'E', icon:Eraser, run:()=>setTool('eraser') },
-    {label:'Clone Stamp',hint:'S',icon:Copy,keywords:'sample retouch texture alt click',run:()=>setTool('clone')},
-    {label:'Healing Brush',hint:'J',icon:Sparkles,keywords:'heal repair blend texture alt click',run:()=>setTool('heal')},
-    {label:'Merge Down',hint:'Ctrl E',icon:Layers,run:mergeDown},
-    {label:'New adjustment layer: Levels',hint:'',keywords:'levels contrast black white point gamma exposure tone',icon:SlidersHorizontal,run:()=>addAdjustment('levels')},
-    {label:'New adjustment layer: Curves',hint:'',keywords:'curves tone contrast shadows highlights',icon:SlidersHorizontal,run:()=>addAdjustment('curves')},
-    {label:'New adjustment layer: Hue/Saturation',hint:'',keywords:'hue saturation lightness colour color desaturate black and white grayscale vibrance',icon:SlidersHorizontal,run:()=>addAdjustment('hueSaturation')},
-    {label:'Warp selected layer',hint:'',icon:Scaling,run:openWarp},
-    { label:'Keyboard shortcuts', hint:'?', icon:Command, run:()=>setModal('shortcuts') },
-  ];
   useEffect(()=>{if(palette&&view==='diagrams')diagramCommands.current?.list();},[palette,view]);
-  const currentIndex=project.pages.findIndex(p=>p.id===pageId);
-  const requireLayer=!selected?'Select a layer first':selected.lockMovementX&&!(selected instanceof Textbox&&selected.isEditing)?'Unlock the layer first':undefined;
-  const requireImage=!(selected instanceof FabricImage)?'Select an image layer first':requireLayer;
-  const requireText=!(selected instanceof Textbox)?'Select a text layer first':requireLayer;
-  const selectAllLayers=()=>{const c=canvas.current;if(!c)return;c.setActiveObject(new ActiveSelection(c.getObjects().filter(o=>!o.lockMovementX&&o.visible),{canvas:c}));c.requestRenderAll();syncSelection();};
-  const clearSelection=()=>{setRegion(null);canvas.current?.discardActiveObject();canvas.current?.requestRenderAll();syncSelection();setTool('select');};
-  const copyLayers=copyToClipboard;
-  const pasteLayers=()=>void pasteFromClipboard();
-  const focusSetting=(label:string)=>{setMobilePanel('properties');requestAnimationFrame(()=>{const input=document.querySelector<HTMLElement>(`[aria-label="${label}"]`);/* Settings tucked into a closed menu open first. */for(let d=input?.closest('details');d;d=d.parentElement?.closest('details')??null)d.open=true;input?.scrollIntoView({block:'nearest'});input?.focus();});};
-  const moreActions:PaletteAction[] = [
-    {label:'Pen tool',hint:'P',icon:PenTool,keywords:'path bezier curve vector shape draw',run:()=>setTool('pen')},
-    {label:'Edit path points',hint:'',icon:PenTool,keywords:'node anchor handle bezier',disabled:selected instanceof Path?requireLayer:'Select a path or pen shape first',run:()=>{setTool('select');togglePathEdit();}},
-    {label:'Crop tool',hint:'C',icon:Crop,keywords:'straighten trim rotate page',run:()=>setTool('crop')},
-    {label:'Image size…',hint:'',icon:Scaling,keywords:'resample resize scale pixels dimensions',run:()=>setModal('imagesize')},
-    {label:'Canvas size…',hint:'',icon:Scaling,keywords:'extend border space anchor',run:()=>setModal('canvassize')},
-    {label:'Trim to content',hint:'',icon:Crop,keywords:'transparent pixels crop auto',run:trimToContent},
-    {label:'Crop to selection',hint:'',icon:Crop,disabled:region?undefined:'Make a selection first',run:()=>{const b=region&&maskBounds(selectionPixels(region));if(b){setRegion(null);cropTo(b);}}},
-    {label:'Toggle rulers',hint:'Ctrl R',icon:Ruler,run:toggleRulers},
-    {label:'Toggle guides',hint:'Ctrl ;',icon:Ruler,run:()=>setShowGuides(v=>!v)},
-    {label:'Clear guides',hint:'',icon:Ruler,disabled:guides.x.length||guides.y.length?undefined:'This page has no guides',run:()=>setGuides({x:[],y:[]})},
-    {label:'Show history',hint:'',icon:HistoryIcon,keywords:'undo steps states',run:()=>{setSidePanel('history');setMobilePanel('properties');}},
-    {label:'Perspective distort',hint:'',icon:Scaling,keywords:'free transform corners keystone',disabled:requireLayer,run:openPerspective},
-    {label:'Gradient tool',hint:'G',icon:Blend,keywords:'fill blend fade linear radial',run:()=>setTool('gradient')},
-    {label:'Paint bucket',hint:'K',icon:PaintBucket,keywords:'fill flood colour color area',run:()=>setTool('bucket')},
-    {label:'Mask brush',hint:'Q',icon:Brush,keywords:'paint layer mask hide reveal',run:()=>setTool('mask')},
-    {label:'Add layer mask',hint:'',icon:Layers,disabled:requireLayer??(hasLayerMask(selected)?'This layer already has a mask':undefined),run:addLayerMask},
-    {label:'Invert layer mask',hint:'',icon:Layers,disabled:requireLayer??(hasLayerMask(selected)?undefined:'Add a layer mask first'),run:invertSelectedMask},
-    {label:'Apply layer mask',hint:'',icon:Layers,disabled:requireLayer??(hasLayerMask(selected)?undefined:'Add a layer mask first'),run:applyLayerMask},
-    {label:'Delete layer mask',hint:'',icon:Layers,disabled:requireLayer??(hasLayerMask(selected)?undefined:'Add a layer mask first'),run:deleteLayerMask},
-    ...(Object.keys(effectLabels) as EffectName[]).map(name=>({label:`Add layer style: ${effectLabels[name]}`,hint:'',icon:Sparkles,keywords:'effect fx shadow glow outline stroke overlay',disabled:requireLayer,run:()=>addEffect(name)})),
-    {label:'Clear layer style',hint:'',icon:Sparkles,disabled:requireLayer??((selected as Obj|null)?.layerStyle?undefined:'This layer has no style'),run:()=>setLayerStyle(undefined)},
-    {label:'Select layer pixels',hint:'',icon:SquareDashed,keywords:'transparency alpha load selection',disabled:requireLayer,run:()=>{const c=canvas.current,o=c?.getActiveObject() as Obj|undefined;if(!c||!o)return;selectionTarget.current=o.id||null;showMask(o.id!,layerPixelsMask(c,page,o));setTool('marquee');}},
-    {label:'Remove background with AI',hint:'',icon:Eraser,keywords:'cut out subject transparent isolate',disabled:!aiReady?'AI models are not bundled in this build.':requireImage,run:()=>void removeBackground()},
-    {label:'Export text as transparent PNG',hint:'',icon:Download,disabled:requireText,run:()=>void exportTransparentPng(true)},
-    {label:'Export page as transparent PNG',hint:'',icon:Download,disabled:page.source?'Unlock Original PDF first':undefined,run:()=>void exportTransparentPng()},
-    {label:'Sharpen image layer with AI (2×)',hint:'',keywords:'upscale enhance super resolution blurry esrgan',icon:SlidersHorizontal,disabled:!aiReady?'AI models are not bundled in this build.':requireImage,run:()=>void aiSharpenSelected()},
-    {label:'Remove selection with AI fill',hint:'',keywords:'inpaint erase object content aware lama',icon:Eraser,disabled:!aiReady?'AI models are not bundled in this build.':region?undefined:'Draw a Marquee or Lasso selection first',run:()=>void aiRemove()},
-    {label:'Straighten page (fix tilt and rotation)',hint:'',keywords:'deskew skew tilt rotate upright orientation scan photo ocr level',icon:RotateCw,disabled:page.source?'Unlock Original PDF first':undefined,run:()=>void straightenPage()},
-    ...(aiReady?[{label:'Flatten photographed page (AI)',hint:'',keywords:'dewarp perspective curved curl unwarp document photo scan keystone',icon:Wand2,disabled:page.source?'Unlock Original PDF first':undefined,run:()=>void flattenPageAi()}]:[]),
-    {label:'Find & redact (remove personal data)',hint:'',keywords:'redact redaction black out censor hide remove personal data privacy gdpr email phone iban card name confidential',icon:EyeOff,disabled:textRegions.length?undefined:'Open a page with text first',run:()=>setRedactOpen(true)},
-    {label:'Add form field: Text',hint:'',keywords:'form field input fillable acroform text box',icon:Type,run:()=>addFormField('text')},
-    {label:'Add form field: Checkbox',hint:'',keywords:'form field fillable acroform tick box',icon:Square,run:()=>addFormField('checkbox')},
-    {label:'Add form field: Dropdown',hint:'',keywords:'form field fillable acroform select list choice combo',icon:Square,run:()=>addFormField('dropdown')},
-    {label:'Add form field: Radio button',hint:'',keywords:'form field fillable acroform option choice',icon:Square,run:()=>addFormField('radio')},
-    {label:'Proofread image text',hint:'',keywords:'spelling spell check ocr mistakes typo misread dictionary',icon:Type,disabled:textRegions.some(r=>r.kind==='ocr')?undefined:'Open an image or scanned page with text first',run:()=>setProofOpen(true)},
-    {label:'Find and replace in image text',hint:'',keywords:'ocr rename typo correct name word everywhere',icon:Type,disabled:textRegions.some(r=>r.kind==='ocr')?undefined:'Open an image or scanned page with detected text first.',run:()=>setFindOpen(true)},
-    {label:'Convert all detected text',hint:'',keywords:'ocr sharpen crisp blurry replace every line all text',icon:Type,disabled:textRegions.some(r=>r.kind==='ocr')?undefined:'Open an image or scanned page with detected text first.',run:()=>void convertAllDetectedText()},
-    {label:'Choose OCR languages',hint:'',keywords:'german deutsch spanish español italian italiano dutch nederlands portuguese português english french language',icon:Type,run:()=>focusSetting('OCR languages')},
-    {label:'Choose OCR scan depth',hint:'',keywords:'thorough sparse buttons badges labels screenshot',icon:Type,run:()=>focusSetting('OCR scan depth')},
-    {label:'Choose OCR selection grouping',hint:'',keywords:'teams avatar initials split words lines',icon:Type,run:()=>focusSetting('OCR selection grouping')},
-    {label:'Choose OCR replacement font',hint:'',keywords:'teams segoe aptos calibri corporate',icon:Type,run:()=>focusSetting('OCR replacement font')},
-    {label:'Choose OCR replacement weight',hint:'',keywords:'bold regular italic text',icon:Bold,run:()=>focusSetting('OCR replacement weight')},
-    {label:'Adjust replacement background',hint:'',icon:SlidersHorizontal,run:()=>focusSetting('Text replacement background')},
-    {label:'Adjust text cleanup padding',hint:'',icon:SlidersHorizontal,run:()=>focusSetting('Text cleanup padding')},
-    {label:'Adjust letter spacing',hint:'',icon:SlidersHorizontal,disabled:requireText,run:()=>focusSetting('Letter spacing')},
-    {label:'Adjust text softness',hint:'',keywords:'blur sharpness scan match',icon:SlidersHorizontal,disabled:requireText,run:()=>focusSetting('Text softness')},
-    ...Object.keys(blendModes).map(name=>({label:`Set blend mode: ${name}`,hint:'',icon:Layers,disabled:page.source?'Blend modes require a design page':requireLayer,run:()=>updateObject({globalCompositeOperation:blendModes[name as keyof typeof blendModes]})})),
-    ...['Font size','Font family','Text content','Object fill','Stroke color','Layer blend mode','Shape mask'].map(setting=>({label:`Edit ${setting.toLowerCase()}`,hint:'',icon:Settings2,disabled:setting.startsWith('Font')||setting==='Text content'?requireText:requireLayer,run:()=>focusSetting(setting)})),
-    ...['brightness','contrast','saturation','blur','Crop X','Crop Y','Crop width','Crop height'].map(setting=>({label:`Adjust image ${setting.toLowerCase()}`,hint:'',icon:SlidersHorizontal,disabled:requireImage,run:()=>{setMobilePanel('properties');requestAnimationFrame(()=>{document.querySelectorAll<HTMLDetailsElement>('.properties-content details').forEach(d=>{d.open=true;});focusSetting(setting);});}})),
-    {label:'Change drawing color',hint:'',icon:PenLine,run:()=>focusSetting('Drawing color')},
-    {label:'Change page background',hint:'',icon:Square,run:()=>{clearSelection();focusSetting('Page background');}},
-    {label:'Return to document editor',hint:'',icon:FileText,run:()=>{setView(documentView.current);setPdfHome(false);}},
-    {label:'Show pages',hint:'',icon:Layers,run:()=>{setLeftOpen(true);setMobilePanel('pages');}},
-    {label:'Hide pages',hint:'',icon:PanelLeftClose,run:()=>{setLeftOpen(false);setMobilePanel(null);}},
-    {label:'Show properties and layers',hint:'',icon:Settings2,run:()=>setMobilePanel('properties')},
-    {label:'Previous page',hint:'',icon:ChevronLeft,disabled:currentIndex===0?'Already on the first page':undefined,run:()=>setPageId(project.pages[currentIndex-1].id)},
-    {label:'Next page',hint:'',icon:ChevronRight,disabled:currentIndex===project.pages.length-1?'Already on the last page':undefined,run:()=>setPageId(project.pages[currentIndex+1].id)},
-    ...project.pages.map((p,i)=>({label:`Go to page ${i+1}: ${p.name}`,hint:'',icon:FileText,keywords:`jump navigate page ${i+1}`,run:()=>setPageId(p.id)})),
-    {label:'Remove current page',hint:'',icon:Trash2,disabled:project.pages.length===1?'Keep at least one page':undefined,run:()=>deletePage()},
-    {label:'Rotate page counterclockwise',hint:'',icon:RotateCw,run:()=>pageAction('left',pageId)},
-    {label:'Move page to beginning',hint:'',icon:ArrowUp,disabled:currentIndex===0?'Already first':undefined,run:()=>pageAction('first',pageId)},
-    {label:'Move page to end',hint:'',icon:ArrowDown,disabled:currentIndex===project.pages.length-1?'Already last':undefined,run:()=>pageAction('last',pageId)},
-    {label:'Resize page',hint:'',icon:Scaling,run:()=>setModal('resize')},
-    {label:'Export pages as SVG',hint:'',icon:FileImage,run:()=>exportDialog('svg')},
-    {label:'Select all layers',hint:'Ctrl A',icon:Layers,run:selectAllLayers},
-    {label:'Deselect everything',hint:'Esc',icon:MousePointer2,run:clearSelection},
-    {label:'Copy selected layers',hint:'Ctrl C',icon:Copy,disabled:!selected&&!region?'Select an area or layer first':undefined,run:copyLayers},
-    {label:'Paste copied layers',hint:'Ctrl V',icon:Copy,disabled:!clipboard.current&&!copyPending.current?'Copy an area or layer first':undefined,run:pasteLayers},
-    {label:'Delete selected layers',hint:'Delete',icon:Trash2,disabled:requireLayer,run:removeSelected},
-    {label:'Bring layer forward',hint:'',icon:ArrowUp,disabled:requireLayer,run:()=>moveLayer('up')},
-    {label:'Send layer backward',hint:'',icon:ArrowDown,disabled:requireLayer,run:()=>moveLayer('down')},
-    {label:'Toggle layer lock',hint:'',icon:LockKeyhole,disabled:!selected?'Select a layer first':undefined,run:()=>{if(selected)toggleLock(selected);}},
-    {label:'Toggle layer visibility',hint:'',icon:Eye,disabled:!selected?'Select a layer first':undefined,run:()=>{if(selected){selected.set({visible:!selected.visible});canvas.current?.requestRenderAll();saveCanvas();}}},
-    ...(['left','center','right'] as const).map(where=>({label:`Align layer ${where} on page`,hint:'',icon:Scaling,disabled:requireLayer,run:()=>align(where)})),
-    {label:'Flip layer horizontally',hint:'',icon:Scaling,disabled:requireLayer,run:()=>updateObject({flipX:!selected?.flipX})},
-    {label:'Flip layer vertically',hint:'',icon:Scaling,disabled:requireLayer,run:()=>updateObject({flipY:!selected?.flipY})},
-    ...(['keep','hide','copy'] as const).map(mode=>({label:mode==='keep'?'Keep artwork inside selection':mode==='hide'?'Hide artwork inside selection':'Copy selection to new layer',hint:'',icon:SquareDashed,disabled:!region?'Draw a rectangular or lasso selection first':undefined,run:()=>void applySelection(mode)})),
-    ...(['none','ellipse','rounded'] as const).map(kind=>({label:kind==='none'?'Remove layer mask':`Apply ${kind} layer mask`,hint:'',icon:Circle,disabled:requireLayer,run:()=>setClip(kind)})),
-    ...(['grayscale','sepia','invert','reset'] as const).map(kind=>({label:kind==='reset'?'Reset image filters':`Apply ${kind} image filter`,hint:'',icon:SlidersHorizontal,disabled:requireImage,run:()=>setImageFilter(kind)})),
-    {label:'Toggle bold text',hint:'',icon:Bold,disabled:requireText,run:()=>updateObject({fontWeight:selected?.fontWeight==='bold'?'normal':'bold'})},
-    {label:'Toggle italic text',hint:'',icon:Italic,disabled:requireText,run:()=>updateObject({fontStyle:selected?.fontStyle==='italic'?'normal':'italic'})},
-    {label:'Toggle underline text',hint:'',icon:Underline,disabled:requireText,run:()=>updateObject({underline:!selected?.underline})},
-    ...(['left','center','right','justify'] as const).map(where=>({label:`Align text ${where}`,hint:'',icon:Type,disabled:requireText,run:()=>updateObject({textAlign:where})})),
-    ...[...bundledFonts.map(f=>f.family),...systemFonts].map(family=>({label:`Set font: ${family}`,hint:'',icon:Type,disabled:requireText,run:()=>void changeTextFont(family)})),
-    ...Object.entries(brushNames).map(([kind,name])=>({label:`Use ${name.toLowerCase()} brush`,hint:'',icon:PenLine,run:()=>{setBrushKind(kind as BrushKind);setTool('brush');}})),
-    ...framePresets.map((f,i)=>({label:`Add artboard: ${f.name}`,hint:`${f.width} × ${f.height}`,icon:Square,keywords:'figma frame screen preset',run:()=>addArtboard(i)})),
-    {label:'Toggle layout grid',hint:'',icon:SquareDashed,keywords:'figma grid guides',run:()=>setLayoutGrid(v=>!v)},
-    ...Object.entries(layoutLabels).map(([key,label])=>({label,hint:'',icon:Scaling,keywords:'figma layout alignment spacing tidy',disabled:(canvas.current?.getActiveObjects().length||0)<(key.startsWith('distribute')?3:key==='row'||key==='column'?2:1)?'Select more layers first':canvas.current?.getActiveObjects().some(o=>o.lockMovementX||o.lockMovementY)?'Unlock the selected layers first':undefined,run:()=>layoutSelection(key as LayoutAction)})),
-    ...['Grid size','Layout gap','Color style name','Corner radius'].map(setting=>({label:`Edit ${setting.toLowerCase()}`,hint:'',icon:Settings2,keywords:'figma design properties',disabled:setting==='Corner radius'&&!(selected instanceof Rect)?'Select a rectangle first':undefined,run:()=>{document.querySelector<HTMLDetailsElement>('.design-tools')?.setAttribute('open','');focusSetting(setting);}})),
-    ...colorStyles.map(style=>({label:`Apply color style: ${style.name}`,hint:style.color,icon:Circle,keywords:'figma swatch fill',run:()=>applyColorStyle(style.color)})),
-    {label:'Increase drawing size',hint:']',icon:Plus,run:()=>{if(tool==='eraser')setEraserSize(v=>brushWidth(v+2));else if(tool==='clone'||tool==='heal')setRetouchSize(v=>brushWidth(v+2));else if(tool==='highlight')setHighlightSize(v=>Math.min(120,v+2));else {setTool('brush');setBrushSize(v=>brushWidth(v+2));}}},
-    {label:'Decrease drawing size',hint:'[',icon:Minus,run:()=>{if(tool==='eraser')setEraserSize(v=>brushWidth(v-2));else if(tool==='clone'||tool==='heal')setRetouchSize(v=>brushWidth(v-2));else if(tool==='highlight')setHighlightSize(v=>Math.max(1,v-2));else {setTool('brush');setBrushSize(v=>brushWidth(v-2));}}},
-    {label:'Toggle snapping to page',hint:'',icon:Maximize,run:()=>setSnap(v=>!v)},
-    {label:'Edit selected diagram',hint:'',icon:Layers,disabled:!selected?.diagramXml?'Select a placed diagram first':undefined,run:editDiagram},
-    ...TOOLS.filter(t=>['select','text','rect','ellipse','line','hand'].includes(t.id)).map(t=>({label:`Use ${t.label.toLowerCase()} tool`,hint:t.key,icon:t.icon,run:()=>setTool(t.id)})),
-    ...layers.map(layer=>({label:`Select layer: ${layer.name||layer.type}`,hint:'',category:'Layers',icon:Layers,run:()=>{canvas.current?.setActiveObject(layer);canvas.current?.requestRenderAll();syncSelection();setTool('select');}})),
-  ];
-  const diagramActions:PaletteAction[] = [
-    ...actions.filter(a=>['Open photo editor','Open PDF MasterTool','Open diagram workspace'].includes(a.label)),
-    ...nativeDiagramCommands.map(c=>({label:`Diagram: ${c.label}`,hint:c.hint,icon:Layers,keywords:c.id.replace(/([A-Z])/g,' $1'),disabled:c.enabled?undefined:'Unavailable for the current diagram selection',run:()=>diagramCommands.current?.run(c.id)})),
-    {label:'New diagram',hint:'',icon:FilePlus2,run:()=>diagramCommands.current?.newDiagram()},
-    {label:'Open Visio or draw.io file',hint:'Ctrl O',aliases:['open vsdx','import visio'],icon:FolderOpen,run:()=>diagramCommands.current?.open()},
-    {label:'Save editable diagram',hint:'.drawio',icon:Save,run:()=>diagramCommands.current?.save()},
-    {label:'Export diagram as PNG',hint:'',icon:FileImage,run:()=>diagramCommands.current?.export('png')},
-    {label:'Export diagram as SVG',hint:'',icon:FileImage,run:()=>diagramCommands.current?.export('svg')},
-    {label:'Export diagram as PDF',hint:'',icon:Download,run:()=>diagramCommands.current?.export('pdf')},
-    {label:'Place diagram in document',hint:'',icon:ImagePlus,run:()=>diagramCommands.current?.export('place')},
-  ];
+  const {actions,requireLayer,focusSetting,moreActions,diagramActions}=editorCommands({selectWorkspace,openDiagrams,setShowDetectedText,setTextScanRevision,setTool,changeZoom,zoomRef,setModal,openFiles,projectInput,saveProject,exportDialog,addText,imageInput,addPage,duplicatePage,pageAction,pageId,undo,duplicate,groupLayers,ungroupLayers,fit,setProtect,page,unlockOriginalPdf,runSelection,region,aiReady,selectSubject,openColorRange,mergeDown,addAdjustment,openWarp,project,selected,canvas,syncSelection,setRegion,copyToClipboard,pasteFromClipboard,setMobilePanel,togglePathEdit,trimToContent,selectionPixels,cropTo,toggleRulers,setShowGuides,guides,setGuides,setSidePanel,openPerspective,addLayerMask,invertSelectedMask,applyLayerMask,deleteLayerMask,addEffect,setLayerStyle,selectionTarget,showMask,removeBackground,exportTransparentPng,aiSharpenSelected,aiRemove,straightenPage,flattenPageAi,textRegions,setRedactOpen,addFormField,setProofOpen,setFindOpen,convertAllDetectedText,updateObject,setView,documentView,setPdfHome,setLeftOpen,setPageId,deletePage,clipboard,copyPending,removeSelected,moveLayer,toggleLock,saveCanvas,align,applySelection,setClip,setImageFilter,changeTextFont,setBrushKind,addArtboard,setLayoutGrid,layoutSelection,colorStyles,applyColorStyle,tool,setEraserSize,setRetouchSize,setHighlightSize,setBrushSize,setSnap,editDiagram,layers,nativeDiagramCommands,diagramCommands});
   const availableActions=(view==='diagrams'?diagramActions:[...actions,...moreActions]).map(a=>{
     let disabled=a.disabled;
     if(a.label==='Undo'&&!history.current.past.length)disabled='Nothing to undo';
