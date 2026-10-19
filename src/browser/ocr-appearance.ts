@@ -57,48 +57,59 @@ export async function matchOcrAppearance(raster:HTMLCanvasElement,region:TextReg
  for(const candidateFamily of families){
   const selectedText=await makeText(region,candidateFamily),selectedSize=selectedText.fontSize,selectedAscent=selectedText.top-region.top+selectedSize*.93;
   selectedText.set({fill:'#000000',objectCaching:false});
-  const softnessCache=new Map<string,number[]>();
-  const allowedSoftness=(ratio:number,dx=0,dy=0)=>{
-   if(selectedEdges===undefined||!paintSelected)return softnessValues;
-   const key=`${ratio}/${dx}/${dy}`,cached=softnessCache.get(key);if(cached)return cached;
+  // Edge-clarity checks are memoized per placement and softness: each one
+  // renders the selected letters again, which dominates the matching time.
+  const allowedCache=new Map<string,boolean>();
+  const allows=(ratio:number,softness:number,dx=0,dy=0)=>{
+   if(!softness||selectedEdges===undefined||!paintSelected)return true;
+   const key=`${ratio}/${dx}/${dy}/${softness}`,cached=allowedCache.get(key);if(cached!==undefined)return cached;
    selectedText.set({fontSize:selectedSize*ratio,left:region.left+dx,top:region.top+selectedAscent-selectedSize*ratio*.93+dy});selectedText.initDimensions();
-   const allowed=softnessValues.filter(softness=>{
-    if(!softness)return true;selectedText.textSoftness=softness;
-    const edges=coverageEdgeWidth(paintSelected(selectedText));
-    return edges!==undefined&&edges<=selectedEdges+.1;
-   });
-   softnessCache.set(key,allowed);return allowed;
+   selectedText.textSoftness=softness;const edges=coverageEdgeWidth(paintSelected(selectedText)),allowed=edges!==undefined&&edges<=selectedEdges+.1;
+   allowedCache.set(key,allowed);return allowed;
   };
-  const coarseSoftness=new Map<number,number[]>();
+  const allowedSoftness=(ratio:number,dx=0,dy=0)=>softnessValues.filter(softness=>allows(ratio,softness,dx,dy));
+  const ratios=[.9,.925,.95,.975,1,1.025,1.05,1.075,1.1];
   const fits:Fit[]=[];
   for(const sample of samples){
    const text=await makeText(sample.region,candidateFamily),size=text.fontSize,ascent=text.top-sample.region.top+size*.93;
    text.set({fill:'#000000',objectCaching:false});const render=coverageRenderer(sample),paint=()=>render(text);
    let fit:Fit|undefined;
-   for(const ratio of [.9,.925,.95,.975,1,1.025,1.05,1.075,1.1]){
+   const tryShifts=(ratio:number,softness:number)=>{
     text.set({fontSize:size*ratio,left:sample.region.left,top:sample.region.top+ascent-size*ratio*.93});text.initDimensions();
-    if(!coarseSoftness.has(ratio))coarseSoftness.set(ratio,allowedSoftness(ratio));
-    for(const softness of coarseSoftness.get(ratio)!){
-     text.textSoftness=softness;const alpha=paint();
-     for(const dx of [-2,-1,0,1,2])for(const dy of [-2,-1,0,1,2]){
-      const result=coverageFit(sample.source,alpha,dx,dy);
-      // Avoid unnecessary blur/resize when several candidates fit equally well.
-      const score=result.score-softness*.003-Math.abs(1-ratio)*.02;
-      if(!fit||score>fit.score)fit={family:candidateFamily,score,softness,ratio,dx,dy,gain:result.gain};
-     }
+    text.textSoftness=softness;const alpha=paint();
+    for(const dx of [-2,-1,0,1,2])for(const dy of [-2,-1,0,1,2]){
+     const result=coverageFit(sample.source,alpha,dx,dy);
+     // Avoid unnecessary blur/resize when several candidates fit equally well.
+     const score=result.score-softness*.003-Math.abs(1-ratio)*.02;
+     if(!fit||score>fit.score)fit={family:candidateFamily,score,softness,ratio,dx,dy,gain:result.gain};
     }
+   };
+   // Coarse to fine: size and position on crisp renders, then softness only
+   // around the best size (blurred renders are by far the slowest to paint).
+   for(const ratio of ratios)tryShifts(ratio,0);
+   // Softness cannot rescue a font whose crisp fit trails the best font this far.
+   if(best&&(!fit||(fit as Fit).score<best.score-.15)){fits.length=0;break;}
+   if(fit&&softnessValues.length>1){
+    const at=ratios.indexOf(fit.ratio);
+    for(const ratio of ratios.slice(Math.max(0,at-1),at+2))for(const softness of allowedSoftness(ratio))if(softness)tryShifts(ratio,softness);
    }
    if(fit){
     // Bilinear shifts shortlist alignments cheaply. Recheck the winner with
-    // actual fractional glyph placement so interpolation isn't mistaken for blur.
-    const initial=fit;fit=undefined;
+    // actual fractional glyph placement so interpolation isn't mistaken for blur:
+    // position first at the shortlisted softness, then the neighbouring softness values.
+    const initial:Fit=fit;fit=undefined;
     text.set({fontSize:size*initial.ratio});text.initDimensions();
-    for(const softness of allowedSoftness(initial.ratio,initial.dx,initial.dy))for(const dx of [initial.dx-.5,initial.dx-.25,initial.dx,initial.dx+.25,initial.dx+.5])for(const dy of [initial.dy-.5,initial.dy-.25,initial.dy,initial.dy+.25,initial.dy+.5]){
-     if(!allowedSoftness(initial.ratio,dx,dy).includes(softness))continue;
+    const place=(softness:number,dx:number,dy:number)=>{
+     if(!allows(initial.ratio,softness,dx,dy))return;
      text.set({left:sample.region.left+dx,top:sample.region.top+ascent-size*initial.ratio*.93+dy});text.textSoftness=softness;
      const result=coverageFit(sample.source,paint()),score=result.score-softness*.003-Math.abs(1-initial.ratio)*.02;
      if(!fit||score>fit.score)fit={family:candidateFamily,score,softness,ratio:initial.ratio,dx,dy,gain:result.gain};
-    }
+    };
+    for(const dx of [-.5,-.25,0,.25,.5])for(const dy of [-.5,-.25,0,.25,.5])place(initial.softness,initial.dx+dx,initial.dy+dy);
+    // Walk the softness values each way from there while the fit improves,
+    // letting the placement settle a little for each.
+    const placed=fit as Fit|undefined,step=softnessValues.indexOf(initial.softness);
+    if(placed)for(const direction of [-1,1])for(let i=step+direction;i>=0&&i<softnessValues.length;i+=direction){const before=(fit as Fit|undefined)?.score??-Infinity;for(const dx of [-.25,0,.25])for(const dy of [-.25,0,.25])place(softnessValues[i],placed.dx+dx,placed.dy+dy);if(((fit as Fit|undefined)?.score??-Infinity)<=before)break;}
     if(fit){fits.push(fit);onFit?.(fit);}
    }
   }
@@ -107,7 +118,7 @@ export async function matchOcrAppearance(raster:HTMLCanvasElement,region:TextReg
   const aggregate={family:candidateFamily,score,softness:median(fits.map(f=>f.softness)),ratio:median(fits.map(f=>f.ratio)),dx:median(fits.map(f=>f.dx)),dy:median(fits.map(f=>f.dy)),gain:median(fits.map(f=>f.gain))};
   // Combining separate medians can create a placement we never evaluated.
   // Keep an actual fitted tuple when that combination would soften the edges.
-  const result=allowedSoftness(aggregate.ratio,aggregate.dx,aggregate.dy).includes(aggregate.softness)?aggregate:{...fits.reduce((a,b)=>a.score>b.score?a:b),score};
+  const result=allows(aggregate.ratio,aggregate.softness,aggregate.dx,aggregate.dy)?aggregate:{...fits.reduce((a,b)=>a.score>b.score?a:b),score};
   if(!best||score>best.score)best=result;
  }
  // Low confidence or mismatched OCR should retain the existing estimate.

@@ -123,8 +123,11 @@ test('editing image text reuses the original letters; find & replace fixes every
   assert.ok(saved.some(l=>/^Edited text: Titulaire: Jean MARTIN/.test(l.name)),'find & replace patch');
   // A letter that appears nowhere on the page falls back to font text.
   await page.locator('.detected-text-overlay button[aria-label*="Repas"]').click();
-  const repas=page.getByLabel('New text');await repas.fill('Repas: Les repas ne sont pas compris (zzz).');await page.getByRole('button',{name:'Apply',exact:true}).click();saved=await layers();
-  assert.ok(saved.some(l=>/Repas/.test(l.name)&&(l.type==='Textbox'||l.type==='textbox')),'fallback to font text');
+  const repas=page.getByLabel('New text');await repas.fill('Repas: Les repas ne sont pas compris (zzz).');await page.getByRole('button',{name:'Apply',exact:true}).click();
+  // Font text matches the original's size and softness first, which takes a few seconds.
+  const fontText=l=>/Repas/.test(l.name)&&(l.type==='Textbox'||l.type==='textbox');
+  for(let i=0;i<40&&!(saved=await layers()).some(fontText);i++);
+  assert.ok(saved.some(fontText),'fallback to font text');
   assert.deepEqual(errors,[]);
  }finally{await browser.close();await server.close();}
 });
