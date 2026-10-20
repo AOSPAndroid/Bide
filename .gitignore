@@ -19,3 +19,6 @@ public/ai/ort/
 tests/real/*
 !tests/real/README.md
 !tests/real/example.json
+dist-saas/
+.env.*.local
+.dev.vars

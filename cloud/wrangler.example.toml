@@ -1,0 +1,30 @@
+# Copy to wrangler.toml and fill in the ids. The worker serves the subscription
+# build (dist-saas) and the licence API from one origin, so the licence cookie
+# reaches the gated model and engine files.
+name = "bide"
+main = "cloud/worker.ts"
+compatibility_date = "2026-10-01"
+
+[assets]
+directory = "dist-saas"
+binding = "ASSETS"
+# Let the worker check the licence before serving the AI models and engines.
+run_worker_first = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "bide"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
+
+[vars]
+APP_URL = "https://bide.example"
+TRIAL_DAYS = "7"
+STRIPE_PRICE_ID = "price_REPLACE"
+MAIL_FROM = "bide <login@bide.example>"
+# STRIPE_AUTOMATIC_TAX = "1"
+
+# Secrets (never in this file):
+#   npx wrangler secret put LICENCE_PRIVATE_KEY
+#   npx wrangler secret put STRIPE_SECRET_KEY
+#   npx wrangler secret put STRIPE_WEBHOOK_SECRET
+#   npx wrangler secret put RESEND_API_KEY

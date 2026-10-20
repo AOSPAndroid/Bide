@@ -231,3 +231,17 @@
 .form-box.own.editable{pointer-events:auto;cursor:move}
 .form-box-label{position:absolute;left:3px;top:50%;transform:translateY(-50%);font:11px/1 Inter,sans-serif;color:#2f6fb3;white-space:nowrap;overflow:hidden;max-width:calc(100% - 6px)}
 .form-box-size{position:absolute;right:-4px;bottom:-4px;width:8px;height:8px;background:#2f6fb3;border-radius:2px;cursor:nwse-resize}
+.paywall{position:fixed;inset:0;z-index:1000;display:grid;place-items:center;padding:16px;background:#25272dcc;backdrop-filter:blur(3px)}
+.paywall-card{width:min(420px,100%);background:var(--surface,#fff);color:var(--ink);border-radius:12px;padding:28px;box-shadow:0 18px 48px #0004;display:grid;gap:12px}
+.paywall-card h1{font-size:20px;margin:0}.paywall-card form{display:grid;gap:12px}
+.paywall-card label{display:grid;gap:6px;font-size:12px;font-weight:600}
+.paywall-card input{font-size:16px;padding:10px 12px;border:1px solid var(--line);border-radius:8px}
+.paywall-card button{font-size:14px;padding:10px 14px;border-radius:8px;border:0;background:var(--accent,#c44c28);color:#fff;font-weight:600;cursor:pointer}
+.paywall-card button.secondary{background:transparent;color:var(--ink);border:1px solid var(--line)}
+.paywall-card button:disabled{opacity:.6;cursor:default}
+.paywall-logo{width:40px;height:40px}.paywall-error{color:#b42318;font-size:13px;margin:0}
+.account-chip{position:fixed;left:12px;bottom:34px;z-index:900;font-size:11px}
+.account-chip summary{cursor:pointer;list-style:none;padding:4px 10px;border-radius:999px;background:var(--accent,#c44c28);color:#fff;font-weight:600;box-shadow:0 2px 8px #0002}
+.account-chip>div{position:absolute;bottom:calc(100% + 6px);left:0;display:grid;gap:6px;min-width:220px;padding:10px;background:var(--surface,#fff);border:1px solid var(--line);border-radius:8px;box-shadow:0 8px 24px #0003}
+.account-chip button{font-size:12px;padding:6px 10px;border-radius:6px;border:0;background:var(--accent,#c44c28);color:#fff;cursor:pointer}
+.account-chip button.secondary{background:transparent;color:var(--ink);border:1px solid var(--line)}

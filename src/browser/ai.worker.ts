@@ -6,15 +6,31 @@ type Feeds=Record<string,{data:Float32Array|BigInt64Array;dims:number[]}>;
 type Loaded={session:ort.InferenceSession;backend:'webgpu'|'wasm'};
 const sessions=new Map<string,Promise<Loaded>>();let base='';
 
-async function create(model:string,backend:Loaded['backend']):Promise<Loaded>{
- const response=await fetch(new URL(`ai/models/${model}.onnx`,base));if(!response.ok)throw new Error(`AI model ${model} is not bundled with this build.`);
- return {session:await ort.InferenceSession.create(new Uint8Array(await response.arrayBuffer()),{executionProviders:[backend],graphOptimizationLevel:'all',logSeverityLevel:3}),backend};
+// A model in one file, or in parts with a manifest (hosts limit file size;
+// see splitLargeFiles in vite.config.ts).
+async function modelBytes(model:string){
+ const url=new URL(`ai/models/${model}.onnx`,base),whole=await fetch(url);if(whole.ok)return new Uint8Array(await whole.arrayBuffer());
+ const manifest=await fetch(`${url}.parts.json`);if(!manifest.ok)throw new Error(whole.status===402?'An active bide trial or subscription is needed for the AI tools.':`AI model ${model} is not bundled with this build.`);
+ const {size,parts}=await manifest.json() as {size:number;parts:number},bytes=new Uint8Array(size);let at=0;
+ for(let i=0;i<parts;i++){const part=await fetch(`${url}.part${i}`);if(!part.ok)throw new Error(`Part ${i+1} of AI model ${model} is missing.`);const chunk=new Uint8Array(await part.arrayBuffer());bytes.set(chunk,at);at+=chunk.length;}
+ if(at!==size)throw new Error(`AI model ${model} is incomplete.`);
+ return bytes;
+}
+// One session is created at a time: ONNX Runtime's WebGPU backend fails with
+// "Session mismatch" when two are created together (OCR and the tilt check).
+let creating:Promise<unknown>=Promise.resolve();
+function create(bytes:Uint8Array,backend:Loaded['backend']):Promise<Loaded>{
+ const next=creating.then(async()=>({session:await ort.InferenceSession.create(bytes,{executionProviders:[backend],graphOptimizationLevel:'all',logSeverityLevel:3}),backend}));
+ creating=next.catch(()=>{});return next;
 }
 function load(model:string,cpuOnly=false){
  const key=cpuOnly?model+'#cpu':model;
  if(!sessions.has(key))sessions.set(key,(async()=>{
-  if(!cpuOnly&&'gpu' in navigator)try{return await create(model,'webgpu');}catch{}
-  return create(model,'wasm');
+  // Downloaded once for both attempts (LaMa alone is 106 MB). ONNX Runtime
+  // may take over the buffer it is given, so WebGPU gets its own copy.
+  const bytes=await modelBytes(model);
+  if(!cpuOnly&&'gpu' in navigator)try{return await create(bytes.slice(),'webgpu');}catch{}
+  return create(bytes,'wasm');
  })().catch(e=>{sessions.delete(key);throw e;}));
  return sessions.get(key)!;
 }
