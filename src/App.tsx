@@ -48,6 +48,8 @@ import DesignTools,{type ColorStyle} from './DesignTools';
 import {framePresets,layoutOffsets,type LayoutAction} from './design-layout';
 import {pageRaster,trimRaster,rasterLayer} from './retouch-canvas';
 import {detectTilt,tiltLabel,type Tilt} from './browser/straighten';
+import {sheetSize} from './page-quad';
+import {unwarpPixels} from './perspective';
 import {burnRedactions} from './redact-canvas';
 import {ocrMatchRect,type Rect as PageRect} from './redaction';
 import RedactDialog,{type RedactionHit} from './RedactDialog';
@@ -543,6 +545,7 @@ export default function App() {
     let t=known;
     if(!t){setBusy('Measuring the page tilt…');try{t=await detectTilt(await pageComposite(c,page),{ai:!!aiReady});}catch(e){fail(e);return;}finally{setBusy('');}}
     if(!t){notify('The page already looks straight.');return;}
+    if(t.sheet){flattenSheet(t.sheet);return;}
     const angle=-(t.turn+t.skew),swap=t.turn%180!==0,width=swap?page.height:page.width,height=swap?page.width:page.height;
     const from=new Point(page.width/2,page.height/2),shift=new Point(width/2,height/2).subtract(from),rad=util.degreesToRadians(angle);
     pageGeometry(t.turn?'Rotate page upright':'Straighten page',width,height,o=>{
@@ -550,12 +553,31 @@ export default function App() {
     },g=>t.turn?{x:[],y:[]}:g);
     setTilt(null);setTextScanRevision(r=>r+1);notify(`Page ${t.turn?`rotated ${t.turn===180?'upright':t.turn===90?'left':'right'}`:''}${t.turn&&t.skew?' and ':''}${t.skew?`straightened ${Math.abs(t.skew).toFixed(1)}°`:''}. Undo restores it.`);
   }
+  // A sheet photographed at an angle: the page's main image is replaced by
+  // the sheet pulled out to a rectangle, and the page takes the sheet's size.
+  function mainImage(c:Canvas){
+    const images=c.getObjects().filter((o):o is FabricImage=>o instanceof FabricImage&&o.visible);
+    return images.sort((a,b)=>b.getScaledWidth()*b.getScaledHeight()-a.getScaledWidth()*a.getScaledHeight())[0] as (FabricImage&Obj)|undefined;
+  }
+  function flattenSheet(sheet:{x:number;y:number}[]){
+    const c=canvas.current;if(!c)return;const image=mainImage(c);
+    if(!image){notify('Open a photo of a page first.');return;}if(image.lockMovementX){notify('Unlock the image layer first.');return;}
+    try{
+      const raster=pageRaster(c,page.width,page.height,[image]),corners=sheet.map(p=>({x:p.x*raster.width,y:p.y*raster.height}));
+      let {width,height}=sheetSize(corners);const k=Math.min(1,4000/Math.max(width,height));width=Math.max(1,Math.round(width*k));height=Math.max(1,Math.round(height*k));
+      const flat=Object.assign(document.createElement('canvas'),{width,height});
+      flat.getContext('2d')!.putImageData(new ImageData(unwarpPixels(raster.getContext('2d')!.getImageData(0,0,raster.width,raster.height),corners,width,height),width,height),0,0);
+      const index=c.getObjects().indexOf(image),next=Object.assign(new FabricImage(flat,{left:0,top:0}),{id:image.id,name:image.name});
+      c.remove(image);c.insertAt(index,next);
+      pageGeometry('Flatten page',width,height,()=>{},()=>({x:[],y:[]}));
+      setTilt(null);setTextScanRevision(r=>r+1);notify('Page flattened to a rectangle. Undo restores the original photo.');
+    }catch(e){fail(e);}
+  }
   // UVDoc flattens a photographed page (perspective and curl) in the page's
   // main image layer, which is replaced by the flattened page at full size.
   async function flattenPageAi(){
     const c=canvas.current;if(!c||busy||loading.current||!designOnly())return;
-    const images=c.getObjects().filter((o):o is FabricImage=>o instanceof FabricImage&&o.visible);
-    const image=images.sort((a,b)=>b.getScaledWidth()*b.getScaledHeight()-a.getScaledWidth()*a.getScaledHeight())[0] as (FabricImage&Obj)|undefined;
+    const image=mainImage(c);
     if(!image){notify('Open a photo of a page first.');return;}if(image.lockMovementX){notify('Unlock the image layer first.');return;}
     setBusy('Flattening the page with AI…');
     try{

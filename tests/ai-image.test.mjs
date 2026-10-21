@@ -47,3 +47,11 @@ test('word boundaries snap to the nearest real gap between words',async()=>{
  assert.equal(snapToGap(cols,36,3,13),32,'boundary inside R moves back to the space (blank 29-34)');
  assert.equal(snapToGap(cols,20,3,13),32);assert.equal(snapToGap(cols,58,3,5),58,'no gap within reach: unchanged');
 });
+test('CTC: a letter split between its accented forms still beats the blank',()=>{
+ // classes: blank, e, é, t. Step 1: blank .4, é .35, e .25 (the accents together win).
+ const dict=['e','é','t'],C=4,steps=[[.05,0,0,.95],[.4,.25,.35,0],[.05,0,0,.95]],data=new Float32Array(steps.flat());
+ assert.equal(ctcDecode(data,3,C,dict).text,'tét');
+ // A weak blank between two of the same letter still separates them (t and T together outweigh it).
+ const upper=['e','é','t','T'],tt=new Float32Array([[.05,0,0,.95,0],[.45,0,0,.3,.25],[.05,0,0,.95,0]].flat());
+ assert.equal(ctcDecode(tt,3,5,upper).text,'tt');
+});

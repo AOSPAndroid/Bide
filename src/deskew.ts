@@ -3,14 +3,33 @@
 // ink pixels is most "peaky" (largest sum of squares) when projected along
 // the text direction. Pure functions on RGBA buffers.
 
-// Ink pixels (1) differ clearly from the page's background luminance, so both
-// dark-on-light and light-on-dark text count.
-export function inkMap(rgba:ArrayLike<number>,width:number,height:number,threshold=60){
- const n=width*height,luma=new Uint8Array(n),histogram=new Uint32Array(256);
- for(let i=0;i<n;i++){const v=(rgba[i*4]*299+rgba[i*4+1]*587+rgba[i*4+2]*114)/1000*(rgba[i*4+3]/255)+255*(1-rgba[i*4+3]/255);luma[i]=v;histogram[luma[i]]++;}
- let seen=0,background=255;for(let v=0;v<256;v++){seen+=histogram[v];if(seen>=n/2){background=v;break;}}
- const ink=new Uint8Array(n);for(let i=0;i<n;i++)ink[i]=Math.abs(luma[i]-background)>threshold?1:0;
- return ink;
+// Ink pixels (1): clearly darker than the surroundings on both sides, left
+// and right or above and below (dark text), or clearly lighter (light text),
+// whichever marks fewer pixels, since text is the minority. Strokes thinner
+// than `radius` pass; the edge of a photographed sheet on a dark desk does
+// not, because one side of it is the desk.
+export function inkMap(rgba:ArrayLike<number>,width:number,height:number,threshold=60,radius=8){
+ const n=width*height,luma=new Uint8Array(n);
+ for(let i=0;i<n;i++)luma[i]=(rgba[i*4]*299+rgba[i*4+1]*587+rgba[i*4+2]*114)/1000*(rgba[i*4+3]/255)+255*(1-rgba[i*4+3]/255);
+ // For each pixel, the brightest (or darkest) neighbour within `radius` on
+ // each side; `dx,dy` is the step direction. Edges count as no contrast.
+ const side=(dx:number,dy:number,bright:boolean)=>{
+  const out=new Uint8Array(n);
+  for(let y=0;y<height;y++)for(let x=0;x<width;x++){
+   let v=luma[y*width+x];
+   for(let k=1;k<=radius;k++){const X=x+dx*k,Y=y+dy*k;if(X<0||Y<0||X>=width||Y>=height)break;const w=luma[Y*width+X];v=bright?Math.max(v,w):Math.min(v,w);}
+   out[y*width+x]=v;
+  }
+  return out;
+ };
+ const [l,r,u,d]=[[-1,0],[1,0],[0,-1],[0,1]].map(([dx,dy])=>side(dx,dy,true)),[L,R,U,D]=[[-1,0],[1,0],[0,-1],[0,1]].map(([dx,dy])=>side(dx,dy,false));
+ const dark=new Uint8Array(n),light=new Uint8Array(n);let darkCount=0,lightCount=0;
+ for(let i=0;i<n;i++){
+  const v=luma[i];
+  if(Math.max(Math.min(l[i],r[i]),Math.min(u[i],d[i]))-v>threshold){dark[i]=1;darkCount++;}
+  if(v-Math.min(Math.max(L[i],R[i]),Math.max(U[i],D[i]))>threshold){light[i]=1;lightCount++;}
+ }
+ return darkCount<=lightCount?dark:light;
 }
 
 // Clockwise rotation (degrees) of the text in an ink map, within ±range.

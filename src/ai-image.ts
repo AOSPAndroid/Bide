@@ -46,10 +46,27 @@ export function dbBoxes(prob:ArrayLike<number>,width:number,height:number,{thres
 // CTC greedy decoding of a recognizer output [T, C]. Class 0 is blank, 1..N are
 // `dict`, and N+1 is a space. Returns text, mean confidence and the time step of
 // each emitted character, so word positions can be recovered.
+// Letters that differ only by accent or case: a small or angled "é" can
+// split its weight between e, é and è so that the blank wins every step.
+const letterGroups=new WeakMap<string[],Int32Array>();
+function groupsOf(dict:string[]){
+ let groups=letterGroups.get(dict);if(groups)return groups;
+ const ids=new Map<string,number>();groups=new Int32Array(dict.length+1);
+ dict.forEach((ch,i)=>{const base=ch.normalize('NFD').replace(/\p{M}/gu,'').toLowerCase()||ch;if(!ids.has(base))ids.set(base,ids.size+1);groups![i+1]=ids.get(base)!;});
+ letterGroups.set(dict,groups);return groups;
+}
 export function ctcDecode(data:ArrayLike<number>,steps:number,classes:number,dict:string[]){
- const chars:{ch:string;t:number;p:number}[]=[];let last=0;
+ const chars:{ch:string;t:number;p:number}[]=[],groups=groupsOf(dict);let last=0;
  for(let t=0;t<steps;t++){
   let best=0,p=data[t*classes];for(let c=1;c<classes;c++)if(data[t*classes+c]>p){p=data[t*classes+c];best=c;}
+  // A blank step is a letter when one letter's variants together outweigh
+  // it, unless that letter continues the previous one (a weak blank still
+  // separates the two l of "ll").
+  if(!best&&p<.5){
+   const sums=new Map<number,{sum:number;best:number;p:number}>();
+   for(let c=1;c<classes;c++){const v=data[t*classes+c];if(v<.02)continue;const g=groups[c]??0,e=sums.get(g)??{sum:0,best:c,p:0};e.sum+=v;if(v>e.p){e.p=v;e.best=c;}sums.set(g,e);}
+   for(const e of sums.values())if(e.sum>p&&e.best!==last&&groups[e.best]!==groups[last]){best=e.best;p=e.sum;}
+  }
   if(best&&best!==last)chars.push({ch:best<=dict.length?dict[best-1]:' ',t,p});
   last=best;
  }

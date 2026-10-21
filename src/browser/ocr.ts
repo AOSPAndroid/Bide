@@ -6,10 +6,12 @@ import {createWorker,PSM,type Worker as OcrEngine,type LoggerMessage} from 'tess
 import type {TextRegion} from '../text-regions';
 import type {OcrScript} from '../ai-image';
 import {inkMap,estimateSkew} from '../deskew';
+import {findSheet,sheetSize} from '../page-quad';
+import {unwarpPixels,mapSquare,type XY} from '../perspective';
 
 export type OcrProgress=(fraction:number,label:string)=>void;
 export type OcrReader='tesseract'|'paddle';
-export type OcrOptions={signal?:AbortSignal;grouping?:OcrGrouping;languages?:string[];engine?:OcrReader;onProgress?:OcrProgress;thorough?:boolean;script?:OcrScript|'auto';accurate?:boolean;deskew?:boolean};
+export type OcrOptions={signal?:AbortSignal;grouping?:OcrGrouping;languages?:string[];engine?:OcrReader;onProgress?:OcrProgress;thorough?:boolean;script?:OcrScript|'auto';accurate?:boolean;deskew?:boolean;flatten?:boolean};
 
 let worker:Promise<OcrEngine>|undefined,workerLanguages='',queue=Promise.resolve(),report:((m:LoggerMessage)=>void)|undefined;
 // One shared engine; switching languages re-initializes it instead of starting another.
@@ -39,6 +41,8 @@ async function prepare(image:HTMLCanvasElement,signal?:AbortSignal):Promise<{inp
 // page their letter cells are dropped (letter editing needs level text).
 export async function recognizeImage(image:HTMLCanvasElement,options:OcrOptions={}):Promise<TextRegion[]>{
  options.signal?.throwIfAborted();
+ const sheet=options.flatten===false||options.deskew===false?undefined:pageSheet(image);
+ if(sheet)return readSheet(image,sheet,options);
  const tilt=options.deskew===false?undefined:pageTilt(image);
  if(!tilt)return recognizeLevel(image,options);
  const {canvas,toOriginal}=levelled(image,tilt);
@@ -47,6 +51,33 @@ export async function recognizeImage(image:HTMLCanvasElement,options:OcrOptions=
   const {glyphs,...rest}=r;
   return {...rest,left:r.left+dx,top:r.top+dy,baseline:r.baseline+dy,...(glyphs&&Math.abs(tilt)<=1?{glyphs:glyphs.map(g=>({...g,x0:g.x0+dx,x1:g.x1+dx}))}:{})};
  }).filter(r=>r.left+r.width>0&&r.top+r.height>0&&r.left<image.width&&r.top<image.height);
+}
+// A sheet photographed at an angle on a darker surface (page-quad.ts), found
+// on a copy at most 600 px across; corners in the image's pixels.
+export function pageSheet(image:HTMLCanvasElement){
+ const k=Math.min(1,600/Math.max(image.width,image.height)),w=Math.max(1,Math.round(image.width*k)),h=Math.max(1,Math.round(image.height*k));
+ const small=Object.assign(document.createElement('canvas'),{width:w,height:h}),g=small.getContext('2d',{willReadFrequently:true})!;
+ g.drawImage(image,0,0,w,h);
+ return findSheet(g.getImageData(0,0,w,h).data,w,h)?.map(p=>({x:p.x/k,y:p.y/k}));
+}
+// Perspective bends each line differently, so a photographed sheet is read
+// flattened to a rectangle, then every region's box is carried back onto the
+// photo through the same mapping (letter cells are dropped: they would lean).
+async function readSheet(image:HTMLCanvasElement,corners:XY[],options:OcrOptions){
+ let {width,height}=sheetSize(corners);const k=Math.min(1,4000/Math.max(width,height));width=Math.max(1,Math.round(width*k));height=Math.max(1,Math.round(height*k));
+ const src=image.getContext('2d',{willReadFrequently:true})!.getImageData(0,0,image.width,image.height);
+ const flat=Object.assign(document.createElement('canvas'),{width,height});
+ flat.getContext('2d')!.putImageData(new ImageData(unwarpPixels(src,corners,width,height),width,height),0,0);
+ const at=(x:number,y:number)=>mapSquare(corners,x/width,y/height);
+ return (await recognizeImage(flat,{...options,flatten:false})).map(r=>{
+  const box=[at(r.left,r.top),at(r.left+r.width,r.top),at(r.left+r.width,r.top+r.height),at(r.left,r.top+r.height)];
+  const left=Math.min(...box.map(p=>p.x)),top=Math.min(...box.map(p=>p.y)),right=Math.max(...box.map(p=>p.x)),bottom=Math.max(...box.map(p=>p.y));
+  const across=Math.hypot(box[1].x-box[0].x,box[1].y-box[0].y)/Math.max(1,r.width),down=Math.hypot(box[3].x-box[0].x,box[3].y-box[0].y)/Math.max(1,r.height);
+  const {glyphs:_,...rest}=r;
+  return {...rest,left,top,width:right-left,height:bottom-top,size:r.size*down,baseline:at(r.left+r.width/2,r.baseline).y,
+   ...(r.words?{words:r.words.map(w=>w.width===undefined?w:{...w,width:w.width*across})}:{}),
+   ...(r.line?{line:{...r.line,words:r.line.words.map(w=>w.width===undefined?w:{...w,width:w.width*across})}}:{})};
+ });
 }
 // Clockwise tilt of the page's text in degrees, when clear enough to correct.
 export function pageTilt(image:HTMLCanvasElement){

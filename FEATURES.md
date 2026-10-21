@@ -1,7 +1,10 @@
 ## Unreleased — searchable PDFs, proofreading and letter reuse
 
 - **Make PDF searchable**: PDF export can add an invisible OCR text layer at each line's position, so scanned pages can be searched, copied and read by screen readers. TXT and Word export of scanned pages use the same text. Pages that already have real PDF text are left alone.
-- OCR benchmark (`npm run bench:ocr`, scripts/ocr-bench.mjs): 14 pages with known text (letter, invoice table, receipt, two columns, small print, dark screenshot, poster, map, plus scan, phone photo, fax and low-resolution versions), scored by line error rate, words found and words right. Two fixes from it:
+- OCR benchmark (`npm run bench:ocr`, scripts/ocr-bench.mjs): 17 pages with known text (letter, invoice table, receipt, two columns, small print, dark screenshot, poster, map, a full A4 report, plus scan, phone photo, fax, low-resolution and photographed-at-an-angle versions), scored by line error rate, words found and words right. Fixes from it:
+  - A sheet photographed at an angle on a darker surface is found by its four corners (the largest bright region, checked for four real edges) and read flattened to a rectangle; regions are carried back onto the photo. Letter photographed at an angle: 87.5% → 100% of words found (Tesseract 93% → 99%); angled invoice 78% → 100%. In the editor the **Straighten** hint then offers to flatten the page, which takes the sheet's size; no AI needed.
+  - Tilt is measured from ink that contrasts with both sides of it, so the edge of a sheet on a dark desk no longer counts as a text line.
+  - CTC decoding: a step where a letter's accented forms (e, é, è) together outweigh the blank keeps the letter, unless it repeats the previous one.
   - Tilted pages are read straightened. The AI recognizer cuts each line out as a level rectangle, so 1.2° of tilt had cut words found on a scan from 100% to 24%. Regions are mapped back onto the original image.
   - Small text is enlarged before AI OCR (1.5×, or up to 3× for tiny print).
 
