@@ -12,6 +12,20 @@
 ## v0.8.14 details — searchable PDFs, proofreading and letter reuse
 
 - **Make PDF searchable**: PDF export can add an invisible OCR text layer at each line's position, so scanned pages can be searched, copied and read by screen readers. TXT and Word export of scanned pages use the same text. Pages that already have real PDF text are left alone.
+- OCR benchmark (`npm run bench:ocr`, scripts/ocr-bench.mjs): 14 pages with known text (letter, invoice table, receipt, two columns, small print, dark screenshot, poster, map, plus scan, phone photo, fax and low-resolution versions), scored by line error rate, words found and words right. Two fixes from it:
+  - Tilted pages are read straightened. The AI recognizer cuts each line out as a level rectangle, so 1.2° of tilt had cut words found on a scan from 100% to 24%. Regions are mapped back onto the original image.
+  - Small text is enlarged before AI OCR (1.5×, or up to 3× for tiny print).
+
+  Also measured and rejected, so the defaults stay:
+  - Real-ESRGAN sharpening before OCR: words found fell from 88% to 25% on the photo, because it invents letter shapes.
+  - Classic unsharp masking.
+  - The PP-OCRv5 server recognizer: it drops word spaces in Latin text and was 11x slower.
+  - Dictionary auto-correction: its gain was too small to justify silently changing names.
+
+  The server detector ("High accuracy") helps only on text over pictures: map 91% → 96%, photographed poster 92% → 100%.
+  AI OCR over the benchmark went from a 17.5% error rate and 82.6% of words found to 3.4% and 96.2% (scanned letter 26% → 99%, phone photo 47% → 88%). Tesseract: 12.6% and 81.7%.
+- **Subscription build** (`npm run build:saas`): sign-in with an emailed code, a 7-day free trial without a card, then €2/month through Stripe Checkout (Apple Pay, Google Pay, cards), with the customer portal for changes. The licence server (`cloud/`, a Workers-style handler with D1) signs licences that the app checks offline for up to 3 days, and serves the AI models and engines only with a valid licence. The editor stays open under the paywall if a licence runs out mid-session. AI models over 24 MiB are split into parts for hosts with a 25 MiB file limit. Setup and the remaining launch steps are in cloud/README.md.
+- The AI worker downloads a model once for its WebGPU and CPU attempts, and creates one session at a time (concurrent WebGPU sessions failed with "Session mismatch").
 - Code structure: App.tsx's canvas event handlers moved to canvas-events.ts, the command palette and menu commands to editor-commands.ts, and shared types and the tool list to editor-types.ts. Each gets its dependencies through a typed interface generated from the compiler's own types. App.tsx went from 1,421 to 1,118 lines.
 - **Object select (AI)** (A): click an object and SlimSAM (Segment Anything, int8, 14 MB) selects it. Shift-click adds another, Alt-click removes one, and the selection works with every selection action (Keep, Hide, To layer, Redact…). The page is encoded once per version of its layers, starting as soon as the tool is picked; each click then takes a fraction of a second. On a test picture it selected a 200 px circle to within 1% of its area.
 - PDF forms: **Form fields** in page properties lists a PDF's own text fields, checkboxes, dropdowns and radio buttons and fills them in place. **Add form field** (Text, Checkbox, Dropdown, Radio button) adds fields of bide's own, which can be dragged and resized on the page, renamed and given options. Export draws the values into the page, or with **Keep form fields fillable** recreates every field with pdf-lib so the PDF stays fillable, password protection included.

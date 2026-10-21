@@ -89,7 +89,24 @@ export async function modelBytes(model:string,base:string,publicDemo=PUBLIC_DEMO
  }
  // Converted FP16 models have their own build-time checksums. Keep the local
  // path unchanged and never fall back to a network download in this edition.
- const response=await (options.fetch??globalThis.fetch)(new URL(`ai/models/${model}.onnx`,base));
- if(!response.ok)throw new Error(`AI model ${model} is not bundled with this build.`);
- return new Uint8Array(await response.arrayBuffer());
+ const request=options.fetch??globalThis.fetch,url=new URL(`ai/models/${model}.onnx`,base);
+ const response=await request(url);
+ if(response.ok)return new Uint8Array(await response.arrayBuffer());
+ if(response.status===402)throw new Error('An active bide trial or subscription is needed for the AI tools.');
+ // Subscription builds split large local models to fit static-host limits.
+ // Public-demo models continue through the pinned, verified path above.
+ const partsResponse=await request(`${url}.parts.json`);
+ if(!partsResponse.ok)throw new Error(`AI model ${model} is not bundled with this build.`);
+ const {size,parts}=await partsResponse.json() as {size:number;parts:number};
+ if(!Number.isSafeInteger(size)||size<=0||!Number.isSafeInteger(parts)||parts<=0||parts>size)throw new Error(`AI model ${model} has an invalid parts manifest.`);
+ const bytes=new Uint8Array(size);let at=0;
+ for(let i=0;i<parts;i++){
+  const part=await request(`${url}.part${i}`);
+  if(!part.ok)throw new Error(`Part ${i+1} of AI model ${model} is missing.`);
+  const chunk=new Uint8Array(await part.arrayBuffer());
+  if(at+chunk.length>size)throw new Error(`AI model ${model} is incomplete.`);
+  bytes.set(chunk,at);at+=chunk.length;
+ }
+ if(at!==size)throw new Error(`AI model ${model} is incomplete.`);
+ return bytes;
 }

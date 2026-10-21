@@ -1,14 +1,15 @@
 import {inkDensity} from '../ocr-weight';
 import {segmentOcrLine,missingLines,type OcrGrouping} from '../ocr-segmentation';
-import {sampleBackground,estimateTextColor,toHex,edgeWidth,blurFromEdgeWidth,inkMass} from '../ocr-image';
+import {sampleBackground,estimateTextColor,toHex,edgeWidth,blurFromEdgeWidth,inkMass,prepareOcrPixels,estimateLineHeight} from '../ocr-image';
 import {prepareOcrImage} from './ocr-prepare';
 import {createWorker,PSM,type Worker as OcrEngine,type LoggerMessage} from 'tesseract.js';
 import type {TextRegion} from '../text-regions';
 import type {OcrScript} from '../ai-image';
+import {inkMap,estimateSkew} from '../deskew';
 
 export type OcrProgress=(fraction:number,label:string)=>void;
 export type OcrReader='tesseract'|'paddle';
-export type OcrOptions={signal?:AbortSignal;grouping?:OcrGrouping;languages?:string[];engine?:OcrReader;onProgress?:OcrProgress;thorough?:boolean;script?:OcrScript|'auto';accurate?:boolean};
+export type OcrOptions={signal?:AbortSignal;grouping?:OcrGrouping;languages?:string[];engine?:OcrReader;onProgress?:OcrProgress;thorough?:boolean;script?:OcrScript|'auto';accurate?:boolean;deskew?:boolean};
 
 let worker:Promise<OcrEngine>|undefined,workerLanguages='',queue=Promise.resolve(),report:((m:LoggerMessage)=>void)|undefined;
 // One shared engine; switching languages re-initializes it instead of starting another.
@@ -32,7 +33,43 @@ async function prepare(image:HTMLCanvasElement,signal?:AbortSignal):Promise<{inp
  return {input:canvas as HTMLCanvasElement,width,height};
 }
 
-export async function recognizeImage(image:HTMLCanvasElement,{signal,grouping='smart',languages=['eng','fra'],engine:ocrEngine='tesseract',onProgress,thorough=false,script='auto',accurate=false}:OcrOptions={}):Promise<TextRegion[]>{
+// A tilted page is read straightened: the AI recognizer cuts each line out
+// as a level rectangle, so even 1.2° of tilt made it miss three words in
+// four. Regions are mapped back onto the original image; on a clearly tilted
+// page their letter cells are dropped (letter editing needs level text).
+export async function recognizeImage(image:HTMLCanvasElement,options:OcrOptions={}):Promise<TextRegion[]>{
+ options.signal?.throwIfAborted();
+ const tilt=options.deskew===false?undefined:pageTilt(image);
+ if(!tilt)return recognizeLevel(image,options);
+ const {canvas,toOriginal}=levelled(image,tilt);
+ return (await recognizeLevel(canvas,options)).map(r=>{
+  const c=toOriginal(r.left+r.width/2,r.top+r.height/2),dx=c.x-(r.left+r.width/2),dy=c.y-(r.top+r.height/2);
+  const {glyphs,...rest}=r;
+  return {...rest,left:r.left+dx,top:r.top+dy,baseline:r.baseline+dy,...(glyphs&&Math.abs(tilt)<=1?{glyphs:glyphs.map(g=>({...g,x0:g.x0+dx,x1:g.x1+dx}))}:{})};
+ }).filter(r=>r.left+r.width>0&&r.top+r.height>0&&r.left<image.width&&r.top<image.height);
+}
+// Clockwise tilt of the page's text in degrees, when clear enough to correct.
+export function pageTilt(image:HTMLCanvasElement){
+ const k=Math.min(1,1000/Math.max(image.width,image.height)),w=Math.max(1,Math.round(image.width*k)),h=Math.max(1,Math.round(image.height*k));
+ const small=Object.assign(document.createElement('canvas'),{width:w,height:h}),g=small.getContext('2d',{willReadFrequently:true})!;
+ g.fillStyle='#fff';g.fillRect(0,0,w,h);g.drawImage(image,0,0,w,h);
+ const result=estimateSkew(inkMap(g.getImageData(0,0,w,h).data,w,h),w,h);
+ return result&&result.confidence>=1.3&&Math.abs(result.angle)>=.5?result.angle:undefined;
+}
+// The image turned back by `tilt` on a canvas large enough for its corners,
+// filled with the page's own background colour.
+function levelled(image:HTMLCanvasElement,tilt:number){
+ const t=-tilt*Math.PI/180,cos=Math.abs(Math.cos(t)),sin=Math.abs(Math.sin(t));
+ const W=Math.ceil(image.width*cos+image.height*sin),H=Math.ceil(image.width*sin+image.height*cos);
+ const canvas=Object.assign(document.createElement('canvas'),{width:W,height:H}),g=canvas.getContext('2d',{willReadFrequently:true})!;
+ const corner=image.getContext('2d')!.getImageData(0,0,1,1).data;
+ g.fillStyle=`rgb(${corner[0]},${corner[1]},${corner[2]})`;g.fillRect(0,0,W,H);
+ g.translate(W/2,H/2);g.rotate(t);g.drawImage(image,-image.width/2,-image.height/2);
+ const back=-t;
+ return {canvas,toOriginal:(x:number,y:number)=>{const px=x-W/2,py=y-H/2;return {x:px*Math.cos(back)-py*Math.sin(back)+image.width/2,y:px*Math.sin(back)+py*Math.cos(back)+image.height/2};}};
+}
+
+async function recognizeLevel(image:HTMLCanvasElement,{signal,grouping='smart',languages=['eng','fra'],engine:ocrEngine='tesseract',onProgress,thorough=false,script='auto',accurate=false}:OcrOptions={}):Promise<TextRegion[]>{
  let resolve!:(v:TextRegion[])=>void,reject!:(e:unknown)=>void;const result=new Promise<TextRegion[]>((yes,no)=>{resolve=yes;reject=no;});
  queue=queue.then(async()=>{try{
   signal?.throwIfAborted();
@@ -40,8 +77,18 @@ export async function recognizeImage(image:HTMLCanvasElement,{signal,grouping='s
   if(ocrEngine==='paddle'){
    // PaddleOCR (bundled AI models) reads the original pixels; its Latin model
    // covers all bundled languages at once, other alphabets have their own.
+   // Small text is enlarged first: 1.5x for ordinary page text (inked rows
+   // under 22 px), up to 3x for tiny print (5 px or less). On the benchmark
+   // (scripts/ocr-bench.mjs) 1.5x lifted words read on a phone photo from 77%
+   // to 88% and on small print from 92% to 100%; more than that lost word
+   // spaces, except on the tiniest print, which went from 51% to 76% at 3x.
    onProgress?.(0,'Loading AI OCR models');const {paddleOcr}=await import('./ai-tools');
-   lines=(await paddleOcr(image,(f,label)=>onProgress?.(f,label||'Recognizing text (AI)'),signal,{script,accurate})).filter(l=>l.confidence>=35);
+   const probe=image.getContext('2d',{willReadFrequently:true})!.getImageData(0,0,image.width,image.height);prepareOcrPixels(probe);
+   const lineHeight=estimateLineHeight(probe),k=lineHeight&&lineHeight<22?Math.max(1,Math.min(lineHeight<=5?3:1.5,28/lineHeight,Math.sqrt(12e6/(image.width*image.height)))):1;
+   let input=image;
+   if(k>1.05){input=Object.assign(document.createElement('canvas'),{width:Math.round(image.width*k),height:Math.round(image.height*k)});const g=input.getContext('2d',{willReadFrequently:true})!;g.imageSmoothingQuality='high';g.drawImage(image,0,0,input.width,input.height);}
+   lines=(await paddleOcr(input,(f,label)=>onProgress?.(f,label||'Recognizing text (AI)'),signal,{script,accurate})).filter(l=>l.confidence>=35);
+   sx=image.width/input.width;sy=image.height/input.height;
   }else{
   onProgress?.(0,'Preparing image');
   let pass=0;const passes=thorough?2:1;

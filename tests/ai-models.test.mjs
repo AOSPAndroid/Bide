@@ -43,7 +43,32 @@ test('local models use the offline pack only, including converted models',async(
  let requested;
  assert.deepEqual(await modelBytes('ppocr-det-server','https://local.test/bide/',false,{fetch:async url=>{requested=String(url);return new Response(bytes);}}),bytes);
  assert.equal(requested,'https://local.test/bide/ai/models/ppocr-det-server.onnx');
- let calls=0;await assert.rejects(modelBytes('ppocr-det','https://local.test/',false,{fetch:async()=>{calls++;return new Response('',{status:404});}}),/not bundled/);assert.equal(calls,1);
+ let calls=0;await assert.rejects(modelBytes('ppocr-det','https://local.test/',false,{fetch:async()=>{calls++;return new Response('',{status:404});}}),/not bundled/);assert.equal(calls,2);
+});
+test('split local models are assembled in order and never fall back to a remote source',async()=>{
+ const requests=[];
+ const fetch=async url=>{
+  const path=new URL(url);requests.push(path.pathname);assert.equal(path.origin,'https://local.test');
+  if(path.pathname.endsWith('.parts.json'))return Response.json({size:4,parts:3});
+  if(path.pathname.endsWith('.part0'))return new Response(bytes.slice(0,1));
+  if(path.pathname.endsWith('.part1'))return new Response(bytes.slice(1,2));
+  if(path.pathname.endsWith('.part2'))return new Response(bytes.slice(2));
+  return new Response('',{status:404});
+ };
+ assert.deepEqual(await modelBytes('ppocr-det','https://local.test/bide/',false,{fetch}),bytes);
+ assert.deepEqual(requests,['/bide/ai/models/ppocr-det.onnx','/bide/ai/models/ppocr-det.onnx.parts.json',...['0','1','2'].map(i=>`/bide/ai/models/ppocr-det.onnx.part${i}`)]);
+});
+test('split models reject malformed manifests, missing parts and incorrect combined sizes',async()=>{
+ for(const [manifest,chunks,message] of [
+  [{size:4,parts:0},[],/invalid parts manifest/],
+  [{size:4,parts:1},[undefined],/Part 1.*missing/],
+  [{size:4,parts:1},[bytes.slice(0,2)],/incomplete/],
+  [{size:2,parts:1},[bytes],/incomplete/],
+ ]){
+  const fetch=async url=>String(url).endsWith('.parts.json')?Response.json(manifest):/\.part\d+$/.test(String(url))&&chunks[0]?new Response(chunks[0]):new Response('',{status:404});
+  await assert.rejects(modelBytes('test','https://local.test/',false,{fetch}),message);
+ }
+ let calls=0;await assert.rejects(modelBytes('test','https://local.test/',false,{fetch:async()=>{calls++;return new Response('',{status:402});}}),/active bide trial/);assert.equal(calls,1);
 });
 test('unknown public model fails before making any request',async()=>{
  let calls=0;await assert.rejects(modelBytes('../untrusted','https://local.test/',true,{fetch:async()=>{calls++;throw new Error('unexpected');}}),/unavailable/);assert.equal(calls,0);

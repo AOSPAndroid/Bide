@@ -105,6 +105,10 @@ The earlier Python prototype remains in the source project for reference. The ne
 
 The prebuilt package includes draw.io static assets under `site/diagrams/runtime`, including shapes, stencils and the math renderer. Keep the full directory. No Java, draw.io desktop, online diagrams.net service, npm installation or runtime download is required. The embedded editor is configured for local assets; its content policy prevents external services and image/font requests. It uses the same host and port as bide. Every visitor has an independent diagram draft in their browser. For local exports and file downloads, the same HTTPS guidance above applies.
 
+## Subscription version (trial and paywall)
+
+The paid, sign-in version is built with `npm run build:saas` and needs the licence server in `cloud/`. See [cloud/README.md](cloud/README.md) for Stripe, email, keys and deployment.
+
 ## Public Sites demo
 
 The demo at https://bide-demo.daaalil.chatgpt.site serves `out/`, built with Vite mode `demo`. `npm run build` produces both the full local `dist/` and the hosted `out/`; `npm run build:demo` rebuilds only the demo. The `.openai/hosting.json` manifest identifies this Site.

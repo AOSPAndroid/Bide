@@ -15,7 +15,7 @@ function load(model:string,cpuOnly=false,onProgress?:(progress:ModelProgress)=>v
  const key=cpuOnly?model+'#cpu':model;
  if(!sessions.has(key))sessions.set(key,(async()=>{
   const bytes=await modelBytes(model,base,undefined,{onProgress});
-  if(!cpuOnly&&'gpu' in navigator)try{return await create(bytes,'webgpu',onProgress);}catch{}
+  if(!cpuOnly&&'gpu' in navigator)try{return await create(bytes.slice(),'webgpu',onProgress);}catch{}
   return create(bytes,'wasm',onProgress);
  })().catch(e=>{sessions.delete(key);throw e;}));
  return sessions.get(key)!;
