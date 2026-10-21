@@ -1,6 +1,11 @@
 ## Unreleased — searchable PDFs, proofreading and letter reuse
 
 - **Make PDF searchable**: PDF export can add an invisible OCR text layer at each line's position, so scanned pages can be searched, copied and read by screen readers. TXT and Word export of scanned pages use the same text. Pages that already have real PDF text are left alone.
+- OCR benchmark (`npm run bench:ocr`, scripts/ocr-bench.mjs): 11 pages with known text (letter, invoice table, receipt, two columns, small print, dark screenshot, plus scan, phone photo, fax and low-resolution versions), scored by line error rate, words found and words right. Two fixes from it:
+  - Tilted pages are read straightened. The AI recognizer cuts each line out as a level rectangle, so 1.2° of tilt had cut words found on a scan from 100% to 24%. Regions are mapped back onto the original image.
+  - Small text is enlarged before AI OCR (1.5×, or up to 3× for tiny print).
+
+  AI OCR over the benchmark went from a 17.5% error rate and 82.6% of words found to 3.4% and 96.2% (scanned letter 26% → 99%, phone photo 47% → 88%). Tesseract: 12.6% and 81.7%.
 - **Subscription build** (`npm run build:saas`): sign-in with an emailed code, a 7-day free trial without a card, then €2/month through Stripe Checkout (Apple Pay, Google Pay, cards), with the customer portal for changes. The licence server (`cloud/`, a Workers-style handler with D1) signs licences that the app checks offline for up to 3 days, and serves the AI models and engines only with a valid licence. The editor stays open under the paywall if a licence runs out mid-session. AI models over 24 MiB are split into parts for hosts with a 25 MiB file limit. Setup and the remaining launch steps are in cloud/README.md.
 - The AI worker downloads a model once for its WebGPU and CPU attempts, and creates one session at a time (concurrent WebGPU sessions failed with "Session mismatch").
 - Code structure: App.tsx's canvas event handlers moved to canvas-events.ts, the command palette and menu commands to editor-commands.ts, and shared types and the tool list to editor-types.ts. Each gets its dependencies through a typed interface generated from the compiler's own types. App.tsx went from 1,421 to 1,118 lines.

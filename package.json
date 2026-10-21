@@ -18,7 +18,8 @@
     "assets:ai": "node scripts/prepare-ai.mjs",
     "test:real": "node scripts/test-real.mjs",
     "build:saas": "tsc -b && vite build --mode saas",
-    "typecheck:cloud": "tsc -p cloud/tsconfig.json"
+    "typecheck:cloud": "tsc -p cloud/tsconfig.json",
+    "bench:ocr": "node scripts/ocr-bench.mjs"
   },
   "dependencies": {
     "@noble/hashes": "1.8.0",
