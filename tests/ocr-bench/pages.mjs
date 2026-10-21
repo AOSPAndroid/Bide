@@ -43,6 +43,28 @@ const darkUi=`<div style="width:760px;padding:28px;background:#1c1f26;font-famil
  l('Save changes','display:inline-block;background:#c44c28;color:#fff;padding:8px 16px;border-radius:6px;font-size:13px'),
 ].join('')}</div>`;
 
+// Text over a busy picture: stripes, blobs and a gradient behind the words.
+const busy=`<div style="position:relative;width:820px;height:460px;overflow:hidden;font-family:Arial,sans-serif;background:repeating-linear-gradient(35deg,#3b6e8f 0 14px,#4f86a8 14px 30px)">
+ <div style="position:absolute;left:-60px;top:180px;width:420px;height:420px;border-radius:50%;background:radial-gradient(#f2b134,#d9602b)"></div>
+ <div style="position:absolute;right:-80px;top:-40px;width:360px;height:300px;border-radius:40%;background:radial-gradient(#9dd17a,#2f7d4a)"></div>
+ <div style="position:absolute;left:40px;top:40px;color:#fff;text-shadow:0 2px 6px #0008">${[
+  l('FESTIVAL DES LUMIÈRES','font-size:40px;font-weight:900;letter-spacing:2px'),
+  l('Du 5 au 8 décembre 2026 · Place Bellecour','font-size:22px;margin-top:6px'),
+  l('Concerts gratuits chaque soir à 20 h 30','font-size:20px;margin-top:150px'),
+  l('Billetterie : www.lumieres-lyon.example','font-size:18px;margin-top:8px'),
+ ].join('')}</div>
+ <div style="position:absolute;right:30px;bottom:30px;background:#fff;color:#c44c28;padding:8px 14px;border-radius:8px;transform:rotate(-6deg)">${l('Entrée libre','font-size:24px;font-weight:bold')}</div>
+</div>`;
+// A map-like screenshot: labels on roads and parks.
+const map=`<div style="position:relative;width:760px;height:480px;background:#e8ece6;font-family:Arial,sans-serif;overflow:hidden">
+ ${Array.from({length:12},(_,i)=>`<div style="position:absolute;left:${i*70-40}px;top:-20px;width:14px;height:540px;background:#fff;transform:rotate(${i%2?18:-12}deg)"></div>`).join('')}
+ <div style="position:absolute;left:420px;top:220px;width:260px;height:160px;border-radius:30px;background:#b9dca4"></div>
+ <div style="position:absolute;left:60px;top:60px;font-size:13px;color:#555">${l('Rue de la République')}</div>
+ <div style="position:absolute;left:470px;top:280px;font-size:13px;color:#3d6b35">${l('Parc de la Tête d’Or')}</div>
+ <div style="position:absolute;left:200px;top:380px;font-size:12px;color:#555">${l('Avenue Jean Jaurès')}</div>
+ <div style="position:absolute;left:40px;top:150px;background:#fff;padding:10px 14px;border-radius:8px;box-shadow:0 2px 8px #0003;font-size:14px">${l('Hôtel du Parc','font-weight:bold')}${l('4,6 ★ · 128 avis')}${l('Ouvert jusqu’à 23:00')}</div>
+</div>`;
+
 export const pages=[
  {id:'letter',category:'clean document',html:letter},
  {id:'invoice',category:'table',html:invoice},
@@ -55,4 +77,7 @@ export const pages=[
  {id:'receipt-fax',category:'low quality',html:receipt,width:360,degrade:{scale:.75,noise:30,blur:.7,jpeg:.4}},
  {id:'small-print-low',category:'small + low resolution',html:smallPrint,degrade:{scale:.8,jpeg:.7}},
  {id:'invoice-retina',category:'screenshot (2x)',html:invoice,dpr:2},
+ {id:'poster',category:'busy picture',html:busy,width:820,height:460},
+ {id:'map',category:'map screenshot',html:map,width:760,height:480},
+ {id:'poster-photo',category:'busy photo',html:busy,width:820,height:460,degrade:{rotate:1.5,noise:12,blur:.6,jpeg:.6}},
 ];

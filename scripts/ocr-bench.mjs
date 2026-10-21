@@ -1,6 +1,6 @@
 // OCR benchmark: realistic pages with known text, read by each engine in the
 // real app code (headless Chromium), scored per page and per engine.
-//   node scripts/ocr-bench.mjs [engine ...]        engines: tesseract, ai, ai-accurate
+//   node scripts/ocr-bench.mjs [engine ...]        engines: tesseract, tesseract-thorough, ai, ai-accurate, ai-sharpen
 //   BENCH_PAGES=invoice,receipt node scripts/ocr-bench.mjs
 // Scores: line CER (each true line against its best-matching stretch of an OCR
 // line, so merged columns are not penalised), word recall and word precision
@@ -51,8 +51,10 @@ try{
     const img=new Image();img.src='data:image/png;base64,'+png;await img.decode();
     const c=document.createElement('canvas');c.width=img.width;c.height=img.height;c.getContext('2d',{willReadFrequently:true}).drawImage(img,0,0);
     const {recognizeImage}=await import('/src/browser/ocr.ts');
-    const regions=await recognizeImage(c,{grouping:'lines',languages:['eng','fra'],engine:engine==='tesseract'?'tesseract':'paddle',accurate:engine==='ai-accurate'});
-    return regions.map(r=>({text:r.text,left:r.left,top:r.top,width:r.width,height:r.height}));
+    // ai-sharpen: Real-ESRGAN 2x first; boxes are scaled back to the page.
+    let input=c,k=1;if(engine==='ai-sharpen'){const {upscaleCanvas}=await import('/src/browser/ai-tools.ts');input=await upscaleCanvas(c,2);k=.5;}
+    const regions=await recognizeImage(input,{grouping:'lines',languages:['eng','fra'],engine:engine.startsWith('tesseract')?'tesseract':'paddle',accurate:engine==='ai-accurate',thorough:engine==='tesseract-thorough'});
+    return regions.map(r=>({text:r.text,left:r.left*k,top:r.top*k,width:r.width*k,height:r.height*k}));
    },[degraded,engine]).catch(e=>{console.error(p.id,engine,e.message);return [];});
    const seconds=(Date.now()-t0)/1000,rows=joinRows(lines),cer=lineErrors(truth,[...lines.map(r=>r.text),...rows]),words=wordScores(truth,lines.map(r=>r.text));
    results.push({page:p.id,category:p.category,engine,cer:cer.rate,recall:words.recall,precision:words.precision,seconds,misses:cer.worst,read:lines.map(r=>r.text)});
