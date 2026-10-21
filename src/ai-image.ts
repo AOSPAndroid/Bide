@@ -172,3 +172,23 @@ export function pickMask(scores:number[],areas:number[],margin=.05){
  for(let i=0;i<scores.length;i++)if(scores[i]>=best-margin&&areas[i]>0&&(pick<0||areas[i]<areas[pick]))pick=i;
  return pick<0?scores.indexOf(best):pick;
 }
+
+// Detector boxes that split one line (busy backgrounds, shadows) are joined:
+// boxes on the same row (vertical overlap of at least 60% of the shorter
+// one) that overlap or nearly touch (gap under half the line height). Wide
+// gaps, such as between table cells, keep their boxes apart.
+export function mergeLineBoxes<B extends {x0:number;y0:number;x1:number;y1:number;score?:number}>(boxes:B[],gap=.5):B[]{
+ const out=boxes.map(b=>({...b}));
+ for(let changed=true;changed;){
+  changed=false;
+  for(let i=0;i<out.length&&!changed;i++)for(let j=i+1;j<out.length&&!changed;j++){
+   const a=out[i],b=out[j],h=Math.min(a.y1-a.y0,b.y1-b.y0),overlap=Math.min(a.y1,b.y1)-Math.max(a.y0,b.y0);
+   const dx=Math.max(a.x0,b.x0)-Math.min(a.x1,b.x1);
+   if(overlap>=.6*h&&dx<=gap*h){
+    out[i]={...a,x0:Math.min(a.x0,b.x0),y0:Math.min(a.y0,b.y0),x1:Math.max(a.x1,b.x1),y1:Math.max(a.y1,b.y1),...(a.score!==undefined&&b.score!==undefined?{score:Math.max(a.score,b.score)}:{})};
+    out.splice(j,1);changed=true;
+   }
+  }
+ }
+ return out.sort((a,b)=>a.y0-b.y0||a.x0-b.x0);
+}
