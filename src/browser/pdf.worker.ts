@@ -1,3 +1,4 @@
+import {HOSTED_BUILD} from '../build-flags';
 // Install the message handler immediately; the WASM module uses top-level await.
 const engineReady=import('./pdf-core');
 let queue=Promise.resolve();
@@ -8,7 +9,7 @@ self.onmessage=(event:MessageEvent)=>{
       const engine=await engineReady;
       let result:unknown;
       switch(method){
-        case 'health':result={ok:true,office:globalThis.isSecureContext&&globalThis.crossOriginIsolated};break;
+        case 'health':result={ok:true,office:!HOSTED_BUILD&&globalThis.isSecureContext&&globalThis.crossOriginIsolated};break;
         case 'import':result=await engine.importBytes(args.bytes,args.name,args.password);break;
         case 'restore':result=await engine.restore(args);break;
         case 'render':result=engine.render(args.source,args.index,args.scale);break;

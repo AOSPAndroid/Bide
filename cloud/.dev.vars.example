@@ -1,0 +1,7 @@
+# Example names only. Copy to the repository root as .dev.vars for local Wrangler.
+# Never commit real values. A remote deployment uses Worker secrets instead.
+LICENCE_PRIVATE_KEY=REPLACE_WITH_PRIVATE_JWK
+STRIPE_SECRET_KEY=REPLACE_WITH_STRIPE_TEST_KEY
+STRIPE_WEBHOOK_SECRET=REPLACE_WITH_TEST_ENDPOINT_SECRET
+RESEND_API_KEY=REPLACE_WITH_RESEND_KEY
+# DEV_SHOW_CODE=1 is only for an isolated local development server.
