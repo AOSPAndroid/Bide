@@ -21,7 +21,7 @@ test('Find & redact removes personal data from PDFs and images',{timeout:900000}
    const p=doc.addPage([0,0,420,200],0,{Font:{F:font}},'BT /F 14 Tf 30 150 Td (Email: alex@example.com) Tj ET BT /F 14 Tf 30 110 Td (Keep this line) Tj ET');doc.insertPage(-1,p);
    const file=join(dir,'letter.pdf');await writeFile(file,doc.saveToBuffer('').asUint8Array());
    const page=await browser.newPage({viewport:{width:1400,height:900},acceptDownloads:true}),errors=[];page.on('pageerror',e=>errors.push(e.message));
-   await page.goto(server.resolvedUrls.local[0]);await page.locator('input[type=file][accept*=".psd"]').setInputFiles(file);
+   await page.goto(server.resolvedUrls.local[0]+'app/');await page.locator('input[type=file][accept*=".psd"]').setInputFiles(file);
    await page.waitForFunction(()=>/editable text regions/.test(document.querySelector('.text-detection-bar span')?.textContent||''),null,{timeout:120000});
    await redactAll(page,'alex@example.com');
    await page.waitForTimeout(1500);
@@ -36,7 +36,7 @@ test('Find & redact removes personal data from PDFs and images',{timeout:900000}
    await shot.setContent('<body style="margin:0;background:#fff"><div style="padding:30px;font:22px Arial;line-height:1.6;color:#111">Contact: alex@example.com<br>Thank you for your order</div></body>');
    const file=join(dir,'mail.png');await shot.screenshot({path:file});await shot.close();
    const page=await browser.newPage({viewport:{width:1400,height:900}}),errors=[];page.on('pageerror',e=>errors.push(e.message));
-   await page.goto(server.resolvedUrls.local[0]);await page.locator('input[type=file][accept*=".psd"]').setInputFiles(file);
+   await page.goto(server.resolvedUrls.local[0]+'app/');await page.locator('input[type=file][accept*=".psd"]').setInputFiles(file);
    await page.locator('button[aria-label*="alex@example.com"]').waitFor({timeout:240000});
    await redactAll(page,'alex@example.com');
    await page.locator('.layer-name',{hasText:/\(redacted\)/}).waitFor({timeout:30000});

@@ -22,7 +22,7 @@ test('AI OCR finds and reads other alphabets',{timeout:900000},async()=>{
    await shot.setContent(`<body style="margin:0;background:#fff"><div dir="${sample.dir||'ltr'}" style="padding:30px 36px;font:34px '${sample.font}';color:#111">${sample.text}</div></body>`);
    const image=join(await mkdtemp(join(tmpdir(),'bide-abc-')),`sample-${n}.png`);await shot.screenshot({path:image});await shot.close();
    const page=await browser.newPage({viewport:{width:1400,height:900}}),errors=[];page.on('pageerror',e=>errors.push(e.message));
-   await page.goto(server.resolvedUrls.local[0]);await page.locator('input[type=file][accept*=".psd"]').setInputFiles(image);
+   await page.goto(server.resolvedUrls.local[0]+'app/');await page.locator('input[type=file][accept*=".psd"]').setInputFiles(image);
    // The last sample also uses the high-accuracy (server) detector.
    if(n===samples.length-1)await (await ocrSetting(page,'High accuracy OCR')).check();
    await page.waitForFunction(s=>(document.querySelector('.text-detection-bar span')?.textContent||'').includes(`AI OCR (${s})`),sample.script,{timeout:240000})

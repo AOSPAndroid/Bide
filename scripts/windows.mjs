@@ -59,7 +59,7 @@ async function buildSource() {
   await run(process.execPath, [join(projectRoot, 'scripts', 'fetch-office.mjs')], {env});
   await run(process.execPath, [npm, 'ci', '--ignore-scripts', '--no-audit', '--no-fund'], {env});
   await run(process.execPath, [join(projectRoot, 'scripts', 'fetch-diagrams.mjs')], {env});
-  await run(process.execPath, [npm, 'run', 'build'], {env});
+  await run(process.execPath, [npm, 'run', 'build:local'], {env});
 }
 
 function status(port, path = '/__bide/status') {

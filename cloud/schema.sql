@@ -25,3 +25,30 @@ CREATE TABLE IF NOT EXISTS sessions (
   user_id TEXT NOT NULL,
   expires INTEGER NOT NULL
 );
+-- Durable checkout attempts and leases. The token fences expired workers.
+CREATE TABLE IF NOT EXISTS billing_state (
+  user_id TEXT PRIMARY KEY REFERENCES users(id),
+  lock_token TEXT,
+  lock_expires INTEGER NOT NULL DEFAULT 0,
+  checkout_key TEXT,
+  checkout_params TEXT,
+  checkout_session TEXT,
+  checkout_url TEXT,
+  checkout_expires INTEGER
+);
+-- Written in the same transaction as the reconciled entitlement.
+CREATE TABLE IF NOT EXISTS stripe_events (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id),
+  processed_at INTEGER NOT NULL
+);
+-- Positive, verified paid invoices; independent of trial/access entitlement.
+CREATE TABLE IF NOT EXISTS payment_receipts (
+  invoice_id TEXT PRIMARY KEY NOT NULL,
+  user_id TEXT NOT NULL REFERENCES users(id),
+  subscription_id TEXT NOT NULL,
+  paid_at INTEGER NOT NULL CHECK (paid_at > 0),
+  amount_paid INTEGER NOT NULL CHECK (amount_paid > 0),
+  currency TEXT NOT NULL CHECK (length(currency) = 3)
+);
+CREATE INDEX IF NOT EXISTS payment_receipts_user_paid ON payment_receipts(user_id, paid_at, invoice_id);

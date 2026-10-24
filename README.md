@@ -110,11 +110,13 @@ Office conversion needs HTTPS (or localhost) and cross-origin isolation response
 npm ci --ignore-scripts
 npm run assets:office
 npm run assets:diagrams
-npm run build
-# dist/ is the complete local app; out/ is the public demo.
+npm run build:local
+# dist/ is the complete local app.
 npm run serve
 npm test
 ```
+
+For the hosted public website in `out/`, use `npm run build`. See [public website and search setup](docs/discovery.md) for domain, indexing and measurement configuration.
 
 React, TypeScript and Fabric.js provide the editor. MuPDF WebAssembly handles PDF parsing/rendering/composition; PDFKit and SVG-to-PDFKit produce vector overlays with embedded fonts. ZetaOffice performs Office conversion in a separate browser worker. The earlier Python prototype remains for reference and is not used by the BAT launchers.
 

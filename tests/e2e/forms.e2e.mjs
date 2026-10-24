@@ -19,7 +19,7 @@ test('PDF forms are filled, extended and exported fillable or flattened',{timeou
   form.createTextField('Full name').addToPage(pg,{x:40,y:220,width:200,height:22});form.createCheckBox('Agree').addToPage(pg,{x:40,y:180,width:14,height:14});
   const file=join(await mkdtemp(join(tmpdir(),'bide-form-')),'application.pdf');await writeFile(file,await made.save());
   const page=await browser.newPage({viewport:{width:1400,height:900},acceptDownloads:true}),errors=[];page.on('pageerror',e=>errors.push(e.message));
-  await page.goto(server.resolvedUrls.local[0]);await page.locator('input[type=file][accept*=".psd"]').setInputFiles(file);
+  await page.goto(server.resolvedUrls.local[0]+'app/');await page.locator('input[type=file][accept*=".psd"]').setInputFiles(file);
   // The PDF's own fields are listed and filled.
   const name=page.getByLabel('Form field Full name');await name.waitFor({timeout:60000});
   await name.fill('Alex Martin');await name.press('Enter');await page.getByLabel('Form field Agree').check();

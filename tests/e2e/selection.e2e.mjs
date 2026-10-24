@@ -29,7 +29,7 @@ test('wand, combined selections, refine and layer masks',{timeout:600000},async(
   const shot=await browser.newPage({viewport:{width:400,height:300}});await shot.setContent(fixture);
   const image=join(await mkdtemp(join(tmpdir(),'bide-sel-')),'shapes.png');await shot.screenshot({path:image});await shot.close();
   const page=await browser.newPage({viewport:{width:1400,height:900}}),errors=[];page.on('pageerror',e=>errors.push(e.message));
-  await page.goto(server.resolvedUrls.local[0]);await page.locator('input[type=file][accept*=".psd"]').setInputFiles(image);
+  await page.goto(server.resolvedUrls.local[0]+'app/');await page.locator('input[type=file][accept*=".psd"]').setInputFiles(image);
   await page.getByText(/1 page added/).waitFor({timeout:60000});await page.waitForTimeout(800);
 
   // Magic wand on the square selects exactly the square.
@@ -94,7 +94,7 @@ test('AI selects the subject and removes the background as a layer mask',{timeou
   await shot.setContent(`<body style="margin:0;background:repeating-linear-gradient(45deg,#e9e4d8 0 12px,#f4f0e6 12px 24px)"><div style="position:absolute;left:150px;top:60px;width:180px;height:260px;border-radius:90px 90px 40px 40px;background:radial-gradient(circle at 40% 30%,#c0392b,#5b1010)"></div></body>`);
   const image=join(await mkdtemp(join(tmpdir(),'bide-sel-')),'figure.png');await shot.screenshot({path:image});await shot.close();
   const page=await browser.newPage({viewport:{width:1400,height:900}}),errors=[];page.on('pageerror',e=>errors.push(e.message));
-  await page.goto(server.resolvedUrls.local[0]);await page.locator('input[type=file][accept*=".psd"]').setInputFiles(image);
+  await page.goto(server.resolvedUrls.local[0]+'app/');await page.locator('input[type=file][accept*=".psd"]').setInputFiles(image);
   await page.getByText(/1 page added/).waitFor({timeout:60000});await page.waitForTimeout(800);
   await page.getByRole('button',{name:'Magic wand',exact:true}).click();
   await page.getByRole('button',{name:'Subject'}).click();
