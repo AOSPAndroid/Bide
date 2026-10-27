@@ -3,12 +3,16 @@
 // server (cloud/worker.ts) signs a licence the app checks with its public key,
 // so the editor also opens offline for up to three days. The editor stays
 // mounted when a licence runs out mid-session, so autosave keeps the work.
+// The iOS and Android apps (VITE_APP_STORE=1) only sign in to accounts: no
+// prices, no purchase and no pointer to one (App Store 3.1.3(f), Google
+// Play's consumption-only apps); subscribing happens on the website.
 import {useCallback,useEffect,useRef,useState,type ReactNode} from 'react';
 import {verifyLicence,importPublicKey,trialDaysLeft,type Licence} from './licence';
 
 const env=import.meta.env as Record<string,string|undefined>;
-export const PAYWALL=env.VITE_PAYWALL==='1';
-const API=(env.VITE_LICENCE_API??'').replace(/\/$/,''),PRICE=env.VITE_PRICE_LABEL||'€2 per month';
+// Read straight from import.meta.env so the build drops the branches it does not use.
+export const PAYWALL=import.meta.env.VITE_PAYWALL==='1',APP_STORE=import.meta.env.VITE_APP_STORE==='1';
+const API=(env.VITE_LICENCE_API??'').replace(/\/$/,''),PRICE=APP_STORE?'':env.VITE_PRICE_LABEL||'€2 per month';
 const store={get:(k:string)=>{try{return localStorage.getItem(k);}catch{return null;}},set:(k:string,v:string|null)=>{try{if(v===null)localStorage.removeItem(k);else localStorage.setItem(k,v);}catch{}}};
 const SESSION='bide-session',LICENCE='bide-licence';
 
@@ -60,6 +64,10 @@ function Gate({children}:{children:ReactNode}){
  const checkout=async()=>{patch({busy:true,error:undefined});try{const r=await api<{url:string}>('/api/checkout',{method:'POST'});location.assign(r.url);}catch(e){patch({busy:false,error:(e as Error).message});}};
  const portal=async()=>{try{const r=await api<{url:string}>('/api/portal',{method:'POST'});location.assign(r.url);}catch(e){alert((e as Error).message);}};
  const signOut=async()=>{try{await api('/api/logout',{method:'POST'});}catch{}store.set(SESSION,null);store.set(LICENCE,null);setCode('');setS({step:'email'});};
+ const remove=async()=>{
+  if(!confirm('Delete your bide account? Any subscription is cancelled at once and cannot be restored. Files and invoices on this device are kept.'))return;
+  try{await api('/api/account/delete',{method:'POST'});store.set(SESSION,null);store.set(LICENCE,null);setCode('');setS({step:'email',error:undefined});opened.current=false;alert('Your bide account has been deleted.');}catch(e){alert((e as Error).message);}
+ };
 
  // Once open, the editor stays mounted under the paywall so nothing is lost.
  const opened=useRef(false);if(s.step==='ready')opened.current=true;
@@ -67,17 +75,20 @@ function Gate({children}:{children:ReactNode}){
  const card=(body:ReactNode)=><div className="paywall" role="dialog" aria-modal="true" aria-label="bide account"><div className="paywall-card"><img src="./brand-logo.svg" alt="" className="paywall-logo"/>{body}{s.error&&<p className="paywall-error" role="alert">{s.error}</p>}</div></div>;
  return <>
   {unlocked&&children}
-  {s.step==='ready'&&s.licence&&<AccountChip licence={s.licence} subscribe={checkout} manage={portal} signOut={signOut}/>}
+  {s.step==='ready'&&s.licence&&<AccountChip licence={s.licence} subscribe={checkout} manage={portal} signOut={signOut} remove={remove}/>}
   {s.step==='checking'&&card(<p className="muted">Checking your subscription…</p>)}
   {s.step==='email'&&card(<form onSubmit={e=>{e.preventDefault();void start();}}>
-   <h1>Try bide free for 7 days</h1><p className="muted">Edit images, PDFs and documents in your browser. Your files stay on your device. No card needed for the trial; then {PRICE}.</p>
+   {APP_STORE?<><h1>Sign in to bide</h1><p className="muted">Use the email of your bide account. A new account starts with 7 free days. Your files stay on your device.</p></>
+    :<><h1>Try bide free for 7 days</h1><p className="muted">Edit images, PDFs and documents in your browser. Your files stay on your device. No card needed for the trial; then {PRICE}.</p></>}
    <label>Email<input type="email" required autoFocus aria-label="Email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="you@example.com"/></label>
    <button disabled={s.busy}>Email me a sign-in code</button></form>)}
   {s.step==='code'&&card(<form onSubmit={e=>{e.preventDefault();void verify();}}>
    <h1>Check your email</h1><p className="muted">We sent a 6-digit code to {s.email}.</p>
    <label>Code<input inputMode="numeric" autoComplete="one-time-code" pattern="\d{6}" maxLength={6} required autoFocus aria-label="Sign-in code" value={code} onChange={e=>setCode(e.target.value.replace(/\D/g,''))}/></label>
    <button disabled={s.busy||code.length!==6}>Sign in</button><button type="button" className="secondary" onClick={()=>setS({step:'email'})}>Use another email</button></form>)}
-  {s.step==='expired'&&card(<>
+  {s.step==='expired'&&card(APP_STORE?<>
+   <h1>No active plan</h1><p className="muted">The account {s.email??''} has no active plan in bide. Your work is kept on this device.</p>
+   <button onClick={()=>void refresh()}>Check again</button><button className="secondary" onClick={()=>void signOut()}>Sign out</button><button className="secondary" onClick={()=>void remove()}>Delete account</button></>:<>
    <h1>Your free trial has ended</h1><p className="muted">Subscribe to keep editing with bide: {PRICE}, cancel any time. Pay with Apple Pay, Google Pay or a card. Your work is saved in this browser.</p>
    <button disabled={s.busy} onClick={()=>void checkout()}>Subscribe</button><button className="secondary" onClick={()=>void signOut()}>Sign out{s.email?` (${s.email})`:''}</button></>)}
   {s.step==='offline'&&card(<>
@@ -88,11 +99,12 @@ function Gate({children}:{children:ReactNode}){
 
 const decode=async(token:string)=>{try{return JSON.parse(atob(token.split('.')[0].replace(/-/g,'+').replace(/_/g,'/'))) as Licence;}catch{return undefined;}};
 
-function AccountChip({licence,subscribe,manage,signOut}:{licence:Licence;subscribe:()=>void;manage:()=>void;signOut:()=>void}){
+function AccountChip({licence,subscribe,manage,signOut,remove}:{licence:Licence;subscribe:()=>void;manage:()=>void;signOut:()=>void;remove:()=>void}){
  const days=trialDaysLeft(licence);
  return <details className="account-chip"><summary aria-label="Account">{licence.status==='trial'?`Trial · ${days} day${days===1?'':'s'} left`:'bide'}</summary><div>
   <span className="muted">{licence.email}</span>
-  {licence.status==='trial'?<button onClick={subscribe}>Subscribe · {PRICE}</button>:<button onClick={manage}>Manage subscription</button>}
+  {!APP_STORE&&(licence.status==='trial'?<button onClick={subscribe}>Subscribe · {PRICE}</button>:<button onClick={manage}>Manage subscription</button>)}
   <button className="secondary" onClick={signOut}>Sign out</button>
+  <button className="secondary" onClick={remove}>Delete account</button>
  </div></details>;
 }

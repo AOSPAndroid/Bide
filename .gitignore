@@ -19,5 +19,6 @@ tests/real/*
 !tests/real/README.md
 !tests/real/example.json
 dist-saas/
+dist-app/
 .env.*.local
 .dev.vars

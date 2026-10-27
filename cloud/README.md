@@ -33,6 +33,10 @@ The code is a standard fetch handler (`cloud/worker.ts`) with a D1 database (`cl
 
      The `_headers` file keeps the cross-origin isolation headers the app needs.
 
+## Apps
+
+The iOS and Android apps use this same server. MOBILE.md covers what to configure: `APP_ORIGINS`, the `used_trials` table, and models fetched with a bearer licence. `/api/account/delete` deletes an account from the web or the apps.
+
 ## Still to do before charging
 
 - **MuPDF licence:** buy a commercial MuPDF licence from Artifex. Without it, a closed hosted version must offer its source under the AGPL. Then make the repository private, and stop distributing the free Windows ZIP, which has no paywall.

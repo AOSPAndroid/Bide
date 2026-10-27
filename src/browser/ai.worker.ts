@@ -4,15 +4,27 @@
 import * as ort from 'onnxruntime-web/webgpu';
 type Feeds=Record<string,{data:Float32Array|BigInt64Array;dims:number[]}>;
 type Loaded={session:ort.InferenceSession;backend:'webgpu'|'wasm'};
-const sessions=new Map<string,Promise<Loaded>>();let base='';
+const sessions=new Map<string,Promise<Loaded>>();let base='',remote='',licence='';
 
+// A file of the build, or, in the apps, one that is not bundled: fetched once
+// from the bide server with the licence and kept in the cache (large models
+// are downloaded only when a tool first needs them).
+async function get(path:string){
+ const local=await fetch(new URL(path,base)).catch(()=>undefined);
+ if(local?.ok||!remote)return local??new Response(null,{status:404});
+ const url=new URL(path,remote).href,cache=typeof caches==='undefined'?undefined:await caches.open('bide-models').catch(()=>undefined);
+ const hit=await cache?.match(url);if(hit)return hit;
+ const response=await fetch(url,{headers:licence?{authorization:`Bearer ${licence}`}:{}});
+ if(response.ok&&cache)await cache.put(url,response.clone()).catch(()=>{});
+ return response;
+}
 // A model in one file, or in parts with a manifest (hosts limit file size;
 // see splitLargeFiles in vite.config.ts).
 async function modelBytes(model:string){
- const url=new URL(`ai/models/${model}.onnx`,base),whole=await fetch(url);if(whole.ok)return new Uint8Array(await whole.arrayBuffer());
- const manifest=await fetch(`${url}.parts.json`);if(!manifest.ok)throw new Error(whole.status===402?'An active bide trial or subscription is needed for the AI tools.':`AI model ${model} is not bundled with this build.`);
+ const path=`ai/models/${model}.onnx`,whole=await get(path);if(whole.ok)return new Uint8Array(await whole.arrayBuffer());
+ const manifest=await get(`${path}.parts.json`);if(!manifest.ok)throw new Error(whole.status===402||manifest.status===402?'An active bide trial or subscription is needed for the AI tools.':`AI model ${model} is not bundled with this build.`);
  const {size,parts}=await manifest.json() as {size:number;parts:number},bytes=new Uint8Array(size);let at=0;
- for(let i=0;i<parts;i++){const part=await fetch(`${url}.part${i}`);if(!part.ok)throw new Error(`Part ${i+1} of AI model ${model} is missing.`);const chunk=new Uint8Array(await part.arrayBuffer());bytes.set(chunk,at);at+=chunk.length;}
+ for(let i=0;i<parts;i++){const part=await get(`${path}.part${i}`);if(!part.ok)throw new Error(`Part ${i+1} of AI model ${model} is missing.`);const chunk=new Uint8Array(await part.arrayBuffer());bytes.set(chunk,at);at+=chunk.length;}
  if(at!==size)throw new Error(`AI model ${model} is incomplete.`);
  return bytes;
 }
@@ -44,7 +56,7 @@ async function run(model:string,feeds:Feeds,cpuOnly=false):Promise<{outputs:Feed
 self.onmessage=async(event:MessageEvent)=>{
  const {id,type}=event.data;
  try{
-  if(type==='init'){base=event.data.base;ort.env.wasm.wasmPaths={mjs:new URL('ai/ort/ort-wasm-simd-threaded.jsep.mjs',base).href,wasm:new URL('ai/ort/ort-wasm-simd-threaded.jsep.wasm',base).href};ort.env.wasm.numThreads=self.crossOriginIsolated?Math.max(1,Math.min(4,navigator.hardwareConcurrency||1)):1;ort.env.logLevel='error';self.postMessage({id});return;}
+  if(type==='init'){base=event.data.base;remote=event.data.remote??'';licence=event.data.licence??'';ort.env.wasm.wasmPaths={mjs:new URL('ai/ort/ort-wasm-simd-threaded.jsep.mjs',base).href,wasm:new URL('ai/ort/ort-wasm-simd-threaded.jsep.wasm',base).href};ort.env.wasm.numThreads=self.crossOriginIsolated?Math.max(1,Math.min(4,navigator.hardwareConcurrency||1)):1;ort.env.logLevel='error';self.postMessage({id});return;}
   const {outputs,backend}=await run(event.data.model,event.data.feeds);
   self.postMessage({id,outputs,backend},{transfer:Object.values(outputs).map(o=>o.data.buffer as ArrayBuffer)});
  }catch(e){self.postMessage({id,error:e instanceof Error?e.message:String(e)});}

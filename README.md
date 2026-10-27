@@ -101,6 +101,10 @@ Rotation incorporates overlays into the PDF background; Undo restores them. Font
 
 Office conversion needs HTTPS (or localhost) and cross-origin isolation response headers. The BAT launcher supplies the necessary local server configuration. Offline startup of the remotely hosted website is not implemented; the local BAT edition reads its assets from disk and works offline after setup.
 
+## Phones
+
+The web app works in phone browsers. Native iOS and Android apps are built with Capacitor from the same code; see [MOBILE.md](MOBILE.md).
+
 ## Development
 
 ```powershell

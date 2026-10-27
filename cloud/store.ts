@@ -16,10 +16,18 @@ export interface Store{
  addSession(hash:string,userId:string,expires:number):Promise<void>;
  session(hash:string):Promise<{user_id:string;expires:number}|undefined>;
  deleteSession(hash:string):Promise<void>;
+ // The user, their sessions and any pending sign-in codes.
+ deleteUser(user:User):Promise<void>;
+ // After a deletion only a hash of the email and its trial end are kept, so
+ // deleting and signing up again does not start a new trial.
+ usedTrial(emailHash:string):Promise<number|undefined>;
+ rememberTrial(emailHash:string,trialEnds:number):Promise<void>;
 }
 
 export class MemoryStore implements Store{
- users=new Map<string,User>();codeList:Code[]=[];sessions=new Map<string,{user_id:string;expires:number}>();
+ users=new Map<string,User>();codeList:Code[]=[];sessions=new Map<string,{user_id:string;expires:number}>();trials=new Map<string,number>();
+ async usedTrial(hash:string){return this.trials.get(hash);}
+ async rememberTrial(hash:string,ends:number){this.trials.set(hash,ends);}
  async userByEmail(email:string){return [...this.users.values()].find(u=>u.email===email);}
  async userById(id:string){return this.users.get(id);}
  async userByCustomer(customer:string){return [...this.users.values()].find(u=>u.stripe_customer===customer);}
@@ -32,6 +40,7 @@ export class MemoryStore implements Store{
  async addSession(hash:string,user_id:string,expires:number){this.sessions.set(hash,{user_id,expires});}
  async session(hash:string){return this.sessions.get(hash);}
  async deleteSession(hash:string){this.sessions.delete(hash);}
+ async deleteUser(user:User){this.users.delete(user.id);this.codeList=this.codeList.filter(c=>c.email!==user.email);for(const [h,s] of this.sessions)if(s.user_id===user.id)this.sessions.delete(h);}
 }
 
 // Minimal D1 surface used here (Cloudflare's D1Database).
@@ -56,4 +65,7 @@ export class D1Store implements Store{
  addSession(hash:string,userId:string,expires:number){return this.run('INSERT INTO sessions (hash,user_id,expires) VALUES (?,?,?)',hash,userId,expires);}
  session(hash:string){return this.one<{user_id:string;expires:number}>('SELECT user_id,expires FROM sessions WHERE hash=?',hash);}
  deleteSession(hash:string){return this.run('DELETE FROM sessions WHERE hash=?',hash);}
+ usedTrial(hash:string){return this.one<{trial_ends:number}>('SELECT trial_ends FROM used_trials WHERE email_hash=?',hash).then(r=>r?.trial_ends);}
+ rememberTrial(hash:string,ends:number){return this.run('INSERT INTO used_trials (email_hash,trial_ends) VALUES (?,?) ON CONFLICT(email_hash) DO UPDATE SET trial_ends=excluded.trial_ends',hash,ends);}
+ async deleteUser(user:User){await this.run('DELETE FROM sessions WHERE user_id=?',user.id);await this.run('DELETE FROM codes WHERE email=?',user.email);await this.run('DELETE FROM users WHERE id=?',user.id);}
 }

@@ -92,3 +92,29 @@ test('the AI models and engines need a valid licence cookie',async()=>{
  assert.equal(await (await call(store,'/ai/models/lama.onnx',{e,headers:{cookie}})).text(),'model bytes');
  assert.equal((await call(store,'/ocr/lang/eng.traineddata.gz',{e,headers:{cookie},now:T0+8*DAY})).status,402,'not after the trial');
 });
+
+test('the apps call across origins and download models with the licence as a bearer token',async()=>{
+ const store=new MemoryStore(),session=await signIn(store),e={...env,ASSETS:{fetch:async()=>new Response('model bytes')}};
+ const preflight=await call(store,'/api/licence',{method:'OPTIONS',headers:{origin:'capacitor://localhost','access-control-request-headers':'authorization'},e});
+ assert.equal(preflight.status,204);assert.equal(preflight.headers.get('access-control-allow-origin'),'capacitor://localhost');assert.match(preflight.headers.get('access-control-allow-headers'),/authorization/);
+ assert.equal((await call(store,'/api/licence',{method:'OPTIONS',headers:{origin:'https://evil.example'},e})).status,403,'other sites are refused');
+ const reply=await call(store,'/api/licence',{token:session,headers:{origin:'https://localhost'},e}),{licence}=await reply.json();
+ assert.equal(reply.headers.get('access-control-allow-origin'),'https://localhost');
+ assert.equal(await (await call(store,'/ai/models/lama.onnx',{e,token:licence,headers:{origin:'https://localhost'}})).text(),'model bytes');
+ assert.equal((await call(store,'/ai/models/lama.onnx',{e,token:session})).status,402,'a session token is not a licence');
+ assert.equal((await call(store,'/api/licence',{token:session,headers:{origin:'https://evil.example'},e})).headers.get('access-control-allow-origin'),null);
+});
+
+test('deleting the account removes the user, their sessions and their Stripe customer',async()=>{
+ const store=new MemoryStore(),session=await signIn(store),user=[...store.users.values()][0];await store.updateUser(user.id,{stripe_customer:'cus_9'});
+ const real=globalThis.fetch,sent=[];globalThis.fetch=async(url,init)=>{sent.push({url:String(url),method:init.method});return new Response('{"deleted":true}',{status:200});};
+ try{assert.equal((await call(store,'/api/account/delete',{method:'POST',token:session})).status,200);}finally{globalThis.fetch=real;}
+ assert.deepEqual(sent,[{url:'https://api.stripe.com/v1/customers/cus_9',method:'DELETE'}]);
+ assert.equal(store.users.size,0);assert.equal(store.sessions.size,0);
+ assert.equal((await call(store,'/api/licence',{token:session})).status,401,'signed out everywhere');
+ assert.equal((await call(store,'/api/account/delete',{method:'POST'})).status,401);
+ // Only a hash of the email is kept, and signing up again keeps the old trial end.
+ assert.ok(![...store.trials.keys()].some(k=>k.includes('alex')));
+ const back=await signIn(store,'alex@example.com',T0+20*DAY);
+ assert.equal((await (await call(store,'/api/licence',{token:back,now:T0+20*DAY})).json()).status,'expired','no second trial');
+});

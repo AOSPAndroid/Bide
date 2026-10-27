@@ -37,7 +37,10 @@ export function demoProject(): Project {
 }
 
 
+// Capacitor's bridge object exists only inside the iOS and Android apps.
+const nativeApp = () => !!(globalThis as {Capacitor?: {isNativePlatform?: () => boolean}}).Capacitor?.isNativePlatform?.();
 export function download(blob: Blob, filename: string) {
+  if (nativeApp()) { void import('./browser/native-save').then(m => m.shareFile(blob, filename)).catch(e => alert(`The file could not be shared: ${e instanceof Error ? e.message : e}`)); return; }
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a'); a.href = url; a.download = filename; a.click();
   setTimeout(() => URL.revokeObjectURL(url), 30000);

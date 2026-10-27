@@ -18,6 +18,7 @@ export type Env={
  MAIL_FROM?:string;                // e.g. "bide <login@bide.example>"
  TRIAL_DAYS?:string;               // default 7
  DEV_SHOW_CODE?:string;            // "1" only for local testing: return the code instead of emailing it
+ APP_ORIGINS?:string;              // origins of the iOS/Android apps, comma separated (default: Capacitor's)
 };
 
 const DAY=86400000,LICENCE_DAYS=3,CODE_MINUTES=10,SESSION_DAYS=90;
@@ -41,9 +42,9 @@ export function licenceFor(u:User,now:number):Licence{
  return {sub:u.id,email:u.email,status,trialEnds:u.trial_ends,...(until?{paidUntil:until}:{}),exp};
 }
 
-async function stripe(env:Env,path:string,params:Record<string,string>){
+async function stripe(env:Env,path:string,params:Record<string,string>,method='POST'){
  if(!env.STRIPE_SECRET_KEY)throw new Error('Payments are not configured.');
- const response=await fetch(`https://api.stripe.com/v1/${path}`,{method:'POST',headers:{authorization:`Bearer ${env.STRIPE_SECRET_KEY}`,'content-type':'application/x-www-form-urlencoded'},body:new URLSearchParams(params)});
+ const response=await fetch(`https://api.stripe.com/v1/${path}`,{method,headers:{authorization:`Bearer ${env.STRIPE_SECRET_KEY}`,'content-type':'application/x-www-form-urlencoded'},body:method==='POST'?new URLSearchParams(params):undefined});
  const body=await response.json() as {url?:string;error?:{message?:string}};
  if(!response.ok)throw new Error(body.error?.message||`Stripe error ${response.status}`);
  return body;
@@ -77,7 +78,26 @@ async function signedIn(request:Request,store:Store,now:number){
 const cookie=(token:string,exp:number,now:number)=>`bide_licence=${token}; Path=/; Max-Age=${Math.max(0,Math.floor((exp-now)/1000))}; Secure; HttpOnly; SameSite=Lax`;
 const readCookie=(request:Request)=>/(?:^|;\s*)bide_licence=([^;]+)/.exec(request.headers.get('cookie')??'')?.[1];
 
+// The iOS and Android apps run on their own origin (Capacitor's local
+// server) and call the API and the gated models across origins.
+const appOrigins=(env:Env)=>(env.APP_ORIGINS??'capacitor://localhost,https://localhost').split(',').map(o=>o.trim()).filter(Boolean);
+function withCors(request:Request,env:Env,response:Response){
+ const origin=request.headers.get('origin');if(!origin||!appOrigins(env).includes(origin))return response;
+ const out=new Response(response.body,response);
+ out.headers.set('access-control-allow-origin',origin);out.headers.set('access-control-allow-credentials','true');out.headers.append('vary','Origin');
+ return out;
+}
+
 export async function handle(request:Request,env:Env,store:Store,now=Date.now()):Promise<Response>{
+ const url=new URL(request.url),path=url.pathname;
+ if(request.method==='OPTIONS'&&(path.startsWith('/api/')||gatedPaths.some(p=>p.test(path)))){
+  const origin=request.headers.get('origin');if(!origin||!appOrigins(env).includes(origin))return new Response(null,{status:403});
+  return new Response(null,{status:204,headers:{'access-control-allow-origin':origin,'access-control-allow-credentials':'true','access-control-allow-methods':'GET, POST, OPTIONS','access-control-allow-headers':'authorization, content-type','access-control-max-age':'86400',vary:'Origin'}});
+ }
+ return withCors(request,env,await route(request,env,store,now));
+}
+
+async function route(request:Request,env:Env,store:Store,now:number):Promise<Response>{
  const url=new URL(request.url),path=url.pathname,post=request.method==='POST';
  const privateKey=()=>importPrivateKey(JSON.parse(env.LICENCE_PRIVATE_KEY));
  try{
@@ -98,7 +118,7 @@ export async function handle(request:Request,env:Env,store:Store,now=Date.now())
    await store.deleteCodes(email);
    let user=await store.userByEmail(email);
    // The trial starts at the first sign-in and belongs to the email address.
-   if(!user){user={id:crypto.randomUUID(),email,created_at:now,trial_ends:now+Number(env.TRIAL_DAYS||7)*DAY};await store.createUser(user);}
+   if(!user){const used=await store.usedTrial(await sha256(`trial:${email}`));user={id:crypto.randomUUID(),email,created_at:now,trial_ends:used??now+Number(env.TRIAL_DAYS||7)*DAY};await store.createUser(user);}
    const session=randomToken();await store.addSession(await sha256(session),user.id,now+SESSION_DAYS*DAY);
    return json({session});
   }
@@ -108,6 +128,14 @@ export async function handle(request:Request,env:Env,store:Store,now=Date.now())
    return json({licence:token,status:licence.status,trialEnds:licence.trialEnds,paidUntil:licence.paidUntil??null,email:licence.email},200,{'set-cookie':cookie(token,licence.exp,now)});
   }
   if(path==='/api/logout'&&post){const auth=await signedIn(request,store,now);if(auth)await store.deleteSession(auth.hash);return json({ok:true},200,{'set-cookie':cookie('',now,now)});}
+  // Deleting the account (required of apps that create accounts): the Stripe
+  // customer goes too, which cancels any subscription at once.
+  if(path==='/api/account/delete'&&post){
+   const auth=await signedIn(request,store,now),u=auth?.user;if(!u)return fail(401,'Sign in again.');
+   if(u.stripe_customer)await stripe(env,`customers/${encodeURIComponent(u.stripe_customer)}`,{},'DELETE');
+   await store.rememberTrial(await sha256(`trial:${u.email}`),u.trial_ends);await store.deleteUser(u);
+   return json({deleted:true},200,{'set-cookie':cookie('',now,now)});
+  }
   if(path==='/api/checkout'&&post){
    const auth=await signedIn(request,store,now),u=auth?.user;if(!u)return fail(401,'Sign in again.');
    if(!env.STRIPE_PRICE_ID)return fail(503,'Payments are not configured.');
@@ -139,7 +167,8 @@ export async function handle(request:Request,env:Env,store:Store,now=Date.now())
   // The app itself: its heavy engines and models need a valid licence cookie.
   if(env.ASSETS){
    if(gatedPaths.some(p=>p.test(path))){
-    const token=readCookie(request),key=await importPublicKey(JSON.parse(env.LICENCE_PRIVATE_KEY));
+    // The licence comes as the cookie (web) or as a bearer token (apps).
+    const token=readCookie(request)??/^Bearer (.+)$/.exec(request.headers.get('authorization')??'')?.[1],key=await importPublicKey(JSON.parse(env.LICENCE_PRIVATE_KEY));
     if(!token||!await verifyLicence(token,key,now))return new Response('A bide subscription or trial is needed for this file.',{status:402});
    }
    return env.ASSETS.fetch(request);

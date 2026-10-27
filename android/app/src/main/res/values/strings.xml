@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">bide</string>
+    <string name="title_activity_main">bide</string>
+    <string name="package_name">app.bide.editor</string>
+    <string name="custom_url_scheme">app.bide.editor</string>
+</resources>

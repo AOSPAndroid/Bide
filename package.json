@@ -17,10 +17,14 @@
     "assets:ai": "node scripts/prepare-ai.mjs",
     "test:real": "node scripts/test-real.mjs",
     "build:saas": "tsc -b && vite build --mode saas",
+    "build:app": "tsc -b && vite build --mode app && cap sync",
     "typecheck:cloud": "tsc -p cloud/tsconfig.json",
     "bench:ocr": "node scripts/ocr-bench.mjs"
   },
   "dependencies": {
+    "@capacitor/core": "8.5.3",
+    "@capacitor/filesystem": "8.1.4",
+    "@capacitor/share": "8.0.3",
     "@noble/hashes": "1.8.0",
     "ag-psd": "31.0.2",
     "dictionary-en": "^4.0.0",
@@ -40,6 +44,9 @@
     "tesseract.js": "6.0.1"
   },
   "devDependencies": {
+    "@capacitor/android": "8.5.3",
+    "@capacitor/cli": "8.5.3",
+    "@capacitor/ios": "8.5.3",
     "@tesseract.js-data/deu": "^1.0.0",
     "@tesseract.js-data/eng": "1.0.0",
     "@tesseract.js-data/fra": "1.0.0",
