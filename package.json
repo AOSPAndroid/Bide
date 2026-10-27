@@ -13,7 +13,7 @@
     "prebuild": "node scripts/prepare-ocr.mjs && node scripts/prepare-ai.mjs && node scripts/check-assets.mjs",
     "build:demo": "tsc -b && vite build --mode demo",
     "assets:ocr": "node scripts/prepare-ocr.mjs",
-    "test:e2e": "node --test --test-concurrency=1 tests/e2e/ocr-replace.e2e.mjs tests/e2e/ocr-appearance.e2e.mjs tests/e2e/ai.e2e.mjs tests/e2e/selection.e2e.mjs tests/e2e/paint.e2e.mjs tests/e2e/canvas-tools.e2e.mjs tests/e2e/searchable.e2e.mjs tests/e2e/proofread.e2e.mjs tests/e2e/straighten.e2e.mjs tests/e2e/alphabets.e2e.mjs tests/e2e/redact.e2e.mjs tests/e2e/adjustments.e2e.mjs tests/e2e/forms.e2e.mjs tests/e2e/object-select.e2e.mjs tests/e2e/paywall.e2e.mjs tests/e2e/model-parts.e2e.mjs",
+    "test:e2e": "node --test --test-concurrency=1 tests/e2e/ocr-replace.e2e.mjs tests/e2e/ocr-appearance.e2e.mjs tests/e2e/ai.e2e.mjs tests/e2e/selection.e2e.mjs tests/e2e/paint.e2e.mjs tests/e2e/canvas-tools.e2e.mjs tests/e2e/searchable.e2e.mjs tests/e2e/proofread.e2e.mjs tests/e2e/straighten.e2e.mjs tests/e2e/alphabets.e2e.mjs tests/e2e/redact.e2e.mjs tests/e2e/adjustments.e2e.mjs tests/e2e/forms.e2e.mjs tests/e2e/object-select.e2e.mjs tests/e2e/paywall.e2e.mjs tests/e2e/model-parts.e2e.mjs tests/e2e/invoices.e2e.mjs",
     "assets:ai": "node scripts/prepare-ai.mjs",
     "test:real": "node scripts/test-real.mjs",
     "build:saas": "tsc -b && vite build --mode saas",

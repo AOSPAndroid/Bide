@@ -147,8 +147,60 @@ h1,h2,.brand {color:var(--ink)}
 .demo-notice>span {flex:1}
 .demo-notice a {color:var(--accent);white-space:nowrap;text-underline-offset:3px}
 .pdf-home,.documents-workspace {flex:1;min-height:0;overflow:auto;background:var(--soft)}
-.documents-workspace {padding:44px 40px 95px}
-.documents-workspace h1 {font-size:36px;line-height:1.15;letter-spacing:-1.3px;font-weight:650;margin:12px 0}
+/* Documents: invoice list and editor. */
+.documents-workspace>.muted {padding:44px 40px}
+.documents-workspace.editing {padding:28px 32px 95px}
+.invoice-editor {display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:22px;max-width:1230px;margin:0 auto;align-items:start}
+.invoice-main h1 {font-size:28px;letter-spacing:-.9px;font-weight:650;margin:14px 0 18px}
+.invoice-topline {display:flex;align-items:center;gap:14px}
+.invoice-card {background:white;border:1px solid var(--line);border-radius:11px;padding:18px 20px;margin-bottom:14px}
+.invoice-card h2 {font-size:13px;font-weight:650;letter-spacing:0;margin-bottom:14px}
+.invoice-grid {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px 14px}
+.invoice-field {display:flex;flex-direction:column;gap:5px;font-size:10px;color:var(--muted);min-width:0}
+.invoice-field.wide {grid-column:span 2}
+.invoice-field.check {flex-direction:row;align-items:center;gap:8px;font-size:11px;color:var(--ink)}
+.invoice-field input,.invoice-field select,.invoice-field textarea {font-size:12px;padding:8px 9px;border-radius:6px;width:100%}
+.invoice-field textarea {min-height:54px;resize:vertical}
+.invoice-number {display:flex;align-items:center;gap:6px}
+.invoice-number>i {font-style:normal;color:var(--subtle);font-size:10px}
+.invoice-inline {font-size:10px;color:var(--accent);padding:4px 6px;border-radius:5px;flex-shrink:0}
+.invoice-line {display:grid;grid-template-columns:minmax(0,2.4fr) .8fr 1fr 1.2fr 1.3fr .8fr 1fr 28px;gap:8px;align-items:end;padding:10px 0;border-bottom:1px solid #eef0f3}
+.invoice-line .invoice-field.wide {grid-column:auto}
+.invoice-line-total {font-size:12px;font-weight:600;text-align:right;padding-bottom:9px;white-space:nowrap}
+.invoice-card .secondary.small {margin-top:12px;font-size:11px;padding:6px 10px;min-height:0}
+.invoice-side {position:sticky;top:0;display:flex;flex-direction:column}
+.invoice-totals>div {display:flex;justify-content:space-between;gap:10px;font-size:11px;color:var(--muted);padding:4px 0}
+.invoice-totals>div b {color:var(--ink);font-weight:600;white-space:nowrap}
+.invoice-totals>.grand {font-size:14px;color:var(--ink);border-top:1px solid var(--line);margin-top:6px;padding-top:10px}
+.invoice-checks ul {list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}
+.invoice-checks li button {width:100%;justify-content:flex-start;align-items:flex-start;white-space:normal;text-align:left;font-size:11px;line-height:1.5;padding:6px 7px;border-radius:6px}
+.invoice-checks li button>svg {flex-shrink:0;margin-top:2px}
+.invoice-checks li.error svg {color:#c0392b}
+.invoice-checks li.warning svg {color:#b7791f}
+.invoice-ok {display:flex;gap:7px;font-size:11px;line-height:1.5;color:var(--success)}
+.invoice-ok svg {flex-shrink:0;margin-top:2px}
+.invoice-actions {display:flex;flex-direction:column;gap:8px}
+.invoice-actions .primary,.invoice-actions .secondary {width:100%;min-height:36px}
+.invoice-row {display:flex;gap:8px}
+.invoice-row>button {flex:1}
+.secondary.danger {color:#b03a2e}
+.invoice-status {font-size:10px;padding:3px 7px;border-radius:10px;background:var(--soft);color:var(--muted);white-space:nowrap}
+.invoice-status.issued {background:#e7f4ee;color:var(--success)}
+.invoice-table {width:100%;border-collapse:collapse;background:white;border:1px solid var(--line);border-radius:11px;overflow:hidden;font-size:12px}
+.invoice-table th {text-align:left;font-size:10px;font-weight:600;color:var(--muted);padding:10px 14px;border-bottom:1px solid var(--line)}
+.invoice-table td {padding:10px 14px;border-bottom:1px solid #eef0f3}
+.invoice-table tr:last-child td {border-bottom:0}
+.invoice-table tbody tr {cursor:pointer}
+.invoice-table tbody tr:hover {background:var(--accent-soft)}
+.invoice-table .amount {text-align:right;white-space:nowrap}
+.invoice-link {padding:0;font-weight:600;color:var(--accent)}
+.pdf-tool-card.static {cursor:default}
+.pdf-tool-card.static:hover {transform:none;box-shadow:none;border-color:var(--line)}
+.client-list {list-style:none;margin:0;padding:0;background:white;border:1px solid var(--line);border-radius:11px}
+.client-list li {display:flex;align-items:center;justify-content:space-between;padding:8px 14px;font-size:12px;border-bottom:1px solid #eef0f3}
+.client-list li:last-child {border-bottom:0}
+@media(max-width:980px){.invoice-editor{grid-template-columns:1fr}.invoice-side{position:static}.invoice-line{grid-template-columns:repeat(3,minmax(0,1fr))}.invoice-line>.invoice-field:first-child{grid-column:1/-1}}
+@media(max-width:600px){.documents-workspace.editing{padding:16px 16px 95px}.invoice-grid{grid-template-columns:1fr 1fr}.invoice-field.wide{grid-column:1/-1}.invoice-line{grid-template-columns:1fr 1fr}.invoice-table th:nth-child(2),.invoice-table td:nth-child(2),.invoice-table th:nth-child(4),.invoice-table td:nth-child(4){display:none}.invoice-table td,.invoice-table th{padding:9px 8px}}
 .pdf-home-content {max-width:1230px;margin:0 auto;padding:44px 40px 95px}
 .pdf-home-heading {display:flex;justify-content:space-between;align-items:center;gap:35px;margin-bottom:34px}
 .workspace-eyebrow {font-size:10px;font-weight:650;letter-spacing:2px;color:var(--accent)}

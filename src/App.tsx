@@ -1079,7 +1079,7 @@ export default function App() {
     <footer className="statusbar"><span><ShieldCheck size={12}/>In your browser · Files stay on this computer</span><div><button aria-pressed={leftOpen} title={leftOpen?'Hide the page strip':'Show the page strip'} onClick={()=>{setLeftOpen(v=>!v);setMobilePanel(null);}}><Layers size={12}/>Pages · {project.pages.length}</button><button onClick={()=>duplicatePage()}><Copy size={12}/>Duplicate page</button><button disabled={project.pages.length===1} onClick={()=>deletePage()}><Trash2 size={12}/>Delete page</button><span className="status-engine"><span className={health.ok?'online':'offline'}/>{health.ok?'Browser engine ready':'Loading PDF engine…'}</span></div></footer>
     </div>
     {view==='pdf'&&pdfHome&&<PdfWorkspace tools={pdfTools} name={project.name} pages={project.pages.length} onOpen={()=>openFiles()} onEdit={()=>setPdfHome(false)} onRun={tool=>{setPdfHome(false);tool.run();}}/>}
-    {view==='documents'&&<Documents/>}
+    {view==='documents'&&<Documents notify={notify} onFillForm={()=>{selectWorkspace('pdf');setPdfHome(false);openFiles();}}/>}
     {toast&&<div className="toast" role="status"><Check size={16}/>{toast}</div>}
     {error&&<ModalShell title="Something needs your attention" close={()=>setError('')}><p className="error-message">{error}</p><div className="dialog-actions"><button className="primary" onClick={()=>setError('')}>Got it</button></div></ModalShell>}
     {importNotice&&<ModalShell title="PSD import details" close={()=>setImportNotice('')}><p className="notice">{importNotice}</p><div className="dialog-actions"><button className="primary" onClick={()=>setImportNotice('')}>Continue editing</button></div></ModalShell>}

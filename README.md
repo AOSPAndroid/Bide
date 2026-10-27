@@ -41,7 +41,15 @@ Every visitor has an independent workspace stored in their own browser. Sharing 
 
 The interface uses warm white panels, burnt-orange accents (`#C44C28`), graphite text (`#25272D`), and an original B monogram. The bide wordmark carries the tagline “Image & Document Editor”. Compact chrome gives the document most of the screen. The top row holds the workspace switcher (**Photo editor**, **PDF MasterTool**, **Documents**), the menus and **Find a tool** (Ctrl+K). The second row holds the document name, Open/Save/Export, undo/redo, the active tool's options and zoom. Tools sit in an icon rail on the left (hover for names and shortcuts); the page strip opens for multi-page documents or with **Pages** in the status bar; Properties, Layers and History are on the right.
 
-Photo editor and PDF MasterTool share your current document, layers and undo history. The PDF home has searchable tools grouped under Organize, Convert, Edit and Security; **Continue editing** returns to the document. **Documents** is the workspace for forms and e-invoices; its tools are still being built. Ctrl+K can also switch workspaces.
+Photo editor and PDF MasterTool share your current document, layers and undo history. The PDF home has searchable tools grouped under Organize, Convert, Edit and Security; **Continue editing** returns to the document. **Documents** makes e-invoices and opens PDF forms. Ctrl+K can also switch workspaces.
+
+### E-invoices (Factur-X)
+
+**Documents → New invoice** fills in your business details from the last invoice, numbers it in sequence (F-2026-0001, AV-2026-0001 for credit notes), and checks it as you type against EN 16931 and the French 2026 e-invoicing rules: SIREN and VAT number checksums, electronic address, invoicing frame (goods, services or both), VAT category and exemption reason, IBAN, due date, and the mandatory late-payment, €40 indemnity and discount mentions. Clicking a check jumps to its field.
+
+**Issue and download Factur-X** freezes the invoice and saves a PDF/A-3 with the EN 16931 XML embedded (`factur-x.xml`), readable by people and by accounting software. Issued invoices can also be saved as UBL or CII XML, and corrected with a credit note that refers back to them. Standard, zero rated, exempt (including the VAT franchise, `VATEX-FR-FRANCHISE`), reverse charge, intra-EU and export lines are supported; deposits go in **Already paid**.
+
+bide creates and checks the invoice; sending it to a business client goes through your approved e-invoicing platform (*plateforme agréée*), which accepts Factur-X, UBL and CII. Invoices are kept in this browser; keep the downloaded files as your record.
 
 ## Editor
 
