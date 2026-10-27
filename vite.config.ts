@@ -1,5 +1,6 @@
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
+import {discoveryPlugin} from './scripts/discovery-plugin.mjs';
 import {cp, mkdir, readdir, readFile, writeFile, rm, stat} from 'node:fs/promises';
 import {join} from 'node:path';
 // Static hosts such as Sites (Cloudflare Static Assets) refuse files over
@@ -16,11 +17,13 @@ async function splitLargeFiles(dir:string, limit=24*2**20, part=20*2**20) {
   }
 }
 const headers = { 'Cross-Origin-Opener-Policy': 'same-origin', 'Cross-Origin-Embedder-Policy': 'require-corp' };
-export default defineConfig(({mode}) => {
+export default defineConfig(({mode,command}) => {
+  const env=loadEnv(mode,process.cwd(),'VITE_');
+  const publicSite=mode==='demo'||mode==='saas'||command==='serve';
   // The subscription build (npm run build:saas) must carry the licence server's public key.
   if (mode === 'saas' && !loadEnv(mode, process.cwd(), 'VITE_').VITE_LICENCE_PUBLIC_KEY) throw new Error('Set VITE_LICENCE_PUBLIC_KEY (from node cloud/keys.mjs) to build the subscription version.');
   return {
-  base: './', publicDir: mode === 'demo' || mode === 'saas' ? false : 'public',
+  base: publicSite ? '/' : './', publicDir: command === 'serve' ? 'public' : mode === 'demo' || mode === 'saas' ? false : 'public',
   // Use our explicitly located runtime, avoiding a second emitted WASM copy.
   resolve:{conditions:['onnxruntime-web-use-extern-wasm','module','browser','development|production']},
   plugins: [react(), ...(mode === 'saas' ? [{name:'bide-saas-assets', async closeBundle() {
@@ -39,9 +42,9 @@ export default defineConfig(({mode}) => {
     await cp('public/ai/ort','out/ai/ort',{recursive:true});
     await mkdir('out/ai/models',{recursive:true});
     for(const script of ['latin','cyrillic','greek','arabic','korean','cjk'])await cp(`public/ai/models/ppocr-${script}-dict.json`,`out/ai/models/ppocr-${script}-dict.json`);
-  }}] : [])],
+  }}] : []), ...(publicSite ? [discoveryPlugin(mode,env)] : [])],
   build: {target:'esnext',outDir:mode === 'demo' ? 'out' : mode === 'saas' ? 'dist-saas' : 'dist'},
   // Lazily imported deps are listed so the dev server doesn't reload the page mid-session on first use.
   optimizeDeps: {exclude:['mupdf'], include:['docx','fflate','onnxruntime-web/webgpu','nspell','pdf-lib','pdfkit','svg-to-pdfkit'], esbuildOptions:{target:'esnext'}},
-  worker: {format:'es'}, server:{headers}, preview:{headers},
+  worker: {format:'es'}, server:{headers,allowedHosts:['terminal.local']}, preview:{headers},
 };});

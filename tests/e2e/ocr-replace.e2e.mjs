@@ -23,7 +23,7 @@ test('OCR text on an imported image becomes an editable layer',{timeout:240000},
  const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||undefined});
  try{
   const page=await browser.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));await recordStatuses(page);
-  await page.goto(server.resolvedUrls.local[0]);
+  await page.goto(server.resolvedUrls.local[0]+'app/');
   await page.locator('input[type=file][accept*=".psd"]').setInputFiles(image);
   await sawStatus(page,/Recognizing text( \(AI\))?… \d+%/);
   const region=page.locator('button[aria-label^="Edit detected text: Quarterly"]');
@@ -58,7 +58,7 @@ test('enabling German re-scans with the German model',{timeout:240000},async()=>
  const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||undefined});
  try{
   const page=await browser.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
-  await page.goto(server.resolvedUrls.local[0]);
+  await page.goto(server.resolvedUrls.local[0]+'app/');
   await page.locator('input[type=file][accept*=".psd"]').setInputFiles(image);
   // Tesseract's language models are what this test exercises (AI OCR covers Latin languages at once).
   await (await ocrSetting(page,'OCR engine')).selectOption('tesseract');
@@ -81,7 +81,7 @@ test('a bold label and a regular value on one line keep their own weights',{time
  const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||undefined});
  try{
   const page=await browser.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
-  await page.goto(server.resolvedUrls.local[0]);
+  await page.goto(server.resolvedUrls.local[0]+'app/');
   await page.locator('input[type=file][accept*=".psd"]').setInputFiles(image);
   const region=page.locator('button[aria-label^="Edit detected text: Nom du client: Dalil"]');await region.waitFor({timeout:180000});
   await (await ocrSetting(page,'Edit image text with')).selectOption('font');
@@ -108,7 +108,7 @@ test('editing image text reuses the original letters; find & replace fixes every
   const image=join(await mkdtemp(join(tmpdir(),'bide-e2e-')),'card.png');await shot.screenshot({path:image});await shot.close();
   const page=await browser.newPage({viewport:{width:1400,height:900}}),errors=[];page.on('pageerror',e=>errors.push(e.message));
   const layers=async()=>{await page.waitForTimeout(1500);return page.evaluate(async()=>{const {restoreLocal}=await import('/src/model.ts');return (await restoreLocal()).pages[0].canvas.objects.map(o=>({name:o.name,type:o.type,left:o.left,width:o.width}));});};
-  await page.goto(server.resolvedUrls.local[0]);await page.locator('input[type=file][accept*=".psd"]').setInputFiles(image);
+  await page.goto(server.resolvedUrls.local[0]+'app/');await page.locator('input[type=file][accept*=".psd"]').setInputFiles(image);
   await page.waitForFunction(()=>/OCR regions/.test(document.querySelector('.text-detection-bar span')?.textContent||''),null,{timeout:180000});
   // Click a line: edit in the dialog; the result is a pixel patch, not font text.
   await page.locator('.detected-text-overlay button[aria-label*="Nom du client"]').click();

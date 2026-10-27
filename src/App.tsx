@@ -59,13 +59,17 @@ import FormPanel,{FormOverlay} from './FormPanel';
 import {newField,type FormField,type FormFieldType,type PdfFormField} from './forms';
 import {createRetouchController} from './retouch-controller';
 import {useWorkspaceTools} from './workspace-tools';
+import {discoveryTool} from './discovery';
+import {setMeasurementTool,trackMeasurement} from './measurement';
 
 import {TOOLS,type Obj,type Tool,type PaletteAction,type Modal} from './editor-types';
 import {attachCanvasEvents} from './canvas-events';
 import {editorCommands} from './editor-commands';
 
 export default function App() {
-  const [view, setView] = useState<Workspace>(()=>PUBLIC_DEMO && window.innerWidth<700 ? 'pdf' : 'photo');
+  const [entryTool,setEntryTool] = useState(()=>discoveryTool(window.location.search));
+  const [view, setView] = useState<Workspace>(()=>entryTool || HOSTED_BUILD ? 'pdf' : 'photo');
+  useEffect(()=>{setMeasurementTool(entryTool || 'edit');trackMeasurement('editor_opened');},[]);
   const [pdfHome, setPdfHome] = useState(true);
   const documentView = useRef<'photo'|'pdf'>(view==='pdf'?'pdf':'photo');
   const [nativeDiagramCommands,setNativeDiagramCommands]=useState<NativeDiagramCommand[]>([]);
@@ -324,7 +328,7 @@ export default function App() {
       if (!openedByUser.current && data?.version === 1 && data.pages.length) {
         if(Object.keys(data.sources).length)await restoreSources(data.sources);
         if(openedByUser.current)return;
-        projectRef.current = data; setProject(data); setPageId(data.pages[0].id); setEpoch(v => v + 1);
+      projectRef.current = data; setProject(data); setPageId(data.pages[0].id); setEpoch(v => v + 1);
       }
     }).catch(fail).finally(() => setInitializing(false));
   }, []);
@@ -711,7 +715,11 @@ export default function App() {
     try {
       const data = parseProject(await file.text());
       if(Object.keys(data.sources).length)await restoreSources(data.sources);
-      commit(data,true); setPageId(data.pages[0].id); notify('Project opened.');
+      commit(data,true); setPageId(data.pages[0].id); setPdfHome(false); setModal(null); notify('Project opened.');
+      trackMeasurement('document_opened');
+      if (entryTool==='compress') exportDialog('pdf','balanced');
+      if (entryTool==='merge') setLeftOpen(true);
+      setEntryTool(undefined);
     } catch(e) { fail(e); } finally { setBusy(''); }
   }
   async function importWithPassword(file: File) {
@@ -751,9 +759,14 @@ export default function App() {
         result.pages.forEach((p,i) => pages.push({ ...blankPage(p.width,p.height), name: `${file.name.replace(/\.[^.]+$/, '')} · ${i+1}`, source: result.id, index: p.index }));
       }
       const current = capture();
+      if (!pages.length) throw new Error('No document pages could be opened.');
       commit({ version: 1, name: append ? current.name : files[0].name.replace(/\.[^.]+$/, ''), pages: append ? [...current.pages,...pages] : pages, sources }, true);
       if (notices.length) setImportNotice(notices.join('\n\n'));
       setPageId(pages[0].id); setPdfHome(false); setModal(null); notify(`${pages.length} ${pages.length === 1 ? 'page' : 'pages'} added. Original PDF content is preserved.`);
+      trackMeasurement('document_opened');
+      if (entryTool==='compress' && !append) exportDialog('pdf','balanced');
+      if (entryTool==='merge') {setLeftOpen(true);notify('Your PDFs are open. Arrange the page thumbnails, then export one PDF.');}
+      setEntryTool(undefined);
     } catch(e) { fail(e); } finally { setBusy(''); }
   }
   function openFiles(append = false) { importMode.current = append ? 'append' : 'open'; fileInput.current?.click(); }
@@ -780,6 +793,7 @@ export default function App() {
         const { exportPsd, needsFlattenedPsd } = await import('./browser/psd');
         const current = capture().pages.find(p => p.id === pageId)!;
         download(await exportPsd(current), `${safeName(current.name)}.psd`);
+        trackMeasurement('export_completed',{format:'psd'});
         setModal(null); notify(needsFlattenedPsd(canvas.current?.getObjects()||[])?'PSD exported as a merged appearance to preserve adjustments and compositing. Save .bide to retain editable layers.':'PSD exported with raster layers and supported groups. Save .bide to retain editable text and masks.'); return;
       }
       if (protect && format === 'pdf' && !options?.reimport && (!exportPassword || exportPassword !== passwordConfirmation)) throw new Error('Enter and confirm the same non-empty PDF password.');
@@ -798,6 +812,7 @@ export default function App() {
       } else {
         const ext = ['png','jpg','svg','split'].includes(body.format) ? 'zip' : body.format;
         download(blob,`${safeName(projectRef.current.name)}${body.format === 'split' ? '-pages' : ''}.${ext}`);
+        trackMeasurement('export_completed',{format:body.format});
         setModal(null); setExportPassword(''); setPasswordConfirmation(''); notify(`Export ready · ${(blob.size/1024).toFixed(0)} KB`);
       }
     } catch(e) { fail(e); } finally { setBusy(''); }
@@ -1057,7 +1072,7 @@ export default function App() {
   const pdfTools: PdfTool[] = [{category:'Organize',title:'Merge documents',desc:'Combine PDFs and images into one.',icon:Merge,run:()=>openFiles(true)},{category:'Organize',title:'Split & extract',desc:'Save individual pages or a page range.',icon:Scissors,run:()=>exportDialog('split')},{category:'Organize',title:'Compress PDF',desc:'Balance file size and image quality.',icon:Scaling,run:()=>exportDialog('pdf','balanced')},{category:'Convert',title:'Convert to PDF',desc:HOSTED_BUILD?'Images & text. Office: local edition.':'Word, Excel, PowerPoint, images & text.',icon:FileText,run:()=>openFiles()},{category:'Convert',title:'PDF to images',desc:'Export sharp PNG, JPEG or SVG pages.',icon:FileImage,run:()=>exportDialog('png')},{category:'Convert',title:'Make PDF searchable',desc:'OCR scanned pages into searchable, copyable text.',icon:Search,run:()=>exportDialog('pdf','lossless',true)},{category:'Convert',title:'PDF to Word',desc:'Extract editable text into a DOCX file.',icon:FileText,run:()=>exportDialog('docx')},{category:'Edit',title:'Sign a document',desc:'Draw or type your signature.',icon:PenLine,run:()=>setModal('signature')},{category:'Edit',title:'Add & edit text',desc:'Place, style and resize a text box.',icon:Type,run:()=>{setModal(null);addText();}},{category:'Edit',title:'Watermarks',desc:'Stamp editable text across a page range.',icon:Type,run:()=>setModal('watermark')},{category:'Edit',title:'Page numbers',desc:'Headers, footers and custom numbering.',icon:FileText,run:()=>setModal('numbers')},{category:'Edit',title:'Crop page',desc:'Trim the visible boundary of a page.',icon:Scissors,run:()=>setModal('crop')},{category:'Security',title:'Protect PDF',desc:'Require a password to open the export.',icon:LockKeyhole,run:()=>{exportDialog();setProtect(true);}},{category:'Security',title:'Unlock PDF',desc:'Open an encrypted PDF with its password.',icon:UnlockKeyhole,run:()=>openFiles()},{category:'Organize',title:'Organize pages',desc:'Add pages. Drag thumbnails to reorder.',icon:Layers,run:()=>{setModal(null);setLeftOpen(true);notify('Drag page thumbnails to reorder. Right-click a page to rotate, duplicate or delete.');}}];
 
   const menus: Record<string, string[]> = { File:['New document','Open PDF, image or Office file','Open editable project','Save editable project','Export PDF','Export current design as PSD'], Edit:['Undo','Redo','Duplicate selection','Group selection','Ungroup selection','Warp selected layer','Merge Down'], Image:['Image size…','Canvas size…','Crop tool','Crop to selection','Trim to content','Perspective distort'], View:['Toggle rulers','Toggle guides','Clear guides','Show history','Fit page to window','Actual size (100%)'], Layer:['Add layer mask','Invert layer mask','Apply layer mask','Delete layer mask','Add layer style: Drop shadow','Add layer style: Stroke','Add layer style: Outer glow','Clear layer style','New adjustment layer: Levels','New adjustment layer: Curves','New adjustment layer: Hue/Saturation','Merge Down'], Select:['Select all pixels','Inverse selection','Select subject with AI','Select color range','Select layer pixels','Magic wand','Deselect everything'], Insert:['Add text box','Place image','Add signature','Add blank page'], Page:['Duplicate current page','Rotate current page clockwise','Fit page to window','Crop current page'], PDF:['Merge documents','Split PDF into pages','Compress PDF','Convert Office or images to PDF','Extract text to Word','Extract plain text','Add watermarks','Add page numbers','Protect PDF with password','Unlock password PDF','Add form field: Text','Add form field: Checkbox','Find & redact (remove personal data)'], Help:['Keyboard shortcuts'] };
-  return <div className={`app workspace-${view}`} onDragOver={e=>{ if(view!=='diagrams'&&e.dataTransfer.types.includes('Files')) { e.preventDefault(); setDraggingFile(true); } }} onDrop={e=>{ if(view!=='diagrams'&&e.dataTransfer.files.length) { e.preventDefault(); setDraggingFile(false); setPdfHome(false);void importFiles([...e.dataTransfer.files],true); } }}>
+  return <div className={`app workspace-${view}`} onDragOver={e=>{ if(view!=='diagrams'&&e.dataTransfer.types.includes('Files')) { e.preventDefault(); setDraggingFile(true); } }} onDrop={e=>{ if(view!=='diagrams'&&e.dataTransfer.files.length) { e.preventDefault(); setDraggingFile(false); setPdfHome(false);void importFiles([...e.dataTransfer.files],!(view==='pdf'&&pdfHome&&entryTool)); } }}>
     <input ref={fileInput} type="file" multiple accept={HOSTED_BUILD?'.psd,.pdf,.png,.jpg,.jpeg,.webp,.bmp,.tif,.tiff,.txt,.md,.svg,.bide,.folio':'.psd,.pdf,.png,.jpg,.jpeg,.webp,.bmp,.tif,.tiff,.doc,.docx,.odt,.rtf,.xls,.xlsx,.ods,.ppt,.pptx,.odp,.txt,.md,.svg,.bide,.folio'} hidden onChange={e=>{ void importFiles([...e.target.files||[]],importMode.current==='append'); e.target.value=''; }}/>
     <input ref={imageInput} type="file" multiple accept="image/png,image/jpeg,image/webp" hidden onChange={e=>{ for(const file of [...e.target.files||[]]) void addImage(file); e.target.value=''; }}/>
     <input ref={projectInput} type="file" accept=".bide,.folio" hidden onChange={e=>{ if(e.target.files?.[0]) void loadProject(e.target.files[0]); e.target.value=''; }}/>
@@ -1110,7 +1125,7 @@ export default function App() {
     {pageMenu&&<PageMenu position={pageMenu} count={project.pages.length} index={project.pages.findIndex(p=>p.id===pageMenu.id)} close={()=>setPageMenu(null)} run={action=>pageAction(action,pageMenu.id)}/>}
     <footer className="statusbar"><span><ShieldCheck size={12}/>In your browser · Files stay on this computer</span><div><button aria-pressed={leftOpen} title={leftOpen?'Hide the page strip':'Show the page strip'} onClick={()=>{setLeftOpen(v=>!v);setMobilePanel(null);}}><Layers size={12}/>Pages · {project.pages.length}</button><button onClick={()=>duplicatePage()}><Copy size={12}/>Duplicate page</button><button disabled={project.pages.length===1} onClick={()=>deletePage()}><Trash2 size={12}/>Delete page</button><span className="status-engine"><span className={health.ok?'online':'offline'}/>{health.ok?'Browser engine ready':'Loading PDF engine…'}</span></div></footer>
     </div>
-    {view==='pdf'&&pdfHome&&<PdfWorkspace tools={pdfTools} name={project.name} pages={project.pages.length} onOpen={()=>openFiles()} onEdit={()=>setPdfHome(false)} onRun={tool=>{setPdfHome(false);tool.run();}}/>}
+    {view==='pdf'&&pdfHome&&<PdfWorkspace tools={pdfTools} name={project.name} pages={project.pages.length} intent={entryTool} website={HOSTED_BUILD} onOpen={()=>openFiles()} onEdit={()=>{setEntryTool(undefined);setPdfHome(false);}} onRun={tool=>{setMeasurementTool(tool.title==='Merge documents'?'merge':tool.title==='Compress PDF'?'compress':tool.title==='Split & extract'?'split':'other');setEntryTool(undefined);setPdfHome(false);tool.run();}}/>}
     {diagramsVisited&&<Diagrams onCommands={setNativeDiagramCommands} active={view==='diagrams'} commands={diagramCommands} onPlace={placeDiagram} onNew={()=>{diagramTarget.current=undefined;}} onPalette={()=>{setPalette(true);setQuery('');setCommandIndex(0);}}/>}
     {toast&&<div className="toast" role="status"><Check size={16}/>{toast}</div>}
     {error&&<ModalShell title="Something needs your attention" close={()=>setError('')}><p className="error-message">{error}</p><div className="dialog-actions"><button className="primary" onClick={()=>setError('')}>Got it</button></div></ModalShell>}

@@ -40,7 +40,7 @@ test('trial, paywall and subscription in the subscription build',{timeout:600000
   await context.route('https://checkout.stripe.com/**',route=>route.fulfill({contentType:'text/html',body:'<h1>Stripe Checkout</h1>'}));
   // The browser's clock follows the licence server's, so the trial can run out.
   await context.clock.install({time:clock});
-  await page.goto(server.resolvedUrls.local[0]);
+  await page.goto(server.resolvedUrls.local[0]+'app/');
   // Sign-in: email, then the code (the test server returns it instead of emailing).
   await page.getByRole('heading',{name:'Try bide free for 7 days'}).waitFor({timeout:60000});
   assert.equal(await page.locator('.artboard').count(),0,'the editor is locked before sign-in');
@@ -63,7 +63,7 @@ test('trial, paywall and subscription in the subscription build',{timeout:600000
   const signature=[...new Uint8Array(await crypto.subtle.sign('HMAC',signingKey,new TextEncoder().encode(`${stamp}.${event}`)))].map(b=>b.toString(16).padStart(2,'0')).join('');
   const paid=await handle(new Request(env.APP_URL+'/api/stripe/webhook',{method:'POST',headers:{'stripe-signature':`t=${stamp},v1=${signature}`},body:event}),env,store,clock);
   assert.equal(paid.status,200);assert.equal(await store.stripeEventProcessed('evt_fixture_paid'),true);
-  await page.goto(server.resolvedUrls.local[0]+'?subscribed=1');
+  await page.goto(server.resolvedUrls.local[0]+'app/?subscribed=1');
   await page.locator('.artboard').waitFor({timeout:60000});
   assert.equal(await page.locator('.account-chip summary').innerText(),'bide');
   // With the licence server unreachable, the stored licence still opens the editor.

@@ -14,10 +14,10 @@ type StripeSubscription={id:string;customer:string|{id:string};status:string;cur
 type StripeSession={id:string;customer:string|{id:string};subscription?:string|{id:string}|null;status:string;url?:string|null;expires_at:number;metadata?:Record<string,string>};
 type StripeList<T>={data:T[];has_more:boolean};
 type RequestOptions={method?:'GET'|'POST';idempotencyKey?:string};
-type StripeClient=<T>(path:string,params?:Record<string,string>|string,options?:RequestOptions)=>Promise<T>;
+export type StripeClient=<T>(path:string,params?:Record<string,string>|string,options?:RequestOptions)=>Promise<T>;
 
 function configured(env:BillingEnv){if(!env.STRIPE_SECRET_KEY||!env.STRIPE_PRICE_ID)throw new BillingError(503,'Payments are not configured.');}
-async function stripeRequest<T>(env:BillingEnv,path:string,params:Record<string,string>|string={},options:RequestOptions={}):Promise<T>{
+export async function stripeRequest<T>(env:BillingEnv,path:string,params:Record<string,string>|string={},options:RequestOptions={}):Promise<T>{
  if(!env.STRIPE_SECRET_KEY)throw new BillingError(503,'Payments are not configured.');
  const method=options.method??'GET',body=typeof params==='string'?params:new URLSearchParams(params).toString();
  const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),10000);
@@ -99,7 +99,7 @@ function applySubscriptions(ctx:BillingContext,customer:string,rows:StripeSubscr
  return rows.some(s=>!terminal(s));
 }
 async function portal(api:StripeClient,env:BillingEnv,customer:string){
- const result=await api<{url:string}>('billing_portal/sessions',{customer,return_url:`${env.APP_URL}/`},{method:'POST'});
+ const result=await api<{url:string}>('billing_portal/sessions',{customer,return_url:new URL('/app/',env.APP_URL).href},{method:'POST'});
  if(!result.url)throw unavailable();return {url:result.url};
 }
 export async function billingPortal(env:BillingEnv,customer:string){
@@ -155,7 +155,7 @@ export async function checkout(env:BillingEnv,store:Store,userId:string,now:numb
   if(!ctx.checkout.checkout_key){
    const key=crypto.randomUUID(),expires=Math.floor((ctx.now()+DAY)/1000);
    const params:Record<string,string>={mode:'subscription',customer,'line_items[0][price]':env.STRIPE_PRICE_ID!,'line_items[0][quantity]':'1',
-    success_url:`${env.APP_URL}/?subscribed=1`,cancel_url:`${env.APP_URL}/`,client_reference_id:ctx.user.id,
+    success_url:new URL('/app/?subscribed=1',env.APP_URL).href,cancel_url:new URL('/app/',env.APP_URL).href,client_reference_id:ctx.user.id,
     'metadata[user_id]':ctx.user.id,'metadata[checkout_key]':key,'subscription_data[metadata][user_id]':ctx.user.id,'subscription_data[metadata][checkout_key]':key,
     allow_promotion_codes:'true',billing_address_collection:'auto',expires_at:String(expires)};
    if(env.STRIPE_AUTOMATIC_TAX==='1'){params['automatic_tax[enabled]']='true';params['customer_update[address]']='auto';}

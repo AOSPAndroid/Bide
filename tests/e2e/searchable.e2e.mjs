@@ -23,7 +23,7 @@ test('image pages export as searchable PDF and as text',{timeout:600000},async()
   const shot=await browser.newPage({viewport:{width:640,height:300}});await shot.setContent(scan);
   const image=join(await mkdtemp(join(tmpdir(),'bide-search-')),'scan.png');await shot.screenshot({path:image});await shot.close();
   const page=await browser.newPage({viewport:{width:1400,height:900},acceptDownloads:true}),errors=[];page.on('pageerror',e=>errors.push(e.message));
-  await page.goto(server.resolvedUrls.local[0]);await page.locator('input[type=file][accept*=".psd"]').setInputFiles(image);
+  await page.goto(server.resolvedUrls.local[0]+'app/');await page.locator('input[type=file][accept*=".psd"]').setInputFiles(image);
   await page.getByText(/page added/).waitFor({timeout:60000});
 
   const pdf=await exportWith(page,'pdf');

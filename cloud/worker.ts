@@ -5,6 +5,7 @@
 import {signLicence,verifyLicence,importPrivateKey,importPublicKey,base64url,type Licence} from '../src/licence';
 import {D1Store,type Store,type User} from './store';
 import {BillingError,checkout,billingPortal,reconcileStripeEvent,type StripeEvent} from './billing';
+import {D1PaymentStore,recordPaidInvoice,type PaymentD1} from './measurement';
 
 export type Env={
  DB?:unknown;                      // D1 database (cloud/schema.sql)
@@ -115,7 +116,8 @@ export async function handle(request:Request,env:Env,store:Store,now=Date.now())
    if(!env.STRIPE_WEBHOOK_SECRET||!await verifyStripeSignature(body,request.headers.get('stripe-signature'),env.STRIPE_WEBHOOK_SECRET,now))return fail(400,'Bad signature.');
    const event=JSON.parse(body) as StripeEvent;
    if(!event||typeof event.id!=='string'||!event.id||typeof event.type!=='string'||!event.data?.object)return fail(400,'Invalid Stripe event.');
-   await reconcileStripeEvent(env,store,event,now);
+   if(event.type==='invoice.paid')await recordPaidInvoice(env,store,new D1PaymentStore(env.DB as PaymentD1),event);
+   else await reconcileStripeEvent(env,store,event,now);
    return json({received:true});
   }
   if(path.startsWith('/api/'))return fail(404,'Not found.');
