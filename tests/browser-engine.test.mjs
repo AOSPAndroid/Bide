@@ -82,6 +82,35 @@ test('PDF text detection preserves geometry, font and source until a region is e
  const edited=await removePdfText(source.id,0,region.id);assert.notEqual(edited.id,source.id);assert.ok(detectPdfText(source.id,0).regions.some(r=>r.text.includes('Original first page')));assert.equal(detectPdfText(edited.id,0).regions.some(r=>r.text.includes('Original first page')),false);assert.ok(detectPdfText(edited.id,1).regions.some(r=>r.text.includes('Original second page')));
  const doc=mupdf.Document.openDocument(Buffer.from(edited.data,'base64'),'pdf'),page=doc.loadPage(0),pix=page.toPixmap(mupdf.Matrix.identity,mupdf.ColorSpace.DeviceRGB,false,true);assert.equal(page.getLinks().length,1);const pixels=pix.getPixels(),offset=(150*pix.getWidth()+100)*3;assert.ok(pixels[offset+1]>150&&pixels[offset]<100,'green vector background remains');pix.destroy();page.destroy();doc.destroy();
 });
+
+test('an invisible OCR layer is searchable but is not native editable PDF text',async()=>{
+ const doc=new mupdf.PDFDocument(),font=new mupdf.Font('Helvetica'),ref=doc.addSimpleFont(font);
+ const p=doc.addPage([0,0,400,200],0,{Font:{F:ref}},'BT /F 20 Tf 3 Tr 30 100 Td (Wrong old OCR 999x) Tj ET');doc.insertPage(-1,p);
+ const bytes=doc.saveToBuffer('');
+ try{
+  const imported=await importBytes(bytes.asUint8Array().slice(),'searchable-scan.pdf');
+  const page=doc.loadPage(0),text=page.toStructuredText('');try{assert.match(text.asText(),/Wrong old OCR/);}finally{text.destroy();page.destroy();}
+  assert.deepEqual(detectPdfText(imported.id,0).regions,[],'the visible page must go through image OCR');
+ }finally{bytes.destroy();p.destroy();ref.destroy();font.destroy();doc.destroy();}
+});
+
+test('mixed pages expose painted text, ignoring invisible, transparent and clipping-only text',async()=>{
+ const doc=new mupdf.PDFDocument(),font=new mupdf.Font('Helvetica'),ref=doc.addSimpleFont(font);
+ const p=doc.addPage([0,0,400,300],0,{Font:{F:ref},ExtGState:{Transparent:{Type:'ExtGState',ca:0,CA:0}}},
+  'BT /F 18 Tf 30 250 Td (Visible amount 123,45) Tj ET '+
+  'BT /F 18 Tf 3 Tr 30 200 Td (Hidden amount 999,99) Tj ET '+
+  'q /Transparent gs BT /F 18 Tf 0 Tr 30 150 Td (Transparent amount) Tj ET Q '+
+  'q BT /F 18 Tf 7 Tr 30 100 Td (Clip-only amount) Tj ET Q '+
+  'BT /F 18 Tf 1 Tr 30 50 Td (Stroked amount) Tj ET');doc.insertPage(-1,p);
+ const bytes=doc.saveToBuffer('');
+ try{
+  const imported=await importBytes(bytes.asUint8Array().slice(),'mixed-pdf.pdf'),regions=detectPdfText(imported.id,0).regions;
+  assert.deepEqual(regions.map(r=>r.text.trim()),['Visible amount 123,45','Stroked amount']);
+  assert.ok(Math.abs(regions[0].left-30)<1);assert.ok(Math.abs(regions[0].baseline-50)<1);
+  const changed=await removePdfText(imported.id,0,regions[0].id);
+  assert.deepEqual(detectPdfText(changed.id,0).regions.map(r=>r.text.trim()),['Stroked amount']);
+ }finally{bytes.destroy();p.destroy();ref.destroy();font.destroy();doc.destroy();}
+});
 test('embedded TrueType font is reusable and missing glyphs are identified',async()=>{
  const bytes=new Uint8Array(await readFile('src/browser/fonts/LiberationSans-Regular.ttf'));const doc=new mupdf.PDFDocument(),font=new mupdf.Font('LiberationSans',bytes),ref=doc.addSimpleFont(font);const p=doc.addPage([0,0,400,300],0,{Font:{F1:ref}},'BT /F1 24 Tf 40 200 Td (Editable embedded font) Tj ET');doc.insertPage(-1,p);const buffer=doc.saveToBuffer('');const imported=await importBytes(buffer.asUint8Array().slice(),'embedded.pdf');await writeFile('tmp/pdfs/editable-embedded.pdf',buffer.asUint8Array());buffer.destroy();p.destroy();ref.destroy();font.destroy();doc.destroy();
  const region=detectPdfText(imported.id,0).regions[0];assert.ok(region.fontData);assert.ok(region.fontId);assert.equal(fontSupportsText(region.fontData,'Edited font 123'),true);assert.equal(fontSupportsText(region.fontData,'\u{1f9d1}'),false);
