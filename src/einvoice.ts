@@ -12,8 +12,11 @@ export type Party={name:string;siren?:string;siret?:string;vatId?:string;
  electronicAddress?:string};
 // VAT categories (UNTDID 5305) offered: standard, zero rated, exempt (with a
 // reason, e.g. the French "franchise en base"), reverse charge, intra-EU, export.
-export type VatCategory='S'|'Z'|'E'|'AE'|'K'|'G';
+export type VatCategory='S'|'Z'|'E'|'AE'|'K'|'G'|'O';
 export type InvoiceLine={id:string;name:string;description?:string;quantity:number;unit:string;unitPrice:number;vatCategory:VatCategory;vatRate:number};
+// Discounts and charges on the whole invoice (BG-20/BG-21), e.g. a global
+// discount or shipping; each sits in a VAT category like a line.
+export type Adjustment={charge:boolean;amount:number;reason:string;vatCategory:VatCategory;vatRate:number};
 export type PaymentCode='58'|'30'|'49'|'48'|'10'|'20';
 export type InvoiceType='380'|'381'|'386';// invoice, credit note, prepayment invoice
 export type Operation='goods'|'services'|'mixed';
@@ -26,7 +29,9 @@ export type Invoice={
  // Credit notes and corrections refer to the invoice they correct (BT-25).
  precedingInvoice?:{number:string;date?:string};
  payment:{code:PaymentCode;iban?:string;bic?:string;terms?:string};
- prepaid?:number;
+ adjustments?:Adjustment[];prepaid?:number;
+ // Rounding of the amount due (BT-114), as some senders state it.
+ rounding?:number;
  // Reason printed for VAT categories other than S (BT-120), e.g. "TVA non applicable, art. 293 B du CGI".
  exemptionReason?:string;
  // French mandatory mentions on business invoices: late-payment penalties,
@@ -44,7 +49,7 @@ export const paymentMeans:{code:PaymentCode;label:string;fr:string}[]=[
 ];
 export const vatCategories:{code:VatCategory;label:string;zero:boolean}[]=[
  {code:'S',label:'Standard rate',zero:false},{code:'Z',label:'Zero rated',zero:true},{code:'E',label:'Exempt',zero:true},
- {code:'AE',label:'Reverse charge',zero:true},{code:'K',label:'Intra-EU supply',zero:true},{code:'G',label:'Export outside the EU',zero:true},
+ {code:'AE',label:'Reverse charge',zero:true},{code:'K',label:'Intra-EU supply',zero:true},{code:'G',label:'Export outside the EU',zero:true},{code:'O',label:'Not subject to VAT',zero:true},
 ];
 export const frenchMentions={
  latePenalty:'Pénalités de retard : trois fois le taux d’intérêt légal.',
@@ -57,7 +62,7 @@ export const frenchMentions={
 // French extension adds VATEX-FR-FRANCHISE for the "franchise en base".
 export function exemptionCode(inv:Invoice,category:VatCategory){
  if(category==='E')return /293\s*B|L\.?\s*223-3|franchise/i.test(inv.exemptionReason??'')?'VATEX-FR-FRANCHISE':undefined;
- return {AE:'VATEX-EU-AE',K:'VATEX-EU-IC',G:'VATEX-EU-G'}[category as 'AE'|'K'|'G'];
+ return {AE:'VATEX-EU-AE',K:'VATEX-EU-IC',G:'VATEX-EU-G',O:'VATEX-EU-O'}[category as 'AE'|'K'|'G'|'O'];
 }
 export const deliveryCountry=(inv:Invoice)=>inv.deliveryCountry||(inv.lines.some(l=>l.vatCategory==='K')?inv.buyer.address.country:undefined);
 
@@ -67,10 +72,13 @@ export const lineNet=(l:InvoiceLine)=>round2(l.quantity*l.unitPrice);
 // line amounts (rounded once per group, BR-CO-17), then the invoice totals.
 export function totals(inv:Invoice){
  const groups=new Map<string,{category:VatCategory;rate:number;basis:number;tax:number}>();
- for(const l of inv.lines){const key=`${l.vatCategory}:${l.vatRate}`,g=groups.get(key)??{category:l.vatCategory,rate:l.vatRate,basis:0,tax:0};g.basis=round2(g.basis+lineNet(l));groups.set(key,g);}
+ const add=(category:VatCategory,rate:number,amount:number)=>{const key=`${category}:${rate}`,g=groups.get(key)??{category,rate,basis:0,tax:0};g.basis=round2(g.basis+amount);groups.set(key,g);};
+ for(const l of inv.lines)add(l.vatCategory,l.vatRate,lineNet(l));
+ const adjustments=inv.adjustments??[];for(const a of adjustments)add(a.vatCategory,a.vatRate,a.charge?round2(a.amount):-round2(a.amount));
  const vat=[...groups.values()].map(g=>({...g,tax:round2(g.basis*g.rate/100)}));
- const lineTotal=round2(inv.lines.reduce((s,l)=>s+lineNet(l),0)),taxTotal=round2(vat.reduce((s,g)=>s+g.tax,0)),grandTotal=round2(lineTotal+taxTotal),prepaid=round2(inv.prepaid??0);
- return {vat,lineTotal,taxBasis:lineTotal,taxTotal,grandTotal,prepaid,due:round2(grandTotal-prepaid)};
+ const lineTotal=round2(inv.lines.reduce((s,l)=>s+lineNet(l),0)),allowances=round2(adjustments.filter(a=>!a.charge).reduce((s,a)=>s+a.amount,0)),charges=round2(adjustments.filter(a=>a.charge).reduce((s,a)=>s+a.amount,0));
+ const taxBasis=round2(lineTotal-allowances+charges),taxTotal=round2(vat.reduce((s,g)=>s+g.tax,0)),grandTotal=round2(taxBasis+taxTotal),prepaid=round2(inv.prepaid??0),rounding=round2(inv.rounding??0);
+ return {vat,lineTotal,allowances,charges,taxBasis,taxTotal,grandTotal,prepaid,rounding,due:round2(grandTotal-prepaid+rounding)};
 }
 
 // Luhn check used by SIREN and SIRET (La Poste's SIRETs follow their own rule).
@@ -87,7 +95,7 @@ const ibanValid=(iban:string)=>{const s=iban.replace(/\s+/g,'').toUpperCase();if
 const isDate=(s?:string)=>!!s&&/^\d{4}-\d{2}-\d{2}$/.test(s)&&!Number.isNaN(Date.parse(s));
 
 // EN 16931 names the intra-EU rules BR-IC-*.
-const ruleGroup:Record<VatCategory,string>={S:'S',Z:'Z',E:'E',AE:'AE',K:'IC',G:'G'};
+const ruleGroup:Record<VatCategory,string>={S:'S',Z:'Z',E:'E',AE:'AE',K:'IC',G:'G',O:'O'};
 export type Issue={rule:string;severity:'error'|'warning';field:string;message:string};
 // EN 16931 business rules (BR-*) that a form can break, plus the French
 // reform's (FR-*). Errors block export; warnings are mentions French law
@@ -123,13 +131,20 @@ export function checkInvoice(inv:Invoice):Issue[]{
   if(zero&&l.vatRate!==0)err(`BR-${ruleGroup[l.vatCategory]}-05`,`${at}.vatRate`,`Line ${n}: ${vatCategories.find(c=>c.code===l.vatCategory)!.label.toLowerCase()} lines have 0% VAT.`);
   if(!zero&&!(l.vatRate>0))err('BR-S-05',`${at}.vatRate`,`Line ${n}: standard-rate lines need a VAT rate above 0%.`);
  });
- const cats=new Set(inv.lines.map(l=>l.vatCategory));
+ (inv.adjustments??[]).forEach((a,i)=>{
+  const at=`adjustments.${i}`,what=a.charge?'charge':'discount';
+  if(!(a.amount>0))err(a.charge?'BR-36':'BR-31',`${at}.amount`,`The ${what} needs an amount above zero.`);
+  if(!a.reason.trim())err(a.charge?'BR-38':'BR-33',`${at}.reason`,`Say what the ${what} is for.`);
+  if(a.vatCategory==='S'&&!(a.vatRate>0))err(a.charge?'BR-S-07':'BR-S-06',`${at}.vatRate`,`The ${what} needs the VAT rate of the lines it applies to.`);
+ });
+ const cats=new Set([...inv.lines.map(l=>l.vatCategory),...(inv.adjustments??[]).map(a=>a.vatCategory)]);
  if(cats.has('S')&&!inv.seller.vatId)err('BR-S-02','seller.vatId','Your VAT number is required when you charge VAT.');
  for(const c of ['AE','K','G'] as const)if(cats.has(c)&&!inv.seller.vatId)err(`BR-${ruleGroup[c]}-02`,'seller.vatId','Your VAT number is required for this VAT category.');
  if(cats.has('E')&&!inv.seller.vatId&&!inv.seller.taxRegistration)err('BR-E-02','seller.vatId','Exempt invoices need your VAT number or another tax registration number. Micro-entrepreneurs under the VAT franchise can ask their tax office (SIE) for an intra-EU VAT number.');
  for(const c of ['AE','K'] as const)if(cats.has(c)&&!inv.buyer.vatId)err(`BR-${ruleGroup[c]}-02`,'buyer.vatId','The client’s VAT number is required for reverse charge and intra-EU supplies.');
  if(cats.has('K')&&!inv.deliveryDate)err('BR-IC-11','deliveryDate','Intra-EU supplies need the delivery date.');
- if([...cats].some(c=>c!=='S')&&!inv.exemptionReason?.trim())err('BR-E-10','exemptionReason','Give the reason for 0% VAT (e.g. “TVA non applicable, art. 293 B du CGI”).');
+ if(cats.has('O')&&cats.size>1)err('BR-O-11','lines','Lines not subject to VAT must go on their own invoice.');
+ if([...cats].some(c=>c!=='S'&&c!=='Z')&&!inv.exemptionReason?.trim())err('BR-E-10','exemptionReason','Give the reason for 0% VAT (e.g. “TVA non applicable, art. 293 B du CGI”).');
  if(inv.type==='381'&&!inv.precedingInvoice?.number)err('FR-CREDIT','precedingInvoice','A credit note must name the invoice it corrects.');
  const t=totals(inv);
  if(t.due>0&&!inv.dueDate&&!inv.payment.terms?.trim())err('BR-CO-25','dueDate','Give a due date or payment terms.');

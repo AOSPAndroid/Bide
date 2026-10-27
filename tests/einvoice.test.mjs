@@ -54,3 +54,50 @@ test('Factur-X PDF: PDF/A-3 with factur-x.xml attached and the Factur-X XMP',asy
  assert.ok(streams.includes(xml),'the attached XML is the CII invoice, unchanged');
  assert.ok(!/\/BaseFont \/(Helvetica|Times|Courier)/.test(text),'no unembedded standard fonts');
 });
+
+test('received e-invoices are read back: CII, UBL and the XML inside a Factur-X PDF',async()=>{
+ const {readInvoiceXml}=await import('../tmp/einvoice-read.mjs'),{embeddedInvoiceXml}=await import('../tmp/facturx-read.mjs'),{parseXml,text}=await import('../tmp/xml-lite.mjs');
+ const strip=inv=>JSON.parse(JSON.stringify(inv));// drop undefined fields
+ const same=(a,b)=>{for(const k of ['type','number','issueDate','dueDate','currency','operation','exemptionReason','latePenalty','recoveryIndemnity','discountTerms','prepaid'])assert.deepEqual(a[k],b[k],k);
+  for(const k of ['name','siren','vatId'])assert.deepEqual([a.seller[k],a.buyer[k]],[b.seller[k],b.buyer[k]],k);
+  assert.deepEqual(a.lines.map(l=>[l.name,l.quantity,l.unit,l.unitPrice,l.vatCategory,l.vatRate]),b.lines.map(l=>[l.name,l.quantity,l.unit,l.unitPrice,l.vatCategory,l.vatRate]));
+  assert.deepEqual(totals(a),totals(b));};
+ for(const [name,inv] of Object.entries(samples)){
+  for(const xml of [toCii(inv),toUbl(inv)]){const r=readInvoiceXml(xml);assert.deepEqual(r.warnings,[],name);same(strip(r.invoice),strip(inv));}
+ }
+ assert.equal(readInvoiceXml(toCii(samples['credit-note'])).invoice.precedingInvoice.number,'F-2026-0042');
+ // A sender's total that does not match its lines is reported.
+ const off=readInvoiceXml(toCii(samples['services-vat']).replace('<ram:GrandTotalAmount>2969.07','<ram:GrandTotalAmount>2970.00'));assert.match(off.warnings[0],/states a total of 2970.00/);
+ assert.throws(()=>readInvoiceXml('<html><body/></html>'),/not a CII or UBL invoice/);
+ assert.equal(text(parseXml('<a x="1"><b>&lt;5 &amp; caf&#233;</b><![CDATA[<raw>]]></a>'),'b'),'<5 & café');
+ // The XML attached to our own Factur-X PDF comes back unchanged.
+ const fonts={regular:new Uint8Array(await readFile('src/browser/fonts/LiberationSans-Regular.ttf')),bold:new Uint8Array(await readFile('src/browser/fonts/LiberationSans-Bold.ttf'))};
+ const xml=toCii(samples.franchise),pdf=await facturxPdf(samples.franchise,xml,fonts);
+ assert.deepEqual(await embeddedInvoiceXml(pdf),{name:'factur-x.xml',xml});
+});
+
+test('scanned invoices: dates, amounts and table rows are read into a draft',async()=>{
+ const {datesIn,amountsIn,rowNumberReadings,invoiceFromOcr}=await import('../tmp/invoice-ocr.mjs');
+ assert.deepEqual(datesIn('Date 27/10/2026, échéance le 26 novembre 2026'),['2026-10-27','2026-11-26']);
+ assert.deepEqual(datesIn('Issued October 5, 2026 · due 2026-11-04'),['2026-10-05','2026-11-04']);
+ assert.deepEqual(amountsIn('1 284,50 € · 1.284,50 · 1,284.50 · 18,5 · 3,200 words'),[1284.5,1284.5,1284.5,18.5,3200]);
+ // "1 450.00 450.00": the space is a column gap, not a thousands separator.
+ assert.ok(rowNumberReadings('1 450.00 450.00').some(r=>r.join()==='1,450,450'));
+ // Two columns of parties side by side, a table and totals, as OCR returns them.
+ const at=(text,left,top)=>({text,left,top,width:text.length*7,height:14});
+ const lines=[at('Facture',48,48),at('N°',320,52),at('F-2026-0099',470,52),at('Date',320,66),at('03/11/2026',470,66),at('Échéance',320,80),at('03/12/2026',470,80),
+  at('ÉMETTEUR',48,150),at('CLIENT',300,150),at('Atelier Lumière SARL',48,164),at('Harbour View SAS',300,164),at('14 rue des Acacias',48,178),at('2 quai de la Fosse',300,178),
+  at('69003 Lyon',48,192),at('44000 Nantes',300,192),at('SIREN 000123455',48,206),at('SIREN 000987651',300,206),at('TVA FR31000123455',48,220),
+  at('Désignation',48,260),at('Qté',300,260),at('P.U. HT',380,260),at('TVA',450,260),at('Total HT',500,260),
+  at('Refonte du site web',48,280),at('1',300,280),at('1 850,00 €',380,280),at('20 %',450,280),at('1 850,00 €',500,280),
+  at('Maintenance (heures)',48,300),at('6,5',300,300),at('72,50 €',380,300),at('20 %',450,300),at('471,25 €',500,300),
+  at('Total HT',330,340),at('2 321,25 €',500,340),at('Total TVA',330,354),at('464,25 €',500,354),at('Total TTC',330,368),at('2 785,50 €',500,368),
+  at('IBAN FR76 3000 6000 0112 3456 7890 189',48,420)];
+ const {invoice:inv,found,notes}=invoiceFromOcr(lines,'2026-11-05');
+ assert.equal(inv.number,'F-2026-0099');assert.equal(inv.issueDate,'2026-11-03');assert.equal(inv.dueDate,'2026-12-03');
+ assert.equal(inv.seller.name,'Atelier Lumière SARL');assert.equal(inv.seller.siren,'000123455');assert.equal(inv.seller.vatId,'FR31000123455');assert.equal(inv.seller.address.city,'Lyon');
+ assert.equal(inv.buyer.name,'Harbour View SAS');assert.equal(inv.buyer.siren,'000987651');assert.equal(inv.buyer.address.postcode,'44000');
+ assert.deepEqual(inv.lines.map(l=>[l.name,l.quantity,l.unitPrice,l.vatRate]),[['Refonte du site web',1,1850,20],['Maintenance (heures)',6.5,72.5,20]]);
+ assert.equal(inv.payment.iban,'FR76 3000 6000 0112 3456 7890 189');
+ assert.ok(found.includes('totals match'),JSON.stringify({found,notes}));
+});

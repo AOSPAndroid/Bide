@@ -49,6 +49,8 @@ Photo editor and PDF MasterTool share your current document, layers and undo his
 
 **Issue and download Factur-X** freezes the invoice and saves a PDF/A-3 with the EN 16931 XML embedded (`factur-x.xml`), readable by people and by accounting software. Issued invoices can also be saved as UBL or CII XML, and corrected with a credit note that refers back to them. Standard, zero rated, exempt (including the VAT franchise, `VATEX-FR-FRANCHISE`), reverse charge, intra-EU and export lines are supported; deposits go in **Already paid**.
 
+**Open an invoice** reads e-invoices you receive (Factur-X PDF, UBL, CII), checks them and keeps the original. A PDF without invoice data, or a photo of a paper invoice, is read with OCR into a draft listing what it could not find; check every field before issuing it.
+
 bide creates and checks the invoice; sending it to a business client goes through your approved e-invoicing platform (*plateforme agréée*), which accepts Factur-X, UBL and CII. Invoices are kept in this browser; keep the downloaded files as your record.
 
 ## Editor

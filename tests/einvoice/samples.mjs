@@ -17,5 +17,7 @@ export const samples={
  'reverse-charge':{...base,number:'F-2026-0044',buyer:{name:'Kensington Works Ltd',vatId:'GB123456789',address:{line1:'1 Canal Street',postcode:'M1 3HE',city:'Manchester',country:'GB'}},
   exemptionReason:'Autoliquidation',lines:[line('1','Conseil en design',3,650,0,'AE','DAY')]},
  'credit-note':{...base,type:'381',number:'AV-2026-0003',precedingInvoice:{number:'F-2026-0042',date:'2026-10-27'},lines:[line('1','Remise commerciale sur refonte',1,150)]},
+ 'discount-shipping':{...base,number:'F-2026-0046',operation:'goods',lines:[line('1','Lampes de bureau',10,89),line('2','Abat-jour',10,24.5)],
+  adjustments:[{charge:false,amount:113.5,reason:'Remise fidélité 10 %',vatCategory:'S',vatRate:20},{charge:true,amount:25,reason:'Frais de port',vatCategory:'S',vatRate:20}]},
  'deposit-paid':{...base,number:'F-2026-0045',prepaid:600,payment:{...base.payment,terms:'Solde à 30 jours'},lines:[line('1','Identité visuelle',1,2400),line('2','Déclinaisons',3,120)]},
 };

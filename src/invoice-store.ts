@@ -7,7 +7,10 @@ import {blankInvoice,nextNumber,type Invoice,type Party} from './einvoice';
 import type {InvoiceLanguage} from './facturx-pdf';
 
 export type Client=Party&{id:string};
-export type StoredInvoice={id:string;status:'draft'|'issued';invoice:Invoice;updated:string;issued?:string};
+// Received invoices keep the original file; drafts read from a scan keep
+// what the reading could not be sure of.
+export type StoredInvoice={id:string;status:'draft'|'issued'|'received';invoice:Invoice;updated:string;issued?:string;
+ source?:{name:string;format:'facturx'|'ubl'|'cii'|'scan';warnings:string[];original?:Blob}};
 export type DocumentsData={seller?:Party;payment?:Invoice['payment'];exemptionReason?:string;language:InvoiceLanguage;clients:Client[];invoices:StoredInvoice[]};
 
 const key='documents';

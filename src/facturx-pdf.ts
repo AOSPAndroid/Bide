@@ -9,9 +9,9 @@ import {totals,lineNet,sirenOf,units,paymentMeans,type Invoice,type Party} from 
 export type InvoiceLanguage='fr'|'en';
 const labels={
  fr:{invoice:'Facture',credit:'Avoir',prepayment:'Facture d’acompte',number:'N°',issued:'Date',due:'Échéance',delivery:'Livraison',from:'Émetteur',to:'Client',siren:'SIREN',siret:'SIRET',vat:'TVA',item:'Désignation',qty:'Qté',unit:'Unité',price:'P.U. HT',rate:'TVA',net:'Total HT',
-  base:'Base HT',tax:'Montant TVA',subtotal:'Total HT',taxTotal:'Total TVA',total:'Total TTC',prepaid:'Déjà payé',dueAmount:'Net à payer',payment:'Paiement',iban:'IBAN',bic:'BIC',corrects:'Corrige la facture',order:'Commande',reference:'Référence',page:'Page'},
+  base:'Base HT',lines:'Total des lignes HT',rounding:'Arrondi',tax:'Montant TVA',subtotal:'Total HT',taxTotal:'Total TVA',total:'Total TTC',prepaid:'Déjà payé',dueAmount:'Net à payer',payment:'Paiement',iban:'IBAN',bic:'BIC',corrects:'Corrige la facture',order:'Commande',reference:'Référence',page:'Page'},
  en:{invoice:'Invoice',credit:'Credit note',prepayment:'Prepayment invoice',number:'No.',issued:'Date',due:'Due',delivery:'Delivery',from:'From',to:'Bill to',siren:'SIREN',siret:'SIRET',vat:'VAT',item:'Description',qty:'Qty',unit:'Unit',price:'Unit price',rate:'VAT',net:'Net',
-  base:'Net base',tax:'VAT amount',subtotal:'Net total',taxTotal:'VAT total',total:'Total',prepaid:'Already paid',dueAmount:'Amount due',payment:'Payment',iban:'IBAN',bic:'BIC',corrects:'Corrects invoice',order:'Order',reference:'Reference',page:'Page'},
+  base:'Net base',lines:'Lines total',rounding:'Rounding',tax:'VAT amount',subtotal:'Net total',taxTotal:'VAT total',total:'Total',prepaid:'Already paid',dueAmount:'Amount due',payment:'Payment',iban:'IBAN',bic:'BIC',corrects:'Corrects invoice',order:'Order',reference:'Reference',page:'Page'},
 };
 
 // The Factur-X XMP extension schema (Factur-X 1.0, section 6.2.2).
@@ -77,8 +77,9 @@ export function facturxPdf(inv:Invoice,xml:string,fonts:{regular:Uint8Array;bold
    for(const g of t.vat){doc.font('regular').fontSize(9).fillColor(ink).text(g.category==='S'?`${qty(g.rate)} %`:`${g.category} 0 %`,left,y,{width:50}).text(money(g.basis),left+50,y,{width:90,align:'right'}).text(money(g.tax),left+140,y,{width:90,align:'right'});y+=13;}
    if(t.vat.some(g=>g.category!=='S')&&inv.exemptionReason){doc.fontSize(8.5).fillColor(muted).text(inv.exemptionReason,left,y+2,{width:230});y=doc.y;}
    let ty=box;const total=(k:string,v:string,strong=false)=>{doc.font(strong?'bold':'regular').fontSize(strong?11:9.5).fillColor(ink).text(k,right-230,ty,{width:120}).text(v,right-110,ty,{width:110,align:'right'});ty+=strong?18:14;};
-   total(L.subtotal,money(t.lineTotal));total(L.taxTotal,money(t.taxTotal));total(L.total,money(t.grandTotal),!t.prepaid);
-   if(t.prepaid){total(L.prepaid,money(-t.prepaid));total(L.dueAmount,money(t.due),true);}
+   if(inv.adjustments?.length){total(L.lines,money(t.lineTotal));for(const a of inv.adjustments)total(a.reason,money(a.charge?a.amount:-a.amount));}
+   total(L.subtotal,money(t.taxBasis));total(L.taxTotal,money(t.taxTotal));total(L.total,money(t.grandTotal),!t.prepaid&&!t.rounding);
+   if(t.prepaid||t.rounding){if(t.prepaid)total(L.prepaid,money(-t.prepaid));if(t.rounding)total(L.rounding,money(t.rounding));total(L.dueAmount,money(t.due),true);}
    y=Math.max(y,ty)+18;
    // Payment and the legal mentions.
    const means=paymentMeans.find(m=>m.code===inv.payment.code),method=means?(language==='fr'?means.fr:means.label):'';

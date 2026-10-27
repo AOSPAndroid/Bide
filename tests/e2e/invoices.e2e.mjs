@@ -4,7 +4,7 @@
 // there after a reload. All details are invented.
 import {test} from 'node:test';import assert from 'node:assert/strict';
 import {createServer} from 'vite';import {chromium} from 'playwright-core';import * as mupdf from 'mupdf';
-import {mkdtemp,readFile} from 'node:fs/promises';import {tmpdir} from 'node:os';import {join} from 'node:path';
+import {mkdtemp,readFile,writeFile} from 'node:fs/promises';import {tmpdir} from 'node:os';import {join} from 'node:path';
 
 async function saved(page,click){
  const [download]=await Promise.all([page.waitForEvent('download',{timeout:60000}),click()]);
@@ -62,6 +62,26 @@ test('an e-invoice is checked, issued as Factur-X, credited and kept',{timeout:6
   assert.equal(await card(page,'Your business').getByLabel('Name').inputValue(),'Atelier Lumière SARL','your details are remembered');
   await card(page,'Client').getByLabel('Saved client').selectOption({label:'Harbour View SAS'});
   assert.equal(await card(page,'Client').getByLabel('City').inputValue(),'Nantes');
+  // A Factur-X someone sends is read exactly and kept read only with its original.
+  await page.getByRole('button',{name:'All documents'}).click();
+  const received=join(await mkdtemp(join(tmpdir(),'bide-invoice-')),'Facture fournisseur.pdf');await writeFile(received,pdf.bytes);
+  await page.getByLabel('Open an invoice file').setInputFiles(received);
+  await page.getByText(/Received as Factur-X from Atelier Lumière SARL/).waitFor({timeout:60000});
+  assert.equal(await page.getByLabel('Invoice total').innerText(),'3\u202f001,20\u00a0€');
+  await page.getByText('This invoice passes the checks').waitFor();
+  const original=await saved(page,()=>page.getByRole('button',{name:'Original file'}).click());assert.ok(original.bytes.equals(pdf.bytes));
+  await page.getByRole('button',{name:'All documents'}).click();
+  await page.getByRole('region',{name:'Received'}).getByText('Atelier Lumière SARL').waitFor();
+  // A photo of a paper invoice becomes a draft to check.
+  const photo=join(await mkdtemp(join(tmpdir(),'bide-invoice-')),'scan.png');
+  await writeFile(photo,Buffer.from(mupdf.Document.openDocument(pdf.bytes,'application/pdf').loadPage(0).toPixmap(mupdf.Matrix.scale(2,2),mupdf.ColorSpace.DeviceRGB,false).asPNG()));
+  await page.getByLabel('Open an invoice file').setInputFiles(photo);
+  await page.getByText(/Read from scan.png with OCR/).waitFor({timeout:240000});
+  assert.equal(await card(page,'Client').getByLabel('Name').inputValue(),'Harbour View SAS');
+  assert.equal(await card(page,'Client').getByLabel('SIREN').inputValue(),'000987651');
+  assert.equal(await card(page,'Payment').getByLabel('IBAN').inputValue(),'FR76 3000 6000 0112 3456 7890 189');
+  assert.equal(await page.getByRole('group',{name:'Line 1'}).getByLabel('Description').inputValue(),'Refonte du site web');
+  assert.equal(await page.getByLabel('Invoice total').innerText(),'3\u202f001,20\u00a0€');
   // Fits a phone screen without sideways scrolling.
   await page.setViewportSize({width:390,height:844});await page.waitForTimeout(300);
   assert.ok(await page.evaluate(()=>{const m=document.querySelector('.documents-workspace');return m.scrollWidth<=m.clientWidth+1;}),'no horizontal scroll at phone width');
