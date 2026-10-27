@@ -32,3 +32,14 @@ export function perspectivePixels(src:{width:number;height:number;data:ArrayLike
  return {data:out,width,height,left,top};
 }
 export const mapSquare=(corners:XY[],u:number,v:number)=>apply(squareToQuad(corners),u,v);
+
+// The inverse: the quad `corners` of `src` pulled out to a width×height
+// rectangle (a photographed page flattened).
+export function unwarpPixels(src:{width:number;height:number;data:ArrayLike<number>},corners:XY[],width:number,height:number){
+ const m=squareToQuad(corners),out=new Uint8ClampedArray(width*height*4),W=src.width,H=src.height,d=src.data;
+ for(let y=0;y<height;y++)for(let x=0;x<width;x++){
+  const p=apply(m,(x+.5)/width,(y+.5)/height),fx=Math.min(W-1,Math.max(0,p.x-.5)),fy=Math.min(H-1,Math.max(0,p.y-.5)),x0=Math.floor(fx),y0=Math.floor(fy),x1=Math.min(W-1,x0+1),y1=Math.min(H-1,y0+1),ax=fx-x0,ay=fy-y0;
+  for(let c=0;c<4;c++)out[(y*width+x)*4+c]=(d[(y0*W+x0)*4+c]*(1-ax)+d[(y0*W+x1)*4+c]*ax)*(1-ay)+(d[(y1*W+x0)*4+c]*(1-ax)+d[(y1*W+x1)*4+c]*ax)*ay;
+ }
+ return out;
+}

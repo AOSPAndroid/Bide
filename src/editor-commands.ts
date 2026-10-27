@@ -1,7 +1,7 @@
 // The command palette and menu commands, with the reason each is unavailable.
 // Built on every render from the editor's state and actions.
 import {Canvas,Rect,FabricImage,Path,ActiveSelection} from 'fabric';
-import {LassoSelect,SquareDashed,Wand2,PaintBucket,Blend,Brush,PenTool,Crop,Ruler,History as HistoryIcon,ArrowDown,ArrowUp,Bold,ChevronLeft,ChevronRight,Circle,Command,Copy,Download,Eraser,Eye,EyeOff,FileImage,FilePlus2,FileText,FolderOpen,Highlighter,ImagePlus,Italic,Layers,LockKeyhole,Maximize,Merge,Minus,MousePointer2,PanelLeftClose,PenLine,Plus,Redo2,RotateCw,Save,Scaling,Scissors,Search,Settings2,SlidersHorizontal,Sparkles,Square,Trash2,Type,Underline,Undo2,UnlockKeyhole,ZoomIn} from 'lucide-react';
+import {LassoSelect,SquareDashed,Wand2,PaintBucket,Blend,Brush,PenTool,Crop,Ruler,History as HistoryIcon,ArrowDown,ArrowUp,Bold,ChevronLeft,ChevronRight,Circle,Command,Copy,Download,Eraser,Eye,EyeOff,FileImage,FilePlus2,FileText,FolderOpen,Highlighter,ImagePlus,Italic,Layers,LockKeyhole,Maximize,Merge,Minus,MousePointer2,PanelLeftClose,PenLine,Plus,Receipt,Redo2,RotateCw,Save,Scaling,Scissors,Search,Settings2,SlidersHorizontal,Sparkles,Square,Trash2,Type,Underline,Undo2,UnlockKeyhole,ZoomIn} from 'lucide-react';
 import type {RefObject,Dispatch,SetStateAction} from 'react';
 import {type SelectionAction} from './SelectionBar';
 import {type Guides} from './Rulers';
@@ -11,7 +11,6 @@ import {layerPixelsMask,hasLayerMask} from './selection-canvas';
 import {Textbox} from './text-appearance';
 import {type Page,type Project} from './model';
 import {blendModes} from './browser/layer-utils';
-import {type DiagramCommands,type NativeDiagramCommand} from './Diagrams';
 import {type Workspace} from './WorkspaceDock';
 import {bundledFonts,systemFonts} from './font-catalog';
 import {type SelectionPoint} from './selection-mask';
@@ -25,7 +24,6 @@ import {TOOLS,type Obj,type Tool,type PaletteAction,type Modal} from './editor-t
 
 export type EditorCommandsDeps={
   selectWorkspace:(next: Workspace) => void;
-  openDiagrams:() => void;
   setShowDetectedText:Dispatch<SetStateAction<boolean>>;
   setTextScanRevision:Dispatch<SetStateAction<number>>;
   setTool:Dispatch<SetStateAction<Tool>>;
@@ -126,18 +124,15 @@ export type EditorCommandsDeps={
   setHighlightSize:Dispatch<SetStateAction<number>>;
   setBrushSize:Dispatch<SetStateAction<number>>;
   setSnap:Dispatch<SetStateAction<boolean>>;
-  editDiagram:() => void;
   layers:Obj[];
-  nativeDiagramCommands:NativeDiagramCommand[];
-  diagramCommands:RefObject<DiagramCommands | null>;
 };
 
 export function editorCommands(d:EditorCommandsDeps){
-  const {selectWorkspace,openDiagrams,setShowDetectedText,setTextScanRevision,setTool,changeZoom,zoomRef,setModal,openFiles,projectInput,saveProject,exportDialog,addText,imageInput,addPage,duplicatePage,pageAction,pageId,undo,duplicate,groupLayers,ungroupLayers,fit,setProtect,page,unlockOriginalPdf,runSelection,region,aiReady,selectSubject,openColorRange,mergeDown,addAdjustment,openWarp,project,selected,canvas,syncSelection,setRegion,copyToClipboard,pasteFromClipboard,setMobilePanel,togglePathEdit,trimToContent,selectionPixels,cropTo,toggleRulers,setShowGuides,guides,setGuides,setSidePanel,openPerspective,addLayerMask,invertSelectedMask,applyLayerMask,deleteLayerMask,addEffect,setLayerStyle,selectionTarget,showMask,removeBackground,exportTransparentPng,aiSharpenSelected,aiRemove,straightenPage,flattenPageAi,textRegions,setRedactOpen,addFormField,setProofOpen,setFindOpen,convertAllDetectedText,updateObject,setView,documentView,setPdfHome,setLeftOpen,setPageId,deletePage,clipboard,copyPending,removeSelected,moveLayer,toggleLock,saveCanvas,align,applySelection,setClip,setImageFilter,changeTextFont,setBrushKind,addArtboard,setLayoutGrid,layoutSelection,colorStyles,applyColorStyle,tool,setEraserSize,setRetouchSize,setHighlightSize,setBrushSize,setSnap,editDiagram,layers,nativeDiagramCommands,diagramCommands}=d;
+  const {selectWorkspace,setShowDetectedText,setTextScanRevision,setTool,changeZoom,zoomRef,setModal,openFiles,projectInput,saveProject,exportDialog,addText,imageInput,addPage,duplicatePage,pageAction,pageId,undo,duplicate,groupLayers,ungroupLayers,fit,setProtect,page,unlockOriginalPdf,runSelection,region,aiReady,selectSubject,openColorRange,mergeDown,addAdjustment,openWarp,project,selected,canvas,syncSelection,setRegion,copyToClipboard,pasteFromClipboard,setMobilePanel,togglePathEdit,trimToContent,selectionPixels,cropTo,toggleRulers,setShowGuides,guides,setGuides,setSidePanel,openPerspective,addLayerMask,invertSelectedMask,applyLayerMask,deleteLayerMask,addEffect,setLayerStyle,selectionTarget,showMask,removeBackground,exportTransparentPng,aiSharpenSelected,aiRemove,straightenPage,flattenPageAi,textRegions,setRedactOpen,addFormField,setProofOpen,setFindOpen,convertAllDetectedText,updateObject,setView,documentView,setPdfHome,setLeftOpen,setPageId,deletePage,clipboard,copyPending,removeSelected,moveLayer,toggleLock,saveCanvas,align,applySelection,setClip,setImageFilter,changeTextFont,setBrushKind,addArtboard,setLayoutGrid,layoutSelection,colorStyles,applyColorStyle,tool,setEraserSize,setRetouchSize,setHighlightSize,setBrushSize,setSnap,layers}=d;
   const actions: PaletteAction[] = [
     { label:'Open photo editor', hint:'', icon:FileImage, run:()=>selectWorkspace('photo') },
     { label:'Open PDF MasterTool', hint:'', icon:FileText, run:()=>selectWorkspace('pdf') },
-    { label:'Open diagram workspace', hint:'', icon:Layers, run:openDiagrams },
+    { label:'Open Documents workspace', hint:'', icon:Receipt, run:()=>selectWorkspace('documents') },
     {label:'Recognize text on current page',hint:'',icon:Type,keywords:'ocr scan edit pdf image text font',run:()=>{setShowDetectedText(true);setTextScanRevision(v=>v+1);}},
     {label:'Toggle detected text regions',hint:'',icon:Type,run:()=>setShowDetectedText(v=>!v)},
     {label:'Zoom tool',hint:'Z',icon:ZoomIn,run:()=>setTool('zoom')},
@@ -287,20 +282,10 @@ export function editorCommands(d:EditorCommandsDeps){
     {label:'Increase drawing size',hint:']',icon:Plus,run:()=>{if(tool==='eraser')setEraserSize(v=>brushWidth(v+2));else if(tool==='clone'||tool==='heal')setRetouchSize(v=>brushWidth(v+2));else if(tool==='highlight')setHighlightSize(v=>Math.min(120,v+2));else {setTool('brush');setBrushSize(v=>brushWidth(v+2));}}},
     {label:'Decrease drawing size',hint:'[',icon:Minus,run:()=>{if(tool==='eraser')setEraserSize(v=>brushWidth(v-2));else if(tool==='clone'||tool==='heal')setRetouchSize(v=>brushWidth(v-2));else if(tool==='highlight')setHighlightSize(v=>Math.max(1,v-2));else {setTool('brush');setBrushSize(v=>brushWidth(v-2));}}},
     {label:'Toggle snapping to page',hint:'',icon:Maximize,run:()=>setSnap(v=>!v)},
-    {label:'Edit selected diagram',hint:'',icon:Layers,disabled:!selected?.diagramXml?'Select a placed diagram first':undefined,run:editDiagram},
     ...TOOLS.filter(t=>['select','text','rect','ellipse','line','hand'].includes(t.id)).map(t=>({label:`Use ${t.label.toLowerCase()} tool`,hint:t.key,icon:t.icon,run:()=>setTool(t.id)})),
     ...layers.map(layer=>({label:`Select layer: ${layer.name||layer.type}`,hint:'',category:'Layers',icon:Layers,run:()=>{canvas.current?.setActiveObject(layer);canvas.current?.requestRenderAll();syncSelection();setTool('select');}})),
   ];
-  const diagramActions:PaletteAction[] = [
-    ...actions.filter(a=>['Open photo editor','Open PDF MasterTool','Open diagram workspace'].includes(a.label)),
-    ...nativeDiagramCommands.map(c=>({label:`Diagram: ${c.label}`,hint:c.hint,icon:Layers,keywords:c.id.replace(/([A-Z])/g,' $1'),disabled:c.enabled?undefined:'Unavailable for the current diagram selection',run:()=>diagramCommands.current?.run(c.id)})),
-    {label:'New diagram',hint:'',icon:FilePlus2,run:()=>diagramCommands.current?.newDiagram()},
-    {label:'Open Visio or draw.io file',hint:'Ctrl O',aliases:['open vsdx','import visio'],icon:FolderOpen,run:()=>diagramCommands.current?.open()},
-    {label:'Save editable diagram',hint:'.drawio',icon:Save,run:()=>diagramCommands.current?.save()},
-    {label:'Export diagram as PNG',hint:'',icon:FileImage,run:()=>diagramCommands.current?.export('png')},
-    {label:'Export diagram as SVG',hint:'',icon:FileImage,run:()=>diagramCommands.current?.export('svg')},
-    {label:'Export diagram as PDF',hint:'',icon:Download,run:()=>diagramCommands.current?.export('pdf')},
-    {label:'Place diagram in document',hint:'',icon:ImagePlus,run:()=>diagramCommands.current?.export('place')},
-  ];
-  return {actions,requireLayer,focusSetting,moreActions,diagramActions};
+  // The Documents workspace has no canvas, so its palette only switches workspaces.
+  const documentsActions=actions.filter(a=>['Open photo editor','Open PDF MasterTool','Open Documents workspace'].includes(a.label));
+  return {actions,requireLayer,focusSetting,moreActions,documentsActions};
 }

@@ -318,3 +318,57 @@ test('D1-backed sign-in, checkout and signed webhook survive duplicate requests'
  assert.equal((await store.userById(user.id)).subscription_status,'active');
  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM stripe_events').get().n,1);
 });
+
+test('the apps call across origins and download models with the licence as a bearer token',async()=>{
+ const store=new MemoryStore(),session=await signIn(store),e={...env,ASSETS:{fetch:async()=>new Response('model bytes')}};
+ const preflight=await call(store,'/api/licence',{method:'OPTIONS',headers:{origin:'capacitor://localhost','access-control-request-headers':'authorization'},e});
+ assert.equal(preflight.status,204);assert.equal(preflight.headers.get('access-control-allow-origin'),'capacitor://localhost');assert.match(preflight.headers.get('access-control-allow-headers'),/authorization/);
+ assert.equal((await call(store,'/api/licence',{method:'OPTIONS',headers:{origin:'https://evil.example'},e})).status,403,'other sites are refused');
+ const reply=await call(store,'/api/licence',{token:session,headers:{origin:'https://localhost'},e}),{licence}=await reply.json();
+ assert.equal(reply.headers.get('access-control-allow-origin'),'https://localhost');
+ assert.equal(await (await call(store,'/ai/models/lama.onnx',{e,token:licence,headers:{origin:'https://localhost'}})).text(),'model bytes');
+ assert.equal((await call(store,'/ai/models/lama.onnx',{e,token:session})).status,402,'a session token is not a licence');
+ assert.equal((await call(store,'/api/licence',{token:session,headers:{origin:'https://evil.example'},e})).headers.get('access-control-allow-origin'),null);
+});
+
+test('deleting the account removes the user, their sessions and their Stripe customer',async()=>{
+ const store=new MemoryStore(),session=await signIn(store),user=[...store.users.values()][0];await store.updateUser(user.id,{stripe_customer:'cus_9'});
+ const real=globalThis.fetch,sent=[];globalThis.fetch=async(url,init)=>{sent.push({url:String(url),method:init.method});return new Response('{"deleted":true}',{status:200});};
+ try{assert.equal((await call(store,'/api/account/delete',{method:'POST',token:session})).status,200);}finally{globalThis.fetch=real;}
+ assert.deepEqual(sent,[{url:'https://api.stripe.com/v1/customers/cus_9',method:'DELETE'}]);
+ assert.equal(store.users.size,0);assert.equal(store.sessions.size,0);
+ assert.equal((await call(store,'/api/licence',{token:session})).status,401,'signed out everywhere');
+ assert.equal((await call(store,'/api/account/delete',{method:'POST'})).status,401);
+ // Only a hash of the email is kept, and signing up again keeps the old trial end.
+ assert.ok(![...store.trials.keys()].some(k=>k.includes('alex')));
+ const back=await signIn(store,'alex@example.com',T0+20*DAY);
+ assert.equal((await (await call(store,'/api/licence',{token:back,now:T0+20*DAY})).json()).status,'expired','no second trial');
+});
+
+test('D1 account deletion removes dependent billing records and retains the original trial',{skip:!sqlite},async t=>{
+ const db=new sqlite.DatabaseSync(':memory:');t.after(()=>db.close());
+ db.exec('PRAGMA foreign_keys=ON');
+ db.exec(await readFile(new URL('../cloud/schema.sql',import.meta.url),'utf8'));
+ const migration=await readFile(new URL('../cloud/migrations/0003_used_trials.sql',import.meta.url),'utf8');
+ db.exec(migration);db.exec(migration);
+ const store=new D1Store(sqliteD1(db)),session=await signIn(store),user=await store.userByEmail('alex@example.com');
+ const other={id:'other',email:'other@example.com',created_at:T0,trial_ends:T0+7*DAY};await store.createUser(other);
+ for(const u of [user,other]){
+  assert.ok(await store.acquireBilling(u.id,'delete_fixture',T0,T0+DAY));
+  await store.saveBilling(u.id,'delete_fixture',T0,{stripe_customer:'cus_'+u.id,subscription_status:'active',paid_until:T0+30*DAY},emptyCheckout(),'evt_'+u.id);
+  await store.addCode({email:u.email,hash:'code_'+u.id,created_at:T0,expires:T0+DAY,attempts:0});
+  db.prepare('INSERT INTO payment_receipts VALUES (?,?,?,?,?,?)').run('in_'+u.id,u.id,'sub_'+u.id,T0,200,'eur');
+ }
+ const real=globalThis.fetch;t.after(()=>{globalThis.fetch=real;});
+ globalThis.fetch=async(url,init)=>{assert.equal(String(url),'https://api.stripe.com/v1/customers/cus_'+user.id);assert.equal(init.method,'DELETE');return Response.json({deleted:true});};
+ assert.equal((await call(store,'/api/account/delete',{method:'POST',token:session})).status,200);
+ assert.equal(await store.userById(user.id),undefined);
+ for(const table of ['billing_state','stripe_events','sessions','payment_receipts']){
+  assert.equal(db.prepare(`SELECT COUNT(*) AS n FROM ${table} WHERE user_id=?`).get(user.id).n,0,table);
+ }
+ assert.equal(db.prepare('SELECT COUNT(*) AS n FROM codes WHERE email=?').get(user.email).n,0);
+ assert.ok(await store.userById(other.id));
+ assert.equal(db.prepare('SELECT COUNT(*) AS n FROM payment_receipts WHERE user_id=?').get(other.id).n,1);
+ const back=await signIn(store,user.email,T0+20*DAY);
+ assert.equal((await (await call(store,'/api/licence',{token:back,now:T0+20*DAY})).json()).status,'expired');
+});

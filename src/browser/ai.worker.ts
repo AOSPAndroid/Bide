@@ -5,7 +5,21 @@ import * as ort from 'onnxruntime-web/webgpu';
 import {modelBytes,type ModelProgress} from './ai-models';
 type Feeds=Record<string,{data:Float32Array|BigInt64Array;dims:number[]}>;
 type Loaded={session:ort.InferenceSession;backend:'webgpu'|'wasm'};
-const sessions=new Map<string,Promise<Loaded>>();let base='';
+const sessions=new Map<string,Promise<Loaded>>();let base='',remote='',licence='';
+
+// Native app bundles fetch omitted models from the configured licence server.
+// Public-demo downloads continue through ai-models.ts's pinned verification.
+async function get(input:RequestInfo|URL):Promise<Response>{
+ const url=String(input),local=await fetch(input).catch(()=>undefined);
+ if(local?.ok||!remote)return local??new Response(null,{status:404});
+ const path=url.startsWith(base)?url.slice(base.length):new URL(url).pathname.replace(/^\//,'');
+ const target=new URL(path,remote.endsWith('/')?remote:remote+'/').href;
+ const cache=typeof caches==='undefined'?undefined:await caches.open('bide-app-models').catch(()=>undefined);
+ const hit=await cache?.match(target);if(hit)return hit;
+ const response=await fetch(target,{headers:licence?{authorization:`Bearer ${licence}`}:{}});
+ if(response.ok&&cache)await cache.put(target,response.clone()).catch(()=>{});
+ return response;
+}
 
 async function create(bytes:Uint8Array,backend:Loaded['backend'],onProgress?:(progress:ModelProgress)=>void):Promise<Loaded>{
  onProgress?.({stage:'prepare',loaded:bytes.byteLength,total:bytes.byteLength});
@@ -14,7 +28,7 @@ async function create(bytes:Uint8Array,backend:Loaded['backend'],onProgress?:(pr
 function load(model:string,cpuOnly=false,onProgress?:(progress:ModelProgress)=>void){
  const key=cpuOnly?model+'#cpu':model;
  if(!sessions.has(key))sessions.set(key,(async()=>{
-  const bytes=await modelBytes(model,base,undefined,{onProgress});
+  const bytes=await modelBytes(model,base,undefined,{onProgress,...(remote?{fetch:get}:{})});
   if(!cpuOnly&&'gpu' in navigator)try{return await create(bytes.slice(),'webgpu',onProgress);}catch{}
   return create(bytes,'wasm',onProgress);
  })().catch(e=>{sessions.delete(key);throw e;}));
@@ -30,7 +44,8 @@ async function run(model:string,feeds:Feeds,cpuOnly=false,onProgress?:(progress:
 async function handle(event:MessageEvent){
  const {id,type}=event.data;
  try{
-  if(type==='init'){base=event.data.base;ort.env.wasm.wasmPaths={mjs:new URL('ai/ort/ort-wasm-simd-threaded.jsep.mjs',base).href,wasm:new URL('ai/ort/ort-wasm-simd-threaded.jsep.wasm',base).href};ort.env.wasm.numThreads=self.crossOriginIsolated?Math.max(1,Math.min(4,navigator.hardwareConcurrency||1)):1;ort.env.logLevel='error';self.postMessage({id});return;}
+  if(type==='init'){base=event.data.base;remote=event.data.remote??'';licence=event.data.licence??'';ort.env.wasm.wasmPaths={mjs:new URL('ai/ort/ort-wasm-simd-threaded.jsep.mjs',base).href,wasm:new URL('ai/ort/ort-wasm-simd-threaded.jsep.wasm',base).href};ort.env.wasm.numThreads=self.crossOriginIsolated?Math.max(1,Math.min(4,navigator.hardwareConcurrency||1)):1;ort.env.logLevel='error';self.postMessage({id});return;}
+  if('remote' in event.data){remote=event.data.remote??'';licence=event.data.licence??'';}
   const {outputs,backend}=await run(event.data.model,event.data.feeds,false,progress=>self.postMessage({id,progress}));
   self.postMessage({id,outputs,backend},{transfer:Object.values(outputs).map(o=>o.data.buffer as ArrayBuffer)});
  }catch(e){self.postMessage({id,error:e instanceof Error?e.message:String(e)});}

@@ -52,3 +52,13 @@ test('the clicked object wins over a higher-scoring whole-scene mask',async()=>{
  assert.equal(pickMask([.913,1.013,.988],[264342,31220,30850]),2,'circle: either object mask is close');
  assert.equal(pickMask([.5,.9,.6],[10,0,20]),1,'empty masks are skipped unless nothing else qualifies');
 });
+
+test('a line split by the detector is joined; table cells and the next line are not',async()=>{
+ const {mergeLineBoxes}=await import('../tmp/ai-image.mjs');
+ const split=[{x0:0,y0:10,x1:60,y1:30},{x0:55,y0:11,x1:200,y1:31}];
+ assert.deepEqual(mergeLineBoxes(split),[{x0:0,y0:10,x1:200,y1:31}]);
+ const cells=[{x0:0,y0:10,x1:60,y1:30},{x0:120,y0:10,x1:180,y1:30}];
+ assert.equal(mergeLineBoxes(cells).length,2,'a gap of 3 line heights keeps table cells apart');
+ const lines=[{x0:0,y0:10,x1:200,y1:30},{x0:0,y0:32,x1:200,y1:52}];
+ assert.equal(mergeLineBoxes(lines).length,2,'lines above each other stay apart');
+});

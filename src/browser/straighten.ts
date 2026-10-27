@@ -2,8 +2,12 @@
 // few degrees (text-line projection, no AI), so it can be straightened
 // before text recognition.
 import {inkMap,estimateSkew} from '../deskew';
+import {findSheet} from '../page-quad';
+import type {XY} from '../perspective';
 
-export type Tilt={turn:0|90|180|270;skew:number};
+// `sheet`: a page photographed at an angle on a darker surface, its corners
+// as fractions of the image (clockwise from top left), to flatten instead.
+export type Tilt={turn:0|90|180|270;skew:number;sheet?:XY[]};
 
 const canvas=(width:number,height:number)=>Object.assign(document.createElement('canvas'),{width,height});
 
@@ -22,6 +26,8 @@ function upright(source:HTMLCanvasElement,turn:number,max=1000){
 export const minSkew=.3,minTurnConfidence=.8;
 
 export async function detectTilt(raster:HTMLCanvasElement,{ai,signal}:{ai:boolean;signal?:AbortSignal}):Promise<Tilt|undefined>{
+ const plain=upright(raster,0,600),corners=findSheet(plain.getContext('2d',{willReadFrequently:true})!.getImageData(0,0,plain.width,plain.height).data,plain.width,plain.height);
+ if(corners)return {turn:0,skew:0,sheet:corners.map(p=>({x:p.x/plain.width,y:p.y/plain.height}))};
  let turn:Tilt['turn']=0;
  if(ai){
   const {detectOrientation}=await import('./ai-tools'),result=await detectOrientation(raster,signal);
@@ -35,6 +41,7 @@ export async function detectTilt(raster:HTMLCanvasElement,{ai,signal}:{ai:boolea
 }
 
 export function tiltLabel(t:Tilt){
+ if(t.sheet)return 'photographed at an angle';
  const turned=t.turn===180?'upside down':t.turn?`turned ${t.turn===90?'right':'left'}`:'';
  const tilted=t.skew?`tilted ${Math.abs(t.skew).toFixed(1)}°`:'';
  return [turned,tilted].filter(Boolean).join(' and ');

@@ -65,6 +65,14 @@ const map=`<div style="position:relative;width:760px;height:480px;background:#e8
  <div style="position:absolute;left:40px;top:150px;background:#fff;padding:10px 14px;border-radius:8px;box-shadow:0 2px 8px #0003;font-size:14px">${l('Hôtel du Parc','font-weight:bold')}${l('4,6 ★ · 128 avis')}${l('Ouvert jusqu’à 23:00')}</div>
 </div>`;
 
+// A full A4 page as a 150 dpi scan would show it: 11 pt text, several paragraphs.
+const a4=page([
+ l('Rapport d’activité — troisième trimestre 2026','font-size:20px;font-weight:bold;margin-bottom:14px'),
+ ...['Le chiffre d’affaires du trimestre atteint 482 300 €, en hausse de 12 % par rapport à 2025.','Les ventes en ligne représentent désormais 38 % du total, contre 31 % un an plus tôt.','Trois nouveaux magasins ont ouvert à Bordeaux, Lille et Strasbourg en septembre.','Les délais de livraison moyens sont passés de 4,2 à 3,1 jours ouvrés.','Le taux de satisfaction client mesuré en octobre s’établit à 91 %.','Les investissements prévus pour 2027 concernent l’entrepôt de Mâcon et le site web.'].map(t=>l(t,'font-size:15px;line-height:1.75')),
+ l('Points d’attention','font-size:16px;font-weight:bold;margin:16px 0 6px'),
+ ...['Hausse du coût des transports de 7 % depuis juillet.','Recrutement difficile pour les postes de préparateurs de commandes.','Renouvellement du contrat de maintenance informatique avant le 31 décembre.'].map(t=>l('• '+t,'font-size:15px;line-height:1.75')),
+].join(''),'font-family:\'Times New Roman\',serif');
+
 export const pages=[
  {id:'letter',category:'clean document',html:letter},
  {id:'invoice',category:'table',html:invoice},
@@ -77,6 +85,9 @@ export const pages=[
  {id:'receipt-fax',category:'low quality',html:receipt,width:360,degrade:{scale:.75,noise:30,blur:.7,jpeg:.4}},
  {id:'small-print-low',category:'small + low resolution',html:smallPrint,degrade:{scale:.8,jpeg:.7}},
  {id:'invoice-retina',category:'screenshot (2x)',html:invoice,dpr:2},
+ {id:'a4-scan',category:'full page scan',html:a4,degrade:{rotate:.7,paper:'#f3f1ea',noise:10,jpeg:.7}},
+ {id:'letter-angle',category:'photo at an angle',html:letter,perspective:'perspective(1200px) rotateX(14deg) rotateY(-10deg)',degrade:{noise:8,jpeg:.75}},
+ {id:'invoice-angle',category:'photo at an angle',html:invoice,perspective:'perspective(1100px) rotateX(-12deg) rotateY(12deg) rotateZ(2deg)',degrade:{noise:8,jpeg:.75}},
  {id:'poster',category:'busy picture',html:busy,width:820,height:460},
  {id:'map',category:'map screenshot',html:map,width:760,height:480},
  {id:'poster-photo',category:'busy photo',html:busy,width:820,height:460,degrade:{rotate:1.5,noise:12,blur:.6,jpeg:.6}},

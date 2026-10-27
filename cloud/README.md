@@ -17,7 +17,7 @@ ChatGPT Sites supports Workers, D1 and runtime secrets. Its existing `.openai/ho
 - **Sign-in:** Resend sends a six-digit code. Codes expire after ten minutes and allow five attempts; an email can request at most five per hour. A successful verification consumes the code atomically.
 - **Trial:** the seven days start at first sign-in and belong to the account. Clearing browser storage does not restart them.
 - **Licence:** `/api/licence` returns an ECDSA P-256 signed entitlement and an HttpOnly licence cookie. The public verification key is built into the frontend; the private signing key stays on the server. Cached licences allow access for up to three days, including some delay in reflecting subscription changes.
-- **Protected downloads:** the Worker checks the licence cookie for `/ai/`, `/ocr/`, `/office/` and `/diagrams/runtime/`.
+- **Protected downloads:** the Worker checks the licence cookie for `/ai/`, `/ocr/`, `/office/`.
 - **Checkout:** one Stripe customer is associated with the account. A pending purchase is reused; customers with an existing subscription use the billing portal instead of starting another purchase.
 - **Subscription updates:** verified webhook events trigger reconciliation against Stripe's current subscriptions for the configured Bide price. Successfully processed event IDs are recorded. Delayed or repeated event snapshots cannot simply overwrite the current entitlement.
 - **Cancellation:** Stripe's customer portal handles cancellation and payment-method changes. Normal cancellation at period end retains access through the paid period. For `past_due`, the existing policy uses Stripe's recorded subscription-period end **plus seven days**. That is not necessarily seven days after the failed payment: a renewal can already have advanced the billed period. Review that policy before live launch; this patch preserves its existing behavior.
@@ -78,7 +78,7 @@ Stripe can deliver events repeatedly and out of order. See its [webhook guidance
    npx wrangler deploy --dry-run
    ```
 
-   The SaaS prebuild prepares OCR, pinned AI models and draw.io. The output is `dist-saas/`. Large ONNX models are split into 20 MiB parts. The build checks required engines, model parts and the host's 25 MiB per-file limit. The paid website omits Office conversion; the local edition keeps it.
+   The SaaS prebuild prepares OCR and pinned AI models. The output is `dist-saas/`. Large ONNX models are split into 20 MiB parts. The build checks required engines, model parts and the host's 25 MiB per-file limit. The paid website omits Office conversion; the local edition keeps it.
 
 6. **Deploy the configured sandbox and exercise it.** `npx wrangler deploy` publishes to the account in the active Wrangler configuration. Complete a test purchase through the real website, verify the webhook's D1 update, and then test retries, cancellation at period end, renewal, payment failure/recovery and protected downloads without a valid cookie. Verify email delivery and the final return URL. These checks need the actual provider accounts.
 
@@ -111,3 +111,9 @@ The existing public demo offers much of the same editor without a subscription. 
 - A three-day cached licence is not the same as a guarantee that every feature works offline: engines must already be cached and browser storage may be cleared.
 
 Keep the production switch blocked until provider configuration, the real test checkout/webhook flow, the licensing choice and the customer-facing merchant information are complete.
+
+## Mobile apps and account deletion
+
+The iOS and Android apps use this same server; see [MOBILE.md](../MOBILE.md). Configure `APP_ORIGINS` for their origins. Gated models accept a signed licence as a bearer token. `/api/account/delete` removes the account, sessions, billing records and Stripe customer, preserving only a hashed email and its original trial end.
+
+For an existing database, apply `cloud/migrations/0001_billing_safety.sql`, `0002_measurement.sql`, and `0003_used_trials.sql` before this Worker. Fresh databases use `cloud/schema.sql`.

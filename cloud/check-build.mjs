@@ -5,8 +5,7 @@ import {join} from 'node:path';
 const root='dist-saas',maxBytes=25*2**20;
 const required=['index.html','_headers','brand-logo.svg','licenses/mupdf-LICENSE',
   'ocr/worker.min.js','ocr/lang/eng.traineddata.gz','ocr/lang/fra.traineddata.gz',
-  'ai/ort/ort-wasm-simd-threaded.jsep.mjs','ai/ort/ort-wasm-simd-threaded.jsep.wasm',
-  'diagrams/runtime/index.html','diagrams/runtime/js/app.min.js'];
+  'ai/ort/ort-wasm-simd-threaded.jsep.mjs','ai/ort/ort-wasm-simd-threaded.jsep.wasm'];
 for (const file of required) await access(join(root,file));
 const manifest=JSON.parse(await readFile('public/ai/manifest.json','utf8'));
 for (const [name,entry] of Object.entries(manifest.files)) {
@@ -32,4 +31,5 @@ async function inspect(directory){
 }
 await inspect(root);
 if (await stat(join(root,'office/runtime')).then(()=>true,()=>false)) throw new Error('The hosted paid build must not include the unsupported Office runtime.');
+if (await stat(join(root,'diagrams')).then(()=>true,()=>false)) throw new Error('The retired diagram workspace must not be bundled.');
 console.log(`Checked ${count} hosted assets, model parts and required engines.`);

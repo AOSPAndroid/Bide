@@ -27,10 +27,11 @@ export function wordScores(truth,read){
  return {recall:total?hit/total:1,precision:got.length?hit/got.length:(total?0:1)};
 }
 // OCR lines on the same visual row (overlapping vertically), joined left to
-// right: a table row read cell by cell still matches its true line.
-export function joinRows(regions){
- const rows=[];
- for(const r of [...regions].sort((a,b)=>a.top-b.top)){
+// right: a table row read cell by cell still matches its true line. On a
+// page tilted clockwise by `angle` degrees, rows are followed along the tilt.
+export function joinRows(regions,angle=0){
+ const rows=[],slope=Math.tan(angle*Math.PI/180);
+ for(const r of [...regions].map(r=>({...r,top:r.top-(r.left+r.width/2)*slope})).sort((a,b)=>a.top-b.top)){
   const mid=r.top+r.height/2,row=rows.find(w=>mid>w.top&&mid<w.top+w.height);
   if(row)row.items.push(r);else rows.push({top:r.top,height:r.height,items:[r]});
  }

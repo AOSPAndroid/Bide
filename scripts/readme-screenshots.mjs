@@ -73,9 +73,5 @@ try{
  // 5. PDF tools home.
  {const page=await open(browser);await page.getByRole('button',{name:/PDF MasterTool/}).first().click();await page.waitForTimeout(800);await page.screenshot({path:`${out}/pdf-tools.png`});await page.close();}
 
- // 6. Diagrams (bundled draw.io).
- {const page=await open(browser);await page.getByRole('button',{name:/Diagrams/}).first().click();
-  await page.waitForFunction(()=>!document.querySelector('.diagram-loading'),null,{timeout:120000}).catch(()=>{});await page.waitForTimeout(4000);
-  await page.screenshot({path:`${out}/diagrams.png`});await page.close();}
 }finally{await browser.close();await server.close();}
 console.log('Screenshots written to',out);

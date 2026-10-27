@@ -19,6 +19,9 @@ export interface Store{
  addSession(hash:string,userId:string,expires:number):Promise<void>;
  session(hash:string):Promise<{user_id:string;expires:number}|undefined>;
  deleteSession(hash:string):Promise<void>;
+ deleteUser(user:User):Promise<void>;
+ usedTrial(emailHash:string):Promise<number|undefined>;
+ rememberTrial(emailHash:string,trialEnds:number):Promise<void>;
  acquireBilling(userId:string,token:string,now:number,expires:number):Promise<BillingState|undefined>;
  renewBilling(userId:string,token:string,now:number,expires:number):Promise<boolean>;
  releaseBilling(userId:string,token:string):Promise<void>;
@@ -28,7 +31,7 @@ export interface Store{
 
 export class MemoryStore implements Store{
  users=new Map<string,User>();codeList:Code[]=[];sessions=new Map<string,{user_id:string;expires:number}>();
- billing=new Map<string,BillingState>();stripeEvents=new Set<string>();
+ billing=new Map<string,BillingState>();stripeEvents=new Set<string>();trials=new Map<string,number>();stripeEventUsers=new Map<string,string>();
  async userByEmail(email:string){return [...this.users.values()].find(u=>u.email===email);}
  async userById(id:string){return this.users.get(id);}
  async userByCustomer(customer:string){return [...this.users.values()].find(u=>u.stripe_customer===customer);}
@@ -58,9 +61,17 @@ export class MemoryStore implements Store{
   if(!state||!current||state.lock_token!==token||state.lock_expires<=now)return false;
   if(eventId&&this.stripeEvents.has(eventId))throw new Error('Stripe event already processed.');
   this.users.set(userId,{...current,...user});this.billing.set(userId,{...state,...checkout});
-  if(eventId)this.stripeEvents.add(eventId);return true;
+  if(eventId){this.stripeEvents.add(eventId);this.stripeEventUsers.set(eventId,userId);}return true;
  }
  async stripeEventProcessed(eventId:string){return this.stripeEvents.has(eventId);}
+ async usedTrial(hash:string){return this.trials.get(hash);}
+ async rememberTrial(hash:string,ends:number){this.trials.set(hash,ends);}
+ async deleteUser(user:User){
+  this.users.delete(user.id);this.billing.delete(user.id);this.codeList=this.codeList.filter(c=>c.email!==user.email);
+  for(const [hash,session] of this.sessions)if(session.user_id===user.id)this.sessions.delete(hash);
+  for(const [event,userId] of this.stripeEventUsers)if(userId===user.id){this.stripeEvents.delete(event);this.stripeEventUsers.delete(event);}
+ }
+
 }
 
 type D1Result={results?:unknown[];meta:{changes:number}};
@@ -91,6 +102,15 @@ export class D1Store implements Store{
  addSession(hash:string,userId:string,expires:number){return this.run('INSERT INTO sessions (hash,user_id,expires) VALUES (?,?,?)',hash,userId,expires);}
  session(hash:string){return this.one<{user_id:string;expires:number}>('SELECT user_id,expires FROM sessions WHERE hash=?',hash);}
  deleteSession(hash:string){return this.run('DELETE FROM sessions WHERE hash=?',hash);}
+ usedTrial(hash:string){return this.one<{trial_ends:number}>('SELECT trial_ends FROM used_trials WHERE email_hash=?',hash).then(r=>r?.trial_ends);}
+ rememberTrial(hash:string,ends:number){return this.run('INSERT INTO used_trials (email_hash,trial_ends) VALUES (?,?) ON CONFLICT(email_hash) DO UPDATE SET trial_ends=excluded.trial_ends',hash,ends);}
+ async deleteUser(user:User){
+  await this.db.batch([
+   ...['payment_receipts','stripe_events','billing_state','sessions'].map(table=>this.db.prepare(`DELETE FROM ${table} WHERE user_id=?`).bind(user.id)),
+   this.db.prepare('DELETE FROM codes WHERE email=?').bind(user.email),
+   this.db.prepare('DELETE FROM users WHERE id=?').bind(user.id)
+  ]);
+ }
  acquireBilling(userId:string,token:string,now:number,expires:number){
   return this.one<BillingState>('INSERT INTO billing_state (user_id,lock_token,lock_expires) VALUES (?,?,?) ON CONFLICT(user_id) DO UPDATE SET lock_token=excluded.lock_token,lock_expires=excluded.lock_expires WHERE billing_state.lock_expires<=? RETURNING *',userId,token,expires,now);
  }

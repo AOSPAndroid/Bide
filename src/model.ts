@@ -4,7 +4,7 @@ import { uuid } from './browser/crypto';
 // Registers the adjustment layer class so saved pages load it.
 import './adjustment-layer';
 
-FabricObject.customProperties = ['id', 'name', 'diagramXml','pdfFontData','pdfOriginalFont','pdfFontFallback','pdfFontBold','pdfFontItalic','recognizedKey','objectCaching','textSoftness','layerMask','layerStyle'];
+FabricObject.customProperties = ['id', 'name','pdfFontData','pdfOriginalFont','pdfFontFallback','pdfFontBold','pdfFontItalic','recognizedKey','objectCaching','textSoftness','layerMask','layerStyle'];
 // The editor's coordinates use top-left anchors. Fabric 7 defaults to centered anchors.
 Object.assign(FabricObject.ownDefaults, { originX: 'left', originY: 'top', cornerColor: '#ffffff', cornerStrokeColor: '#a83c1c', borderColor: '#c44c28', cornerSize: 9, transparentCorners: false, padding: 3 });
 
@@ -37,7 +37,10 @@ export function demoProject(): Project {
 }
 
 
+// Capacitor's bridge object exists only inside the iOS and Android apps.
+const nativeApp = () => !!(globalThis as {Capacitor?: {isNativePlatform?: () => boolean}}).Capacitor?.isNativePlatform?.();
 export function download(blob: Blob, filename: string) {
+  if (nativeApp()) { void import('./browser/native-save').then(m => m.shareFile(blob, filename)).catch(e => alert(`The file could not be shared: ${e instanceof Error ? e.message : e}`)); return; }
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a'); a.href = url; a.download = filename; a.click();
   setTimeout(() => URL.revokeObjectURL(url), 30000);

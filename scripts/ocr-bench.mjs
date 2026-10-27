@@ -21,7 +21,8 @@ try{
  const shots={};
  for(const p of chosen){
   const shot=await browser.newPage({viewport:{width:p.width??900,height:p.height??1100},deviceScaleFactor:p.dpr??1});
-  await shot.setContent(`<!doctype html><meta charset="utf-8"><body style="margin:0">${p.html}</body>`);await shot.evaluate(()=>document.fonts.ready);
+  // `perspective`: the page photographed at an angle, on a dark desk.
+  await shot.setContent(p.perspective?`<!doctype html><meta charset="utf-8"><body style="margin:0;padding:60px;background:#4a4e55"><div style="transform:${p.perspective};transform-origin:center">${p.html}</div></body>`:`<!doctype html><meta charset="utf-8"><body style="margin:0">${p.html}</body>`);await shot.evaluate(()=>document.fonts.ready);
   const truth=await shot.evaluate(()=>[...document.querySelectorAll('.l')].map(e=>e.innerText.replace(/\s+/g,' ').trim()).filter(Boolean));
   const png=await shot.screenshot({fullPage:true});await shot.close();
   shots[p.id]={truth,png:png.toString('base64')};
@@ -47,16 +48,16 @@ try{
   await writeFile(`tmp/ocr-bench/${p.id}.png`,Buffer.from(degraded,'base64'));
   for(const engine of engines){
    const t0=Date.now();
-   const lines=await page.evaluate(async([png,engine])=>{
+   const {tilt,lines}=await page.evaluate(async([png,engine])=>{
     const img=new Image();img.src='data:image/png;base64,'+png;await img.decode();
     const c=document.createElement('canvas');c.width=img.width;c.height=img.height;c.getContext('2d',{willReadFrequently:true}).drawImage(img,0,0);
-    const {recognizeImage}=await import('/src/browser/ocr.ts');
+    const {recognizeImage,pageTilt}=await import('/src/browser/ocr.ts');
     // ai-sharpen: Real-ESRGAN 2x first; boxes are scaled back to the page.
     let input=c,k=1;if(engine==='ai-sharpen'){const {upscaleCanvas}=await import('/src/browser/ai-tools.ts');input=await upscaleCanvas(c,2);k=.5;}
     const regions=await recognizeImage(input,{grouping:'lines',languages:['eng','fra'],engine:engine.startsWith('tesseract')?'tesseract':'paddle',accurate:engine==='ai-accurate',thorough:engine==='tesseract-thorough'});
-    return regions.map(r=>({text:r.text,left:r.left*k,top:r.top*k,width:r.width*k,height:r.height*k}));
-   },[degraded,engine]).catch(e=>{console.error(p.id,engine,e.message);return [];});
-   const seconds=(Date.now()-t0)/1000,rows=joinRows(lines),cer=lineErrors(truth,[...lines.map(r=>r.text),...rows]),words=wordScores(truth,lines.map(r=>r.text));
+    return {tilt:pageTilt(c)??0,lines:regions.map(r=>({text:r.text,left:r.left*k,top:r.top*k,width:r.width*k,height:r.height*k}))};
+   },[degraded,engine]).catch(e=>{console.error(p.id,engine,e.message);return {tilt:0,lines:[]};});
+   const seconds=(Date.now()-t0)/1000,rows=joinRows(lines,tilt),cer=lineErrors(truth,[...lines.map(r=>r.text),...rows]),words=wordScores(truth,lines.map(r=>r.text));
    results.push({page:p.id,category:p.category,engine,cer:cer.rate,recall:words.recall,precision:words.precision,seconds,misses:cer.worst,read:lines.map(r=>r.text)});
    console.log(`${p.id.padEnd(16)} ${engine.padEnd(12)} CER ${(cer.rate*100).toFixed(1).padStart(5)}%  words ${(words.recall*100).toFixed(1).padStart(5)}% found, ${(words.precision*100).toFixed(1).padStart(5)}% right  ${seconds.toFixed(1).padStart(5)} s`);
   }

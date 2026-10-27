@@ -31,3 +31,12 @@ test('an empty page has no tilt',()=>{
  const blank=new Uint8ClampedArray(200*100*4).fill(255);
  assert.equal(estimateSkew(inkMap(blank,200,100),200,100),undefined);
 });
+
+test('a tilted sheet photographed on a dark desk is measured from its text',()=>{
+ const W=600,H=500,rgba=new Uint8ClampedArray(W*H*4);
+ for(let i=0;i<W*H;i++){rgba[i*4]=rgba[i*4+1]=rgba[i*4+2]=60;rgba[i*4+3]=255;}// dark desk
+ const sheet=page(-3,{width:W,height:H});// white page with dark text lines
+ for(let y=0;y<H;y++)for(let x=0;x<W;x++)if(y>40&&y<300&&x>50&&x<560){const o=(y*W+x)*4;rgba[o]=sheet[o];rgba[o+1]=sheet[o+1];rgba[o+2]=sheet[o+2];}
+ const result=estimateSkew(inkMap(rgba,W,H),W,H);
+ assert.ok(result&&Math.abs(result.angle+3)<=.2,`measured ${result?.angle}`);
+});

@@ -101,10 +101,6 @@ Open `http://127.0.0.1:8766`. Node is only a development file server; it is not 
 
 The earlier Python prototype remains in the source project for reference. The new BAT launchers use the static server and browser engines. The ZIP includes these launchers and their helper scripts at its top level.
 
-## Bundled diagram workspace
-
-The prebuilt package includes draw.io static assets under `site/diagrams/runtime`, including shapes, stencils and the math renderer. Keep the full directory. No Java, draw.io desktop, online diagrams.net service, npm installation or runtime download is required. The embedded editor is configured for local assets; its content policy prevents external services and image/font requests. It uses the same host and port as bide. Every visitor has an independent diagram draft in their browser. For local exports and file downloads, the same HTTPS guidance above applies.
-
 ## Subscription version (trial and paywall)
 
 The paid, sign-in version is built with `npm run build:saas` and needs the licence server in `cloud/`. See [cloud/README.md](cloud/README.md) for Stripe, email, keys and deployment.
@@ -113,7 +109,7 @@ The paid, sign-in version is built with `npm run build:saas` and needs the licen
 
 The demo at https://bide-demo.daaalil.chatgpt.site serves `out/`, built with Vite mode `demo`. `npm run build` produces both the full local `dist/` and the hosted `out/`; `npm run build:demo` rebuilds only the demo. The `.openai/hosting.json` manifest identifies this Site.
 
-The demo bundles PDF/image tools and draw.io. It excludes the Office runtime: soffice.wasm and soffice.data exceed Cloudflare Static Assets' 25 MiB per-file limit. Office imports show an immediate local-edition explanation rather than attempting a missing download. The regular local build keeps Office support. Static isolation headers are in `_headers`. No documents, credentials, autosaves or local runtime state are deployed. Public access lets anyone visit the app, not other visitors' documents.
+The demo bundles PDF/image tools. It excludes the Office runtime: soffice.wasm and soffice.data exceed Cloudflare Static Assets' 25 MiB per-file limit. Office imports show an immediate local-edition explanation rather than attempting a missing download. The regular local build keeps Office support. Static isolation headers are in `_headers`. No documents, credentials, autosaves or local runtime state are deployed. Public access lets anyone visit the app, not other visitors' documents.
 
 **AI OCR is available on the public site**, including English/French and the other supported alphabets, High accuracy, proofreading, font matching and original-letter replacement. AI image actions are available too. To fit the hosting limits, the demo fetches models only when used from the immutable Hugging Face URLs in `public/ai/manifest.json`, verifies their byte length and SHA-256, and caches verified bytes in browser CacheStorage when supported. The hosted detector uses the original full-precision model; the offline edition uses the tested float16-weight conversion for the large detector and LaMa. Recognition and editing still run on the visitor's device; documents are never sent to Hugging Face. A first use needs internet access and may take longer; model downloads can be blocked by a corporate proxy, and the browser can evict its cache. Standard OCR remains bundled as a fallback. The local ZIP continues to use only bundled models, with no runtime CDN or model downloads.
 

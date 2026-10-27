@@ -25,7 +25,7 @@ export function discoveryOptions(mode, env = {}) {
 }
 
 export function editorHtml(html, options) {
-  return html.replace(/<title>[\s\S]*?<\/title>/i, '<title>Bide editor — PDF, images &amp; diagrams</title>')
+  return html.replace(/<title>[\s\S]*?<\/title>/i, '<title>Bide editor — PDF, images &amp; documents</title>')
     .replace('<head>', `<head><base href="/"><meta name="robots" content="noindex,follow"><meta name="description" content="Open the Bide document editor. Edit, merge and compress PDFs on your device."><link rel="canonical" href="${escaped(options.origin)}/app/">`)
     .replace('</head>', `<script id="bide-measurement-config" type="application/json">${json({measurementId:options.gaMeasurementId,page:'app'})}</script><script defer src="/measurement.js"></script></head>`);
 }

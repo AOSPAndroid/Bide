@@ -11,11 +11,27 @@
 
 ## v0.8.14 details — searchable PDFs, proofreading and letter reuse
 
+- **Documents workspace**: the bundled draw.io Diagrams workspace was removed and replaced by a Documents workspace (forms and e-invoices), making the app about 150 MB smaller. Diagrams already placed in a project stay as images.
+- **E-invoices** (Documents → New invoice): invoices, prepayment invoices and credit notes as Factur-X (PDF/A-3b with the CII XML embedded, EN 16931 profile), UBL 2.1 or CII. Live checks cover EN 16931 business rules and the French 2026 reform (SIREN/SIRET/VAT checksums, SIREN-based electronic address, invoicing frame B1/S1/M1, mandatory payment mentions, VATEX exemption codes including VATEX-FR-FRANCHISE). Issued invoices are frozen and numbered in sequence; corrections are credit notes. Your business details, clients and payment settings are remembered in the browser.
+  - Conformance (`node scripts/einvoice-conformance.mjs`): six sample invoices in both formats are valid against the official Factur-X and UBL schemas and the European Commission's EN 16931 schematron (12/12), and every broken variant the schematron rejects is also refused by the editor. The reference `factur-x` Python library reads each PDF as Factur-X EN 16931. PDF/A-3 conformance of the PDF itself has not been checked with veraPDF yet.
+  - Sending to business clients is left to the user's approved platform (plateforme agréée); bide does not transmit invoices.
+- **Open an invoice** (Documents): a received Factur-X / ZUGFeRD PDF, UBL or CII file is read exactly and kept read only with its original, and checked against the same rules, so a supplier's mistakes show. Invoice-level discounts and charges, rounding and "not subject to VAT" lines are supported; the sender's stated totals are compared with the recomputed ones. All 32 example invoices of the European Commission's EN 16931 artefacts (CII and UBL, several countries) are read with matching totals.
+  - A PDF without invoice data, a photo or a scan is read with OCR into a draft: number, dates, SIREN/SIRET and VAT numbers (checksums), parties by column, IBAN/BIC, table rows (quantity × price = amount decides between "1 450,00" and "1 | 450.00"), discounts, charges, deposits and totals. What was not found is listed on the draft. On our sample invoices rendered to images every field comes back and the totals match; on the benchmark's English invoice all 4 lines and the client are found.
+- Invoice-level discounts and charges in the editor, PDF and XML (BG-20/BG-21); zero-rated lines no longer carry an exemption reason (BR-Z-10).
+- Workspace tabs have accessible names on phones, where only their icons show.
+- **iOS and Android apps** (Capacitor 8, `npm run build:app`, see MOBILE.md): the web app in a native shell. People subscribe on the website and sign in in the app, which shows no price or purchase (App Store 3.1.3(f), Google Play consumption-only). Saving opens the share sheet; the camera can photograph documents and invoices; the essential AI models are bundled (about 41 MB) and the large ones are downloaded from the server with the user's licence and cached. Office import is not available in the apps. Tested as a build in Chromium, not yet on devices.
+- **Delete account** (account menu, web and apps): deletes the Stripe customer (cancelling any subscription), the account and its sessions. Only a hash of the email and its trial end are kept, so re-registering gives no second trial.
+- Licence server: the app origins are allowed across origins (APP_ORIGINS), and the gated models also accept the licence as a bearer token.
 - **Make PDF searchable**: PDF export can add an invisible OCR text layer at each line's position, so scanned pages can be searched, copied and read by screen readers. TXT and Word export of scanned pages use the same text. Pages that already have real PDF text are left alone.
-- OCR benchmark (`npm run bench:ocr`, scripts/ocr-bench.mjs): 14 pages with known text (letter, invoice table, receipt, two columns, small print, dark screenshot, poster, map, plus scan, phone photo, fax and low-resolution versions), scored by line error rate, words found and words right. Two fixes from it:
+- OCR benchmark (`npm run bench:ocr`, scripts/ocr-bench.mjs): 17 pages with known text (letter, invoice table, receipt, two columns, small print, dark screenshot, poster, map, a full A4 report, plus scan, phone photo, fax, low-resolution and photographed-at-an-angle versions), scored by line error rate, words found and words right. Fixes from it:
+  - A sheet photographed at an angle on a darker surface is found by its four corners (the largest bright region, checked for four real edges) and read flattened to a rectangle; regions are carried back onto the photo. Letter photographed at an angle: 87.5% → 100% of words found (Tesseract 93% → 99%); angled invoice 78% → 100%. In the editor the **Straighten** hint then offers to flatten the page, which takes the sheet's size; no AI needed.
+  - Tilt is measured from ink that contrasts with both sides of it, so the edge of a sheet on a dark desk no longer counts as a text line.
+  - CTC decoding: a step where a letter's accented forms (e, é, è) together outweigh the blank keeps the letter, unless it repeats the previous one.
   - Tilted pages are read straightened. The AI recognizer cuts each line out as a level rectangle, so 1.2° of tilt had cut words found on a scan from 100% to 24%. Regions are mapped back onto the original image.
   - Small text is enlarged before AI OCR (1.5×, or up to 3× for tiny print).
 
+  - Unsure lines (confidence under 0.93) are read again 15% wider, and the clearly surer reading is kept. Words found in tiny print: 76% → 85%.
+  - Detector boxes that split one line (busy backgrounds, text shadows) are joined before recognition. Photographed poster: 92% → 96% of words found, 85% → 100% right.
   Also measured and rejected, so the defaults stay:
   - Real-ESRGAN sharpening before OCR: words found fell from 88% to 25% on the photo, because it invents letter shapes.
   - Classic unsharp masking.
@@ -23,7 +39,7 @@
   - Dictionary auto-correction: its gain was too small to justify silently changing names.
 
   The server detector ("High accuracy") helps only on text over pictures: map 91% → 96%, photographed poster 92% → 100%.
-  AI OCR over the benchmark went from a 17.5% error rate and 82.6% of words found to 3.4% and 96.2% (scanned letter 26% → 99%, phone photo 47% → 88%). Tesseract: 12.6% and 81.7%.
+  AI OCR over the 17-page benchmark: 1.1% line error rate, 96.9% of words found, 97.8% of the words it returns right, 2.3 s per page (first 14 pages, before these fixes: 17.5% and 82.6%; scanned letter 26% → 99%, phone photo 47% → 88%, tiny print 51% → 85%, angled letter 100%). Tesseract: 11.4% and 83.0%.
 - **Subscription build** (`npm run build:saas`): sign-in with an emailed code, a 7-day free trial without a card, then €2/month through Stripe Checkout (Apple Pay, Google Pay, cards), with the customer portal for changes. The licence server (`cloud/`, a Workers-style handler with D1) signs licences that the app checks offline for up to 3 days, and serves the AI models and engines only with a valid licence. The editor stays open under the paywall if a licence runs out mid-session. AI models over 24 MiB are split into parts for hosts with a 25 MiB file limit. Setup and the remaining launch steps are in cloud/README.md.
 - The AI worker downloads a model once for its WebGPU and CPU attempts, and creates one session at a time (concurrent WebGPU sessions failed with "Session mismatch").
 - Code structure: App.tsx's canvas event handlers moved to canvas-events.ts, the command palette and menu commands to editor-commands.ts, and shared types and the tool list to editor-types.ts. Each gets its dependencies through a typed interface generated from the compiler's own types. App.tsx went from 1,421 to 1,118 lines.
@@ -74,7 +90,7 @@
 
 Checked against the [Photopea manual](https://www.photopea.com/learn/) and [iLovePDF tool catalogue](https://www.ilovepdf.com/) on 2026-09-16, and against the actual bide code and verification results.
 
-**bide is a local visual editor with integrated PDF tools and a bundled draw.io workspace. It does not currently provide full feature parity with Photopea or iLovePDF.** This is a capability audit, not a promise that all file variants or workflows work identically. “Implemented” means the described bide operation exists; it does not mean the entire competitor subsystem has been reproduced. “Missing” means there is no finished, supported workflow. Nothing marked missing is represented as a working tool in the UI.
+**bide is a local visual editor with integrated PDF tools. It does not currently provide full feature parity with Photopea or iLovePDF.** This is a capability audit, not a promise that all file variants or workflows work identically. “Implemented” means the described bide operation exists; it does not mean the entire competitor subsystem has been reproduced. “Missing” means there is no finished, supported workflow. Nothing marked missing is represented as a working tool in the UI.
 
 ## Visual editor compared with Photopea
 
@@ -138,22 +154,6 @@ The catalogue includes [organization, conversion, editing, security and intellig
 | AI summaries / translation | Missing | No AI model/service integration |
 | PDF to Markdown | Missing | Plain text export does not reconstruct Markdown structure |
 | Reusable workflows | Missing | No saved multi-step or folder-batch conversion pipelines |
-
-## Diagrams: bundled draw.io
-
-bide 0.4.1 includes the actual draw.io 31.4.5 browser editor, served locally from the release ZIP. It does not embed the hosted diagrams.net website. The design/PDF editor remains bide's separate Fabric.js implementation.
-
-| Workflow | Status | Scope |
-|---|---|---|
-| Shape editing and connectors | Bundled draw.io | Drag, resize, rotate, connect shapes, edit labels, group, align, arrange and undo/redo |
-| Flowchart / UML / network libraries | Bundled draw.io | Local shape libraries and More Shapes panel; specialized libraries are not each individually tested |
-| Pages and layers | Bundled draw.io | Native diagram pages/layers retained in `.drawio` |
-| Templates | Implemented | Blank, process flow, team structure and system overview starters; not a clone of the entire online template gallery |
-| Native files and autosave | Implemented | Open/save `.drawio` or XML, independent IndexedDB draft; PNG exports also embed diagram XML |
-| SVG / PNG / PDF | Implemented | Current-page exports; SVG with HTML labels, PNG at 2x scale, PDF with rasterized diagram (not searchable text) |
-| Place diagram into PDF/design | Implemented | Image layer carrying editable source; Edit diagram reopens it and updates the layer on placement; `.bide` preserves the source |
-| Command palette | Implemented | Context-specific commands, including Ctrl+K from the diagram iframe |
-| Cloud / AI / remote integrations | Unavailable | No cloud storage, hosted collaboration, remote icon search, remote fonts/images or server-only converters; local diagram work requires no internet |
 
 ## Verified locally
 

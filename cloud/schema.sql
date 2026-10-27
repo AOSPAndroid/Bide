@@ -52,3 +52,10 @@ CREATE TABLE IF NOT EXISTS payment_receipts (
   currency TEXT NOT NULL CHECK (length(currency) = 3)
 );
 CREATE INDEX IF NOT EXISTS payment_receipts_user_paid ON payment_receipts(user_id, paid_at, invoice_id);
+
+-- Deleted accounts: a hash of the email and when its trial ended, so a new
+-- account for the same email does not get a second trial.
+CREATE TABLE IF NOT EXISTS used_trials (
+  email_hash TEXT PRIMARY KEY,
+  trial_ends INTEGER NOT NULL
+);

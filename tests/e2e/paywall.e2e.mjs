@@ -75,3 +75,50 @@ test('trial, paywall and subscription in the subscription build',{timeout:600000
   assert.deepEqual(errors,[],JSON.stringify(errors));
  }finally{globalThis.fetch=realFetch;await browser.close();await server.close();delete process.env.VITE_PAYWALL;delete process.env.VITE_LICENCE_PUBLIC_KEY;}
 });
+
+// The iOS/Android build: sign-in only, no prices or purchase; account
+// deletion; the licence server across origins; a model left out of the app
+// bundle fetched from the server with the licence.
+test('the app build signs in, shows no purchase, deletes the account and fetches models',{timeout:600000},async()=>{
+ const {readFile}=await import('node:fs/promises');
+ const pair=await crypto.subtle.generateKey({name:'ECDSA',namedCurve:'P-256'},true,['sign','verify']);
+ const priv=await crypto.subtle.exportKey('jwk',pair.privateKey),pub=await crypto.subtle.exportKey('jwk',pair.publicKey);
+ const remote='https://bide.example';
+ Object.assign(process.env,{VITE_LICENCE_PUBLIC_KEY:JSON.stringify({kty:pub.kty,crv:pub.crv,x:pub.x,y:pub.y}),VITE_LICENCE_API:remote,VITE_MODEL_BASE:remote+'/'});
+ const server=await createServer({mode:'app',logLevel:'error',server:{port:0,host:'127.0.0.1'}});await server.listen();
+ const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||undefined});
+ const origin=server.resolvedUrls.local[0].replace(/\/$/,''),store=new MemoryStore(),served=[];let clock=Date.now();
+ const env={APP_URL:remote,LICENCE_PRIVATE_KEY:JSON.stringify(priv),DEV_SHOW_CODE:'1',APP_ORIGINS:origin,STRIPE_SECRET_KEY:'sk_test',
+  ASSETS:{fetch:async r=>{const path=new URL(r.url).pathname;served.push(path);return new Response(await readFile('public'+path));}}};
+ try{
+  const context=await browser.newContext({viewport:{width:390,height:844}}),page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
+  // The licence server is another origin, as it is for the apps.
+  await context.route(remote+'/**',async route=>{const r=route.request(),body=r.postData();
+   const reply=await handle(new Request(r.url(),{method:r.method(),headers:r.headers(),body:body??undefined}),env,store,clock);
+   await route.fulfill({status:reply.status,headers:Object.fromEntries(reply.headers),body:Buffer.from(await reply.arrayBuffer())});});
+  // ppocr-det is not in this "app bundle": it must come from the server.
+  await context.route(`${origin}/ai/models/ppocr-det.onnx*`,route=>route.fulfill({status:404,body:''}));
+  await context.clock.install({time:clock});
+  await page.goto(origin);
+  await page.getByRole('heading',{name:'Sign in to bide'}).waitFor({timeout:60000});
+  const text=await page.locator('.paywall').innerText();assert.doesNotMatch(text,/€|per month|subscribe|Apple Pay/i,'no price or purchase in the app');
+  await page.getByLabel('Email').fill('alex@example.com');await page.getByRole('button',{name:'Email me a sign-in code'}).click();
+  await page.getByLabel('Sign-in code').waitFor();await page.getByRole('button',{name:'Sign in'}).click();
+  await page.locator('.account-chip').waitFor({timeout:60000});
+  await page.locator('.account-chip summary').click();
+  assert.equal(await page.locator('.account-chip').getByRole('button',{name:/Subscribe|Manage/}).count(),0,'no purchase buttons');
+  // The AI reads text with a model downloaded from the server, the licence as a bearer token.
+  const read=await page.evaluate(async()=>{const c=document.createElement('canvas');c.width=420;c.height=80;const g=c.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,420,80);g.fillStyle='#111';g.font='32px Arial';g.fillText('Invoice 2026',20,52);
+   const {recognizeImage}=await import('/src/browser/ocr.ts');return (await recognizeImage(c,{engine:'paddle',grouping:'lines'})).map(r=>r.text).join(' ');});
+  assert.match(read,/Invoice 2026/);assert.ok(served.includes('/ai/models/ppocr-det.onnx'),'the model came from the server');
+  // After the trial: no purchase, only sign out or delete.
+  clock+=8*24*3600000;await context.clock.setSystemTime(clock);await page.reload();
+  await page.getByRole('heading',{name:'No active plan'}).waitFor({timeout:60000});
+  assert.doesNotMatch(await page.locator('.paywall').innerText(),/€|subscribe|website|web/i);
+  page.on('dialog',d=>void d.accept());
+  await page.getByRole('button',{name:'Delete account'}).click();
+  await page.getByRole('heading',{name:'Sign in to bide'}).waitFor({timeout:30000});
+  assert.equal(store.users.size,0,'the account is gone from the server');
+  assert.deepEqual(errors,[],JSON.stringify(errors));
+ }finally{await browser.close();await server.close();for(const k of ['VITE_LICENCE_PUBLIC_KEY','VITE_LICENCE_API','VITE_MODEL_BASE'])delete process.env[k];}
+});

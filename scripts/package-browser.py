@@ -7,7 +7,7 @@ root = Path(__file__).resolve().parent.parent
 out = root / 'release'
 out.mkdir(exist_ok=True)
 target = out / 'bide-browser.zip'
-for required in ['index.html', 'ocr/worker.min.js', 'ocr/lang/eng.traineddata.gz','ocr/lang/fra.traineddata.gz', 'office/runtime/soffice.wasm', 'diagrams/runtime/index.html', 'diagrams/runtime/js/app.min.js', 'licenses/drawio-LICENSE.txt', 'ai/models/lama.onnx', 'ai/models/realesr-general-x4v3.onnx', 'ai/models/ppocr-det.onnx', 'ai/models/ppocr-latin-rec.onnx', 'ai/ort/ort-wasm-simd-threaded.jsep.wasm']:
+for required in ['index.html', 'ocr/worker.min.js', 'ocr/lang/eng.traineddata.gz','ocr/lang/fra.traineddata.gz', 'office/runtime/soffice.wasm', 'ai/models/lama.onnx', 'ai/models/realesr-general-x4v3.onnx', 'ai/models/ppocr-det.onnx', 'ai/models/ppocr-latin-rec.onnx', 'ai/ort/ort-wasm-simd-threaded.jsep.wasm']:
     if not (root / 'dist' / required).is_file(): raise SystemExit(f'Missing built asset: {required}. Build before packaging.')
 manifest = json.loads((root / 'public/ai/manifest.json').read_text(encoding='utf-8'))
 required_assets = ['brand-logo.svg', 'favicon.svg']

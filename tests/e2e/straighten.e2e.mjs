@@ -1,5 +1,6 @@
 // End-to-end: tilted and turned page images are offered a one-click
-// straighten before OCR, and a photographed page can be flattened with AI.
+// straighten before OCR, and a photographed page can be flattened (by its
+// corners, or with AI).
 import {test} from 'node:test';import assert from 'node:assert/strict';
 import {createServer} from 'vite';import {chromium} from 'playwright-core';
 import {mkdtemp} from 'node:fs/promises';import {tmpdir} from 'node:os';import {join} from 'node:path';
@@ -51,6 +52,18 @@ test('tilted, turned and photographed pages are straightened',{timeout:900000},a
    await page.waitForTimeout(1500);const after=await saved(page);
    assert.notEqual(after.objects[0].src,before.objects[0].src,'image layer replaced');
    // Read as "Ivoice total 14 EUR" before flattening.
+   await page.locator('button[aria-label="Edit detected text: Invoice total 1284 EUR"]').waitFor({timeout:180000});
+   assert.deepEqual(errors,[]);await page.close();}
+
+  // The same photo: the hint offers to flatten the sheet without AI, and the
+  // page takes the sheet's shape.
+  {const {page,errors}=await open(browser,await picture(browser,'perspective(900px) rotateX(18deg) rotateY(-16deg) rotateZ(3deg)',{size:{width:640,height:330},background:'#5a5f66',name:'photo.png'}));
+   const hint=page.locator('.straighten-hint');await hint.waitFor({timeout:180000});
+   assert.match(await hint.innerText(),/photographed at an angle/);
+   const before=await saved(page);await hint.click();await page.getByText(/Page flattened to a rectangle/).waitFor({timeout:30000});
+   await page.waitForTimeout(1500);const after=await saved(page);
+   assert.notEqual(after.objects[0].src,before.objects[0].src,'image layer replaced');
+   assert.ok(after.width<before.width&&after.height<before.height,`page ${after.width}×${after.height} is the sheet, not the photo`);
    await page.locator('button[aria-label="Edit detected text: Invoice total 1284 EUR"]').waitFor({timeout:180000});
    assert.deepEqual(errors,[]);await page.close();}
  }finally{await browser.close();await server.close();}

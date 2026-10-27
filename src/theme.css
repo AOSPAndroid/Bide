@@ -14,7 +14,7 @@
   --line: #dedfe3;
   --panel: var(--surface);
   --success: #30856a;
-  /* Compatibility for canvas and embedded diagram controls. */
+  /* Compatibility for canvas controls. */
   --blue: var(--accent);
   --blue-strong: var(--accent);
   --navy: var(--ink);
@@ -110,7 +110,7 @@ h1,h2,.brand {color:var(--ink)}
 .layer-row.selected .layer-type {border-color:var(--accent-border);background:var(--surface);color:var(--accent)}
 .background-layer,.layers-empty,.layer-footer {color:var(--muted)}
 .modal-backdrop {background:#25272d36;backdrop-filter:blur(4px)}
-.modal,.diagrams-workspace .dialog {background:var(--surface);border-color:var(--line);box-shadow:0 24px 90px #25272d30}
+.modal {background:var(--surface);border-color:var(--line);box-shadow:0 24px 90px #25272d30}
 .modal-header {color:var(--ink)}
 .stacked-label {color:var(--ink)}
 .stacked-label input,.stacked-label select {background:var(--soft);border-color:var(--line)}
@@ -122,7 +122,7 @@ h1,h2,.brand {color:var(--ink)}
 .signature-pad {background:white;border-color:var(--line)}
 .signature-pad span {color:var(--muted);border-color:var(--line)}
 .signature-type {background:var(--soft);color:var(--ink)}
-.notice,.hosting-notice,.diagram-notice {background:#fff8ea;border-color:#e8d3a5;color:#775614}
+.notice,.hosting-notice {background:#fff8ea;border-color:#e8d3a5;color:#775614}
 .export-note {background:var(--soft);border-color:var(--line);color:var(--ink)}
 .export-note small {color:var(--muted)}
 .shortcut-list>div {color:var(--ink);border-color:var(--line)}
@@ -141,19 +141,74 @@ h1,h2,.brand {color:var(--ink)}
 ::-webkit-scrollbar-thumb:hover {background:var(--subtle)}
 .crop-preview {background:var(--canvas);border-color:var(--line)}
 .crop-preview>div {background:white;border-color:var(--accent)}
-.diagrams-workspace,.diagram-stage iframe {background:var(--surface)}
-.diagram-header,.diagram-footer {border-color:var(--line)}
-.diagram-actions button:hover {background:var(--selected)}
-.diagram-actions .primary:hover {background:var(--ink);color:white}
-.diagram-loading {background:#f4f5f7f0;color:var(--ink)}
-.diagram-footer {color:var(--muted)}
 
 /* A dedicated PDF tools home, sharing the existing document canvas. */
 .demo-notice {display:flex;align-items:center;gap:14px;flex-shrink:0;padding:9px 18px;background:var(--accent-soft);border-bottom:1px solid var(--line);color:var(--ink);font-size:12px;line-height:1.5}
 .demo-notice>span {flex:1}
 .demo-notice a {color:var(--accent);white-space:nowrap;text-underline-offset:3px}
 .demo-try-ocr {color:var(--accent);font:inherit;font-weight:650;white-space:nowrap;padding:2px 7px;border:1px solid currentColor;border-radius:4px}
-.pdf-home {flex:1;min-height:0;overflow:auto;background:var(--soft)}
+.pdf-home,.documents-workspace {flex:1;min-height:0;overflow:auto;background:var(--soft)}
+/* Documents: invoice list and editor. */
+.documents-workspace>.muted {padding:44px 40px}
+.documents-workspace.editing {padding:28px 32px 95px}
+.invoice-editor {display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:22px;max-width:1230px;margin:0 auto;align-items:start}
+.invoice-main h1 {font-size:28px;letter-spacing:-.9px;font-weight:650;margin:14px 0 18px}
+.invoice-topline {display:flex;align-items:center;gap:14px}
+.invoice-card {background:white;border:1px solid var(--line);border-radius:11px;padding:18px 20px;margin-bottom:14px}
+.invoice-card h2 {font-size:13px;font-weight:650;letter-spacing:0;margin-bottom:14px}
+.invoice-grid {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px 14px}
+.invoice-field {display:flex;flex-direction:column;gap:5px;font-size:10px;color:var(--muted);min-width:0}
+.invoice-field.wide {grid-column:span 2}
+.invoice-field.check {flex-direction:row;align-items:center;gap:8px;font-size:11px;color:var(--ink)}
+.invoice-field input,.invoice-field select,.invoice-field textarea {font-size:12px;padding:8px 9px;border-radius:6px;width:100%}
+.invoice-field textarea {min-height:54px;resize:vertical}
+.invoice-number {display:flex;align-items:center;gap:6px}
+.invoice-number>i {font-style:normal;color:var(--subtle);font-size:10px}
+.invoice-inline {font-size:10px;color:var(--accent);padding:4px 6px;border-radius:5px;flex-shrink:0}
+.invoice-line {display:grid;grid-template-columns:minmax(0,2.4fr) .8fr 1fr 1.2fr 1.3fr .8fr 1fr 28px;gap:8px;align-items:end;padding:10px 0;border-bottom:1px solid #eef0f3}
+.invoice-line .invoice-field.wide {grid-column:auto}
+.invoice-line-total {font-size:12px;font-weight:600;text-align:right;padding-bottom:9px;white-space:nowrap}
+.invoice-card .secondary.small {margin-top:12px;font-size:11px;padding:6px 10px;min-height:0}
+.invoice-side {position:sticky;top:0;display:flex;flex-direction:column}
+.invoice-totals>div {display:flex;justify-content:space-between;gap:10px;font-size:11px;color:var(--muted);padding:4px 0}
+.invoice-totals>div b {color:var(--ink);font-weight:600;white-space:nowrap}
+.invoice-totals>.grand {font-size:14px;color:var(--ink);border-top:1px solid var(--line);margin-top:6px;padding-top:10px}
+.invoice-checks ul {list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}
+.invoice-checks li button {width:100%;justify-content:flex-start;align-items:flex-start;white-space:normal;text-align:left;font-size:11px;line-height:1.5;padding:6px 7px;border-radius:6px}
+.invoice-checks li button>svg {flex-shrink:0;margin-top:2px}
+.invoice-checks li.error svg {color:#c0392b}
+.invoice-checks li.warning svg {color:#b7791f}
+.invoice-ok {display:flex;gap:7px;font-size:11px;line-height:1.5;color:var(--success)}
+.invoice-ok svg {flex-shrink:0;margin-top:2px}
+.invoice-actions {display:flex;flex-direction:column;gap:8px}
+.invoice-actions .primary,.invoice-actions .secondary {width:100%;min-height:36px}
+.invoice-row {display:flex;gap:8px}
+.invoice-row>button {flex:1}
+.invoice-row.start {justify-content:flex-start}.invoice-row.start>button {flex:0 0 auto}
+.invoice-line.adjustment {grid-template-columns:minmax(0,3.2fr) 1.2fr 1.3fr .8fr 1fr 28px}
+.secondary.danger {color:#b03a2e}
+.invoice-status {font-size:10px;padding:3px 7px;border-radius:10px;background:var(--soft);color:var(--muted);white-space:nowrap}
+.invoice-status.issued {background:#e7f4ee;color:var(--success)}
+.invoice-status.received {background:#e9eef8;color:#3b5c99}
+.invoice-source {border:1px solid #c9d6ee;background:#f3f6fc;border-radius:10px;padding:12px 16px;margin-bottom:14px;font-size:12px;line-height:1.6}
+.invoice-source.scan {border-color:var(--accent-border);background:var(--accent-soft)}
+.invoice-source ul {margin:6px 0 0;padding-left:18px;color:var(--muted)}
+.invoice-reading {display:flex;align-items:center;gap:10px;font-size:12px;color:var(--muted);margin:-18px 0 20px}
+.invoice-table {width:100%;border-collapse:collapse;background:white;border:1px solid var(--line);border-radius:11px;overflow:hidden;font-size:12px}
+.invoice-table th {text-align:left;font-size:10px;font-weight:600;color:var(--muted);padding:10px 14px;border-bottom:1px solid var(--line)}
+.invoice-table td {padding:10px 14px;border-bottom:1px solid #eef0f3}
+.invoice-table tr:last-child td {border-bottom:0}
+.invoice-table tbody tr {cursor:pointer}
+.invoice-table tbody tr:hover {background:var(--accent-soft)}
+.invoice-table .amount {text-align:right;white-space:nowrap}
+.invoice-link {padding:0;font-weight:600;color:var(--accent)}
+.pdf-tool-card.static {cursor:default}
+.pdf-tool-card.static:hover {transform:none;box-shadow:none;border-color:var(--line)}
+.client-list {list-style:none;margin:0;padding:0;background:white;border:1px solid var(--line);border-radius:11px}
+.client-list li {display:flex;align-items:center;justify-content:space-between;padding:8px 14px;font-size:12px;border-bottom:1px solid #eef0f3}
+.client-list li:last-child {border-bottom:0}
+@media(max-width:980px){.invoice-editor{grid-template-columns:1fr}.invoice-side{position:static}.invoice-line,.invoice-line.adjustment{grid-template-columns:repeat(3,minmax(0,1fr))}.invoice-line>.invoice-field:first-child{grid-column:1/-1}}
+@media(max-width:600px){.documents-workspace.editing{padding:16px 16px 95px}.invoice-grid{grid-template-columns:1fr 1fr}.invoice-field.wide{grid-column:1/-1}.invoice-line,.invoice-line.adjustment{grid-template-columns:1fr 1fr}.invoice-table th:nth-child(2),.invoice-table td:nth-child(2),.invoice-table th:nth-child(4),.invoice-table td:nth-child(4){display:none}.invoice-table td,.invoice-table th{padding:9px 8px}}
 .pdf-home-content {max-width:1230px;margin:0 auto;padding:44px 40px 95px}
 .pdf-home-heading {display:flex;justify-content:space-between;align-items:center;gap:35px;margin-bottom:34px}
 .workspace-eyebrow {font-size:10px;font-weight:650;letter-spacing:2px;color:var(--accent)}
@@ -216,7 +271,7 @@ h1,h2,.brand {color:var(--ink)}
   .pdf-home-heading{gap:20px}.current-document{min-width:220px;padding:12px}.current-document strong{max-width:135px}.pdf-tools-filter{align-items:flex-start;flex-direction:column;gap:14px}.pdf-tool-search{width:100%}.pdf-tool-search input{max-width:none;flex:1}.pdf-tools-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.current-workspace{font-size:10px}.pdf-home-shortcut{display:none}
 }
 @media(max-width:600px) {
-  .current-workspace{border:0;padding-left:0}.menubar .menu-wrapper:nth-child(5){display:none}.options-bar{overflow-x:auto;flex-shrink:0}.options-end{margin-left:8px}.options-end>*{flex-shrink:0}.pdf-home-content{padding:25px 18px 100px}.pdf-home-heading{align-items:flex-start;flex-direction:column;gap:20px}.pdf-home-heading h1{font-size:29px}.current-document{width:100%;max-width:none}.current-document strong{max-width:220px}.pdf-categories button{padding:8px 9px}.pdf-tool-card{padding:17px 13px;min-height:170px}.pdf-tool-category{font-size:7px;right:11px;top:24px}.diagram-footer>span:last-child{display:none}
+  .current-workspace{border:0;padding-left:0}.menubar .menu-wrapper:nth-child(5){display:none}.options-bar{overflow-x:auto;flex-shrink:0}.options-end{margin-left:8px}.options-end>*{flex-shrink:0}.pdf-home-content{padding:25px 18px 100px}.pdf-home-heading{align-items:flex-start;flex-direction:column;gap:20px}.pdf-home-heading h1{font-size:29px}.current-document{width:100%;max-width:none}.current-document strong{max-width:220px}.pdf-categories button{padding:8px 9px}.pdf-tool-card{padding:17px 13px;min-height:170px}.pdf-tool-category{font-size:7px;right:11px;top:24px}
 }
 @media(prefers-reduced-motion:reduce) {
   .workspace-dock,.dock-icon,.dock-tooltip,.dock-handle svg,.pdf-tool-card,.pdf-tool-arrow{transition:none!important;animation:none!important}.dock-item:hover .dock-icon,.dock-item:focus-visible .dock-icon,.pdf-tool-card:not(:disabled):hover{transform:none}
@@ -243,11 +298,6 @@ h1,h2,.brand {color:var(--ink)}
   .current-document strong {font-size:14px}
   .current-document>span>span {font-size:12px}
   .document-name>input {width:120px}
-  .diagram-header {height:auto;flex-direction:column;flex-wrap:nowrap;flex-shrink:0;align-items:stretch;width:100%;min-width:0;padding:8px;gap:8px}
-  .diagram-header .document-name>input {width:220px;max-width:70vw}
-  .diagram-actions {width:100%;min-width:0;overflow-x:auto;flex-shrink:0;padding-bottom:4px}
-  .diagram-actions>button {min-height:34px;flex-shrink:0}
-  .diagram-footer {padding-right:8px;padding-left:8px}
   .statusbar {padding-right:8px;padding-left:8px}
   .canvas-area {min-width:0}
   .tool-rail {overflow-y:auto}

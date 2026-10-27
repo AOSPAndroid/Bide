@@ -13,7 +13,7 @@ type StripeItem={id:string;price?:string|{id:string};current_period_end?:number}
 type StripeSubscription={id:string;customer:string|{id:string};status:string;current_period_end?:number;metadata?:Record<string,string>;items:{data:StripeItem[];has_more?:boolean}};
 type StripeSession={id:string;customer:string|{id:string};subscription?:string|{id:string}|null;status:string;url?:string|null;expires_at:number;metadata?:Record<string,string>};
 type StripeList<T>={data:T[];has_more:boolean};
-type RequestOptions={method?:'GET'|'POST';idempotencyKey?:string};
+type RequestOptions={method?:'GET'|'POST'|'DELETE';idempotencyKey?:string};
 export type StripeClient=<T>(path:string,params?:Record<string,string>|string,options?:RequestOptions)=>Promise<T>;
 
 function configured(env:BillingEnv){if(!env.STRIPE_SECRET_KEY||!env.STRIPE_PRICE_ID)throw new BillingError(503,'Payments are not configured.');}

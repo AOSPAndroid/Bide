@@ -14,12 +14,11 @@ export function searchCommands<T extends SearchableCommand>(commands:T[],query:s
 }
 
 export function commandMetadata(label:string):Pick<SearchableCommand,'aliases'|'keywords'|'category'> {
-  if(label==='Open diagram workspace')return {category:'Workspaces',aliases:['visio','draw','diagram','diagrams','drawio','draw.io','flowchart','flow chart','uml','network diagram'],keywords:'Microsoft Visio vsdx shapes connectors'};
+  if(label==='Open Documents workspace')return {category:'Workspaces',aliases:['documents','invoice','invoices','facture','e-invoice','e-invoices','factur-x','forms'],keywords:'invoicing billing zugferd fillable'};
   if(label==='Open photo editor')return {category:'Workspaces',aliases:['photo','photos','photoshop','photopea','image editor','design'],keywords:'pictures graphics psd'};
-  if(label==='Open PDF MasterTool')return {category:'Workspaces',aliases:['pdf','pdf tools','ilovepdf','documents','pdf master'],keywords:'convert compress merge split'};
+  if(label==='Open PDF MasterTool')return {category:'Workspaces',aliases:['pdf','pdf tools','ilovepdf','pdf master'],keywords:'convert compress merge split'};
   const extra:Record<string,string>={'Open PDF, image or Office file':'open import psd photoshop docx xlsx pptx jpg png svg file','Extract text to Word':'docx pdf to word conversion','Extract plain text':'txt text extraction','Export pages as JPEG':'jpg jpeg image','Save editable project':'bide save download project','Add signature':'sign signing autograph'};
   if(extra[label])return {category:'Document',keywords:extra[label]};
-  if(/diagram|drawio/i.test(label))return {category:'Diagrams',keywords:'draw drawio visio flowchart vsdx'};
   if(/page/i.test(label)&&!/export|extract/i.test(label))return {category:'Pages',keywords:'document artboard navigation organize'};
   if(/export|extract|compress|convert|merge|split|password/i.test(label))return {category:'Export & PDF',keywords:'download conversion save output'};
   if(/brush|eras|draw|highlight|pan|tool/i.test(label))return {category:'Tools',keywords:'drawing paint tools'};

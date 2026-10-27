@@ -2,7 +2,7 @@
 import {runModel} from './ai';
 import type {ModelProgress} from './ai-models';
 import {segmentGlyphs,type Glyph} from '../glyph-edit';
-import {tilePlan,toPlanar,dbBoxes,ctcDecode,ctcWords,trimToInk,growToInk,inkBand,inpaintWindows,resizeBilinear,snapToGap,rtlReorder,separateLetters,ocrScripts,pickMask,type Rect,type OcrScript} from '../ai-image';
+import {tilePlan,toPlanar,dbBoxes,ctcDecode,ctcWords,trimToInk,growToInk,inkBand,inpaintWindows,resizeBilinear,snapToGap,rtlReorder,separateLetters,ocrScripts,pickMask,mergeLineBoxes,type Rect,type OcrScript} from '../ai-image';
 
 type Progress=(fraction:number,label?:string)=>void;
 const canvas=(width:number,height:number)=>Object.assign(document.createElement('canvas'),{width,height});
@@ -63,6 +63,8 @@ const dictionary=(script:OcrScript)=>{
 // A line the Latin model reads with less confidence than this is also tried
 // with the other alphabets when the script is automatic.
 const sureRead=.8;
+// Lines read with less confidence than this get a second look.
+const retryBelow=.93;
 
 // PaddleOCR PP-OCRv5: DB text detection (mobile, or the larger server model
 // for high accuracy), then recognition per line with word boxes recovered
@@ -75,7 +77,7 @@ export async function paddleOcr(source:HTMLCanvasElement,onProgress?:Progress,si
  const scale=Math.min(1,1600/Math.max(width,height)),dw=Math.max(32,Math.round(width*scale/32)*32),dh=Math.max(32,Math.round(height*scale/32)*32);
  const detInput={data:resizeBilinear(src.data,width,height,dw,dh)};
  const prob=(await runModel(accurate?'ppocr-det-server':'ppocr-det',{x:{data:toPlanar(detInput.data,dw,dh,{mean:[.485,.456,.406],std:[.229,.224,.225],bgr:true}),dims:[1,3,dh,dw]}},signal,loading));
- const boxes=dbBoxes(Object.values(prob)[0].data,dw,dh),lines:AiOcrLine[]=[];onProgress?.(.1);
+ const boxes=mergeLineBoxes(dbBoxes(Object.values(prob)[0].data,dw,dh)),lines:AiOcrLine[]=[];onProgress?.(.1);
  let pageScript:OcrScript|undefined=script==='auto'?undefined:script,probes=0;
  for(const [k,b] of boxes.entries()){
    // Widen the crop a little: on soft or textured backgrounds the detector can
@@ -83,14 +85,27 @@ export async function paddleOcr(source:HTMLCanvasElement,onProgress?:Progress,si
   const margin=(b.y1-b.y0)*height/dh*.25;
   const x0=Math.max(0,Math.floor(b.x0*width/dw-margin)),y0=Math.max(0,Math.floor(b.y0*height/dh)),x1=Math.min(width,Math.ceil(b.x1*width/dw+margin)),y1=Math.min(height,Math.ceil(b.y1*height/dh)),w=x1-x0,h=y1-y0;
   if(w<4||h<4)continue;
-  const rw=Math.max(16,Math.min(3200,Math.round(w*48/h))),region=new Uint8ClampedArray(w*h*4);
-  for(let y=0;y<h;y++)region.set(src.data.subarray(((y0+y)*width+x0)*4,((y0+y)*width+x1)*4),y*w*4);
-  const input=toPlanar(resizeBilinear(region,w,h,rw,48),rw,48,{mean:[.5,.5,.5],std:[.5,.5,.5],bgr:true});
-  const read=async(s:OcrScript)=>{
-   const dict=await dictionary(s),out=Object.values(await runModel(`ppocr-${s}-rec`,{x:{data:input.slice(),dims:[1,3,48,rw]}},signal,loading))[0];
-   const [,steps,classes]=out.dims;return {script:s,steps,...ctcDecode(out.data,steps,classes,dict)};
+  // The recognizer's input: rows [top, bottom) of the line's columns, 48 px
+  // high, optionally `stretch`ed wider.
+  const crop=(top:number,bottom:number,stretch=1)=>{
+   const ch=bottom-top,rw=Math.max(16,Math.min(3200,Math.round(w*48/ch*stretch))),region=new Uint8ClampedArray(w*ch*4);
+   for(let y=0;y<ch;y++)region.set(src.data.subarray(((top+y)*width+x0)*4,((top+y)*width+x1)*4),y*w*4);
+   return {rw,data:toPlanar(resizeBilinear(region,w,ch,rw,48),rw,48,{mean:[.5,.5,.5],std:[.5,.5,.5],bgr:true})};
+  };
+  let input=crop(y0,y1);
+  const read=async(s:OcrScript,from=input)=>{
+   const dict=await dictionary(s),out=Object.values(await runModel(`ppocr-${s}-rec`,{x:{data:from.data.slice(),dims:[1,3,48,from.rw]}},signal,loading))[0];
+   const [,steps,classes]=out.dims;return {script:s,steps,rw:from.rw,...ctcDecode(out.data,steps,classes,dict)};
   };
   let best=await read(pageScript??'latin');
+  // An unsure line is read again 15% wider, which separates cramped small
+  // letters; the clearly surer reading is kept. On the benchmark this lifted
+  // words found in tiny print from 76% to 85% (extra room above and below
+  // the line was also tried, and lowered the phone photo's score).
+  if(best.text&&best.confidence<retryBelow){
+   const wide=crop(y0,y1,1.15),next=await read(best.script,wide);
+   if(next.text&&next.confidence>best.confidence+.02){best=next;input=wide;}
+  }
   // An empty read (only spaces) is unsure too, however confident, and so is
   // one with non-Latin letters (the Latin model knows Greek for formulas). A
   // single look-alike letter (a circle read as Ο) is not enough to switch.
@@ -101,7 +116,7 @@ export async function paddleOcr(source:HTMLCanvasElement,onProgress?:Progress,si
   }
   // Digits and punctuation read by another alphabet's model are still Latin text.
   if(best.script!=='latin'&&!/(?!\p{Script=Latin})\p{L}/u.test(best.text))best={...best,script:'latin'};
-  const decoded=best,steps=best.steps,rtl=best.script==='arabic';
+  const decoded=best,steps=best.steps,rw=best.rw,rtl=best.script==='arabic';
   if(decoded.text){
    // Column ink inside the line (contrast with the line's corner colour) to tighten word boxes.
    // The detector pads its boxes; trim lines and words to inked rows/columns
