@@ -21,8 +21,8 @@ export type Env={
 };
 
 const DAY=86400000,LICENCE_DAYS=3,CODE_MINUTES=10,SESSION_DAYS=90;
-// Paths of the app that need a licence: the AI models, OCR data, Office and diagram engines.
-export const gatedPaths=[/^\/ai\//,/^\/ocr\//,/^\/office\//,/^\/diagrams\/runtime\//];
+// Paths of the app that need a licence: the AI models, OCR data and Office engine.
+export const gatedPaths=[/^\/ai\//,/^\/ocr\//,/^\/office\//];
 
 const json=(body:unknown,status=200,headers:Record<string,string>={})=>new Response(JSON.stringify(body),{status,headers:{'content-type':'application/json','cache-control':'no-store',...headers}});
 const fail=(status:number,error:string)=>json({error},status);

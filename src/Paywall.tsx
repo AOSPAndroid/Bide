@@ -70,7 +70,7 @@ function Gate({children}:{children:ReactNode}){
   {s.step==='ready'&&s.licence&&<AccountChip licence={s.licence} subscribe={checkout} manage={portal} signOut={signOut}/>}
   {s.step==='checking'&&card(<p className="muted">Checking your subscription…</p>)}
   {s.step==='email'&&card(<form onSubmit={e=>{e.preventDefault();void start();}}>
-   <h1>Try bide free for 7 days</h1><p className="muted">Edit images, PDFs and diagrams in your browser. Your files stay on your device. No card needed for the trial; then {PRICE}.</p>
+   <h1>Try bide free for 7 days</h1><p className="muted">Edit images, PDFs and documents in your browser. Your files stay on your device. No card needed for the trial; then {PRICE}.</p>
    <label>Email<input type="email" required autoFocus aria-label="Email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="you@example.com"/></label>
    <button disabled={s.busy}>Email me a sign-in code</button></form>)}
   {s.step==='code'&&card(<form onSubmit={e=>{e.preventDefault();void verify();}}>

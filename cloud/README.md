@@ -7,7 +7,7 @@ The subscription build of bide asks people to sign in. They get **7 days free** 
 - **Sign-in:** the user types an email; `/api/auth/start` emails a 6-digit code (Resend), `/api/auth/verify` checks it and returns a session. Codes expire after 10 minutes, allow 5 attempts, and at most 5 can be requested per hour.
 - **Trial:** it starts at the first sign-in and belongs to the email address (`users.trial_ends`), so clearing the browser does not restart it.
 - **Licence:** `/api/licence` returns a licence signed with ECDSA P-256 (`src/licence.ts`): status `trial`, `active` or `expired`, valid at most 3 days. The app checks it with the public key built into it. That lets it open offline for up to 3 days, and it can't be forged. The same licence is set as an HttpOnly cookie.
-- **Gated files:** when the worker serves the app (`ASSETS`), the AI models, OCR data and Office/diagram engines (`/ai/`, `/ocr/`, `/office/`, `/diagrams/runtime/`) are only served with a valid licence cookie.
+- **Gated files:** when the worker serves the app (`ASSETS`), the AI models, OCR data and Office engine (`/ai/`, `/ocr/`, `/office/`) are only served with a valid licence cookie.
 - **Payment:** `/api/checkout` opens Stripe Checkout (subscription). Stripe's webhook (`/api/stripe/webhook`, signature checked) records the subscription; `active` lasts until the end of the paid period, `past_due` keeps a week's grace. `/api/portal` opens Stripe's customer portal to cancel or change the card.
 
 The code is a standard fetch handler (`cloud/worker.ts`) with a D1 database (`cloud/schema.sql`). `npm test` covers it (`tests/cloud.test.mjs`), and `tests/e2e/paywall.e2e.mjs` runs the whole flow in a browser.

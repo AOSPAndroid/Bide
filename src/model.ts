@@ -4,7 +4,7 @@ import { uuid } from './browser/crypto';
 // Registers the adjustment layer class so saved pages load it.
 import './adjustment-layer';
 
-FabricObject.customProperties = ['id', 'name', 'diagramXml','pdfFontData','pdfOriginalFont','pdfFontFallback','pdfFontBold','pdfFontItalic','recognizedKey','objectCaching','textSoftness','layerMask','layerStyle'];
+FabricObject.customProperties = ['id', 'name','pdfFontData','pdfOriginalFont','pdfFontFallback','pdfFontBold','pdfFontItalic','recognizedKey','objectCaching','textSoftness','layerMask','layerStyle'];
 // The editor's coordinates use top-left anchors. Fabric 7 defaults to centered anchors.
 Object.assign(FabricObject.ownDefaults, { originX: 'left', originY: 'top', cornerColor: '#ffffff', cornerStrokeColor: '#a83c1c', borderColor: '#c44c28', cornerSize: 9, transparentCorners: false, padding: 3 });
 

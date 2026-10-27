@@ -4,7 +4,7 @@ import { Blend, Brush, Circle, Copy, Crop, Eraser, Hand, Highlighter, LassoSelec
 import type {LayerStyle} from './layer-effects';
 import type {SearchableCommand} from './command-search';
 
-export type Obj = FabricObject & { layerStyle?:LayerStyle; textSoftness?:number; pdfFontData?:string;pdfOriginalFont?:string;pdfFontFallback?:string;pdfFontBold?:boolean;pdfFontItalic?:boolean;recognizedKey?:string; id?: string; name?: string; diagramXml?: string; text?: string; fontSize?: number; fontFamily?: string; fontWeight?: string | number; fontStyle?: string; underline?: boolean; textAlign?: string; isEditing?: boolean };
+export type Obj = FabricObject & { layerStyle?:LayerStyle; textSoftness?:number; pdfFontData?:string;pdfOriginalFont?:string;pdfFontFallback?:string;pdfFontBold?:boolean;pdfFontItalic?:boolean;recognizedKey?:string; id?: string; name?: string; text?: string; fontSize?: number; fontFamily?: string; fontWeight?: string | number; fontStyle?: string; underline?: boolean; textAlign?: string; isEditing?: boolean };
 export type Tool = 'select' | 'pen' | 'crop' | 'wand' | 'object' | 'gradient' | 'bucket' | 'mask' | 'text' | 'rect' | 'ellipse' | 'line' | 'brush' | 'highlight' | 'eraser' | 'marquee' | 'lasso' | 'hand' | 'clone' | 'heal' | 'zoom';
 export type PaletteAction = SearchableCommand & {hint:string;icon:typeof Type;run:()=>void};
 export type Modal = 'imagesize' | 'canvassize' | 'new' | 'export' | 'signature' | 'shortcuts' | 'resize' | 'watermark' | 'numbers' | 'crop' | null;

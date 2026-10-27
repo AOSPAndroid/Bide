@@ -1,8 +1,8 @@
 # bide — Browser Edition
 
-A Photopea-inspired visual editor, PDF toolkit, and bundled draw.io diagram editor in one browser app. Editing and conversion run locally inside the browser. It needs no installed Office, LibreOffice, Python, draw.io desktop, extensions or conversion service.
+A Photopea-inspired visual editor, PDF toolkit and documents workspace in one browser app. Editing and conversion run locally inside the browser. It needs no installed Office, LibreOffice, Python, extensions or conversion service.
 
-**This is not full Photopea or iLovePDF feature parity.** Diagrams use the actual open-source draw.io editor with its remote integrations disabled. See [FEATURES.md](FEATURES.md) for supported features and remaining work.
+**This is not full Photopea or iLovePDF feature parity.** See [FEATURES.md](FEATURES.md) for supported features and remaining work.
 
 ![Photo editor: layer style (drop shadow and outer glow) on a headline, with rulers and a guide](docs/screenshots/photo-editor.png)
 
@@ -12,8 +12,6 @@ A Photopea-inspired visual editor, PDF toolkit, and bundled draw.io diagram edit
 | **Edit text in images.** Detected lines are outlined; a typo in a screenshot ("Martinn") was fixed with the image's own letters. | **Selections.** Magic wand with Shift to add, plus Subject (AI), colour range, refine and layer masks. |
 | ![Pen tool shape over a gradient, with the History panel](docs/screenshots/pen-history.png) | ![PDF MasterTool home with searchable PDF tools](docs/screenshots/pdf-tools.png) |
 | **Pen, gradient and History.** A pen shape on a gradient layer; every step is named in History. | **PDF MasterTool.** Merge, split, compress, convert, sign, watermark and protect, all in the browser. |
-| ![Bundled draw.io diagram editor](docs/screenshots/diagrams.png) | |
-| **Diagrams.** The bundled draw.io editor, offline, with *Place in document*. | |
 
 Screenshots are generated from the app with `node scripts/readme-screenshots.mjs` (demo content only).
 
@@ -27,9 +25,9 @@ Keep the BAT files with their `scripts` and `site` folders. No Node runtime is d
 
 The BAT files run directly through Node: **PowerShell and execution-policy changes are not needed.** Normal setup and launch never download dependencies. If the built app is missing, the launcher prints the ready-to-run ZIP link and stops.
 
-GitHub's **Code → Download ZIP** creates a source folder such as `Bide-main`. A source build must be explicitly requested with `"Install Dependencies.bat" --build-source`; it needs npm packages and the browser Office/diagram runtimes, which may require network access. Use the prebuilt release ZIP on a PC where proxy authentication blocks dependency downloads. Its root launchers run offline using your existing Node; the `source` folder is only for rebuilding.
+GitHub's **Code → Download ZIP** creates a source folder such as `Bide-main`. A source build must be explicitly requested with `"Install Dependencies.bat" --build-source`; it needs npm packages and the browser Office runtime, which may require network access. Use the prebuilt release ZIP on a PC where proxy authentication blocks dependency downloads. Its root launchers run offline using your existing Node; the `source` folder is only for rebuilding.
 
-The local edition works without internet after setup. A hosted edition needs only a browser and no Node runtime on the work PC; see [HOSTING.md](HOSTING.md). A public [bide demo](https://bide-demo.daaalil.chatgpt.site) is hosted with Sites. The demo includes the photo editor, PDF tools and draw.io; Office-to-PDF conversion is available only in the local download because the Office assets exceed the host's 25 MiB file limit. Files and drafts stay in each visitor's browser. The previous `Setup.cmd` and `start bide.cmd` now forward to these BAT files.
+The local edition works without internet after setup. A hosted edition needs only a browser and no Node runtime on the work PC; see [HOSTING.md](HOSTING.md). A public [bide demo](https://bide-demo.daaalil.chatgpt.site) is hosted with Sites. The demo includes the photo editor and PDF tools; Office-to-PDF conversion is available only in the local download because the Office assets exceed the host's 25 MiB file limit. Files and drafts stay in each visitor's browser. The previous `Setup.cmd` and `start bide.cmd` now forward to these BAT files.
 
 ## Share internally using IP:port
 
@@ -41,9 +39,9 @@ Every visitor has an independent workspace stored in their own browser. Sharing 
 
 ## Workspaces
 
-The interface uses warm white panels, burnt-orange accents (`#C44C28`), graphite text (`#25272D`), and an original B monogram. The bide wordmark carries the tagline “Image & Document Editor”. Compact chrome gives the document most of the screen. The top row holds the workspace switcher (**Photo editor**, **PDF MasterTool**, **Diagrams**), the menus and **Find a tool** (Ctrl+K). The second row holds the document name, Open/Save/Export, undo/redo, the active tool's options and zoom. Tools sit in an icon rail on the left (hover for names and shortcuts); the page strip opens for multi-page documents or with **Pages** in the status bar; Properties, Layers and History are on the right.
+The interface uses warm white panels, burnt-orange accents (`#C44C28`), graphite text (`#25272D`), and an original B monogram. The bide wordmark carries the tagline “Image & Document Editor”. Compact chrome gives the document most of the screen. The top row holds the workspace switcher (**Photo editor**, **PDF MasterTool**, **Documents**), the menus and **Find a tool** (Ctrl+K). The second row holds the document name, Open/Save/Export, undo/redo, the active tool's options and zoom. Tools sit in an icon rail on the left (hover for names and shortcuts); the page strip opens for multi-page documents or with **Pages** in the status bar; Properties, Layers and History are on the right.
 
-Photo editor and PDF MasterTool share your current document, layers and undo history. The PDF home has searchable tools grouped under Organize, Convert, Edit and Security; **Continue editing** returns to the document. Drawio keeps its own diagram draft, and **Place in document** returns to the photo/PDF workspace you came from. Ctrl+K can also switch workspaces.
+Photo editor and PDF MasterTool share your current document, layers and undo history. The PDF home has searchable tools grouped under Organize, Convert, Edit and Security; **Continue editing** returns to the document. **Documents** is the workspace for forms and e-invoices; its tools are still being built. Ctrl+K can also switch workspaces.
 
 ## Editor
 
@@ -59,17 +57,6 @@ Photo editor and PDF MasterTool share your current document, layers and undo his
 - **Paths and canvas:** pen tool (P) with point editing; rulers (Ctrl+R) and guides dragged from them; crop (C) with straighten; Image size, Canvas size and Trim in the **Image** menu; skew fields and Perspective for layers; a **History** tab to jump to any step.
 
 Basic 8-bit RGB PSD import preserves raster layer names, positions, opacity and supported blend modes. Complex documents use their saved composite preview with an explicit notice. PSD export writes the current design page as raster layers; text, groups and shapes are not native Photoshop objects. `.bide` retains the editable editor objects. PSB and 16/32-bit or non-RGB PSD files are not supported.
-
-## Diagrams
-
-Choose **Diagrams** in the workspace switcher at the top. The bundled draw.io 31.4.5 editor supplies draggable/resizable shapes, attached connectors, labels, flowchart/UML/network shape libraries, layers, pages, alignment/layout tools, grouping, undo/redo, and its own zoom/pan controls. Start from a blank canvas, process flow, team structure, or system overview. The **More Shapes** button opens additional bundled libraries.
-
-- Open and save native `.drawio` / draw.io XML files, including multiple pages. The current diagram also autosaves locally, independently of your photo/PDF document.
-- Export the current diagram page as SVG, PNG (with editable XML embedded), or PDF. The PDF button produces a high-resolution image PDF; text is not searchable. Use draw.io's File → Print for its browser printing workflow.
-- **Place in document** adds a diagram as an image layer to your current PDF/design. Select that layer and choose **Edit diagram** to reopen its source; placing it again updates that layer. `.bide` files retain this editable diagram source.
-- **Ctrl+K** opens bide's command palette in all three workspaces, including when the diagram iframe has keyboard focus.
-
-The prebuilt ZIP includes the diagram editor, shape libraries and math renderer. It never loads the online diagrams.net editor. Remote storage, real-time collaboration, AI services, remote icon search, remote fonts/images and server-only conversion services are disabled or unavailable. Native `.drawio` files and local assets work offline. External images referenced by an imported file must be embedded locally to display/export. SVG exports can contain HTML labels (`foreignObject`), which some external viewers do not render; PNG/PDF preserve their appearance. Opening a new diagram replaces the current diagram draft; save a `.drawio` copy to keep separate files.
 
 ## Conversions
 
@@ -109,7 +96,6 @@ Office conversion needs HTTPS (or localhost) and cross-origin isolation response
 ```powershell
 npm ci --ignore-scripts
 npm run assets:office
-npm run assets:diagrams
 npm run build
 # dist/ is the complete local app; out/ is the public demo.
 npm run serve
@@ -120,7 +106,7 @@ React, TypeScript and Fabric.js provide the editor. MuPDF WebAssembly handles PD
 
 The tests cover import/render, source and accented overlay text, links, merge order, rotation, ranges, split, image/SVG/DOCX/TXT output, project integrity and blocked external SVG resources. Browser verification covers Word/Excel/PowerPoint conversion, text dragging/resizing, downloads and image compression. `THIRD_PARTY.md` records engine provenance and license locations.
 
-bide is independent and is not affiliated with Photopea, iLovePDF or draw.io. The repository retains its existing Apache-2.0 LICENSE; bundled components retain their own licenses, documented in THIRD_PARTY.md.
+bide is independent and is not affiliated with Photopea or iLovePDF. The repository retains its existing Apache-2.0 LICENSE; bundled components retain their own licenses, documented in THIRD_PARTY.md.
 
 ### Photo retouching
 

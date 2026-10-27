@@ -28,8 +28,6 @@ async function fixture(t, built = true) {
     await mkdir(join(base,'site','office','runtime'),{recursive:true});
     await writeFile(join(base,'site','index.html'),'<title>bide launcher fixture</title>');
     for (const name of ['soffice.js','soffice.wasm','soffice.data','soffice.data.js.metadata']) await writeFile(join(base,'site','office','runtime',name),'test fixture');
-    await mkdir(join(base,'site','diagrams','runtime','js'),{recursive:true});
-    for (const name of ['index.html','js/app.min.js','js/bootstrap.js','bide-build.json']) await writeFile(join(base,'site','diagrams','runtime',name),'test fixture');
   } else await writeFile(join(base,'package.json'),'{}');
   return base;
 }
@@ -56,12 +54,12 @@ test('a missing explicit Node path stops clearly without downloading a runtime',
   assert.equal((await readdir(base)).includes('.runtime'),false);
 });
 
-test('an incomplete diagram bundle stops without downloading assets', {skip:!windows}, async t => {
+test('an incomplete Office bundle stops without downloading assets', {skip:!windows}, async t => {
   const base=await fixture(t);
-  await rm(join(base,'site','diagrams','runtime','js','app.min.js'));
+  await rm(join(base,'site','office','runtime','soffice.wasm'));
   const result=check(base,process.execPath);
   assert.equal(result.status,1);
-  assert.match(result.stderr,/diagram editor is incomplete/);
+  assert.match(result.stderr,/Office engine is incomplete/);
   assert.match(result.stderr,/No downloads were attempted/);
   assert.doesNotMatch(result.stderr,/network request forbidden/);
 });

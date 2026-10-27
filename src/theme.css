@@ -14,7 +14,7 @@
   --line: #dedfe3;
   --panel: var(--surface);
   --success: #30856a;
-  /* Compatibility for canvas and embedded diagram controls. */
+  /* Compatibility for canvas controls. */
   --blue: var(--accent);
   --blue-strong: var(--accent);
   --navy: var(--ink);
@@ -110,7 +110,7 @@ h1,h2,.brand {color:var(--ink)}
 .layer-row.selected .layer-type {border-color:var(--accent-border);background:var(--surface);color:var(--accent)}
 .background-layer,.layers-empty,.layer-footer {color:var(--muted)}
 .modal-backdrop {background:#25272d36;backdrop-filter:blur(4px)}
-.modal,.diagrams-workspace .dialog {background:var(--surface);border-color:var(--line);box-shadow:0 24px 90px #25272d30}
+.modal {background:var(--surface);border-color:var(--line);box-shadow:0 24px 90px #25272d30}
 .modal-header {color:var(--ink)}
 .stacked-label {color:var(--ink)}
 .stacked-label input,.stacked-label select {background:var(--soft);border-color:var(--line)}
@@ -122,7 +122,7 @@ h1,h2,.brand {color:var(--ink)}
 .signature-pad {background:white;border-color:var(--line)}
 .signature-pad span {color:var(--muted);border-color:var(--line)}
 .signature-type {background:var(--soft);color:var(--ink)}
-.notice,.hosting-notice,.diagram-notice {background:#fff8ea;border-color:#e8d3a5;color:#775614}
+.notice,.hosting-notice {background:#fff8ea;border-color:#e8d3a5;color:#775614}
 .export-note {background:var(--soft);border-color:var(--line);color:var(--ink)}
 .export-note small {color:var(--muted)}
 .shortcut-list>div {color:var(--ink);border-color:var(--line)}
@@ -141,18 +141,14 @@ h1,h2,.brand {color:var(--ink)}
 ::-webkit-scrollbar-thumb:hover {background:var(--subtle)}
 .crop-preview {background:var(--canvas);border-color:var(--line)}
 .crop-preview>div {background:white;border-color:var(--accent)}
-.diagrams-workspace,.diagram-stage iframe {background:var(--surface)}
-.diagram-header,.diagram-footer {border-color:var(--line)}
-.diagram-actions button:hover {background:var(--selected)}
-.diagram-actions .primary:hover {background:var(--ink);color:white}
-.diagram-loading {background:#f4f5f7f0;color:var(--ink)}
-.diagram-footer {color:var(--muted)}
 
 /* A dedicated PDF tools home, sharing the existing document canvas. */
 .demo-notice {display:flex;align-items:center;gap:14px;flex-shrink:0;padding:9px 18px;background:var(--accent-soft);border-bottom:1px solid var(--line);color:var(--ink);font-size:12px;line-height:1.5}
 .demo-notice>span {flex:1}
 .demo-notice a {color:var(--accent);white-space:nowrap;text-underline-offset:3px}
-.pdf-home {flex:1;min-height:0;overflow:auto;background:var(--soft)}
+.pdf-home,.documents-workspace {flex:1;min-height:0;overflow:auto;background:var(--soft)}
+.documents-workspace {padding:44px 40px 95px}
+.documents-workspace h1 {font-size:36px;line-height:1.15;letter-spacing:-1.3px;font-weight:650;margin:12px 0}
 .pdf-home-content {max-width:1230px;margin:0 auto;padding:44px 40px 95px}
 .pdf-home-heading {display:flex;justify-content:space-between;align-items:center;gap:35px;margin-bottom:34px}
 .workspace-eyebrow {font-size:10px;font-weight:650;letter-spacing:2px;color:var(--accent)}
@@ -215,7 +211,7 @@ h1,h2,.brand {color:var(--ink)}
   .pdf-home-heading{gap:20px}.current-document{min-width:220px;padding:12px}.current-document strong{max-width:135px}.pdf-tools-filter{align-items:flex-start;flex-direction:column;gap:14px}.pdf-tool-search{width:100%}.pdf-tool-search input{max-width:none;flex:1}.pdf-tools-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.current-workspace{font-size:10px}.pdf-home-shortcut{display:none}
 }
 @media(max-width:600px) {
-  .current-workspace{border:0;padding-left:0}.menubar .menu-wrapper:nth-child(5){display:none}.options-bar{overflow-x:auto;flex-shrink:0}.options-end{margin-left:8px}.options-end>*{flex-shrink:0}.pdf-home-content{padding:25px 18px 100px}.pdf-home-heading{align-items:flex-start;flex-direction:column;gap:20px}.pdf-home-heading h1{font-size:29px}.current-document{width:100%;max-width:none}.current-document strong{max-width:220px}.pdf-categories button{padding:8px 9px}.pdf-tool-card{padding:17px 13px;min-height:170px}.pdf-tool-category{font-size:7px;right:11px;top:24px}.diagram-footer>span:last-child{display:none}
+  .current-workspace{border:0;padding-left:0}.menubar .menu-wrapper:nth-child(5){display:none}.options-bar{overflow-x:auto;flex-shrink:0}.options-end{margin-left:8px}.options-end>*{flex-shrink:0}.pdf-home-content{padding:25px 18px 100px}.pdf-home-heading{align-items:flex-start;flex-direction:column;gap:20px}.pdf-home-heading h1{font-size:29px}.current-document{width:100%;max-width:none}.current-document strong{max-width:220px}.pdf-categories button{padding:8px 9px}.pdf-tool-card{padding:17px 13px;min-height:170px}.pdf-tool-category{font-size:7px;right:11px;top:24px}
 }
 @media(prefers-reduced-motion:reduce) {
   .workspace-dock,.dock-icon,.dock-tooltip,.dock-handle svg,.pdf-tool-card,.pdf-tool-arrow{transition:none!important;animation:none!important}.dock-item:hover .dock-icon,.dock-item:focus-visible .dock-icon,.pdf-tool-card:not(:disabled):hover{transform:none}
@@ -242,11 +238,6 @@ h1,h2,.brand {color:var(--ink)}
   .current-document strong {font-size:14px}
   .current-document>span>span {font-size:12px}
   .document-name>input {width:120px}
-  .diagram-header {height:auto;flex-direction:column;flex-wrap:nowrap;flex-shrink:0;align-items:stretch;width:100%;min-width:0;padding:8px;gap:8px}
-  .diagram-header .document-name>input {width:220px;max-width:70vw}
-  .diagram-actions {width:100%;min-width:0;overflow-x:auto;flex-shrink:0;padding-bottom:4px}
-  .diagram-actions>button {min-height:34px;flex-shrink:0}
-  .diagram-footer {padding-right:8px;padding-left:8px}
   .statusbar {padding-right:8px;padding-left:8px}
   .canvas-area {min-width:0}
   .tool-rail {overflow-y:auto}
