@@ -1,15 +1,11 @@
-## v0.8.14 — Searchable documents, forms and advanced editing
+## v0.8.15 — Documents, OCR fixes and current downloads
 
-- Latest OCR improvements: searchable PDF/TXT/DOCX export, English/French proofreading dictionaries, character confidence, cross-page letter borrowing, faster appearance matching, additional AI OCR alphabets and a high-accuracy detector.
-- Page straightening/orientation and AI flattening; SlimSAM click-based object selection; editable Levels, Curves and Hue/Saturation layers.
-- PDF redaction and Find & redact, existing PDF form filling, new movable text/checkbox/dropdown/radio fields, and fillable or flattened PDF export.
-- Release fixes remove redacted native field values and intersecting vector paths, sanitize retained project PDF sources, honor chosen match occurrences, read current visible text for searchable export, preserve adjustments in masked rendering/PSD fallback, fix Arabic reading order and radio switching.
-- Searchable export reads the current visible composite; the original OCR scan remains only an appearance reference. Rasterized softened/system-font text is OCR'd; native text is not duplicated.
-- Redaction rebuilds project PDF sources from retained pages. Supported form fields are recreated with the export appearance; unsupported widgets flatten. Original form styling/signatures are not preserved through this destructive cleanup. Undo retains originals while the document remains open.
-- Form export supports the bundled Liberation Sans glyphs, including French, Greek and Cyrillic. Other unsupported scripts report a clear font-coverage error rather than silently changing values.
-- Full offline model pack and seven Tesseract languages are bundled in the ZIP. Hosted demo omits Office and AI model assets.
+- Replaces the Diagrams workspace with Documents for PDF forms and electronic invoices. The retired diagram engine is excluded from this release.
+- Includes the latest OCR, searchable export, proofreading, image editing and mobile source updates described below.
+- Scanned PDFs with invisible or clipping-only text layers now use fresh OCR instead of treating stale hidden text as visible, editable PDF text.
+- Website, editor and launcher download links now follow the latest stable release. The ZIP includes the full offline model and Office packs, complete corresponding source, and a VERSION.txt identifying its source commit.
 
-## v0.8.14 details — searchable PDFs, proofreading and letter reuse
+## v0.8.15 details — Documents and advanced editing
 
 - **Documents workspace**: the bundled draw.io Diagrams workspace was removed and replaced by a Documents workspace (forms and e-invoices), making the app about 150 MB smaller. Diagrams already placed in a project stay as images.
 - **E-invoices** (Documents → New invoice): invoices, prepayment invoices and credit notes as Factur-X (PDF/A-3b with the CII XML embedded, EN 16931 profile), UBL 2.1 or CII. Live checks cover EN 16931 business rules and the French 2026 reform (SIREN/SIRET/VAT checksums, SIREN-based electronic address, invoicing frame B1/S1/M1, mandatory payment mentions, VATEX exemption codes including VATEX-FR-FRANCHISE). Issued invoices are frozen and numbered in sequence; corrections are credit notes. Your business details, clients and payment settings are remembered in the browser.
@@ -54,6 +50,17 @@
 - Offline spelling suggestions (English and French, Hunspell dictionaries in a worker): the edit dialog offers corrections for doubtful words, including typical OCR confusions such as rn→m, l→I and 0→O. **Proofread** lists every line with a suspect word and fixes it with one click, using the image's own letters.
 - Original-letter edits borrow a missing letter from any line of the same x-height, aligned on the baseline (lines with descenders used to be excluded), and from other pages of the document when this page doesn't have it.
 - Font-text replacement fits size and position on crisp renders first, then tries blur only around the best size, and skips fonts that trail far behind. The matched result is the same as before, 4–8× faster: about 15 s instead of more than 2 minutes in headless Chromium.
+
+## v0.8.14 — Searchable documents, forms and advanced editing
+
+- Latest OCR improvements: searchable PDF/TXT/DOCX export, English/French proofreading dictionaries, character confidence, cross-page letter borrowing, faster appearance matching, additional AI OCR alphabets and a high-accuracy detector.
+- Page straightening/orientation and AI flattening; SlimSAM click-based object selection; editable Levels, Curves and Hue/Saturation layers.
+- PDF redaction and Find & redact, existing PDF form filling, new movable text/checkbox/dropdown/radio fields, and fillable or flattened PDF export.
+- Release fixes remove redacted native field values and intersecting vector paths, sanitize retained project PDF sources, honor chosen match occurrences, read current visible text for searchable export, preserve adjustments in masked rendering/PSD fallback, fix Arabic reading order and radio switching.
+- Searchable export reads the current visible composite; the original OCR scan remains only an appearance reference. Rasterized softened/system-font text is OCR'd; native text is not duplicated.
+- Redaction rebuilds project PDF sources from retained pages. Supported form fields are recreated with the export appearance; unsupported widgets flatten. Original form styling/signatures are not preserved through this destructive cleanup. Undo retains originals while the document remains open.
+- Form export supports the bundled Liberation Sans glyphs, including French, Greek and Cyrillic. Other unsupported scripts report a clear font-coverage error rather than silently changing values.
+- Full offline model pack and seven Tesseract languages are bundled in the ZIP. Hosted demo omits Office and AI model assets.
 
 ## v0.8.13 — Independent branding and editor improvements
 

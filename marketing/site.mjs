@@ -3,7 +3,7 @@ import { dirname, join, resolve } from 'node:path';
 
 export const MARKETING_ROUTES = ['/', '/pdf-editor/', '/merge-pdf/', '/compress-pdf/', '/pricing/', '/privacy/', '/help/'];
 const SOURCE = 'https://github.com/AOSPAndroid/Bide';
-const DOWNLOAD = `${SOURCE}/releases/download/v0.8.14/bide-browser.zip`;
+const DOWNLOAD = `${SOURCE}/releases/latest/download/bide-browser.zip`;
 const fallbackOrigin = 'https://bide-demo.daaalil.chatgpt.site';
 const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const json = value => JSON.stringify(value).replace(/</g, '\\u003c');
