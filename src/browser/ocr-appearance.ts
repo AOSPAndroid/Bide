@@ -125,6 +125,25 @@ export async function matchOcrAppearance(raster:HTMLCanvasElement,region:TextReg
  return best&&best.score>=.55?best:undefined;
 }
 
+// Softness alone, for a text already fitted in place: rendered over the
+// selected letters of a finer raster (`scale` raster pixels per page unit),
+// with the blur whose edge width matches the original's. Returns page units.
+export function matchOcrSoftness(raster:HTMLCanvasElement,region:TextRegion,regions:TextRegion[],text:Textbox,scale:number){
+ const up=(r:TextRegion)=>({...r,left:r.left*scale,top:r.top*scale,width:r.width*scale,height:r.height*scale});
+ const selected=samplePixels(raster,up(region),regions.map(up));if(!selected)return 0;
+ const target=coverageEdgeWidth(selected.source);if(target===undefined)return 0;
+ const paint=coverageRenderer(selected),saved={fontSize:text.fontSize,left:text.left,top:text.top,width:text.width,softness:text.textSoftness};
+ text.set({fontSize:saved.fontSize*scale,left:saved.left*scale,top:saved.top*scale,width:saved.width*scale,objectCaching:false});text.initDimensions();
+ let best=0,error=Infinity;
+ for(const softness of [0,.15,.3,.45,.6,.8,1,1.3,1.7,2.2,3,4]){
+  text.textSoftness=softness;const edges=coverageEdgeWidth(paint(text));if(edges===undefined)continue;
+  // Prefer the crisper value unless a softer one is clearly closer.
+  const e=Math.abs(edges-target);if(e<error-.03){error=e;best=softness;}
+ }
+ text.set({fontSize:saved.fontSize,left:saved.left,top:saved.top,width:saved.width});text.textSoftness=saved.softness;text.initDimensions();
+ return best/scale;
+}
+
 export function applyOcrAppearance(text:Textbox,region:TextRegion,fit:Fit){
  const size=text.fontSize,ascent=text.top-region.top+size*.93;
  text.set({fontSize:size*fit.ratio,left:region.left+fit.dx,top:region.top+ascent-size*fit.ratio*.93+fit.dy,

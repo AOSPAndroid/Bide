@@ -148,10 +148,18 @@ export async function matchedDetectedTextbox(region:TextRegion,c:Canvas,p:Page,r
  const all=regions.length?regions:[region],inkCache=new Map<string,Promise<PageInk|undefined>>();
  const ink=(family:string)=>{if(!inkCache.has(family))inkCache.set(family,options.ocrStyle==='auto'?pageInkLevel(all,family):Promise.resolve(undefined));return inkCache.get(family)!;};
  const makeText=async(r:TextRegion,family:string)=>(await detectedTextbox(r,{...options,ocrFont:family,matchBlur:false,pageInk:await ink(family)})).text;
- const {matchOcrAppearance,applyOcrAppearance}=await import('./browser/ocr-appearance');
- const raster=await pageComposite(c,p),fit=await matchOcrAppearance(raster,region,options.appearanceRegions??all,options.ocrFont,{autoFont:options.autoFont,matchBlur:options.matchBlur,makeText});
+ const {matchOcrAppearance,applyOcrAppearance,matchOcrSoftness}=await import('./browser/ocr-appearance');
+ // A PDF page's units are points (72 dpi): small scanned letters look soft at
+ // that scale however crisp the scan, and replacement text got a blur the
+ // page does not have. Font, size and position are fitted at page scale; the
+ // softness of a PDF page is measured on a render with ~32 px letters.
+ const pdf=!!p.source,regionsAll=options.appearanceRegions??all;
+ const raster=await pageComposite(c,p),fit=await matchOcrAppearance(raster,region,regionsAll,options.ocrFont,{autoFont:options.autoFont,matchBlur:options.matchBlur&&!pdf,makeText});
  if(!fit)return detectedTextbox(region,{...options,pageInk:await ink(options.ocrFont)});
- const text=await makeText(region,fit.family);applyOcrAppearance(text,region,fit);return {text,embedded:false};
+ const text=await makeText(region,fit.family);applyOcrAppearance(text,region,fit);
+ const k=pdf?Math.max(1,Math.min(4,32/Math.max(1,region.height),Math.sqrt(16e6/(p.width*p.height)))):1;
+ if(pdf&&options.matchBlur){const fine=await previewCanvas(p.source!,p.index,k,Math.ceil(p.width*k),Math.ceil(p.height*k));text.textSoftness=matchOcrSoftness(fine,region,regionsAll,text,k);text.initDimensions();}
+ return {text,embedded:false};
 }
 
 // Hide the original OCR text by clearing, repairing or patching the area under
