@@ -20,10 +20,15 @@ export default defineConfig(({mode}) => {
   // The subscription build (npm run build:saas) must carry the licence server's public key.
   if (mode === 'saas' && !loadEnv(mode, process.cwd(), 'VITE_').VITE_LICENCE_PUBLIC_KEY) throw new Error('Set VITE_LICENCE_PUBLIC_KEY (from node cloud/keys.mjs) to build the subscription version.');
   return {
-  base: './', publicDir: mode === 'demo' ? false : 'public',
+  base: './', publicDir: mode === 'demo' || mode === 'saas' ? false : 'public',
   // Use our explicitly located runtime, avoiding a second emitted WASM copy.
   resolve:{conditions:['onnxruntime-web-use-extern-wasm','module','browser','development|production']},
-  plugins: [react(), ...(mode === 'saas' ? [{name:'bide-split-models', async closeBundle() { await splitLargeFiles('dist-saas/ai/models'); }}] : []), ...(mode === 'demo' ? [{name:'bide-demo-assets', async closeBundle() {
+  plugins: [react(), ...(mode === 'saas' ? [{name:'bide-saas-assets', async closeBundle() {
+    // Keep the complete on-origin paid engines, but omit unsupported Office files.
+    // A local edition's assets may also exist in public; never copy those blindly.
+    for (const name of ['diagrams','licenses','favicon.svg','brand-logo.svg','_headers','ocr','ai']) await cp(`public/${name}`, `dist-saas/${name}`, {recursive:true});
+    await splitLargeFiles('dist-saas/ai/models');
+  }}] : []), ...(mode === 'demo' ? [{name:'bide-demo-assets', async closeBundle() {
     // Hosted AI downloads verified, pinned models on demand. Runtime and OCR
     // dictionaries stay on this origin; the local edition bundles every model.
     await mkdir('out', {recursive:true});

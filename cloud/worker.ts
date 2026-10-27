@@ -4,6 +4,7 @@
 // Written as a standard fetch handler (Cloudflare Workers); see cloud/README.md.
 import {signLicence,verifyLicence,importPrivateKey,importPublicKey,base64url,type Licence} from '../src/licence';
 import {D1Store,type Store,type User} from './store';
+import {BillingError,checkout,billingPortal,reconcileStripeEvent,type StripeEvent} from './billing';
 
 export type Env={
  DB?:unknown;                      // D1 database (cloud/schema.sql)
@@ -31,22 +32,15 @@ const randomToken=()=>base64url(crypto.getRandomValues(new Uint8Array(32)));
 const sixDigits=()=>String(crypto.getRandomValues(new Uint32Array(1))[0]%1000000).padStart(6,'0');
 const normalEmail=(value:unknown)=>typeof value==='string'&&/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim())&&value.length<=254?value.trim().toLowerCase():undefined;
 
-// What the user may do now. A paid subscription counts until the end of the
-// period paid for; past_due keeps a week's grace while Stripe retries.
+// What the user may do now. Active subscriptions count through Stripe's period
+// end; the existing past_due policy allows another week beyond that period end.
+// current_period_end is an invoiced-period boundary, not a payment receipt.
 export function licenceFor(u:User,now:number):Licence{
  const until=u.paid_until??0,s=u.subscription_status??'';
  const paid=(['active','trialing'].includes(s)&&until>now)||(s==='past_due'&&until+7*DAY>now);
  const status=paid?'active':now<u.trial_ends?'trial':'expired';
  const exp=status==='active'?now+LICENCE_DAYS*DAY:status==='trial'?Math.min(now+LICENCE_DAYS*DAY,u.trial_ends):now;
  return {sub:u.id,email:u.email,status,trialEnds:u.trial_ends,...(until?{paidUntil:until}:{}),exp};
-}
-
-async function stripe(env:Env,path:string,params:Record<string,string>){
- if(!env.STRIPE_SECRET_KEY)throw new Error('Payments are not configured.');
- const response=await fetch(`https://api.stripe.com/v1/${path}`,{method:'POST',headers:{authorization:`Bearer ${env.STRIPE_SECRET_KEY}`,'content-type':'application/x-www-form-urlencoded'},body:new URLSearchParams(params)});
- const body=await response.json() as {url?:string;error?:{message?:string}};
- if(!response.ok)throw new Error(body.error?.message||`Stripe error ${response.status}`);
- return body;
 }
 
 // Stripe-Signature: "t=<seconds>,v1=<hex HMAC-SHA256 of `${t}.${body}`>", within 5 minutes.
@@ -92,13 +86,12 @@ export async function handle(request:Request,env:Env,store:Store,now=Date.now())
   if(path==='/api/auth/verify'&&post){
    const body=await request.json().catch(()=>({})) as {email?:unknown;code?:unknown},email=normalEmail(body.email),code=typeof body.code==='string'?body.code.trim():'';
    if(!email||!/^\d{6}$/.test(code))return fail(400,'Enter the 6-digit code from the email.');
-   const hash=await sha256(`${email}:${code}`),codes=(await store.codes(email)).filter(c=>c.expires>now&&c.attempts<5);
-   const match=codes.find(c=>c.hash===hash);
-   if(!match){for(const c of codes)await store.recordAttempt(email,c.hash);return fail(401,'That code is wrong or has expired.');}
-   await store.deleteCodes(email);
+   const hash=await sha256(`${email}:${code}`);
+   if(!await store.consumeCode(email,hash,now)){await store.recordFailedCodeAttempt(email,now);return fail(401,'That code is wrong or has expired.');}
    let user=await store.userByEmail(email);
    // The trial starts at the first sign-in and belongs to the email address.
-   if(!user){user={id:crypto.randomUUID(),email,created_at:now,trial_ends:now+Number(env.TRIAL_DAYS||7)*DAY};await store.createUser(user);}
+   if(!user){await store.createUser({id:crypto.randomUUID(),email,created_at:now,trial_ends:now+Number(env.TRIAL_DAYS||7)*DAY});user=await store.userByEmail(email);}
+   if(!user)throw new Error('Sign-in could not be completed. Please request a new code.');
    const session=randomToken();await store.addSession(await sha256(session),user.id,now+SESSION_DAYS*DAY);
    return json({session});
   }
@@ -110,29 +103,19 @@ export async function handle(request:Request,env:Env,store:Store,now=Date.now())
   if(path==='/api/logout'&&post){const auth=await signedIn(request,store,now);if(auth)await store.deleteSession(auth.hash);return json({ok:true},200,{'set-cookie':cookie('',now,now)});}
   if(path==='/api/checkout'&&post){
    const auth=await signedIn(request,store,now),u=auth?.user;if(!u)return fail(401,'Sign in again.');
-   if(!env.STRIPE_PRICE_ID)return fail(503,'Payments are not configured.');
-   const params:Record<string,string>={mode:'subscription','line_items[0][price]':env.STRIPE_PRICE_ID,'line_items[0][quantity]':'1',
-    success_url:`${env.APP_URL}/?subscribed=1`,cancel_url:`${env.APP_URL}/`,client_reference_id:u.id,'subscription_data[metadata][user_id]':u.id,allow_promotion_codes:'true',billing_address_collection:'auto'};
-   if(u.stripe_customer){params.customer=u.stripe_customer;if(env.STRIPE_AUTOMATIC_TAX==='1')params['customer_update[address]']='auto';}else params.customer_email=u.email;
-   if(env.STRIPE_AUTOMATIC_TAX==='1')params['automatic_tax[enabled]']='true';
-   return json({url:(await stripe(env,'checkout/sessions',params)).url});
+   return json(await checkout(env,store,u.id,now));
   }
   if(path==='/api/portal'&&post){
    const auth=await signedIn(request,store,now),u=auth?.user;if(!u)return fail(401,'Sign in again.');
    if(!u.stripe_customer)return fail(400,'There is no subscription to manage yet.');
-   return json({url:(await stripe(env,'billing_portal/sessions',{customer:u.stripe_customer,return_url:`${env.APP_URL}/`})).url});
+   return json(await billingPortal(env,u.stripe_customer));
   }
   if(path==='/api/stripe/webhook'&&post){
    const body=await request.text();
    if(!env.STRIPE_WEBHOOK_SECRET||!await verifyStripeSignature(body,request.headers.get('stripe-signature'),env.STRIPE_WEBHOOK_SECRET,now))return fail(400,'Bad signature.');
-   const event=JSON.parse(body) as {type:string;data:{object:Record<string,any>}},o=event.data.object;
-   if(event.type==='checkout.session.completed'&&o.client_reference_id)await store.updateUser(o.client_reference_id,{stripe_customer:o.customer,subscription_id:o.subscription});
-   if(event.type.startsWith('customer.subscription.')){
-    const user=(o.metadata?.user_id&&await store.userById(o.metadata.user_id))||(o.customer&&await store.userByCustomer(o.customer));
-    // Newer API versions keep the period on the subscription item.
-    const end=o.current_period_end??o.items?.data?.[0]?.current_period_end;
-    if(user)await store.updateUser(user.id,{stripe_customer:o.customer,subscription_id:o.id,subscription_status:event.type==='customer.subscription.deleted'?'canceled':o.status,paid_until:end?end*1000:user.paid_until??null});
-   }
+   const event=JSON.parse(body) as StripeEvent;
+   if(!event||typeof event.id!=='string'||!event.id||typeof event.type!=='string'||!event.data?.object)return fail(400,'Invalid Stripe event.');
+   await reconcileStripeEvent(env,store,event,now);
    return json({received:true});
   }
   if(path.startsWith('/api/'))return fail(404,'Not found.');
@@ -145,7 +128,7 @@ export async function handle(request:Request,env:Env,store:Store,now=Date.now())
    return env.ASSETS.fetch(request);
   }
   return fail(404,'Not found.');
- }catch(e){return fail(500,e instanceof Error?e.message:'Server error.');}
+ }catch(e){return e instanceof BillingError?json({error:e.message},e.status,{'retry-after':'2'}):fail(500,e instanceof Error?e.message:'Server error.');}
 }
 
 export default {fetch:(request:Request,env:Env)=>handle(request,env,new D1Store(env.DB as never))};
