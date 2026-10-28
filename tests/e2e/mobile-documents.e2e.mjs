@@ -132,7 +132,11 @@ test('phones: deleting a draft or a client can be undone; the toast fits and let
 test('Android: system Back closes the invoice and returns to the list; typing is saved when the page is hidden',{timeout:300000},async()=>{
  const {context,page,errors}=await device(android);
  try{
-  await page.goto('data:text/html,<title>previous</title>previous site');await app(page);await documents(page);
+  // Use a real prior HTTP document: managed browsers may forbid data: page
+  // navigation. The history sequence and previous-page assertions stay real.
+  const previous=new URL('previous-test-page.html',server.resolvedUrls.local[0]).href;
+  await page.route(previous,route=>route.fulfill({status:200,contentType:'text/html',body:'<!doctype html><title>previous</title>previous site'}));
+  await page.goto(previous);await app(page);await documents(page);
   await page.getByRole('button',{name:'New invoice'}).first().tap();
   const number=page.getByRole('region',{name:'Invoice details'}).getByLabel('Number');await number.fill('ZZTEST');
   await page.goBack();
