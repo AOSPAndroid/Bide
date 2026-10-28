@@ -12,11 +12,17 @@
  .canvas-footer{height:var(--bottom-bar);min-height:var(--bottom-bar)}
  .canvas-tab{position:absolute;left:0;bottom:0;z-index:16;height:var(--bottom-bar);padding:0 8px;background:none;border:0}
  .canvas-tab>button{min-height:40px;padding:4px 10px;font-size:12px}
- .canvas-tab>span:first-of-type{max-width:140px}
+ /* Only Pages and the page number fit beside the zoom from 601px up; the name is
+    in the command strip above. */
+ .canvas-tab>svg,.canvas-tab>span:not(.tab-page){display:none}
  .workspace-layout[data-panel=pages] .pages-panel{bottom:var(--bottom-bar)}
  .workspace-layout[data-panel=pages]::after{content:'';position:absolute;inset:0 0 var(--bottom-bar);z-index:14;background:#25272d40}
  .workspace-layout[data-panel=pages] .small-pages-button,.workspace-layout[data-panel=properties] .small-properties-button{background:var(--selected);border-color:var(--accent-border);color:var(--accent)}
- /* Design & layout: long labels wrap inside the narrow panel instead of widening it. */
+}
+
+/* Design & layout: long labels wrap inside the narrow panel instead of widening
+   it (also in the 252px inspector of landscape phones and tablets). */
+@media(max-width:820px),(pointer:coarse){
  .design-tools-body{grid-template-columns:minmax(0,1fr)}
  .design-actions{grid-template-columns:repeat(2,minmax(0,1fr))}
  .design-actions button{white-space:normal;line-height:1.25}
@@ -35,7 +41,7 @@
  .palette-search input{font-size:16px;min-height:40px}
  .modal:has(.palette-search,.phone-menu) .modal-header>.icon-button{width:44px;height:44px}
  .command-list>button{min-height:52px}
- .tip-card,.rail-bottom>button[aria-label="Keyboard shortcuts"]{display:none}
+ .tip-card,.rail-bottom>button[aria-label="Keyboard shortcuts"],.tool-group button>kbd{display:none}
  /* Clone Stamp and Healing Brush (RetouchSource.tsx). */
  .options-bar .set-source{min-height:40px;gap:6px;padding:4px 12px;font-weight:600}
  .options-bar .set-source[aria-pressed=true]{background:var(--selected);border-color:var(--accent);color:var(--accent)}
@@ -51,7 +57,7 @@
  .topbar .workspace-nav>button,.phone-menu-button,.topbar .command-button{flex:0 0 auto;flex-direction:column;justify-content:center;gap:4px;height:48px;min-width:48px;width:auto;padding:2px 6px;border-radius:8px;line-height:1}
  .topbar .workspace-nav>button>span{display:none}
  .topbar .workspace-nav>button>svg{width:20px;height:20px}
- .topbar .workspace-nav small.nav-short{display:block;font-size:10.5px;font-weight:650;letter-spacing:.4px}
+ .topbar .workspace-nav small.nav-short{display:block;font-size:11px;font-weight:650;letter-spacing:.4px}
  .topbar-right{margin-left:auto;gap:2px}
  .phone-menu-button,.topbar .command-button{border:0;background:none;color:var(--ink);font-size:11px;font-weight:600}
  .topbar .command-button span{display:block;position:static;width:auto;height:auto;min-width:0;overflow:visible;clip-path:none;text-align:center}
@@ -110,7 +116,8 @@
  .text-detection-bar>span{order:1;flex:1 1 0;min-width:0}
  .text-detection-bar>.ocr-more{order:2}
  .text-detection-bar>:not(label:first-child,span,.ocr-more){order:4}
- .text-detection-bar:not(.more)>:is(button:not(.ocr-more),details:not([open])){display:none}
+ /* The Straighten hint stays out: a tilted phone photo is when it matters. */
+ .text-detection-bar:not(.more)>:is(button:not(.ocr-more,.straighten-hint),details:not([open])){display:none}
  .text-detection-bar.more>span{order:3;flex-basis:100%;white-space:normal}
  .text-detection-bar.more>.ocr-more{order:1;margin-left:auto}
  .text-detection-bar button,.text-detection-bar .ocr-settings>summary{display:flex;align-items:center;min-height:44px;padding:4px 12px;font-size:13px}
@@ -158,6 +165,16 @@
  .quick-insert button{min-height:44px;font-size:13px}
  .alignment-buttons button,.selection-actions button,.filter-buttons button,.design-tools-body button{min-height:40px;font-size:12px}
  .inspector .design-swatches>div>button{min-width:40px;min-height:40px}
+ /* Section toggles (Design & layout, Form fields, Layer style, Crop image): the
+    padding moves from the section onto its summary, which is what a tap opens. */
+ .inspector .design-tools{padding-block:0}
+ .inspector .design-tools>summary{padding-block:13px}
+ .inspector .design-tools[open]{padding-bottom:12px}
+ .inspector details.property-section{padding-block:0}
+ .inspector details.property-section>summary{min-height:44px;margin:0;align-items:center}
+ .inspector details.property-section[open]{padding-bottom:10px}
+ .inspector .property-section details>summary{padding-block:13px}
+ .inspector .property-section details{margin-top:0}
  .inspector .number-field{height:40px}
  .inspector .number-field span{font-size:11px}
  .inspector :is(input:not([type=checkbox],[type=color],[type=range]),select,textarea){font-size:16px}
