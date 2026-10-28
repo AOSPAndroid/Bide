@@ -73,10 +73,14 @@ test('a digital PDF line in Helvetica is edited in its metric-compatible face',{
   await page.goto(server.resolvedUrls.local[0]+'app/');await page.locator('input[type=file][accept*=".psd"]').setInputFiles(file);
   const field=page.locator('button[aria-label^="Edit detected text: Closing balance"]').first();await field.waitFor({timeout:60000});
   await field.click();
-  // The line opens as a text layer being edited, its text selected: typing replaces it.
+  // The tap opens the New text dialog; Edit as text box makes the line a text
+  // layer being edited, its text selected: typing replaces it.
+  assert.equal(await page.getByLabel('New text').inputValue(),'Closing balance 3 412,85 EUR');
+  await page.getByRole('button',{name:'Edit as text box'}).click();
   await page.waitForFunction(()=>document.activeElement?.tagName==='TEXTAREA',null,{timeout:60000});
-  await page.keyboard.type('Closing balance 3 421,85 EUR');await page.keyboard.press('Escape');await page.waitForTimeout(1500);
-  const layer=await page.evaluate(async()=>{const {restoreLocal}=await import('/src/model.ts');return (await restoreLocal()).pages[0].canvas.objects.find(o=>o.type?.toLowerCase()==='textbox');});
+  await page.keyboard.type('Closing balance 3 421,85 EUR');await page.keyboard.press('Escape');
+  // Autosave runs 0.9 s after the last change; under load it can take longer than a fixed wait.
+  let layer;for(let i=0;i<30&&layer?.text!=='Closing balance 3 421,85 EUR';i++){await page.waitForTimeout(500);layer=await page.evaluate(async()=>{const {restoreLocal}=await import('/src/model.ts');return (await restoreLocal())?.pages[0].canvas.objects.find(o=>o.type?.toLowerCase()==='textbox');});}
   assert.ok(layer,'the line became a text layer');
   assert.equal(layer.text,'Closing balance 3 421,85 EUR');
   assert.equal(layer.fontFamily,'Liberation Sans','Helvetica is replaced by the metric-compatible Liberation Sans, not Lato');
