@@ -187,7 +187,7 @@ export function editorCommands(d:EditorCommandsDeps){
   const clearSelection=()=>{setRegion(null);canvas.current?.discardActiveObject();canvas.current?.requestRenderAll();syncSelection();setTool('select');};
   const copyLayers=copyToClipboard;
   const pasteLayers=()=>void pasteFromClipboard();
-  const focusSetting=(label:string)=>{setMobilePanel('properties');requestAnimationFrame(()=>{const input=document.querySelector<HTMLElement>(`[aria-label="${label}"]`);/* Settings tucked into a closed menu open first. */for(let d=input?.closest('details');d;d=d.parentElement?.closest('details')??null)d.open=true;input?.scrollIntoView({block:'nearest'});input?.focus();});};
+  const focusSetting=(label:string)=>{/* OCR settings sit in their own dropdown, not in the Properties drawer. */if(!document.querySelector(`.ocr-settings [aria-label="${label}"]`))setMobilePanel('properties');requestAnimationFrame(()=>{const input=document.querySelector<HTMLElement>(`[aria-label="${label}"]`);/* Settings tucked into a closed menu open first. */for(let d=input?.closest('details');d;d=d.parentElement?.closest('details')??null)d.open=true;input?.scrollIntoView({block:'nearest'});input?.focus();});};
   const moreActions:PaletteAction[] = [
     {label:'Pen tool',hint:'P',icon:PenTool,keywords:'path bezier curve vector shape draw',run:()=>setTool('pen')},
     {label:'Edit path points',hint:'',icon:PenTool,keywords:'node anchor handle bezier',disabled:selected instanceof Path?requireLayer:'Select a path or pen shape first',run:()=>{setTool('select');togglePathEdit();}},

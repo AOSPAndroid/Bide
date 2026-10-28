@@ -14,13 +14,15 @@ type Props={ai:boolean;status:string;regions:TextRegion[];show:boolean;onShow:(s
 export default function TextDetectionBar({ai,status,regions,show,onShow,settings,onChange,scanning,onRescan,onConvertAll,onFindReplace,onProofread,tilt,onStraighten}:Props){
  const [available,setAvailable]=useState<OcrLanguage[]>([]);
  useEffect(()=>{let live=true;void bundledOcrLanguages().then(list=>{if(live)setAvailable(list);});return()=>{live=false;};},[]);
- const ocr=regions.some(r=>r.kind==='ocr'),menu=useRef<HTMLDetailsElement>(null);
+ const ocr=regions.some(r=>r.kind==='ocr'),menu=useRef<HTMLDetailsElement>(null),[more,setMore]=useState(false);
  // The settings dropdown closes on a click or Escape outside it, like a menu.
  useEffect(()=>{const close=(e:Event)=>{const d=menu.current;if(d?.open&&(e instanceof KeyboardEvent?e.key==='Escape':!d.contains(e.target as Node)))d.open=false;};document.addEventListener('pointerdown',close);document.addEventListener('keydown',close);return()=>{document.removeEventListener('pointerdown',close);document.removeEventListener('keydown',close);};},[]);
  const toggle=(code:string,on:boolean)=>{const next=available.map(l=>l.code).filter(c=>c===code?on:settings.languages.includes(c));if(next.length)onChange({languages:next});};
- return <div className="text-detection-bar">
+ return <div className={`text-detection-bar${more?' more':''}`}>
   <label><input type="checkbox" checked={show} onChange={e=>onShow(e.target.checked)}/>Edit detected text</label>
   <span title={status}>{status||'Open a page to detect its text'}</span>
+  {/* Phones: the actions fold behind More and wrap below when shown (mobile-chrome.css). */}
+  <button className="ocr-more" aria-expanded={more} onClick={()=>setMore(v=>!v)}>{more?'Less':'More'}</button>
   {tilt&&onStraighten&&<button className="straighten-hint" disabled={scanning} title={`The page looks ${tilt}. Straightening it first helps text recognition; Undo restores it.`} onClick={onStraighten}>Straighten ({tilt})</button>}
   {ocr&&<>
    <button disabled={scanning} title="List words the dictionary does not know or letters the recognizer was unsure of, with one-click fixes." onClick={onProofread}>Proofread</button>
