@@ -150,6 +150,9 @@ test('Android: system Back closes the invoice and returns to the list; typing is
    const {loadDocuments}=await import('/src/invoice-store.ts');return (await loadDocuments()).invoices.map(s=>s.invoice.number);
   });
   assert.ok(stored.includes('QUICK1'),`saved when the page was hidden (${stored})`);
+  // Leaving the workspace with the invoice open drops its entry too: Back then leaves bide, not a press that does nothing.
+  await page.locator('.workspace-nav').getByRole('button',{name:/Photo/}).tap();
+  await page.goBack();await page.waitForFunction(()=>document.title==='previous');
   assert.deepEqual(errors,[]);
  }finally{await context.close();}
 });
@@ -219,6 +222,26 @@ test('Android: narrow fields get the whole row, lines are compact, long values w
   assert.equal((await attrs(you.getByLabel('Name',{exact:true}),'autocomplete')).autocomplete,'organization');
   assert.equal((await attrs(you.getByLabel('Email'),'autocomplete')).autocomplete,'email');
   assert.equal((await attrs(client.getByLabel('Name',{exact:true}),'autocomplete')).autocomplete,'off','your details are not offered for the client');
+  assert.equal((await attrs(you.getByLabel('Country'),'maxlength')).maxlength,'2','a 2-character Country gets the code from autofill, not a name cut to 2 letters');
+  assert.deepEqual(errors,[]);
+ }finally{await context.close();}
+});
+
+// Safari before 26 has no CSS field-sizing: the one-line fields are sized by script instead.
+test('Android without CSS field-sizing: one-line fields fit their text, also once the invoice is issued',{timeout:300000},async()=>{
+ const {context,page,errors}=await device(android);
+ try{
+  await page.addInitScript(()=>{const supports=CSS.supports.bind(CSS);CSS.supports=(...a)=>/field-sizing/.test(a.join(' '))?false:supports(...a);
+   addEventListener('DOMContentLoaded',()=>document.head.append(Object.assign(document.createElement('style'),{textContent:'textarea{field-sizing:fixed!important}'})));});
+  await newInvoice(page);await fillValid(page);
+  const description=page.getByRole('group',{name:'Line 1'}).getByLabel('Description');
+  await description.fill(long);await page.getByRole('group',{name:'Line 1'}).getByLabel('Unit price (excl. VAT)').fill('100');
+  // Spare height: the field's height less what its text needs (at least the 44px minimum).
+  const spare=()=>description.evaluate(e=>{const h=e.offsetHeight,old=e.style.height;e.style.height='auto';const need=Math.max(e.scrollHeight+e.offsetHeight-e.clientHeight,parseFloat(getComputedStyle(e).minHeight));e.style.height=old;return h-need;});
+  assert.equal(await spare(),0,'the draft description is as tall as its text');
+  await Promise.all([page.waitForEvent('download',{timeout:60000}),page.getByRole('region',{name:'Invoice summary'}).getByRole('button',{name:'Issue'}).tap()]);
+  await page.getByText(/Issued .* read only/).waitFor();
+  assert.equal(await spare(),0,'issued, the description takes the whole row and shrinks to its text');
   assert.deepEqual(errors,[]);
  }finally{await context.close();}
 });

@@ -8,19 +8,22 @@ import type {InvoiceLanguage} from './facturx-pdf';
 type Edit=(patch:Partial<Invoice>)=>void;
 const moneyFormat=(currency:string)=>(v:number)=>new Intl.NumberFormat('fr-FR',{style:'currency',currency}).format(v);
 
-// Phone keyboards: digits for numbers, capitals without autocorrect for codes, autofill for your own details.
-type Hints=Pick<InputHTMLAttributes<HTMLInputElement>,'inputMode'|'autoComplete'|'autoCapitalize'|'autoCorrect'|'spellCheck'>;
+// Phone keyboards: digits for numbers, capitals without autocorrect for codes, autofill for your own details
+// (Country allows 2 characters, so autofill gives the code: "Germany" cut to 2 letters would read GE, Georgia).
+type Hints=Pick<InputHTMLAttributes<HTMLInputElement>,'inputMode'|'autoComplete'|'autoCapitalize'|'autoCorrect'|'spellCheck'|'maxLength'>;
 const code:Hints={autoCapitalize:'characters',autoCorrect:'off',spellCheck:false};
 // On phones and tablets long one-line values (descriptions, names, mentions) wrap instead of being cut off.
 const narrow='(max-width:980px)',Wrap=createContext(false);
-const useNarrow=()=>useSyncExternalStore(change=>{const m=matchMedia(narrow);m.addEventListener('change',change);return()=>m.removeEventListener('change',change);},()=>matchMedia(narrow).matches);
+// Module-level, so React does not resubscribe on every keystroke.
+const watchNarrow=(change:()=>void)=>{const m=matchMedia(narrow);m.addEventListener('change',change);return()=>m.removeEventListener('change',change);},isNarrow=()=>matchMedia(narrow).matches;
+const useNarrow=()=>useSyncExternalStore(watchNarrow,isNarrow);
 
 // Every input names the invoice field it edits, so a check can focus it.
 function Text({label,field,value,onChange,locked,type='text',wide,placeholder,list,multiline,...hints}:{label:string;field:string;value?:string;onChange:(v:string)=>void;locked?:boolean;type?:string;wide?:boolean;placeholder?:string;list?:string;multiline?:boolean}&Hints){
  const wrap=useContext(Wrap)&&!!multiline,area=useRef<HTMLTextAreaElement>(null);
- // Grows with its text where CSS field-sizing is missing (older Safari), also when the screen turns.
+ // Grows with its text where CSS field-sizing is missing (older Safari), also when the screen turns or the field widens once locked (no Remove button).
  useLayoutEffect(()=>{const el=area.current;if(!el||CSS.supports('field-sizing','content'))return;
-  const fit=()=>{el.style.height='auto';el.style.height=`${el.scrollHeight+el.offsetHeight-el.clientHeight}px`;};fit();addEventListener('resize',fit);return()=>removeEventListener('resize',fit);},[value,wrap]);
+  const fit=()=>{el.style.height='auto';el.style.height=`${el.scrollHeight+el.offsetHeight-el.clientHeight}px`;};fit();addEventListener('resize',fit);return()=>removeEventListener('resize',fit);},[value,wrap,locked]);
  return <label className={`invoice-field${wide?' wide':''}`}><span>{label}</span>{wrap
   ?<textarea ref={area} className="one-line" rows={1} {...hints} data-field={field} value={value??''} disabled={locked} placeholder={placeholder} onKeyDown={e=>{if(e.key==='Enter')e.preventDefault();}} onChange={e=>onChange(e.target.value.replace(/\s*\n\s*/g,' '))}/>
   :<input {...hints} data-field={field} type={type} value={value??''} disabled={locked} placeholder={placeholder} list={list} onChange={e=>onChange(e.target.value)}/>}</label>;
@@ -41,7 +44,7 @@ function PartyFields({who,party,onChange,locked,clients,onPick}:{who:'seller'|'b
   <Text label="Street" field={f('address')} value={party.address.line1} onChange={line1=>address({line1})} locked={locked} wide multiline autoComplete={fill('address-line1')}/>
   <Text label="Postcode" field={f('address.postcode')} value={party.address.postcode} onChange={postcode=>address({postcode})} locked={locked} autoComplete={fill('postal-code')} inputMode={party.address.country==='FR'?'numeric':undefined}/>
   <Text label="City" field={f('address.city')} value={party.address.city} onChange={city=>address({city})} locked={locked} autoComplete={fill('address-level2')}/>
-  <Text label="Country" field={f('address.country')} value={party.address.country} onChange={country=>address({country:country.toUpperCase().slice(0,2)})} locked={locked} placeholder="FR" {...code} autoComplete={fill('country')}/>
+  <Text label="Country" field={f('address.country')} value={party.address.country} onChange={country=>address({country:country.toUpperCase().slice(0,2)})} locked={locked} placeholder="FR" {...code} autoComplete={fill('country')} maxLength={2}/>
   <Text label="SIREN" field={f('siren')} value={siren} onChange={v=>set({siren:v.replace(/\s/g,'')})} locked={locked} placeholder="9 digits" inputMode="numeric" autoComplete="off"/>
   <label className="invoice-field"><span>VAT number</span><span className="invoice-number"><input aria-label="VAT number" {...code} autoComplete="off" data-field={f('vatId')} value={party.vatId??''} disabled={locked} onChange={e=>set({vatId:e.target.value.toUpperCase().replace(/\s/g,'')||undefined})}/>{!locked&&party.address.country==='FR'&&validSiren(siren)&&!party.vatId&&<button className="invoice-inline" onClick={()=>set({vatId:frenchVatId(siren)})} title="Fill in the French VAT number computed from the SIREN">From SIREN</button>}</span></label>
   <Text label="Email" field={f('email')} type="email" value={party.email} onChange={v=>set({email:v||undefined})} locked={locked} autoComplete={fill('email')}/>

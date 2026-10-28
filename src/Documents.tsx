@@ -26,7 +26,8 @@ export default function Documents({onFillForm,notify,ocrEngine}:{onFillForm:()=>
   if(history.state?.invoice){const {invoice:_,...rest}=history.state;history.replaceState(rest,'');}
   const pop=(e:PopStateEvent)=>setOpen(e.state?.invoice??null),hidden=()=>{if(document.visibilityState==='hidden')flush();};
   addEventListener('popstate',pop);addEventListener('pagehide',flush);document.addEventListener('visibilitychange',hidden);
-  return()=>{restoreInto=null;flush();removeEventListener('popstate',pop);removeEventListener('pagehide',flush);document.removeEventListener('visibilitychange',hidden);};
+  // Leaving the workspace closes the invoice, so its entry goes too and Back leaves bide as it does from the list.
+  return()=>{restoreInto=null;flush();if(history.state?.invoice)history.back();removeEventListener('popstate',pop);removeEventListener('pagehide',flush);document.removeEventListener('visibilitychange',hidden);};
  },[]);
  if(!data)return <main className="documents-workspace" aria-label="Documents workspace"><p className="muted">Loading…</p></main>;
  const update=(change:(d:DocumentsData)=>DocumentsData)=>setData(d=>d&&change(d));
