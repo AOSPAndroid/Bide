@@ -8,7 +8,7 @@ import {fileURLToPath} from 'node:url';
 import {registerServerControl} from './server-control.mjs';
 import {networkInterfaces} from 'node:os';
 
-const types = {'.html':'text/html; charset=utf-8', '.js':'application/javascript', '.mjs':'application/javascript', '.onnx':'application/octet-stream', '.css':'text/css', '.svg':'image/svg+xml', '.wasm':'application/wasm', '.json':'application/json', '.png':'image/png', '.jpg':'image/jpeg', '.jpeg':'image/jpeg', '.gif':'image/gif', '.webp':'image/webp', '.ico':'image/x-icon', '.ttf':'font/ttf', '.woff':'font/woff', '.woff2':'font/woff2', '.xml':'application/xml; charset=utf-8', '.txt':'text/plain; charset=utf-8', '.properties':'text/plain; charset=utf-8'};
+const types = {'.html':'text/html; charset=utf-8', '.js':'application/javascript', '.mjs':'application/javascript', '.onnx':'application/octet-stream', '.css':'text/css', '.svg':'image/svg+xml', '.wasm':'application/wasm', '.json':'application/json', '.webmanifest':'application/manifest+json', '.png':'image/png', '.jpg':'image/jpeg', '.jpeg':'image/jpeg', '.gif':'image/gif', '.webp':'image/webp', '.ico':'image/x-icon', '.ttf':'font/ttf', '.woff':'font/woff', '.woff2':'font/woff2', '.xml':'application/xml; charset=utf-8', '.txt':'text/plain; charset=utf-8', '.properties':'text/plain; charset=utf-8'};
 const within = (root, path) => path === root || path.startsWith(root + sep);
 const loopback = address => ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(address);
 

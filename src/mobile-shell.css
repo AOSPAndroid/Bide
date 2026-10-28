@@ -1,3 +1,68 @@
 /* Phones and touch screens: shell. Rules here only apply at phone sizes or to coarse pointers. */
 /* The interface never pinch-zooms (only the canvas does, src/touch-gestures.ts). */
 html,body,#root{touch-action:pan-x pan-y}
+
+/* Workspace switcher: the short names only show on phones and touch tablets (desktop keeps the full names). */
+@media (max-width:600px),(pointer:coarse) and (max-width:1000px){
+ .topbar{min-height:48px}
+ .topbar .workspace-nav>button{flex-direction:column;justify-content:center;height:44px;min-width:44px;padding:4px 3px;gap:3px}
+ .topbar .workspace-nav>button>span{display:none}
+ .topbar .workspace-nav .nav-short{display:block;font-size:11px;font-weight:650;letter-spacing:.02em;line-height:1}
+ .topbar .workspace-nav svg{width:18px;height:18px}
+}
+/* Touch tablets and landscape phones also show the menubar: the logo alone leaves it the room. */
+@media (pointer:coarse) and (min-width:601px) and (max-width:820px){.topbar .brand-lockup{display:none}}
+
+/* Landscape phones: the app fits the screen instead of keeping its 570px desktop minimum, and the
+   inspector scrolls as one column so its fixed-height sections cannot spill over the status bar. */
+@media (pointer:coarse) and (max-height:600px){.app{min-height:0}}
+@media (pointer:coarse) and (max-height:600px) and (min-width:601px){
+ .inspector{overflow-y:auto;overscroll-behavior:contain}
+ .inspector>*{flex-shrink:0}
+ .properties-content{max-height:none;min-height:0;overflow:visible}
+ .layers-list{flex:none;min-height:0;overflow:visible}
+}
+
+/* Demo notice: 44px close button and 40px links; no Windows download on phones and tablets. */
+@media (pointer:coarse){
+ .demo-notice{padding-top:0;padding-bottom:0;font-size:12px;row-gap:0}
+ .demo-notice a{display:inline-flex;align-items:center;min-height:40px}
+ .demo-try-ocr{min-height:40px}
+ .demo-close{width:44px;height:44px;flex-shrink:0;justify-content:center;margin-right:-12px}
+}
+@media (pointer:coarse) and (max-width:600px){
+ .demo-notice{position:relative;padding:8px 44px 0 12px}
+ .demo-close{position:absolute;top:0;right:0;margin:0}
+}
+@media (pointer:coarse) and (max-height:500px){.demo-notice>span{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}
+@media (pointer:coarse) and (hover:none){.demo-notice .demo-download{display:none}}
+
+/* Paywall: a long address wraps instead of widening the card past the screen, and a card
+   taller than the screen (landscape, keyboard open) scrolls. */
+@media (max-width:820px),(pointer:coarse){
+ .paywall{overflow-y:auto;overscroll-behavior:contain;grid-template-columns:minmax(0,420px);justify-content:center}
+ .paywall-card{width:100%;grid-template-columns:minmax(0,1fr)}
+ .paywall-card form{grid-template-columns:minmax(0,1fr)}
+ .paywall-card :is(p,button){overflow-wrap:anywhere}
+ .paywall-card button{white-space:normal}
+}
+@media (max-width:820px) and (max-height:500px),(pointer:coarse) and (max-height:500px){
+ .paywall{padding:8px 16px}
+ .paywall-card{padding:16px 20px;gap:8px}
+ .paywall-card form{gap:8px}
+ .paywall-logo{display:none}
+}
+
+/* Account chip (subscription build): a 40px pill whose menu has 44px buttons and closes on the
+   first tap outside it. The tool rail stops above the pill, so the pill covers no tool. */
+@media (max-width:820px),(pointer:coarse){
+ .account-chip{bottom:calc(34px + env(safe-area-inset-bottom,0px));font-size:12px}
+ .account-chip summary{display:flex;align-items:center;min-height:40px;padding:0 14px}
+ .account-chip[open]::before{content:"";position:fixed;inset:0;z-index:-1}
+ .account-chip>div{max-width:calc(100vw - 24px)}
+ .account-chip button{min-height:44px;font-size:14px}
+ .account-chip button:last-child{margin-top:8px}
+ body:has(.account-chip) .tool-rail{margin-bottom:56px}
+}
+/* Phones: the status bar holds nothing there, so the pill sits lower. */
+@media (max-width:600px){.account-chip{bottom:calc(8px + env(safe-area-inset-bottom,0px))}}
