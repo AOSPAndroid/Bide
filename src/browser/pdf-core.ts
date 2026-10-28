@@ -466,8 +466,21 @@ export async function exportDocument(spec: ExportSpec) {
 
 const cleanFontName=(name:string)=>name.replace(/^[A-Z]{6}\+/,'').replace(/[^a-z0-9]/gi,'').toLowerCase();
 export function fontSupportsText(data:string,text:string){let font:mupdf.Font|undefined;try{font=new mupdf.Font('embedded',toBytes(data));return [...text].every(c=>/\s/.test(c)||font!.encodeCharacter(c)>0);}catch{return false;}finally{font?.destroy();}}
+// Text a page draws, by kind: scanners add an invisible OCR layer (render
+// mode 3, e.g. Tesseract's GlyphLessFont) over the page image, which MuPDF
+// hands to devices as "ignored" text.
+function textKinds(page:mupdf.Page){
+ const n={visible:0,invisible:0},seen=()=>n.visible++,device=new mupdf.Device({fillText:seen,strokeText:seen,clipText:seen,clipStrokeText:seen,ignoreText:()=>n.invisible++});
+ try{page.run(device,mupdf.Matrix.identity);device.close();}finally{device.destroy();}
+ return n;
+}
+// A scanned page whose only text is the scanner's invisible OCR layer is read
+// by bide's own OCR instead: that layer is often misplaced and has no real
+// font, and editing it left the scanned letters in place under the new text.
 export function detectPdfText(source:string,index:number){
- const data=sources.get(source);if(!data)throw new Error('PDF source unavailable');const doc=open(data) as mupdf.PDFDocument;const page=doc.loadPage(index);const bounds=page.getBounds();const structured=page.toStructuredText('preserve-whitespace');
+ const data=sources.get(source);if(!data)throw new Error('PDF source unavailable');const doc=open(data) as mupdf.PDFDocument;const page=doc.loadPage(index);
+ const kinds=textKinds(page);if(!kinds.visible&&kinds.invisible){page.destroy();doc.destroy();return {regions:[] as TextRegion[],skipped:0,ocrLayer:true};}
+ const bounds=page.getBounds();const structured=page.toStructuredText('preserve-whitespace');
  const fonts=new Map<string,{id:string;data:string}>();let budget=0,visited=0;const seen=new Set<number>();
  const resources=(res:mupdf.PDFObject,depth=0)=>{if(depth>8||++visited>128||res.isNull())return;res.get('Font').forEach((font)=>{try{const base=font.get('BaseFont').asName();let descriptor=font.get('FontDescriptor');if(descriptor.isNull())descriptor=font.get('DescendantFonts',0,'FontDescriptor');let stream=descriptor.get('FontFile2');if(stream.isNull()){stream=descriptor.get('FontFile3');if(stream.get('Subtype').asName()!=='OpenType')return;}if(!stream.isStream())return;const buffer=stream.readStream();try{const bytes=buffer.asUint8Array();if(bytes.length>4e6||budget+bytes.length>16e6)return;budget+=bytes.length;fonts.set(cleanFontName(base),{id:'PDFfont-'+source.slice(0,12)+'-'+font.asIndirect(),data:toBase64(bytes)});}finally{buffer.destroy();}}catch{}});res.get('XObject').forEach(obj=>{const id=obj.asIndirect();if(id&&seen.has(id))return;if(id)seen.add(id);resources(obj.get('Resources'),depth+1);});};
  const regions:TextRegion[]=[];let current:TextRegion|undefined,horizontal=true,skipped=0;

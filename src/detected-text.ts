@@ -37,7 +37,8 @@ async function ocrRaster(p:Page,c:Canvas){
 // page, or the image layers of a design page), in page units. Pages whose PDF
 // already has real text, and pages without pictures, get none.
 export async function searchableText(p:Page,{engine,languages,signal,known,script,accurate}:{engine:'tesseract'|'paddle';languages:string[];signal?:AbortSignal;known?:TextRegion[];script?:OcrScript|'auto';accurate?:boolean}){
- if(p.source&&(await detectPdfText(p.source,p.index)).regions.length)return [];
+ // Pages with real text, or a scanner's own OCR layer, are already searchable.
+ if(p.source){const detected=await detectPdfText(p.source,p.index);if(detected.regions.length||detected.ocrLayer)return [];}
  const c=new StaticCanvas(undefined,{width:p.width,height:p.height});
  try{
   await c.loadFromJSON(p.canvas);
@@ -60,8 +61,9 @@ function aiOcrLabel(regions:TextRegion[]){
 }
 export async function scanPageText(p:Page,c:Canvas,{signal,grouping,thorough,languages,engine='tesseract',aiSharpen=false,script='auto',accurate=false,onStatus}:{signal:AbortSignal;grouping:OcrGrouping;thorough:boolean;languages:string[];engine?:'tesseract'|'paddle';aiSharpen?:boolean;script?:OcrScript|'auto';accurate?:boolean;onStatus:(status:string)=>void}):Promise<{regions:TextRegion[];all?:TextRegion[];status:string;suggestedFont?:string}>{
  onStatus('Detecting text…');
- if(p.source){const detected=await detectPdfText(p.source,p.index);signal.throwIfAborted();if(detected.regions.length)return {regions:detected.regions,status:`${detected.regions.length} editable text regions${detected.skipped?' · rotated text kept unchanged':''}`};}
- onStatus('Recognizing image text locally…');
+ let ocrLayer=false;
+ if(p.source){const detected=await detectPdfText(p.source,p.index);signal.throwIfAborted();ocrLayer=!!detected.ocrLayer;if(detected.regions.length)return {regions:detected.regions,status:`${detected.regions.length} editable text regions${detected.skipped?' · rotated text kept unchanged':''}`};}
+ onStatus(ocrLayer?'Scanned page: reading the image (its own text layer is invisible)…':'Recognizing image text locally…');
  let raster=await ocrRaster(p,c);signal.throwIfAborted();
  // AI sharpening (Real-ESRGAN, 2x) only pays off for small or soft text; it is
  // skipped for large rasters, where it would take minutes on a CPU.
@@ -252,12 +254,22 @@ function rowInk(raster:HTMLCanvasElement,r:{left:number;top:number;width:number;
  return {rows,y0};
 }
 
-// Another page's pictures at page units (for borrowing letters from it).
-async function offscreenComposite(p:Page){
- if(p.source)return previewCanvas(p.source,p.index,1,Math.ceil(p.width),Math.ceil(p.height));
+// Another page's pictures at `scale` pixels per page unit (for borrowing letters from it).
+async function offscreenComposite(p:Page,scale=1){
+ if(p.source)return previewCanvas(p.source,p.index,scale,Math.ceil(p.width*scale),Math.ceil(p.height*scale));
  const c=new StaticCanvas(undefined,{width:p.width,height:p.height});
- try{await c.loadFromJSON(p.canvas);return pageRaster(c as unknown as Canvas,p.width,p.height,c.getObjects().filter(o=>o instanceof FabricImage));}finally{await c.dispose();}
+ try{await c.loadFromJSON(p.canvas);const raster=pageRaster(c as unknown as Canvas,p.width,p.height,c.getObjects().filter(o=>o instanceof FabricImage));return scale===1?raster:scaledCanvas(raster,scale);}finally{await c.dispose();}
 }
+function scaledCanvas(source:HTMLCanvasElement,scale:number){
+ const out=document.createElement('canvas');out.width=Math.ceil(source.width*scale);out.height=Math.ceil(source.height*scale);
+ const g=out.getContext('2d')!;g.imageSmoothingQuality='high';g.drawImage(source,0,0,out.width,out.height);return out;
+}
+// Pixels per page unit for cutting letters: a PDF page's units are points
+// (72 dpi), and letters cut at that scale came out as a blurry bitmap over a
+// page drawn sharp at screen resolution. PDF lines are cut from a render where
+// they are about 32 px tall (a whole multiple, so letters stay on pixels).
+export const letterScale=(region:TextRegion,p:Page)=>p.source?Math.max(1,Math.min(4,Math.round(32/Math.max(1,region.height)),Math.floor(Math.sqrt(16e6/(p.width*p.height))))):1;
+const scaledRegion=(r:TextRegion,k:number):TextRegion=>k===1?r:{...r,left:r.left*k,top:r.top*k,width:r.width*k,height:r.height*k,glyphs:r.glyphs?.map(g=>({...g,x0:g.x0*k,x1:g.x1*k}))};
 
 // Glyphs of `regions` whose x-height matches (within 12%), each with its line's
 // baseline, so letters from lines with or without descenders line up.
@@ -268,10 +280,12 @@ function letterLibrary(raster:HTMLCanvasElement,regions:TextRegion[],xHeight:num
  });
 }
 
-export async function glyphEditPatch(c:Canvas,p:Page,region:TextRegion,next:string,page:TextRegion[]=[],otherPages:LetterSource[]=[]){
- if(region.kind!=='ocr'||!region.glyphs)return undefined;
- const cells=lineCells(region.text,region.glyphs);if(!cells)return undefined;
- const raster=await pageComposite(c,p),W=raster.width,H=raster.height;
+export async function glyphEditPatch(c:Canvas,p:Page,lineRegion:TextRegion,next:string,pageRegions:TextRegion[]=[],sources:LetterSource[]=[]){
+ if(lineRegion.kind!=='ocr'||!lineRegion.glyphs)return undefined;
+ // Everything below works in raster pixels, `k` per page unit.
+ const k=letterScale(lineRegion,p),region=scaledRegion(lineRegion,k),page=pageRegions.map(r=>r===lineRegion?region:scaledRegion(r,k)),otherPages=sources.map(o=>({...o,regions:o.regions.map(r=>scaledRegion(r,k))}));
+ const cells=lineCells(region.text,region.glyphs!);if(!cells)return undefined;
+ const raster=k===1?await pageComposite(c,p):await previewCanvas(p.source!,p.index,k,Math.ceil(p.width*k),Math.ceil(p.height*k)),W=raster.width,H=raster.height;
  const target=rowInk(raster,region),metrics=lineMetrics(target.rows);if(!metrics)return undefined;
  const baseline=target.y0+metrics.baseline,rasters=new Map<string,HTMLCanvasElement>([[p.id,raster]]);
  let plan=planGlyphEdit(region.text,cells,next,letterLibrary(raster,page,metrics.xHeight,region,p.id));
@@ -279,14 +293,14 @@ export async function glyphEditPatch(c:Canvas,p:Page,region:TextRegion,next:stri
  for(const other of otherPages){
   if(plan||other.page.id===p.id)continue;
   if(!planGlyphEdit(region.text,cells,next,other.regions.flatMap(r=>r.glyphs?lineCells(r.text,r.glyphs)?.filter(g=>!g.space).map(g=>({...g,y0:0,y1:0,source:r.id}))??[]:[]))&&!plan)continue;
-  const source=await offscreenComposite(other.page);rasters.set(other.page.id,source);
+  const source=await offscreenComposite(other.page,k);rasters.set(other.page.id,source);
   plan=planGlyphEdit(region.text,cells,next,[...letterLibrary(raster,page,metrics.xHeight,region,p.id),...letterLibrary(source,other.regions,metrics.xHeight,region,other.page.id)]);
  }
  if(!plan)return undefined;
  const pieces=plan.pieces.map(q=>({...q,x0:Math.round(q.x0),x1:Math.round(q.x1)})),startX=Math.max(0,Math.round(plan.startX)),width=pieces.reduce((s,q)=>s+q.x1-q.x0,0);
- const top=Math.max(0,Math.floor(region.top)-1),bottom=Math.min(H,Math.ceil(region.top+region.height)+1),endX=Math.min(W,Math.ceil(Math.max(plan.oldEnd,startX+width))+1);
+ const top=Math.max(0,Math.floor(region.top)-k),bottom=Math.min(H,Math.ceil(region.top+region.height)+k),endX=Math.min(W,Math.ceil(Math.max(plan.oldEnd,startX+width))+k);
  // Analyse the whole line plus a margin of rows to see where blobs lead.
- const ax0=Math.max(0,Math.floor(Math.min(region.left,startX))-2),ax1=Math.min(W,Math.max(endX,Math.ceil(region.left+region.width)+2)),ay0=Math.max(0,top-8),ay1=Math.min(H,bottom+8);
+ const ax0=Math.max(0,Math.floor(Math.min(region.left,startX))-2*k),ax1=Math.min(W,Math.max(endX,Math.ceil(region.left+region.width)+2*k)),ay0=Math.max(0,top-8*k),ay1=Math.min(H,bottom+8*k);
  const ctx=raster.getContext('2d',{willReadFrequently:true})!,area=ctx.getImageData(ax0,ay0,ax1-ax0,ay1-ay0),bg=hexRgb(region.background||'#ffffff');
  const own=ownInk(area.data,area.width,area.height,bg,top-ay0,bottom-ay0);
  // Borrowed letters may reach below the line box (descenders): the patch grows to fit them.
@@ -311,6 +325,6 @@ export async function glyphEditPatch(c:Canvas,p:Page,region:TextRegion,next:stri
   x+=w;
  }
  const patch=document.createElement('canvas');patch.width=patchW;patch.height=patchH;patch.getContext('2d')!.putImageData(out,0,0);
- return Object.assign(new FabricImage(patch,{left:startX,top}),{id:uid(),name:`Edited text: ${next.slice(0,40)}`});
+ return Object.assign(new FabricImage(patch,{left:startX/k,top:top/k,scaleX:1/k,scaleY:1/k}),{id:uid(),name:`Edited text: ${next.slice(0,40)}`});
 }
 const hexRgb=(hex:string)=>[1,3,5].map(i=>parseInt(hex.slice(i,i+2),16)||0);
