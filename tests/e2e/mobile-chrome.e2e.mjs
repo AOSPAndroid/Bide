@@ -7,6 +7,7 @@ import {createServer} from 'vite';import {chromium} from 'playwright-core';impor
 import {mkdtemp,writeFile} from 'node:fs/promises';import {tmpdir} from 'node:os';import {join} from 'node:path';
 
 const iphone={viewport:{width:390,height:844},deviceScaleFactor:2,isMobile:true,hasTouch:true};
+const landscape={viewport:{width:844,height:390},deviceScaleFactor:2,isMobile:true,hasTouch:true};
 const android={viewport:{width:360,height:740},deviceScaleFactor:2,isMobile:true,hasTouch:true};
 const tablet={viewport:{width:820,height:1180},deviceScaleFactor:2,isMobile:true,hasTouch:true};
 let server,browser;
@@ -28,8 +29,8 @@ const tapCentre=async(page,cdp,selector)=>{const b=await box(page,selector);asse
 const panel=page=>page.evaluate(()=>document.querySelector('.workspace-layout').dataset.panel??null);
 // Visible controls smaller than 40x40.
 const small=(page,selector)=>page.evaluate(s=>[...document.querySelectorAll(s)].map(e=>({e,r:e.getBoundingClientRect()})).filter(({e,r})=>r.width&&r.height&&e.checkVisibility()&&r.bottom>0&&r.top<innerHeight).filter(({r})=>r.width<40||r.height<40).map(({e,r})=>`${e.getAttribute('aria-label')||e.textContent.trim()||e.className} ${Math.round(r.width)}x${Math.round(r.height)}`),selector);
-// Visible text under 11px inside `selector`.
-const tinyText=(page,selector)=>page.evaluate(s=>[...document.querySelectorAll(`${s} *`)].filter(e=>[...e.childNodes].some(n=>n.nodeType===3&&n.textContent.trim())&&e.getBoundingClientRect().width>0&&e.checkVisibility()).filter(e=>parseFloat(getComputedStyle(e).fontSize)<11).map(e=>`${e.textContent.trim().slice(0,30)} ${getComputedStyle(e).fontSize}`),selector);
+// Visible text under 11px inside any of the comma-separated `selector`s.
+const tinyText=(page,selector)=>page.evaluate(s=>[...document.querySelectorAll(s.split(',').map(x=>`${x} *`).join(','))].filter(e=>[...e.childNodes].some(n=>n.nodeType===3&&n.textContent.trim())&&e.getBoundingClientRect().width>0&&e.checkVisibility()).filter(e=>parseFloat(getComputedStyle(e).fontSize)<11).map(e=>`${e.textContent.trim().slice(0,30)} ${getComputedStyle(e).fontSize}`),selector);
 
 check('finding 14: a labelled Menu button opens File…Help as a sheet; Find is labelled; the palette drops keyboard hints',iphone,async page=>{
  const menu=await box(page,'.phone-menu-button');
@@ -63,7 +64,7 @@ check('finding 19: header, file actions, tool rail, bottom bar and drawers are t
  await tapCentre(page,cdp,'.small-pages-button');
  assert.deepEqual(await small(page,'.pages-panel .panel-heading .icon-button, .page-more, .page-panel-bottom button'),[]);
  await tapCentre(page,cdp,'.small-properties-button');
- assert.deepEqual(await small(page,'.close-small-properties, .layer-retouch-actions button, .quick-insert button'),[]);
+ assert.deepEqual(await small(page,'.close-small-properties, .layer-retouch-actions button, .quick-insert button, .inspector summary'),[]);
  await page.locator('.form-panel>summary').tap();
  assert.deepEqual(await small(page,'.form-add button'),[]);
 });
@@ -77,8 +78,8 @@ check('finding 20: no empty status bar; name and file actions share a row; the p
 });
 
 check('finding 22: no keyboard-only tips on touch; chrome text is at least 11px',iphone,async page=>{
- assert.equal(await page.locator('.tip-card, .rail-bottom>button[aria-label="Keyboard shortcuts"]').evaluateAll(l=>l.filter(e=>e.checkVisibility()).length),0);
- assert.deepEqual(await tinyText(page,'.topbar, .command-strip, .canvas-tab, .canvas-footer'),[],'chrome text');
+ assert.equal(await page.locator('.tip-card, .rail-bottom>button[aria-label="Keyboard shortcuts"], .tool-group button>kbd').evaluateAll(l=>l.filter(e=>e.checkVisibility()).length),0);
+ assert.deepEqual(await tinyText(page,'.topbar, .command-strip, .tool-rail, .canvas-tab, .canvas-footer'),[],'chrome text');
  await page.locator('.small-properties-button').tap();await page.waitForTimeout(300);
  assert.deepEqual(await tinyText(page,'.inspector'),[],'Properties text');
 });
@@ -110,6 +111,12 @@ check('finding 18: Design & layout fits the Properties drawer',android,async(pag
  const fit=await page.evaluate(()=>{const c=document.querySelector('.properties-content');return {scroll:c.scrollWidth,client:c.clientWidth,right:Math.max(...[...document.querySelectorAll('.design-tools-body button')].map(b=>b.getBoundingClientRect().right))};});
  assert.ok(fit.scroll<=fit.client+1,`Design & layout is no wider than the drawer (${fit.scroll} > ${fit.client})`);
  assert.ok(fit.right<=360,`its buttons stay on screen (right edge ${fit.right})`);
+});
+
+check('finding 18: Design & layout also fits the inspector of a landscape phone',landscape,async page=>{
+ await page.locator('.design-tools summary').tap();await page.waitForTimeout(300);
+ const fit=await page.evaluate(()=>{const c=document.querySelector('.properties-content');return {scroll:c.scrollWidth,client:c.clientWidth};});
+ assert.ok(fit.scroll<=fit.client+1,`Design & layout is no wider than the inspector (${fit.scroll} > ${fit.client})`);
 });
 
 check('finding 17: the options bar drops the duplicate zoom and Snap to page, and both scrollers show a cue',iphone,async page=>{
@@ -175,6 +182,17 @@ check('finding 11: on a phone the OCR bar reaches every action through More',and
  assert.equal(await page.evaluate(()=>document.activeElement?.getAttribute('aria-label')),'OCR replacement font');
 },300000);
 
+// A tilted photo still offers Straighten without opening More.
+check('finding 11: a tilted photo keeps its Straighten hint on the folded OCR bar',iphone,async page=>{
+ const shot=await browser.newPage({viewport:{width:700,height:700}});
+ await shot.setContent('<body style="margin:0;background:#fff;display:flex;align-items:center;justify-content:center;height:700px"><div style="width:520px;padding:28px;font:17px Georgia;line-height:1.6;color:#222;transform:rotate(4deg)">Quarterly report<br>Revenue grew strongly across all regions while costs remained stable through the year.<br>Invoice total 1284 EUR</div></body>');
+ const file=join(await mkdtemp(join(tmpdir(),'bide-chrome-')),'tilted.png');await shot.screenshot({path:file});await shot.close();
+ await page.locator('input[type=file][accept*=".psd"]').setInputFiles(file);
+ const hint=page.locator('.straighten-hint');await hint.waitFor({state:'attached',timeout:180000});await page.waitForTimeout(500);
+ assert.equal(await page.locator('.text-detection-bar').evaluate(e=>e.classList.contains('more')),false,'the bar is folded');
+ const b=await hint.boundingBox();assert.ok(b&&b.x>=0&&b.x+b.width<=390&&b.height>=40,`Straighten is on screen and touch-sized (${JSON.stringify(b)})`);
+},300000);
+
 check('finding 21: on a tablet the OCR bar wraps clear of Properties and its settings open on screen',tablet,async page=>{
  await ocrImage(page);
  const overlap=await page.evaluate(()=>{const left=document.querySelector('.inspector').getBoundingClientRect().left;return [...document.querySelectorAll('.text-detection-bar>*')].filter(e=>e.getBoundingClientRect().right>left+1).map(e=>e.textContent.trim().slice(0,20));});
@@ -184,6 +202,12 @@ check('finding 21: on a tablet the OCR bar wraps clear of Properties and its set
  assert.ok(settings.x>=0&&settings.right<=820,`OCR settings open on screen (${settings.x}-${settings.right})`);
  const pages=await box(page,'.small-pages-button');assert.ok(pages.height>=32,`Pages is ${pages.height}px tall`);
 },300000);
+
+check('small tablets: the bottom bar keeps the zoom buttons clear of Pages',{...tablet,viewport:{width:640,height:960}},async page=>{
+ const covered=await page.evaluate(()=>[...document.querySelectorAll('.zoom-controls button,.canvas-tab>button')].filter(b=>b.checkVisibility()).filter(b=>{const r=b.getBoundingClientRect();return !b.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2));}).map(b=>b.getAttribute('aria-label')||b.textContent.trim()));
+ assert.deepEqual(covered,[],'every bottom-bar button can be tapped');
+ assert.match(await page.locator('.canvas-tab').innerText(),/1 \/ 1/,'the page number stays');
+});
 
 check('desktop keeps its menubar and status bar; phone controls stay hidden',{viewport:{width:1400,height:900}},async page=>{
  assert.ok(await page.locator('.menubar').isVisible());assert.ok(await page.locator('.statusbar').isVisible());
