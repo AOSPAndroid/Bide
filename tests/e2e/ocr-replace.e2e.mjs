@@ -135,10 +135,12 @@ test('editing image text reuses the original letters; find & replace fixes every
   const original=await page.evaluate(async()=>{const {restoreLocal}=await import('/src/model.ts');return (await restoreLocal()).pages[0].canvas;});
   await page.locator('.detected-text-overlay button[aria-label*="Repas"]').click();
   const requested='Repas: Les repas ne sont pas compris (zzz).',repas=page.getByLabel('New text');await repas.fill(requested);await page.getByRole('button',{name:'Apply',exact:true}).click();
-  await page.getByRole('dialog',{name:'Something needs your attention'}).getByText(/Cannot preserve the original lettering/).waitFor({timeout:60000});
+  // The refusal stays in the edit dialog and names what the line lacks.
+  const refusal=page.locator('.lettering-refusal');await refusal.waitFor({timeout:60000});
+  assert.match(await refusal.innerText(),/Cannot keep the original lettering: .*“z”.*does not appear in this line|Cannot keep the original lettering: the characters .*“z”/);
   assert.deepEqual(await page.evaluate(async()=>{const {restoreLocal}=await import('/src/model.ts');return (await restoreLocal()).pages[0].canvas;}),original,'refused edit leaves every original layer unchanged');
-  await page.getByRole('button',{name:'Got it',exact:true}).click();
   assert.equal(await repas.inputValue(),requested,'the refused edit retains the typed text');
+  assert.ok(await page.getByRole('button',{name:'Use a font for this edit'}).isVisible(),'a font is offered as an explicit choice');
   await page.getByRole('button',{name:'Cancel',exact:true}).click();
   // An explicit New font choice permits editable font text and appearance fitting.
   await (await ocrSetting(page,'Edit image text with')).selectOption('font');

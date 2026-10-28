@@ -162,7 +162,7 @@ export async function paddleOcr(source:HTMLCanvasElement,onProgress?:Progress,si
     const v=trimToInk(wordRows,top-y0,bottom-y0);
     // Character cells, for editing with the image's own letters (glyph-edit.ts).
     // Each letter keeps the recognizer's probability, to flag doubtful ones.
-    const chars=separateLetters(best.script)?segmentGlyphs(word.text,word.centers.map(c=>c*w/rw),t.x0,t.x1,bandColumns)?.map((g,k)=>({...g,x0:x0+g.x0,x1:x0+g.x1,p:word.probs[k]})):undefined;
+    const chars=separateLetters(best.script)?segmentGlyphs(word.text,word.centers.map(c=>c*w/rw),t.x0,t.x1,bandColumns)?.map((g,k)=>({...g,x0:x0+g.x0,x1:x0+g.x1,p:word.probs[k],c:x0+word.centers[k]*w/rw})):undefined;
     return {text:word.text,confidence:word.confidence,bbox:{x0:x0+t.x0,y0:y0+v.x0,x1:x0+t.x1,y1:y0+v.x1},chars};
    });
    lines.push({script:best.script,text:rtl?rtlReorder(decoded.text):decoded.text,confidence:decoded.confidence*100,bbox:{x0:words.length?Math.min(...words.map(w=>w.bbox.x0)):x0,y0:top,x1:words.length?Math.max(...words.map(w=>w.bbox.x1)):x1,y1:bottom},words});

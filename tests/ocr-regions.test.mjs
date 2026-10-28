@@ -54,6 +54,8 @@ test('doubtful letters map to text positions, skipping spaces',async()=>{
  const region={text:'Dal iil',glyphs:[{p:.99},{p:.98},{p:.97},{p:.95},{p:.4},{p:.9}]};
  assert.deepEqual(doubtfulLetters(region),[5]);
  assert.deepEqual(doubtfulLetters({text:'abc'}),[]);
+ // A placeholder cell (ink with no character) does not shift the letters after it.
+ assert.deepEqual(doubtfulLetters({text:'a b',glyphs:[{ch:'a',p:.9},{ch:'\uFFFC'},{ch:'b',p:.3}]}),[2]);
 });
 test('a tilted line is a level box turned about its centre; lines tilted alike only shift between frames',async()=>{
  const {frameOf,turn,turnedQuad,turnedBounds,inFrame}=await import('../tmp/ocr-regions.mjs');

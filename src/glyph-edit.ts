@@ -1,8 +1,13 @@
 // Editing image text with its own letters: character cells measured on the
 // original line, and a plan that rebuilds edited text from those cells (or
 // matching letters elsewhere on the page) instead of a substitute font.
-// `p`: the recognizer's confidence in this letter (0-1), when known.
-export type Glyph={ch:string;x0:number;x1:number;p?:number};
+// `p`: the recognizer's confidence in this letter (0-1), when known; `c`:
+// where it placed the letter, until the scan is typeset (ocr-typography.ts).
+export type Glyph={ch:string;x0:number;x1:number;p?:number;c?:number};
+// A placeholder cell: ink the reading did not cover (a symbol the recognizer
+// lacks, such as ★). It adds no character to the text; its cell sits in the
+// line before the next character, so a letter edit can keep its pixels.
+export const UNREAD='\uFFFC';
 export type Cell=Glyph&{space?:boolean};
 // Borrowed letters carry their line's band and baseline (page units) and the page they come from.
 export type LibraryGlyph=Glyph&{y0:number;y1:number;source:string;baseline?:number;page?:string};
@@ -81,12 +86,16 @@ export function settleMarks(glyphs:Glyph[],upper:ArrayLike<number>,lower:ArrayLi
 // glyph boxes of its non-space characters (in order). Within a word, gaps or
 // overlaps between boxes are split at their midpoint; a space spans the gap
 // between the words around it. Returns undefined if glyphs and text disagree.
+// A placeholder glyph (UNREAD) is a cell of its own before the next
+// character: the cells spell the text with UNREAD where they lie.
 export function lineCells(text:string,glyphs:Glyph[]):Cell[]|undefined{
  const chars=Array.from(text),cells:Cell[]=[];let g=0;
+ const unread=()=>{while(glyphs[g]?.ch===UNREAD)cells.push({...glyphs[g++]});};
  for(const ch of chars){
   if(/\s/.test(ch)){cells.push({ch,x0:NaN,x1:NaN,space:true});continue;}
-  const glyph=glyphs[g++];if(!glyph||glyph.ch!==ch)return undefined;cells.push({...glyph});
+  unread();const glyph=glyphs[g++];if(!glyph||glyph.ch!==ch)return undefined;cells.push({...glyph});
  }
+ unread();
  if(g!==glyphs.length)return undefined;
  for(let i=0;i+1<cells.length;i++){const a=cells[i],b=cells[i+1];if(!a.space&&!b.space&&a.x1!==b.x0){const m=(a.x1+b.x0)/2;a.x1=m;b.x0=m;}}
  for(let i=0;i<cells.length;i++){const c=cells[i];if(!c.space)continue;const prev=cells.slice(0,i).reverse().find(x=>!x.space),next=cells.slice(i+1).find(x=>!x.space);if(!prev||!next)return undefined;c.x0=prev.x1;c.x1=next.x0;}
@@ -101,6 +110,30 @@ function align(text:string[],next:string[]){
  const keep=new Array<number>(m).fill(-1);let i=0,j=0;
  while(i<n&&j<m){if(text[i]===next[j]){keep[j]=i;i++;j++;}else if(dp[i+1][j]>=dp[i][j+1])i++;else j++;}
  return keep;
+}
+
+// `next`, an edit of the line's text, with its unread cells kept in order.
+// They are absent from the editable text, so replacing/deleting their
+// visible neighbours must not silently erase their ink. Kept letters anchor
+// them; inside a replaced span their boundary follows that span's new length.
+// Only an empty replacement removes the whole field, unread cells included.
+export function withUnread(text:string,cells:Cell[],next:string){
+ const read=Array.from(text),b=Array.from(next),at=new Array<number>(read.length).fill(-1);align(read,b).forEach((k,j)=>{if(k>=0)at[k]=j;});
+ const before=new Array<number>(b.length+1).fill(0);let i=0;
+ for(const c of cells){
+  if(c.ch!==UNREAD){i++;continue;}
+  if(!b.length)continue;
+  let slot:number;
+  if(i===0)slot=0;else if(i===read.length)slot=b.length;
+  else if(at[i]>=0)slot=at[i];else if(at[i-1]>=0)slot=at[i-1]+1;
+  else{
+   let left=i-1,right=i;while(left>=0&&at[left]<0)left--;while(right<read.length&&at[right]<0)right++;
+   const start=left>=0?at[left]+1:0,end=right<read.length?at[right]:b.length;
+   slot=Math.round(start+(end-start)*(i-left-1)/Math.max(1,right-left-1));
+  }
+  before[slot]++;
+ }
+ return b.map((ch,j)=>UNREAD.repeat(before[j])+ch).join('')+UNREAD.repeat(before[b.length]);
 }
 
 // Plan for rendering `next` in place of `text`: everything before the first
@@ -125,6 +158,19 @@ export function planGlyphEdit(text:string,cells:Cell[],next:string,library:Libra
  }
  const startX=p<cells.length?cells[p].x0:cells[cells.length-1].x1;
  return {startX,oldEnd:cells[cells.length-1].x1,pieces};
+}
+
+// The characters of `next` an edit cannot take from the line itself (as
+// planGlyphEdit would, with no library): letters the line lacks, and a space
+// when the line has none to copy. Each listed once, in typing order.
+export function missingLetters(text:string,cells:Cell[],next:string){
+ const a=Array.from(text),b=Array.from(next),keep=align(a,b),out:string[]=[];
+ let p=0;while(p<a.length&&p<b.length&&a[p]===b[p])p++;
+ for(let j=p;j<b.length;j++){
+  const ch=b[j];if(keep[j]>=p||out.includes(ch))continue;
+  if(/\s/.test(ch)?!cells.some(c=>c.space):!cells.some(c=>!c.space&&c.ch===ch))out.push(/\s/.test(ch)?' ':ch);
+ }
+ return out;
 }
 
 // Pixels of this line's letters within an analysis area (RGBA, width x height):

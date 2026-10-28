@@ -1,5 +1,5 @@
 import {inkDensity} from '../ocr-weight';
-import {segmentOcrLine,missingLines,type OcrGrouping} from '../ocr-segmentation';
+import {segmentOcrLine,missingLines,splitAtBackgrounds,type OcrGrouping} from '../ocr-segmentation';
 import {sampleBackground,estimateTextColor,toHex,edgeWidth,blurFromEdgeWidth,inkMass,prepareOcrPixels,estimateLineHeight,growToInk} from '../ocr-image';
 import {prepareOcrImage} from './ocr-prepare';
 import {createWorker,PSM,type Worker as OcrEngine,type LoggerMessage} from 'tesseract.js';
@@ -10,6 +10,7 @@ import {findSheet,sheetSize} from '../page-quad';
 import {unwarpPixels,mapSquare,type XY} from '../perspective';
 import {settleMarks} from '../glyph-edit';
 import {frameOf,turn} from '../ocr-regions';
+import {typesetRegions} from '../ocr-typography';
 
 export type OcrProgress=(fraction:number,label:string)=>void;
 export type OcrReader='tesseract'|'paddle';
@@ -133,11 +134,22 @@ function levelled(image:HTMLCanvasElement,tilt:number){
  return {canvas,toOriginal:(x:number,y:number)=>{const px=x-W/2,py=y-H/2;return {x:px*Math.cos(back)-py*Math.sin(back)+image.width/2,y:px*Math.sin(back)+py*Math.cos(back)+image.height/2};}};
 }
 
+// The background around a word, and whether the word sits on a badge: the
+// ring around it is one flat colour (three in four of its pixels within 16
+// of the median) and not the colour a line height above and below it (a
+// stripe or a road crossing the line goes on there, a badge stops).
+function wordBackground(img:ImageData,b:{x0:number;y0:number;x1:number;y1:number}){
+ const rgb=sampleBackground(img,b),d=Math.max(4,Math.round((b.y1-b.y0)*.9)),outer=sampleBackground(img,{x0:b.x0,y0:b.y0-d,x1:b.x1,y1:b.y1+d},2);
+ const {data,width,height}=img,near=(i:number,c:readonly number[])=>Math.max(Math.abs(data[i]-c[0]),Math.abs(data[i+1]-c[1]),Math.abs(data[i+2]-c[2]))<=16;let flat=0,all=0;
+ for(let y=Math.max(0,b.y0-3);y<Math.min(height,b.y1+3);y++)for(let x=Math.max(0,b.x0-3);x<Math.min(width,b.x1+3);x++){if(x>=b.x0-1&&x<b.x1+1&&y>=b.y0-1&&y<b.y1+1)continue;all++;if(near((y*width+x)*4,rgb))flat++;}
+ return {rgb,badge:flat>=all*.75&&Math.max(...[0,1,2].map(c=>Math.abs(outer[c]-rgb[c])))>=16};
+}
+
 async function recognizeLevel(image:HTMLCanvasElement,{signal,grouping='smart',languages=['eng','fra'],engine:ocrEngine='tesseract',onProgress,thorough=false,script='auto',accurate=false}:OcrOptions={}):Promise<TextRegion[]>{
  let resolve!:(v:TextRegion[])=>void,reject!:(e:unknown)=>void;const result=new Promise<TextRegion[]>((yes,no)=>{resolve=yes;reject=no;});
  queue=queue.then(async()=>{try{
   signal?.throwIfAborted();
-  let lines:{script?:OcrScript;text:string;confidence:number;bbox:{x0:number;y0:number;x1:number;y1:number};words?:{text:string;confidence?:number;bbox:{x0:number;y0:number;x1:number;y1:number};chars?:{ch:string;x0:number;x1:number;p?:number}[]}[]}[],sx=1,sy=1;
+  let lines:{script?:OcrScript;text:string;confidence:number;bbox:{x0:number;y0:number;x1:number;y1:number};words?:{text:string;confidence?:number;bbox:{x0:number;y0:number;x1:number;y1:number};chars?:{ch:string;x0:number;x1:number;p?:number;c?:number}[]}[]}[],sx=1,sy=1;
   if(ocrEngine==='paddle'){
    // PaddleOCR (bundled AI models) reads the original pixels; its Latin model
    // covers all bundled languages at once, other alphabets have their own.
@@ -171,7 +183,9 @@ async function recognizeLevel(image:HTMLCanvasElement,{signal,grouping='smart',l
    // against the rest of the line even when a region holds a single word.
    const lineWords=segmentOcrLine(line,'words'),lineBox=scaleBox(line.bbox),lineBg=sampleBackground(original,lineBox),lineEdge=edgeWidth(original,lineBox,lineBg),pad=Math.min(3,Math.ceil((lineEdge===undefined?0:blurFromEdgeWidth(lineEdge))*2));
    const measured=lineWords.map(g=>{const box=scaleBox(g.bbox);return {text:g.text,width:box.x1-box.x0,inkMass:inkMass(original,box,lineBg,pad),inkDensity:box.x1>box.x0&&box.y1>box.y0?inkDensity(ctx.getImageData(box.x0,box.y0,box.x1-box.x0,box.y1-box.y0).data,lineBg):undefined};});
-   for(const part of segmentOcrLine(line,grouping)){
+   // A badge next to a label is a field of its own (left-to-right lines).
+   const parts=segmentOcrLine(line,grouping).flatMap(part=>grouping==='words'||line.script==='arabic'?[part]:splitAtBackgrounds(part,part.words.map(w=>wordBackground(original,scaleBox(w.bbox)))));
+   for(const part of parts){
     const start=part.words.length?lineWords.findIndex(g=>g.bbox.x0===part.words[0].bbox.x0&&g.bbox.y0===part.words[0].bbox.y0):-1;
     const lineContext=measured.length>1&&start>=0?{words:measured,start,count:part.words.length}:undefined;
     const b={x0:Math.max(0,Math.floor(part.bbox.x0*sx)),y0:Math.max(0,Math.floor(part.bbox.y0*sy)),x1:Math.min(image.width,Math.ceil(part.bbox.x1*sx)),y1:Math.min(image.height,Math.ceil(part.bbox.y1*sy))},w=b.x1-b.x0,h=b.y1-b.y0;if(w<1||h<1)continue;
@@ -179,9 +193,13 @@ async function recognizeLevel(image:HTMLCanvasElement,{signal,grouping='smart',l
     const edge=edgeWidth(original,b,rgb),blur=edge===undefined?undefined:blurFromEdgeWidth(edge);
     // Per-word ink lets a bold label and regular value share one line (see ocr-weight.ts).
     const words=part.words.length>1?part.words.map(word=>{const x0=Math.max(0,Math.floor(word.bbox.x0*sx)),y0=Math.max(0,Math.floor(word.bbox.y0*sy)),x1=Math.min(image.width,Math.ceil(word.bbox.x1*sx)),y1=Math.min(image.height,Math.ceil(word.bbox.y1*sy)),box={x0,y0,x1,y1};return {text:word.text.trim(),width:x1-x0,inkMass:inkMass(original,box,rgb,Math.min(3,Math.ceil((blur??0)*2))),inkDensity:x1>x0&&y1>y0?inkDensity(ctx.getImageData(x0,y0,x1-x0,y1-y0).data,rgb):undefined};}):undefined;
-    regions.push({id:'ocr-'+regions.length,...line.script&&line.script!=='latin'?{script:line.script}:{},text:part.text,left:b.x0,top:b.y0,width:w,height:h,size:h/.75,baseline:b.y1,fontName:'Image text (font unknown)',bold:false,italic:false,color:ink?toHex(ink):light?'#151515':'#ffffff',kind:'ocr',confidence:part.confidence??line.confidence,background:toHex(rgb),inkDensity:inkDensity(ctx.getImageData(b.x0,b.y0,w,h).data,rgb),words,blur,line:lineContext,glyphs:part.words.length&&part.words.every(w=>w.chars?.length)?part.words.flatMap(w=>w.chars!.map(g=>({ch:g.ch,x0:g.x0*sx,x1:g.x1*sx,p:g.p}))):undefined});
+    regions.push({id:'ocr-'+regions.length,...line.script&&line.script!=='latin'?{script:line.script}:{},text:part.text,left:b.x0,top:b.y0,width:w,height:h,size:h/.75,baseline:b.y1,fontName:'Image text (font unknown)',bold:false,italic:false,color:ink?toHex(ink):light?'#151515':'#ffffff',kind:'ocr',confidence:part.confidence??line.confidence,background:toHex(rgb),inkDensity:inkDensity(ctx.getImageData(b.x0,b.y0,w,h).data,rgb),words,blur,line:lineContext,glyphs:part.words.length&&part.words.every(w=>w.chars?.length)?part.words.flatMap(w=>w.chars!.map(g=>({ch:g.ch,x0:g.x0*sx,x1:g.x1*sx,p:g.p,...g.c===undefined?{}:{c:g.c*sx}}))):undefined});
    }
   }
-  resolve(regions.slice(0,2000));
+  // Settle low punctuation on level pages too: a digit's cell must not
+  // borrow a comma's ink when that digit is reused in an original-letter edit.
+  const settled=regions.slice(0,2000).map(r=>r.glyphs?{...r,glyphs:markCells(original,r,[1,3,5].map(i=>parseInt((r.background||'#ffffff').slice(i,i+2),16)))}:r);
+  // Typographic marks and unread symbols, from each cell's ink (ocr-typography.ts).
+  resolve(typesetRegions(settled,original));
  }catch(e){reject(e);}finally{report=undefined;}});return result;
 }

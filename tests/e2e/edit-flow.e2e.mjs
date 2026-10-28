@@ -172,3 +172,39 @@ test("a scanned PDF's own invisible text follows the edit in the download",{time
   assert.deepEqual(errors,[]);
  }finally{await browser.close();await server.close();}
 });
+
+test('an edit needing a letter the line lacks says which, and a font can then be chosen for that line',{timeout:600000},async()=>{
+ const server=await createServer({logLevel:'error',server:{port:0,host:'127.0.0.1'}});await server.listen();
+ const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||undefined});
+ try{
+  const page=await browser.newPage({viewport:{width:1400,height:900}}),errors=[];page.on('pageerror',e=>errors.push(e.message));
+  await page.goto(server.resolvedUrls.local[0]+'app/');await page.locator('input[type=file][accept*=".psd"]').setInputFiles('tests/fixtures/scanned-quote.pdf');
+  const field=page.locator('button[aria-label^="Edit detected text: 289,70"]').first();await field.waitFor({timeout:240000});
+  const mode=page.getByLabel('Edit image text with');assert.equal(await mode.inputValue(),'letters','original letters is the default');
+  const canvasState=()=>page.evaluate(async()=>{const {restoreLocal}=await import('/src/model.ts');return (await restoreLocal()).pages[0].canvas;});
+  await field.click();const input=page.getByLabel('New text');
+  // "289,70 €" has no 5: its own letters cannot write "289,75 €".
+  await input.fill('289,75 €');await page.getByRole('button',{name:'Apply',exact:true}).click();
+  const refusal=page.locator('.lettering-refusal');await refusal.waitFor({timeout:60000});
+  assert.match(await refusal.innerText(),/“5” does not appear in this line/);
+  assert.equal(await input.inputValue(),'289,75 €','the typed text is kept');
+  assert.equal(await page.getByRole('dialog',{name:'Something needs your attention'}).count(),0,'no separate error box');
+  // The explicit choice uses the current input, including changes after the refusal.
+  const latest='289,57 €';await input.fill(latest);
+  await page.getByRole('button',{name:'Use a font for this edit'}).click();
+  await page.getByText('This line is now text in the OCR font',{exact:false}).waitFor({timeout:60000});
+  await page.waitForFunction(async text=>{const {restoreLocal}=await import('/src/model.ts');const p=await restoreLocal();return p?.pages[0].canvas.objects.some(o=>o.type?.toLowerCase()==='textbox'&&o.text===text);},latest,{polling:200,timeout:30000});
+  const layers=(await canvasState()).objects.filter(o=>o.type?.toLowerCase()==='textbox').map(o=>o.text);
+  assert.deepEqual(layers,[latest]);
+  assert.equal(await mode.inputValue(),'letters','font consent applies only to this line and does not change the global mode');
+  // Another field still refuses a missing letter instead of inheriting that font consent.
+  const beforeLater=await canvasState(),next='1 947,85 €';
+  await page.locator('button[aria-label^="Edit detected text: 1 947,80"]').first().click({timeout:60000});
+  await page.getByLabel('New text').fill(next);await page.getByRole('button',{name:'Apply',exact:true}).click();
+  await refusal.waitFor({timeout:60000});assert.match(await refusal.innerText(),/“5” does not appear in this line/);
+  assert.equal(await page.getByLabel('New text').inputValue(),next,'the next refused edit also retains current input');
+  assert.deepEqual(await canvasState(),beforeLater,'a per-line font choice cannot silently replace another field or alter the earlier edit');
+  assert.equal(await mode.inputValue(),'letters');
+  assert.deepEqual(errors,[]);
+ }finally{await browser.close();await server.close();}
+});

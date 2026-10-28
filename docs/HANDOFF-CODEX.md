@@ -1,6 +1,16 @@
 # Handoff to Codex: phones and the open → edit → download flow
 
-Current update: `claude/lucid-fermat-jvmf9l` through `004ccf5` adds native PDF text rewrites and a further phone/desktop UI batch. The older handoff below describes the preceding batch; current integration notes at the end record the safeguards retained during merging.
+**Current update (for the next merge).** `main` already has everything through `004ccf5` (your merges 8e99a5b, f496efa, 30ff666). What is left on `claude/lucid-fermat-jvmf9l`: the OCR typography work (`eb9418a`, `4d016f3`), clearer original-letter refusals (`ec39302`) and this note. The branch already contains `main` up to 757f630, so the merge has no conflicts:
+
+```
+git fetch origin && git merge origin/claude/lucid-fermat-jvmf9l
+```
+
+- Typographic marks are judged from their own ink: ’, − before amounts, – (the recognizer has no en dash: "10–12" read as "1012") and —. On 490 invented fields: exact text 447 → 463, fields wrong only by typography 22 → 6, no field that was right broken. Unread symbols such as ★ keep a letter cell, so an original-letters edit keeps their pixels (the line's own pixels, per your rule). A coloured badge next to a label ("Livret A" + "NOUVEAU") is its own field. Files: new `src/ocr-typography.ts` (run at the end of `recognizeLevel`), `glyph-edit.ts` (`UNREAD` placeholder cells, `withUnread`), `browser/ocr.ts` (`wordBackground`, `splitAtBackgrounds`, `typesetRegions`), `detected-text.ts` `glyphEditPatch`, `ocr-segmentation.ts`, one line in `ai-tools.ts`, `doubtfulLetters` and `ocrMatchRect` skip placeholders. Tests: `tests/ocr-typography.test.mjs`, `tests/e2e/ocr-typography.e2e.mjs`.
+- Refused original-letter edits (your rule is unchanged) now say why inside the edit dialog: which characters the line lacks ("“5” does not appear in this line, and only its own letters are reused") or that it has no letter positions. The typed text stays, and a **Use a font for this edit** button sets that one line in the OCR font as an explicit choice. Find & replace and Proofread keep the error box, with the reason added. (`letterEditBlocker`/`missingLetters`, `LetteringError` in `ocr-replace.ts`; `tests/e2e/ocr-replace.e2e.mjs` was updated for the in-dialog refusal, and `edit-flow` covers the font button.)
+- Verified on the branch head before this merge of main: `npm test` 262 tests, 256 pass, 6 Windows-only skips; `npm run test:e2e` 31 files, 93 tests, all pass; `npm run bench:ocr -- ai`: 1.0% line error, 97.2% words found, 98.1% right. Rerun them after merging.
+- **Please check:** your benchmark on main (1.217% / 96.28% / 97.31%) is below ours on the same OCR code (1.0% / 97.2% / 98.1%), with the same model files (sha256 of ppocr-det, ppocr-latin-rec, ppocr-det-server, doc-ori and uvdoc match your manifest). Ours runs on WebAssembly with 4 threads (no GPU here). `src/browser/ai.worker.ts` uses WebGPU whenever `navigator.gpu` exists: if your run used WebGPU, run the benchmark once with WebGPU off (force the `wasm` backend) and compare. If WebGPU reads worse, hosted users with a GPU get the lower accuracy, and the AI OCR should use the wasm backend (or WebGPU only for LaMa/ESRGAN).
+- Known limits: in-place PDF edits keep a centred line's start, not its centre; small table digits can have misaligned letter cells (a letter edit of "4,8" → "5,8" lost its comma in one invented case); on a page with a clear ’, a deliberately straight ' after a letter also becomes ’.
 
 `main` (9e37c66) already has the OCR, scanned-PDF and pinch-zoom work up to 6be8fcf, and your original-letters rule. Everything below is on `claude/lucid-fermat-jvmf9l` and not on `main` yet.
 
@@ -91,7 +101,7 @@ The owner's target flow: open a file → it is scanned with the best method, no 
 ## 4. Not done yet (do not assume it is)
 
 - Native PDF in-place editing was subsequently implemented in `c1519a8` / `30b0fc9` and integrated below. Unsupported fonts, glyphs, layouts or uncertain new letter-pair spacing still require refusal or an explicit replacement-font choice.
-- Typographic ’ and − come back as ' and -; – and ★ are missing from the Latin recognizer's dictionary.
+- Typographic ’ − – — and unread symbols: done on the branch (see the current update at the top).
 - veraPDF was not run on the Factur-X PDFs.
 
 Privacy: never commit anything from `tests/real/` (private user documents; git-ignored). All test documents are invented.
