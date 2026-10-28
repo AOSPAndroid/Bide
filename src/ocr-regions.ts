@@ -91,6 +91,7 @@ export function regionsAfterEdit(regions:TextRegion[],edits:{region:TextRegion;t
  return regions.flatMap(r=>{
   const e=byId.get(r.id);if(!e)return [r];if(!e.letters)return [];
   const original=r.original??e.region,{glyphs:_glyphs,confidence:_confidence,doubt:_doubt,...rest}=original;
+  if((e.text??original.text)===original.text)return [original];
   return [{...rest,text:e.text??original.text,original,layer:e.layer}];
  });
 }

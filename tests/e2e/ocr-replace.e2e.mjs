@@ -113,6 +113,13 @@ test('editing image text reuses the original letters; find & replace fixes every
   const layers=async()=>{await page.waitForTimeout(1500);return page.evaluate(async()=>{const {restoreLocal}=await import('/src/model.ts');return (await restoreLocal()).pages[0].canvas.objects.map(o=>({name:o.name,type:o.type,left:o.left,width:o.width}));});};
   await page.goto(server.resolvedUrls.local[0]+'app/');await page.locator('input[type=file][accept*=".psd"]').setInputFiles(image);
   await page.waitForFunction(()=>/OCR regions/.test(document.querySelector('.text-detection-bar span')?.textContent||''),null,{timeout:180000});
+  // Bulk font conversion also requires the explicit New font choice.
+  assert.equal(await (await ocrSetting(page,'Edit image text with')).inputValue(),'letters');
+  const beforeBulk=await page.evaluate(async()=>{const {restoreLocal}=await import('/src/model.ts');return (await restoreLocal()).pages[0].canvas;});
+  await page.getByRole('button',{name:'Convert all to font text',exact:true}).click();
+  await page.getByRole('dialog',{name:'Something needs your attention'}).getByText(/Convert all creates new font text/).waitFor();
+  assert.deepEqual(await page.evaluate(async()=>{const {restoreLocal}=await import('/src/model.ts');return (await restoreLocal()).pages[0].canvas;}),beforeBulk,'refused bulk conversion leaves the original canvas unchanged');
+  await page.getByRole('button',{name:'Got it',exact:true}).click();
   // Click a line: edit in the dialog; the result is a pixel patch, not font text.
   await page.locator('.detected-text-overlay button[aria-label*="Nom du client"]').click();
   const input=page.getByLabel('New text');await input.fill((await input.inputValue()).replace('Jeaan','Jean'));await page.getByRole('button',{name:'Apply',exact:true}).click();
@@ -124,13 +131,25 @@ test('editing image text reuses the original letters; find & replace fixes every
   assert.match(await page.locator('[aria-live=polite]').innerText(),/^1 detected line contains/);
   await page.getByRole('button',{name:'Replace all'}).click();saved=await layers();
   assert.ok(saved.some(l=>/^Edited text: Titulaire: Jean MARTIN/.test(l.name)),'find & replace patch');
-  // A letter that appears nowhere on the page falls back to font text.
+  // Missing letters must not silently replace the original face with a font.
+  const original=await page.evaluate(async()=>{const {restoreLocal}=await import('/src/model.ts');return (await restoreLocal()).pages[0].canvas;});
   await page.locator('.detected-text-overlay button[aria-label*="Repas"]').click();
-  const repas=page.getByLabel('New text');await repas.fill('Repas: Les repas ne sont pas compris (zzz).');await page.getByRole('button',{name:'Apply',exact:true}).click();
-  // Font text matches the original's size and softness first, which takes a few seconds.
+  const requested='Repas: Les repas ne sont pas compris (zzz).',repas=page.getByLabel('New text');await repas.fill(requested);await page.getByRole('button',{name:'Apply',exact:true}).click();
+  await page.getByRole('dialog',{name:'Something needs your attention'}).getByText(/Cannot preserve the original lettering/).waitFor({timeout:60000});
+  assert.deepEqual(await page.evaluate(async()=>{const {restoreLocal}=await import('/src/model.ts');return (await restoreLocal()).pages[0].canvas;}),original,'refused edit leaves every original layer unchanged');
+  await page.getByRole('button',{name:'Got it',exact:true}).click();
+  assert.equal(await repas.inputValue(),requested,'the refused edit retains the typed text');
+  await page.getByRole('button',{name:'Cancel',exact:true}).click();
+  // An explicit New font choice permits editable font text and appearance fitting.
+  await (await ocrSetting(page,'Edit image text with')).selectOption('font');
+  await page.locator('.detected-text-overlay button[aria-label*="Repas"]').click({timeout:120000});
+  await page.getByLabel('Text content').waitFor({timeout:120000});
+  await page.getByLabel('Text content').fill(requested);
   const fontText=l=>/Repas/.test(l.name)&&(l.type==='Textbox'||l.type==='textbox');
   for(let i=0;i<40&&!(saved=await layers()).some(fontText);i++);
-  assert.ok(saved.some(fontText),'fallback to font text');
+  assert.ok(saved.some(fontText),'explicit font choice creates editable text');
+  const edited=await page.evaluate(async()=>{const {restoreLocal}=await import('/src/model.ts');return (await restoreLocal()).pages[0].canvas.objects.find(o=>o.text?.startsWith('Repas'));});
+  assert.equal(edited.text,requested,'explicit font text accepts the requested new characters');
   assert.deepEqual(errors,[]);
  }finally{await browser.close();await server.close();}
 });

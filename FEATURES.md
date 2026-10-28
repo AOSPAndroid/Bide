@@ -1,3 +1,8 @@
+## Hosted update — preserve scanned lettering
+
+- Original letters mode reuses pixels from the edited line. It never switches to an OCR font or borrows unverified lettering from another line or page. If it cannot reconstruct an edit, the original stays unchanged and the typed text remains available.
+- New font remains an explicit choice. Find & replace and proofreading follow the same original-letter safeguard; an unsupported replacement does not silently change the page's typography.
+
 ## Unreleased — Open, edit, download
 
 - Fields to check are flagged with their reason, and listed first in Proofread with an Edit button: an IBAN whose check digits fail, a date that does not exist, a SIREN or SIRET failing its checksum, an amount without the thousands space the page's other amounts use, an AI OCR confidence under 93 (70 for Tesseract) or a hard-to-read letter. Text is only checked, never changed. On the 490 invented fields, 14 of the 23 still misread are flagged (6 before), with 6.6% of the correct fields flagged.
