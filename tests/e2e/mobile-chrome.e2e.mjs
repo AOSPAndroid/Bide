@@ -54,6 +54,25 @@ check('finding 14: a labelled Menu button opens File…Help as a sheet; Find is 
  assert.deepEqual(await small(page,'.modal-header .icon-button'),[]);
 });
 
+// The command palette on touch: the list shows at once and the keyboard waits for a tap on
+// the field. A key that opens it (a hardware keyboard) still focuses the field, as on desktop.
+const focused=page=>page.locator('.palette-search input').evaluate(e=>e===document.activeElement);
+check('a tap opens the palette without focusing its field; tapping the field focuses it',iphone,async page=>{
+ await page.locator('.command-button').tap();await page.getByRole('dialog',{name:'What would you like to do?'}).waitFor();
+ assert.equal(await focused(page),false,'the search field is not focused, so no on-screen keyboard');
+ assert.ok(await page.locator('.command-list>button').nth(5).isVisible(),'the commands show at once');
+ await page.locator('.palette-search input').tap();assert.equal(await focused(page),true,'a tap on the field focuses it');
+ await page.getByRole('button',{name:'Close dialog'}).tap();
+ await page.keyboard.press('Control+k');await page.getByRole('dialog',{name:'What would you like to do?'}).waitFor();
+ assert.equal(await focused(page),true,'Ctrl K focuses the field');
+});
+check('desktop: the palette focuses its search field',{viewport:{width:1400,height:900}},async page=>{
+ await page.locator('.command-button').click();await page.getByRole('dialog',{name:'What would you like to do?'}).waitFor();
+ assert.equal(await focused(page),true,'opened with the mouse');
+ await page.keyboard.press('Escape');await page.keyboard.press('Control+k');await page.getByRole('dialog',{name:'What would you like to do?'}).waitFor();
+ assert.equal(await focused(page),true,'opened with Ctrl K');
+});
+
 // Phones group the tool rail: one button per group, a flyout for the rest.
 const railButtons=page=>page.locator('.tool-rail .tool-group>div>button');
 const railGroups=page=>railButtons(page).evaluateAll(bs=>bs.map(b=>b.title.split(': ')[1].split(', ')));

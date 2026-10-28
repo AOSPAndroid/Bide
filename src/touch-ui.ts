@@ -7,7 +7,14 @@ export function useMedia(query:string){
  return useSyncExternalStore(change=>{const l=m();l?.addEventListener('change',change);return()=>l?.removeEventListener('change',change);},()=>!!m()?.matches,()=>false);
 }
 // True on touch-first devices (phones, tablets): no hover, no Alt key, no tooltips.
+const coarse=()=>globalThis.matchMedia?.('(pointer:coarse)');
 export const useCoarsePointer=()=>useMedia('(pointer:coarse)');
+
+// Fields that would open the on-screen keyboard only take focus by themselves
+// with a fine pointer, or when a key (a hardware keyboard) did the opening.
+let keyed=false;
+if(typeof window!=='undefined'){window.addEventListener('keydown',()=>{keyed=true;},true);window.addEventListener('pointerdown',()=>{keyed=false;},true);}
+export const typingFirst=()=>!coarse()?.matches||keyed;
 
 // Scroll `row` into view inside `list` only; scrollIntoView would also scroll
 // the clipped app shell.
