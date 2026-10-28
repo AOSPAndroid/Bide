@@ -17,7 +17,7 @@ Screenshots are generated from the app with `node scripts/readme-screenshots.mjs
 
 ## Start on Windows
 
-1. Get the [prebuilt bide-browser.zip](https://github.com/AOSPAndroid/Bide/releases/latest/download/bide-browser.zip) and extract the entire ZIP into a **new writable folder**. The app and conversion engines are already included. You should see a `site` folder beside the BAT files.
+1. Get the [latest prebuilt bide-browser.zip](https://github.com/AOSPAndroid/Bide/releases/latest/download/bide-browser.zip) and extract the entire ZIP into a **new writable folder**. The app and conversion engines are already included. You should see a `site` folder beside the BAT files.
 2. Use your existing **Node.js 22 or newer**. bide detects `C:\devhome\tools\node24\current\node.exe` or `node.exe` on PATH. With this ZIP, **Install Dependencies.bat is optional**: it only checks your installation and bundled files, with no downloads.
 3. Double-click **launch bide.bat**. It starts the local server in the background and opens the editor in your default browser (use Edge or Chrome).
 
@@ -27,7 +27,7 @@ The BAT files run directly through Node: **PowerShell and execution-policy chang
 
 GitHub's **Code → Download ZIP** creates a source folder such as `Bide-main`. A source build must be explicitly requested with `"Install Dependencies.bat" --build-source`; it needs npm packages and the browser Office runtime, which may require network access. Use the prebuilt release ZIP on a PC where proxy authentication blocks dependency downloads. Its root launchers run offline using your existing Node; the `source` folder is only for rebuilding.
 
-The local edition works without internet after setup. A hosted edition needs only a browser and no Node runtime on the work PC; see [HOSTING.md](HOSTING.md). A public [bide demo](https://bide-demo.daaalil.chatgpt.site) is hosted with Sites. The demo includes the photo editor and PDF tools; Office-to-PDF conversion is available only in the local download because the Office assets exceed the host's 25 MiB file limit. Files and drafts stay in each visitor's browser. The previous `Setup.cmd` and `start bide.cmd` now forward to these BAT files.
+The local edition works without internet after setup. A hosted edition needs only a browser and no Node runtime on the work PC; see [HOSTING.md](HOSTING.md). A public [bide demo](https://bide-demo.daaalil.chatgpt.site) is hosted with Sites. The demo includes the photo editor, PDF tools, Documents and AI OCR with original-letter editing. Hosted AI models download on demand, are checked against pinned SHA-256 hashes and cached when possible; images and PDFs stay in the browser. Office-to-PDF conversion is available only in the local download because the Office assets exceed the host's 25 MiB file limit. The previous `Setup.cmd` and `start bide.cmd` now forward to these BAT files.
 
 ## Share internally using IP:port
 
@@ -110,11 +110,13 @@ The web app works in phone browsers. Native iOS and Android apps are built with 
 ```powershell
 npm ci --ignore-scripts
 npm run assets:office
-npm run build
-# dist/ is the complete local app; out/ is the public demo.
+npm run build:local
+# dist/ is the complete local app.
 npm run serve
 npm test
 ```
+
+For the hosted public website in `out/`, use `npm run build`. See [public website and search setup](docs/discovery.md) for domain, indexing and measurement configuration.
 
 React, TypeScript and Fabric.js provide the editor. MuPDF WebAssembly handles PDF parsing/rendering/composition; PDFKit and SVG-to-PDFKit produce vector overlays with embedded fonts. ZetaOffice performs Office conversion in a separate browser worker. The earlier Python prototype remains for reference and is not used by the BAT launchers.
 

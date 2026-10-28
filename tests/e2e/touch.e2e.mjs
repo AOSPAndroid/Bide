@@ -17,7 +17,7 @@ test('pinch zooms the page on a phone; one finger keeps drawing and panning',{ti
  try{
   const context=await browser.newContext({viewport:{width:390,height:844},deviceScaleFactor:2,isMobile:true,hasTouch:true}),page=await context.newPage(),errors=[];
   page.on('pageerror',e=>errors.push(e.message));const cdp=await context.newCDPSession(page);
-  await page.goto(server.resolvedUrls.local[0]);await page.locator('.artboard').waitFor({timeout:60000});await page.waitForTimeout(1500);
+  await page.goto(server.resolvedUrls.local[0]+'app/');await page.locator('.workspace-nav').getByRole('button',{name:'Photo editor',exact:true}).click();await page.locator('.artboard').waitFor({timeout:60000});await page.waitForTimeout(1500);
   const before=await objects(page),width0=await zoomOf(page),box=await page.locator('.canvas-workspace').boundingBox(),cx=box.x+box.width/2,cy=box.y+box.height/2;
   // Pinch out over the page: the page grows, the interface does not, nothing is added or moved.
   await touches(cdp,pinch(cx,cy,40,120));await page.waitForTimeout(600);

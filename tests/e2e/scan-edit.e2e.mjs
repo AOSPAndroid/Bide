@@ -40,7 +40,7 @@ test('edits on a scanned quote are as sharp as the scan, with or without its OCR
  const server=await createServer({logLevel:'error',server:{port:0,host:'127.0.0.1'}});await server.listen();
  const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||undefined});
  try{
-  const url=server.resolvedUrls.local[0];
+  const url=server.resolvedUrls.local[0]+'app/';
   for(const file of ['scanned-quote-ocr-layer.pdf','scanned-quote.pdf']){
    const r=await editAmount(browser,url,file,'1 947,80','1 974,80 €');
    assert.match(r.title,/OCR/,`${file}: the line is read by OCR, not taken from the invisible layer (${r.title})`);

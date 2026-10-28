@@ -1,4 +1,18 @@
-## Unreleased — searchable PDFs, proofreading and letter reuse
+## v0.8.16 — Sharp text edits on scanned PDFs
+
+- Includes Claude's higher-resolution sharpness measurement for scanned PDF text. Font, size and position are fitted at page scale; softness is measured on a finer render so crisp scans do not acquire unnecessary blur.
+- Measures candidate blur in page units, preserving stronger scan blur instead of clipping it during the higher-resolution comparison.
+- Adds end-to-end coverage for crisp, mildly blurred and heavily blurred scans. The regression opens the current /app/ editor route. Existing appearance checks compare rendered edge clarity in both directions instead of requiring the renderers to use the same blur setting.
+- Retains Documents, invoices, the hidden-PDF-text OCR fix, the complete offline OCR/model and Office packs, and download links that follow the latest stable release.
+
+## v0.8.15 — Documents, OCR fixes and current downloads
+
+- Replaces the Diagrams workspace with Documents for PDF forms and electronic invoices. The retired diagram engine is excluded from this release.
+- Includes the latest OCR, searchable export, proofreading, image editing and mobile source updates described below.
+- Scanned PDFs with invisible or clipping-only text layers now use fresh OCR instead of treating stale hidden text as visible, editable PDF text.
+- Website, editor and launcher download links now follow the latest stable release. The ZIP includes the full offline model and Office packs, complete corresponding source, and a VERSION.txt identifying its source commit.
+
+## v0.8.15 details — Documents and advanced editing
 
 - **Documents workspace**: the bundled draw.io Diagrams workspace was removed and replaced by a Documents workspace (forms and e-invoices), making the app about 150 MB smaller. Diagrams already placed in a project stay as images.
 - **E-invoices** (Documents → New invoice): invoices, prepayment invoices and credit notes as Factur-X (PDF/A-3b with the CII XML embedded, EN 16931 profile), UBL 2.1 or CII. Live checks cover EN 16931 business rules and the French 2026 reform (SIREN/SIRET/VAT checksums, SIREN-based electronic address, invoicing frame B1/S1/M1, mandatory payment mentions, VATEX exemption codes including VATEX-FR-FRANCHISE). Issued invoices are frozen and numbered in sequence; corrections are credit notes. Your business details, clients and payment settings are remembered in the browser.
@@ -49,12 +63,23 @@
 - Original-letter edits borrow a missing letter from any line of the same x-height, aligned on the baseline (lines with descenders used to be excluded), and from other pages of the document when this page doesn't have it.
 - Font-text replacement fits size and position on crisp renders first, then tries blur only around the best size, and skips fonts that trail far behind. The matched result is the same as before, 4–8× faster: about 15 s instead of more than 2 minutes in headless Chromium.
 
+## v0.8.14 — Searchable documents, forms and advanced editing
+
+- Latest OCR improvements: searchable PDF/TXT/DOCX export, English/French proofreading dictionaries, character confidence, cross-page letter borrowing, faster appearance matching, additional AI OCR alphabets and a high-accuracy detector.
+- Page straightening/orientation and AI flattening; SlimSAM click-based object selection; editable Levels, Curves and Hue/Saturation layers.
+- PDF redaction and Find & redact, existing PDF form filling, new movable text/checkbox/dropdown/radio fields, and fillable or flattened PDF export.
+- Release fixes remove redacted native field values and intersecting vector paths, sanitize retained project PDF sources, honor chosen match occurrences, read current visible text for searchable export, preserve adjustments in masked rendering/PSD fallback, fix Arabic reading order and radio switching.
+- Searchable export reads the current visible composite; the original OCR scan remains only an appearance reference. Rasterized softened/system-font text is OCR'd; native text is not duplicated.
+- Redaction rebuilds project PDF sources from retained pages. Supported form fields are recreated with the export appearance; unsupported widgets flatten. Original form styling/signatures are not preserved through this destructive cleanup. Undo retains originals while the document remains open.
+- Form export supports the bundled Liberation Sans glyphs, including French, Greek and Cyrillic. Other unsupported scripts report a clear font-coverage error rather than silently changing values.
+- Full offline model pack and seven Tesseract languages are bundled in the ZIP. Hosted demo omits Office and AI model assets.
+
 ## v0.8.13 — Independent branding and editor improvements
 
 - Original B logo and favicon, warm white/graphite interface, burnt-orange accents, and “Image & Document Editor” tagline. Retired bank logo assets are removed.
 - Compact workspace layout and shorter tool rail, with navigation in the header and more room for documents.
 - OCR appearance matching and original-letter replacement, Find & replace, better bold/symbol weights, and a guard against making replacement text blurrier than the source. Exact matching still depends on the source image and available glyphs/fonts.
-- Offline AI OCR, image removal/fill, sharpening and subject selection in the full Windows package; seven bundled OCR languages. The hosted demo omits the AI model pack and Office engine.
+- Offline AI OCR, image removal/fill, sharpening and subject selection in the full Windows package; seven bundled OCR languages. The hosted demo runs AI OCR and image actions with verified models downloaded on demand and cached in the browser. It still omits the Office engine.
 - Magic wand, combined selections, colour range/refine, layer styles, gradients, paint bucket and paintable masks.
 - Pen and path editing, rulers/guides, crop/straighten, image/canvas size, perspective and named History steps.
 - Prebuilt ZIP retains install, launch, LAN sharing and Stop BAT files and uses existing Node.js 22+ without setup downloads.
@@ -270,7 +295,7 @@ OCR weight defaults to Auto (match strokes), comparing foreground coverage with 
 
 Roboto and Inter are already bundled for offline text and OCR editing. SF Pro, SF Pro Text and SF Pro Display are now offered as installed-font choices in both font menus and the command palette. Apple font files are not bundled or downloaded; use requires a local installation and compliance with Apple licensing. Missing SF Pro fonts report an error recommending bundled Inter instead of silently substituting a different face. Installed-font text retains the existing raster-text PDF/SVG export behavior.
 
-## Unreleased — OCR accuracy, languages and font matching
+## v0.8.14 details — OCR accuracy, languages and font matching
 
 - Small text is enlarged before recognition, based on line height measured from the image (lines under 24 px, up to 3x), and light-on-dark images are inverted. Already-large text is left at native size: enlarging it or stretching contrast measurably hurt accents and ß. PDF pages are rendered for OCR at up to 3600 px. On rendered test text at 72 DPI, character errors fell from about 18% to 0–3% at 9 pt and from about 92% to under 8% at 7 pt.
 - Replacement text color comes from the glyph pixels and the background from a ring around the region, instead of black/white text and a single corner pixel.

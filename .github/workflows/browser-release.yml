@@ -1,0 +1,75 @@
+name: Build browser release
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing draft release tag (for example v0.8.15)
+        required: true
+        type: string
+      source_commit:
+        description: Full source commit SHA matching the draft release
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: browser-release-${{ inputs.release_tag }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      RELEASE_TAG: ${{ inputs.release_tag }}
+      SOURCE_COMMIT: ${{ inputs.source_commit }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_commit }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Validate release target
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          [[ "$SOURCE_COMMIT" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "$SOURCE_COMMIT"
+          test "$RELEASE_TAG" = "v$(node -p 'require("./package.json").version')"
+          gh release view "$RELEASE_TAG" --json isDraft,targetCommitish > /tmp/bide-release.json
+          node --input-type=module -e 'import fs from "node:fs"; const r=JSON.parse(fs.readFileSync("/tmp/bide-release.json")); if(!r.isDraft || r.targetCommitish!==process.env.SOURCE_COMMIT) throw Error("Release must be a draft targeting this exact commit");'
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm run assets:office
+      - run: npm run build:local
+      - run: npm test
+      - name: Package and verify
+        run: |
+          python scripts/package-browser.py
+          python - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+          import hashlib, json, os
+          archive = Path('release/bide-browser.zip')
+          with ZipFile(archive) as z:
+              names = z.namelist()
+              assert len(names) == len(set(names))
+              assert not any('/diagrams/' in n.lower() or n.endswith('/Diagrams.tsx') for n in names)
+              assert z.testzip() is None
+              assert os.environ['SOURCE_COMMIT'] in z.read('VERSION.txt').decode()
+              assert 'v' + json.loads(z.read('source/package.json'))['version'] == os.environ['RELEASE_TAG']
+              for required in ['source/src/Documents.tsx', 'site/office/runtime/soffice.wasm', 'site/ai/models/lama.onnx', 'site/ocr/lang/fra.traineddata.gz']:
+                  assert required in names, required
+          digest = hashlib.file_digest(archive.open('rb'), 'sha256').hexdigest()
+          Path('release/SHA256SUMS.txt').write_text(f'{digest}  bide-browser.zip\n')
+          print(f'SHA256 {digest}')
+          PY
+      - name: Attach files to draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$RELEASE_TAG" release/bide-browser.zip release/SHA256SUMS.txt

@@ -14,7 +14,7 @@ test('Proofread lists a misspelled word and fixes it with the image letters',{ti
   const shot=await browser.newPage({viewport:{width:520,height:200}});await shot.setContent(scan);
   const image=join(await mkdtemp(join(tmpdir(),'bide-proof-')),'notes.png');await shot.screenshot({path:image});await shot.close();
   const page=await browser.newPage({viewport:{width:1400,height:900}}),errors=[];page.on('pageerror',e=>errors.push(e.message));
-  await page.goto(server.resolvedUrls.local[0]);await page.locator('input[type=file][accept*=".psd"]').setInputFiles(image);
+  await page.goto(server.resolvedUrls.local[0]+'app/');await page.locator('input[type=file][accept*=".psd"]').setInputFiles(image);
   await page.locator('button[aria-label^="Edit detected text: Our rnodern"]').waitFor({timeout:240000});
 
   // The edit dialog checks spelling too.

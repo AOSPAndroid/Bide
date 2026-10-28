@@ -14,7 +14,7 @@ async function picture(browser,transform,{size={width:700,height:700},background
 const saved=page=>page.evaluate(async()=>{const {restoreLocal}=await import('/src/model.ts');const p=(await restoreLocal()).pages[0];return {width:p.width,height:p.height,objects:p.canvas.objects.map(o=>({type:o.type,angle:o.angle,src:(o.src||'').slice(-40)}))};});
 async function open(browser,file){
  const page=await browser.newPage({viewport:{width:1400,height:900}}),errors=[];page.on('pageerror',e=>errors.push(e.message));
- await page.goto(server.resolvedUrls.local[0]);await page.locator('input[type=file][accept*=".psd"]').setInputFiles(file);
+ await page.goto(server.resolvedUrls.local[0]+'app/');await page.locator('input[type=file][accept*=".psd"]').setInputFiles(file);
  await page.getByText(/page added/).waitFor({timeout:60000});return {page,errors};
 }
 let server;

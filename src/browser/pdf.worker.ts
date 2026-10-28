@@ -1,3 +1,4 @@
+import {HOSTED_BUILD} from '../build-flags';
 // Install the message handler immediately; the WASM module uses top-level await.
 const engineReady=import('./pdf-core');
 let queue=Promise.resolve();
@@ -8,7 +9,7 @@ self.onmessage=(event:MessageEvent)=>{
       const engine=await engineReady;
       let result:unknown;
       switch(method){
-        case 'health':result={ok:true,office:globalThis.isSecureContext&&globalThis.crossOriginIsolated};break;
+        case 'health':result={ok:true,office:!HOSTED_BUILD&&globalThis.isSecureContext&&globalThis.crossOriginIsolated};break;
         case 'import':result=await engine.importBytes(args.bytes,args.name,args.password);break;
         case 'restore':result=await engine.restore(args);break;
         case 'render':result=engine.render(args.source,args.index,args.scale);break;
@@ -16,6 +17,7 @@ self.onmessage=(event:MessageEvent)=>{
         case 'removeText':result=await engine.removePdfText(args.source,args.index,args.regionId);break;
         case 'findText':result=engine.findPdfText(args.source,args.index,args.needles);break;
         case 'redact':result=await engine.redactPdf(args.source,args.index,args.rects);break;
+        case 'sanitize':result=await engine.sanitizePdf(args.source,args.indexes);break;
         case 'formFields':result=engine.pdfFormFields(args.source,args.index);break;
         case 'fillField':result=await engine.fillPdfField(args.source,args.index,args.widget,args.value);break;
         case 'fontSupports':result=engine.fontSupportsText(args.data,args.text);break;

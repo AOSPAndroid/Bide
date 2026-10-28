@@ -36,11 +36,10 @@ document.querySelector('#run')!.addEventListener('click',async()=>{
    const base=await makeText(region,fitted.family),baseSize=base.fontSize,baseSpacing=base.charSpacing;
    const replacement=await makeText(region,fitted.family);applyOcrAppearance(replacement,region,fitted);
    const sourceEdges=coverageEdgeWidth(coverage),replacementEdges=outputEdges(replacement,380,70);
-   if(softness>0&&fitted.softness<.2)throw Error(`Soft source was converted to crisp text: ${JSON.stringify({family,weight,fitted,diagnostics})}`);
    // Font size and tracking change the radius needed for equal edge clarity.
    // Compare actual rendered pixels for crisp and soft sources alike; a CSS
    // blur radius alone is not a stable measure across those geometry changes.
-   if(sourceEdges===undefined||replacementEdges===undefined||replacementEdges>sourceEdges+.15)throw Error(`Replacement edges are too soft: ${JSON.stringify({family,weight,baseSize,baseSpacing,sourceEdges,replacementEdges,fitted,diagnostics})}`);
+   if(sourceEdges===undefined||replacementEdges===undefined||Math.abs(replacementEdges-sourceEdges)>.15)throw Error(`Replacement edge clarity differs: ${JSON.stringify({family,weight,baseSize,baseSpacing,sourceEdges,replacementEdges,fitted,diagnostics})}`);
    const manual=await matchOcrAppearance(canvas,region,[region],family,{autoFont:false,matchBlur:false,makeText});
    if(!manual||manual.family!==family||manual.softness!==0)throw Error('Manual font/crisp override was ignored');
    results.push({family,weight,sourceSoftness:softness,sourceEdges,replacementEdges,fit:fitted,manual});document.body.append(canvas);

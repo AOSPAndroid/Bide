@@ -15,7 +15,7 @@ test('adjustment layers recolour the layers below, persist and export',{timeout:
   const shot=await browser.newPage({viewport:{width:200,height:120}});await shot.setContent('<body style="margin:0;background:#fff"><div style="width:200px;height:120px;background:#e02020"></div></body>');
   const file=join(await mkdtemp(join(tmpdir(),'bide-adjust-')),'red.png');await shot.screenshot({path:file});await shot.close();
   const page=await browser.newPage({viewport:{width:1400,height:900},acceptDownloads:true}),errors=[];page.on('pageerror',e=>errors.push(e.message));
-  await page.goto(server.resolvedUrls.local[0]);await page.locator('input[type=file][accept*=".psd"]').setInputFiles(file);await page.getByText(/page added/).waitFor({timeout:60000});
+  await page.goto(server.resolvedUrls.local[0]+'app/');await page.locator('input[type=file][accept*=".psd"]').setInputFiles(file);await page.getByText(/page added/).waitFor({timeout:60000});
   await page.waitForTimeout(1500);const before=await pixel(page,100,60);assert.ok(before[0]>200&&before[1]<60,`red to start with: ${before}`);
   await page.keyboard.press('Control+k');await page.keyboard.type('New adjustment layer: Hue/Saturation');await page.keyboard.press('Enter');
   await page.getByLabel('Saturation',{exact:true}).fill('-100');await page.waitForTimeout(800);

@@ -30,6 +30,7 @@ export const removePdfText=(source:string,index:number,regionId:string)=>rpc<{id
 type PageRect=import('./pdf-core').PageRect;
 export const findPdfText=(source:string,index:number,needles:string[])=>rpc<PageRect[][]>('findText',{source,index,needles});
 export const redactPdf=(source:string,index:number,rects:PageRect[])=>rpc<{id:string;data:string}>('redact',{source,index,rects});
+export const sanitizePdf=(source:string,indexes:number[])=>rpc<{id:string;data:string;pages:{index:number;width:number;height:number}[]}>('sanitize',{source,indexes});
 export const pdfFormFields=(source:string,index:number)=>rpc<import('../forms').PdfFormField[]>('formFields',{source,index});
 export const fillPdfField=(source:string,index:number,widget:number,value:string)=>rpc<{id:string;data:string}>('fillField',{source,index,widget,value});
 export const fontSupportsText=(data:string,text:string)=>rpc<boolean>('fontSupports',{data,text});

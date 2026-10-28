@@ -30,14 +30,14 @@ function localSamples(raster:HTMLCanvasElement,region:TextRegion,regions:TextReg
  });
 }
 
-function coverageRenderer(sample:Sample){
+function coverageRenderer(sample:Sample,scale=1){
  const canvas=document.createElement('canvas'),ctx=canvas.getContext('2d',{willReadFrequently:true})!,hi=document.createElement('canvas'),hiCtx=hi.getContext('2d')!;
  canvas.width=sample.source.width;canvas.height=sample.source.height;hi.width=canvas.width*4;hi.height=canvas.height*4;
  return (text:Textbox)=>{
   ctx.clearRect(0,0,canvas.width,canvas.height);
   if(text.textSoftness){
-   hiCtx.clearRect(0,0,hi.width,hi.height);hiCtx.save();hiCtx.scale(4,4);hiCtx.translate(-sample.left,-sample.top);text.render(hiCtx);hiCtx.restore();ctx.drawImage(hi,0,0,canvas.width,canvas.height);
-  }else{ctx.save();ctx.translate(-sample.left,-sample.top);text.render(ctx);ctx.restore();}
+   hiCtx.clearRect(0,0,hi.width,hi.height);hiCtx.save();hiCtx.translate(-sample.left*4,-sample.top*4);hiCtx.scale(4*scale,4*scale);text.render(hiCtx);hiCtx.restore();ctx.drawImage(hi,0,0,canvas.width,canvas.height);
+  }else{ctx.save();ctx.translate(-sample.left,-sample.top);ctx.scale(scale,scale);text.render(ctx);ctx.restore();}
   return alphaCoverage(ctx.getImageData(0,0,canvas.width,canvas.height).data,canvas.width,canvas.height);
  };
 }
@@ -132,16 +132,19 @@ export function matchOcrSoftness(raster:HTMLCanvasElement,region:TextRegion,regi
  const up=(r:TextRegion)=>({...r,left:r.left*scale,top:r.top*scale,width:r.width*scale,height:r.height*scale});
  const selected=samplePixels(raster,up(region),regions.map(up));if(!selected)return 0;
  const target=coverageEdgeWidth(selected.source);if(target===undefined)return 0;
- const paint=coverageRenderer(selected),saved={fontSize:text.fontSize,left:text.left,top:text.top,width:text.width,softness:text.textSoftness};
- text.set({fontSize:saved.fontSize*scale,left:saved.left*scale,top:saved.top*scale,width:saved.width*scale,objectCaching:false});text.initDimensions();
+ // Scale the render, keeping the text and its softness in page units. Scaling
+ // the blur value itself hits Textbox's 2 pt limit before the fine raster fits.
+ const paint=coverageRenderer(selected,scale),saved=text.textSoftness;
  let best=0,error=Infinity;
- for(const softness of [0,.15,.3,.45,.6,.8,1,1.3,1.7,2.2,3,4]){
-  text.textSoftness=softness;const edges=coverageEdgeWidth(paint(text));if(edges===undefined)continue;
-  // Prefer the crisper value unless a softer one is clearly closer.
-  const e=Math.abs(edges-target);if(e<error-.03){error=e;best=softness;}
- }
- text.set({fontSize:saved.fontSize,left:saved.left,top:saved.top,width:saved.width});text.textSoftness=saved.softness;text.initDimensions();
- return best/scale;
+ try{
+  for(const pixels of [0,.15,.3,.45,.6,.8,1,1.3,1.7,2.2,3,4,5,6,8]){
+   const softness=pixels/scale;if(softness>2)continue;
+   text.textSoftness=softness;const edges=coverageEdgeWidth(paint(text));if(edges===undefined)continue;
+   // Prefer the crisper value unless a softer one is clearly closer.
+   const e=Math.abs(edges-target);if(e<error-.03){error=e;best=softness;}
+  }
+ }finally{text.textSoftness=saved;}
+ return best;
 }
 
 export function applyOcrAppearance(text:Textbox,region:TextRegion,fit:Fit){

@@ -15,7 +15,7 @@ test('pen, guides, image and canvas size, crop, skew, perspective and history',{
   const shot=await browser.newPage({viewport:{width:400,height:300}});await shot.setContent(fixture);
   const image=join(await mkdtemp(join(tmpdir(),'bide-canvas-')),'disc.png');await shot.screenshot({path:image});await shot.close();
   const page=await browser.newPage({viewport:{width:1400,height:900}}),errors=[];page.on('pageerror',e=>errors.push(e.message));
-  await page.goto(server.resolvedUrls.local[0]);await page.locator('input[type=file][accept*=".psd"]').setInputFiles(image);
+  await page.goto(server.resolvedUrls.local[0]+'app/');await page.locator('input[type=file][accept*=".psd"]').setInputFiles(image);
   await page.getByText(/1 page added/).waitFor({timeout:60000});await page.waitForTimeout(800);
 
   // Pen: a filled triangle, closed by clicking the first point.

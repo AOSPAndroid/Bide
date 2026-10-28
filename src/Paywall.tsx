@@ -8,6 +8,7 @@
 // Play's consumption-only apps); subscribing happens on the website.
 import {useCallback,useEffect,useRef,useState,type ReactNode} from 'react';
 import {verifyLicence,importPublicKey,trialDaysLeft,type Licence} from './licence';
+import {trackMeasurement} from './measurement';
 
 const env=import.meta.env as Record<string,string|undefined>;
 // Read straight from import.meta.env so the build drops the branches it does not use.
@@ -60,8 +61,8 @@ function Gate({children}:{children:ReactNode}){
  useEffect(()=>{if(s.step!=='ready'||!s.licence)return;const t=setTimeout(()=>void refresh(),Math.max(1000,s.licence.exp-Date.now()+1000));return()=>clearTimeout(t);},[s.step,s.licence,refresh]);
 
  const start=async()=>{patch({busy:true,error:undefined});try{const r=await api<{sent:boolean;devCode?:string}>('/api/auth/start',{method:'POST',body:JSON.stringify({email})},null);patch({step:'code',email,busy:false,devCode:r.devCode});if(r.devCode)setCode(r.devCode);}catch(e){patch({busy:false,error:(e as Error).message});}};
- const verify=async()=>{patch({busy:true,error:undefined});try{const r=await api<{session:string}>('/api/auth/verify',{method:'POST',body:JSON.stringify({email,code})},null);store.set(SESSION,r.session);await refresh();}catch(e){patch({busy:false,error:(e as Error).message});}};
- const checkout=async()=>{patch({busy:true,error:undefined});try{const r=await api<{url:string}>('/api/checkout',{method:'POST'});location.assign(r.url);}catch(e){patch({busy:false,error:(e as Error).message});}};
+ const verify=async()=>{patch({busy:true,error:undefined});try{const r=await api<{session:string}>('/api/auth/verify',{method:'POST',body:JSON.stringify({email,code})},null);store.set(SESSION,r.session);trackMeasurement('sign_in_complete');await refresh();}catch(e){patch({busy:false,error:(e as Error).message});}};
+ const checkout=async()=>{patch({busy:true,error:undefined});try{const r=await api<{url:string}>('/api/checkout',{method:'POST'});trackMeasurement('checkout_started');location.assign(r.url);}catch(e){patch({busy:false,error:(e as Error).message});}};
  const portal=async()=>{try{const r=await api<{url:string}>('/api/portal',{method:'POST'});location.assign(r.url);}catch(e){alert((e as Error).message);}};
  const signOut=async()=>{try{await api('/api/logout',{method:'POST'});}catch{}store.set(SESSION,null);store.set(LICENCE,null);setCode('');setS({step:'email'});};
  const remove=async()=>{

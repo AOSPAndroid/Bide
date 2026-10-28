@@ -1,4 +1,4 @@
-import {Rect} from 'fabric';
+import {Rect,Group,classRegistry} from 'fabric';
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {writeFile,mkdir} from 'node:fs/promises';
@@ -34,4 +34,13 @@ test('normal nested PSD groups remain editable; unsupported descendants and pass
  assert.equal(requiresComposite({width:100,height:100,children:[{blendMode:'normal',children:[{effects:{}}]}]}),true);
  assert.equal(needsFlattenedPsd([new Rect({globalCompositeOperation:'destination-out'})]),true);
  assert.equal(needsFlattenedPsd([new Rect({globalCompositeOperation:'multiply'})]),false);
+});
+
+test('PSD export flattens backdrop adjustments, including nested adjustment layers',()=>{
+ const AdjustmentLayer=classRegistry.getClass('AdjustmentLayer');
+ const adjustment=new AdjustmentLayer({width:4,height:4,adjustment:{kind:'hueSaturation',hue:0,saturation:-100,lightness:0}});
+ assert.equal(adjustment.globalCompositeOperation,'source-over','normal blending does not make an adjustment independently renderable');
+ assert.equal(needsFlattenedPsd([new Rect({fill:'#e02020'}),adjustment]),true);
+ assert.equal(needsFlattenedPsd([new Group([adjustment])]),true);
+ assert.equal(needsFlattenedPsd([new Rect({fill:'#e02020'})]),false,'normal layers retain layered PSD export');
 });

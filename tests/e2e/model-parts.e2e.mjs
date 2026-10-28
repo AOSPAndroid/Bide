@@ -13,7 +13,7 @@ test('an AI model served in parts loads and runs',{timeout:300000},async()=>{
    if(url.endsWith('.parts.json'))return route.fulfill({contentType:'application/json',body:JSON.stringify({size:bytes.length,parts:3})});
    if(m)return route.fulfill({contentType:'application/octet-stream',body:Buffer.from(parts[+m[1]])});
    return route.fulfill({status:404,body:'not here'});});
-  await page.goto(server.resolvedUrls.local[0]);await page.waitForTimeout(1500);
+  await page.goto(server.resolvedUrls.local[0]+'app/');await page.waitForTimeout(1500);
   const size2=await page.evaluate(async()=>{const c=document.createElement('canvas');c.width=c.height=32;const g=c.getContext('2d');g.fillStyle='#c44c28';g.fillRect(0,0,32,32);
    const {upscaleCanvas}=await import('/src/browser/ai-tools.ts');const out=await upscaleCanvas(c,2);return [out.width,out.height];});
   assert.deepEqual(size2,[64,64],'the joined model upscales');

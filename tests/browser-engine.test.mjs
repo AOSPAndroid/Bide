@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdir, writeFile, readFile } from 'node:fs/promises';
 import * as mupdf from 'mupdf';
 import { unzipSync, strFromU8 } from 'fflate';
-import { importBytes, exportDocument, restore, render, selectPages, detectPdfText, removePdfText, fontSupportsText, findPdfText, redactPdf, pdfFormFields, fillPdfField } from '../tmp/browser-core.mjs';
+import { importBytes, exportDocument, restore, render, selectPages, detectPdfText, removePdfText, fontSupportsText, findPdfText, redactPdf, sanitizePdf, pdfFormFields, fillPdfField } from '../tmp/browser-core.mjs';
 await mkdir('tmp/pdfs',{recursive:true});
 const original=new mupdf.PDFDocument(),font=new mupdf.Font('Helvetica'),fontRef=original.addSimpleFont(font);
 for(const label of ['Original first page','Original second page']){const p=original.addPage([0,0,595,842],0,{Font:{helv:fontRef}},`BT /helv 22 Tf 50 772 Td (${label}) Tj ET 0.2 0.7 0.5 rg 50 642 200 100 re f`);original.insertPage(-1,p);p.destroy();}
@@ -81,6 +81,35 @@ test('PDF text detection preserves geometry, font and source until a region is e
  const result=detectPdfText(source.id,0);assert.ok(result.regions.length);const region=result.regions.find(r=>r.text.includes('Original first page'));assert.ok(region);assert.match(region.fontName,/Helvetica/);assert.equal(region.size,22);assert.ok(region.left>=49&&region.left<51);assert.ok(region.width>100);
  const edited=await removePdfText(source.id,0,region.id);assert.notEqual(edited.id,source.id);assert.ok(detectPdfText(source.id,0).regions.some(r=>r.text.includes('Original first page')));assert.equal(detectPdfText(edited.id,0).regions.some(r=>r.text.includes('Original first page')),false);assert.ok(detectPdfText(edited.id,1).regions.some(r=>r.text.includes('Original second page')));
  const doc=mupdf.Document.openDocument(Buffer.from(edited.data,'base64'),'pdf'),page=doc.loadPage(0),pix=page.toPixmap(mupdf.Matrix.identity,mupdf.ColorSpace.DeviceRGB,false,true);assert.equal(page.getLinks().length,1);const pixels=pix.getPixels(),offset=(150*pix.getWidth()+100)*3;assert.ok(pixels[offset+1]>150&&pixels[offset]<100,'green vector background remains');pix.destroy();page.destroy();doc.destroy();
+});
+
+test('an invisible OCR layer is searchable but is not native editable PDF text',async()=>{
+ const doc=new mupdf.PDFDocument(),font=new mupdf.Font('Helvetica'),ref=doc.addSimpleFont(font);
+ const p=doc.addPage([0,0,400,200],0,{Font:{F:ref}},'BT /F 20 Tf 3 Tr 30 100 Td (Wrong old OCR 999x) Tj ET');doc.insertPage(-1,p);
+ const bytes=doc.saveToBuffer('');
+ try{
+  const imported=await importBytes(bytes.asUint8Array().slice(),'searchable-scan.pdf');
+  const page=doc.loadPage(0),text=page.toStructuredText('');try{assert.match(text.asText(),/Wrong old OCR/);}finally{text.destroy();page.destroy();}
+  assert.deepEqual(detectPdfText(imported.id,0).regions,[],'the visible page must go through image OCR');
+ }finally{bytes.destroy();p.destroy();ref.destroy();font.destroy();doc.destroy();}
+});
+
+test('mixed pages expose painted text, ignoring invisible, transparent and clipping-only text',async()=>{
+ const doc=new mupdf.PDFDocument(),font=new mupdf.Font('Helvetica'),ref=doc.addSimpleFont(font);
+ const p=doc.addPage([0,0,400,300],0,{Font:{F:ref},ExtGState:{Transparent:{Type:'ExtGState',ca:0,CA:0}}},
+  'BT /F 18 Tf 30 250 Td (Visible amount 123,45) Tj ET '+
+  'BT /F 18 Tf 3 Tr 30 200 Td (Hidden amount 999,99) Tj ET '+
+  'q /Transparent gs BT /F 18 Tf 0 Tr 30 150 Td (Transparent amount) Tj ET Q '+
+  'q BT /F 18 Tf 7 Tr 30 100 Td (Clip-only amount) Tj ET Q '+
+  'BT /F 18 Tf 1 Tr 30 50 Td (Stroked amount) Tj ET');doc.insertPage(-1,p);
+ const bytes=doc.saveToBuffer('');
+ try{
+  const imported=await importBytes(bytes.asUint8Array().slice(),'mixed-pdf.pdf'),regions=detectPdfText(imported.id,0).regions;
+  assert.deepEqual(regions.map(r=>r.text.trim()),['Visible amount 123,45','Stroked amount']);
+  assert.ok(Math.abs(regions[0].left-30)<1);assert.ok(Math.abs(regions[0].baseline-50)<1);
+  const changed=await removePdfText(imported.id,0,regions[0].id);
+  assert.deepEqual(detectPdfText(changed.id,0).regions.map(r=>r.text.trim()),['Stroked amount']);
+ }finally{bytes.destroy();p.destroy();ref.destroy();font.destroy();doc.destroy();}
 });
 test('embedded TrueType font is reusable and missing glyphs are identified',async()=>{
  const bytes=new Uint8Array(await readFile('src/browser/fonts/LiberationSans-Regular.ttf'));const doc=new mupdf.PDFDocument(),font=new mupdf.Font('LiberationSans',bytes),ref=doc.addSimpleFont(font);const p=doc.addPage([0,0,400,300],0,{Font:{F1:ref}},'BT /F1 24 Tf 40 200 Td (Editable embedded font) Tj ET');doc.insertPage(-1,p);const buffer=doc.saveToBuffer('');const imported=await importBytes(buffer.asUint8Array().slice(),'embedded.pdf');await writeFile('tmp/pdfs/editable-embedded.pdf',buffer.asUint8Array());buffer.destroy();p.destroy();ref.destroy();font.destroy();doc.destroy();
@@ -194,4 +223,101 @@ test('PDF forms: fields are listed, filled, and exported fillable or flattened',
  // Password and fields together.
  const locked=await exportDocument({pages:[{width:400,height:300,index:0,source:id,svg:blank}],title:'Form',format:'pdf',compression:'lossless',range:'',dpi:144,keepForms:true,password:'s3cret'});
  const ld=mupdf.Document.openDocument(locked.bytes,'application/pdf');assert.ok(ld.needsPassword());
+});
+
+test('redacting a form field removes all its widgets and stored values from sources and exports',async()=>{
+ const {PDFDocument,PDFName,PDFString}=await import('pdf-lib');
+ const made=await PDFDocument.create(),first=made.addPage([400,300]),second=made.addPage([400,300]),form=made.getForm();
+ const secret=form.createTextField('Private.contact');secret.setText('SECRET widget');
+ secret.acroField.dict.set(PDFName.of('DV'),PDFString.of('SECRET default'));
+ secret.addToPage(first,{x:30,y:220,width:200,height:22});secret.addToPage(second,{x:30,y:220,width:200,height:22});
+ const publicField=form.createTextField('Public');publicField.setText('Keep me');publicField.addToPage(first,{x:30,y:100,width:200,height:22});
+ const source=await importBytes(await made.save(),'private-form.pdf'),area=pdfFormFields(source.id,0).find(f=>f.name==='Private.contact');
+ const redacted=await redactPdf(source.id,0,[area]);
+ assert.deepEqual(pdfFormFields(redacted.id,0).map(f=>[f.name,f.value]),[['Public','Keep me']]);
+ assert.deepEqual(pdfFormFields(redacted.id,1),[],'other widgets of the same secret field are removed too');
+ const inspect=async bytes=>{
+  const f=(await PDFDocument.load(bytes)).getForm();assert.ok(!f.getFields().some(f=>f.getName()==='Private.contact'));
+  const d=mupdf.Document.openDocument(bytes,'application/pdf');
+  try{
+   for(let i=0;i<d.countPages();i++){const p=d.loadPage(i),t=p.toStructuredText('');try{assert.ok(!t.asText().includes('SECRET'));}finally{t.destroy();p.destroy();}}
+   // Inspect every surviving object's dictionary and decoded stream, including
+   // objects that a viewer would not render. Original appearances must be gone.
+   for(let i=1;i<d.countObjects();i++){
+    const o=d.newIndirect(i),resolved=o.resolve();let value=resolved.toString();
+    try{if(o.isStream()){const b=o.readStream();try{value+='\n'+b.asString();}finally{b.destroy();}}
+     assert.ok(!/SECRET|534543524554|005300450043005200450054/.test(value),`secret object ${i}: ${value.slice(0,200)}`);
+    }finally{resolved.destroy();o.destroy();}
+   }
+  }finally{d.destroy();}
+ };
+ await inspect(Uint8Array.from(atob(redacted.data),c=>c.charCodeAt(0)));
+ for(const keepForms of [false,true]){
+  const {bytes}=await exportDocument({pages:[{width:400,height:300,index:0,source:redacted.id,svg:''},{width:400,height:300,index:1,source:redacted.id,svg:''}],title:'Redacted',format:'pdf',compression:'lossless',range:'',dpi:144,keepForms});
+  await inspect(bytes);
+  if(keepForms)assert.equal((await PDFDocument.load(bytes)).getForm().getTextField('Public').getText(),'Keep me');
+ }
+});
+
+test('redaction removes intersecting vector paths rather than hiding them behind a box',async()=>{
+ const doc=new mupdf.PDFDocument(),page=doc.addPage([0,0,400,200],0,{},'0 0 0 RG 3 w 20 150 m 200 150 l S 20 100 m 200 100 l S');doc.insertPage(-1,page);
+ const source=await importBytes(doc.saveToBuffer('').asUint8Array().slice(),'outlines.pdf');
+ const redacted=await redactPdf(source.id,0,[{left:50,top:40,width:40,height:20}]);
+ const out=mupdf.Document.openDocument(Uint8Array.from(atob(redacted.data),c=>c.charCodeAt(0)),'application/pdf'),p=out.loadPage(0),contents=p.getObject().get('Contents'),chunks=[];
+ try{
+  const read=o=>{const b=o.readStream();try{chunks.push(b.asString());}finally{b.destroy();}};if(contents.isArray())contents.forEach(read);else read(contents);
+  const commands=chunks.join('\n');assert.doesNotMatch(commands,/20 150 m/,'the original crossing path is gone');assert.match(commands,/20 100 m/,'unrelated vector art remains');
+ }finally{contents.destroy();p.destroy();out.destroy();}
+});
+
+test('PDF radio buttons switch between existing choices and preserve the chosen export value',async()=>{
+ const {PDFDocument}=await import('pdf-lib');
+ const made=await PDFDocument.create(),pg=made.addPage([400,300]),radio=made.getForm().createRadioGroup('Size');
+ radio.addOptionToPage('S',pg,{x:30,y:200,width:14,height:14});radio.addOptionToPage('L',pg,{x:60,y:200,width:14,height:14});radio.select('S');
+ const source=await importBytes(await made.save(),'radio.pdf');let id=source.id;
+ for(const widget of [1,0,1]){
+  id=(await fillPdfField(id,0,widget,'Yes')).id;
+  assert.deepEqual(pdfFormFields(id,0).map(f=>f.value),widget===0?['Yes','Off']:['Off','Yes']);
+ }
+ const {bytes}=await exportDocument({pages:[{width:400,height:300,index:0,source:id,svg:''}],title:'Radio',format:'pdf',compression:'lossless',range:'',dpi:144,keepForms:true});
+ assert.equal((await PDFDocument.load(bytes)).getForm().getRadioGroup('Size').getSelected(),'L');
+});
+
+test('Unicode form values use a bundled font and remain editable or flatten correctly',async()=>{
+ const {PDFDocument}=await import('pdf-lib');
+ const value='Мария · Καλημέρα · François à Lyon',fields=[{id:'name',type:'text',name:'Name',left:20,top:20,width:340,height:24,value},
+  {id:'city',type:'dropdown',name:'City',left:20,top:70,width:180,height:24,value:'Αθήνα',options:['Αθήνα','Paris']}];
+ const spec={pages:[{width:400,height:300,index:0,svg:'',forms:fields}],title:'Unicode form',format:'pdf',compression:'lossless',range:'',dpi:144};
+ const kept=await exportDocument({...spec,keepForms:true}),pdf=await PDFDocument.load(kept.bytes),form=pdf.getForm();
+ assert.equal(form.getTextField('Name').getText(),value);assert.deepEqual(form.getDropdown('City').getSelected(),['Αθήνα']);
+ // A full embedded font, rather than a subset containing only the first value,
+ // lets recipients enter different letters using the same appearance resource.
+ const field=form.getTextField('Name'),resources=field.acroField.getWidgets()[0].dict.lookup((await import('pdf-lib')).PDFName.of('AP'));
+ assert.ok(resources,'editable widget appearance is present');
+ const flat=await exportDocument(spec),d=mupdf.Document.openDocument(flat.bytes,'application/pdf'),p=d.loadPage(0),text=p.toStructuredText('');
+ try{assert.ok(text.asText().includes(value));assert.match(text.asText(),/Αθήνα/);assert.equal((await PDFDocument.load(flat.bytes)).getForm().getFields().length,0);}finally{text.destroy();p.destroy();d.destroy();}
+ await assert.rejects(()=>exportDocument({...spec,pages:[{...spec.pages[0],forms:[{...fields[0],value:'你好'}]}]}),/bundled PDF form font does not support/);
+});
+
+test('sanitized project sources omit discarded pages, old form values and unused page resources',async()=>{
+ const {PDFDocument}=await import('pdf-lib');
+ const made=await PDFDocument.create(),discarded=made.addPage([400,300]),kept=made.addPage([400,300]),form=made.getForm();
+ discarded.drawText('SECRET discarded page',{x:20,y:200,size:14});kept.drawText('Keep this page',{x:20,y:200,size:14});
+ const secret=form.createTextField('Discarded');secret.setText('SECRET field');secret.addToPage(discarded,{x:20,y:100,width:150,height:22});
+ const field=form.createTextField('Kept');field.setText('Public value');field.addToPage(kept,{x:20,y:100,width:150,height:22});
+ const doc=mupdf.Document.openDocument(await made.save(),'application/pdf'),extra=doc.addStream('SECRET unused resource',{Type:'XObject',Subtype:'Form',BBox:[0,0,10,10],Resources:{}}),p=doc.loadPage(1),resources=p.getObject().get('Resources');
+ resources.put('XObject',{UnusedSecret:extra});
+ const source=await importBytes(doc.saveToBuffer('').asUint8Array().slice(),'old-source.pdf');
+ const safe=await sanitizePdf(source.id,[1]);assert.equal(safe.pages.length,1);assert.equal(safe.pages[0].index,0);
+ assert.deepEqual(pdfFormFields(safe.id,0).map(f=>[f.name,f.value]),[['Kept','Public value']]);
+ const bytes=Uint8Array.from(atob(safe.data),c=>c.charCodeAt(0)),out=mupdf.Document.openDocument(bytes,'application/pdf');
+ try{
+  assert.equal(out.countPages(),1);const page=out.loadPage(0),text=page.toStructuredText('');try{assert.match(text.asText(),/Keep this page/);assert.doesNotMatch(text.asText(),/SECRET/);}finally{text.destroy();page.destroy();}
+  for(let i=1;i<out.countObjects();i++){
+   const o=out.newIndirect(i),resolved=o.resolve();let raw=resolved.toString();
+   try{if(o.isStream()){const b=o.readStream();try{raw+='\n'+b.asString();}finally{b.destroy();}}assert.doesNotMatch(raw,/SECRET|534543524554|005300450043005200450054/);}finally{resolved.destroy();o.destroy();}
+  }
+ }finally{out.destroy();resources.destroy();p.destroy();extra.destroy();doc.destroy();}
+ assert.equal((await PDFDocument.load(bytes)).getForm().getTextField('Kept').getText(),'Public value');
+ await assert.rejects(()=>sanitizePdf(source.id,[2]),/valid PDF pages/);
 });

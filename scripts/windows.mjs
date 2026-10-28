@@ -55,7 +55,7 @@ async function buildSource() {
   const env = {...process.env, PATH:dirname(process.execPath) + delimiter + (process.env.PATH || ''), npm_config_cache:join(runtime, 'npm-cache'), npm_config_update_notifier:'false'};
   await run(process.execPath, [join(projectRoot, 'scripts', 'fetch-office.mjs')], {env});
   await run(process.execPath, [npm, 'ci', '--ignore-scripts', '--no-audit', '--no-fund'], {env});
-  await run(process.execPath, [npm, 'run', 'build'], {env});
+  await run(process.execPath, [npm, 'run', 'build:local'], {env});
 }
 
 function status(port, path = '/__bide/status') {

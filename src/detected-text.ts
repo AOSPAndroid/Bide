@@ -1,15 +1,18 @@
 // Detecting page text (PDF text layer, else local OCR) and turning a detected
 // region into an editable text layer with a background patch.
-import {FabricImage,Rect,StaticCanvas,type Canvas,type FabricObject} from 'fabric';
+import {FabricImage,Rect,StaticCanvas,Group,type Canvas,type FabricObject} from 'fabric';
 import {growMask,maskBounds,type Mask} from './pixel-mask';
 import {maskToCanvas} from './selection-canvas';
-import {Textbox,clampTextSoftness} from './text-appearance';
+import {Textbox,clampTextSoftness,rasterizedText} from './text-appearance';
+import {needsRasterExport} from './layer-style-render';
+import {hasBlending} from './browser/layer-utils';
 import {detectPdfText,pagePreview} from './browser/engine';
 import {pageRaster,rasterLayer} from './retouch-canvas';
 import {repairTextBackground} from './text-replacement';
 import {estimateOcrBold,glyphInk,wordInk,classifyWordWeights} from './ocr-weight';
 import {darkenToInk,prepareOcrPixels,estimateLineHeight} from './ocr-image';
-import {ensureFont,ensureEmbeddedFont} from './fonts';
+import {ensureFont,ensureEmbeddedFont,ensureDocumentFonts} from './fonts';
+import {rasterSearchWords} from './searchable-text';
 import {fallbackFont,fitOcrText,type TextRegion} from './text-regions';
 import {lineCells,planGlyphEdit,ownInk,lineMetrics,type LibraryGlyph} from './glyph-edit';
 import {mixedWeights,attachNumberParts,recognitionKey,scaleRegions,unconvertedRegions,ocrPatchBounds,ocrScanStatus,isUncertain} from './ocr-regions';
@@ -33,22 +36,33 @@ async function ocrRaster(p:Page,c:Canvas){
  const ctx=reduced.getContext('2d')!;ctx.fillStyle=p.color==='transparent'?'#ffffff':p.color;ctx.fillRect(0,0,reduced.width,reduced.height);ctx.drawImage(source,0,0,reduced.width,reduced.height);return reduced;
 }
 
-// Text lines for a searchable PDF: OCR of the page's pictures (a scanned PDF
-// page, or the image layers of a design page), in page units. Pages whose PDF
-// already has real text, and pages without pictures, get none.
-export async function searchableText(p:Page,{engine,languages,signal,known,script,accurate}:{engine:'tesseract'|'paddle';languages:string[];signal?:AbortSignal;known?:TextRegion[];script?:OcrScript|'auto';accurate?:boolean}){
- // Pages with real text, or a scanner's own OCR layer, are already searchable.
- if(p.source){const detected=await detectPdfText(p.source,p.index);if(detected.regions.length||detected.ocrLayer)return [];}
+// Export always reads the current visible composite. The first OCR scan is
+// an appearance/letter reference, never a valid snapshot of edited content.
+export async function searchableText(p:Page,{engine,languages,signal,script,accurate}:{engine:'tesseract'|'paddle';languages:string[];signal?:AbortSignal;script?:OcrScript|'auto';accurate?:boolean}){
+  signal?.throwIfAborted();
+  const detected=p.source?await detectPdfText(p.source,p.index):undefined;
+  // The scanner already supplied searchable text; never add a duplicate layer.
+  if(detected?.ocrLayer)return [];
+  const native=detected?.regions??[];
  const c=new StaticCanvas(undefined,{width:p.width,height:p.height});
  try{
+   await ensureDocumentFonts(p.canvas);
   await c.loadFromJSON(p.canvas);
-  if(!hasScannableContent(p,c as unknown as Canvas))return [];
-  let regions=known?.filter(r=>r.kind==='ocr');
-  if(!regions?.length){
-   const raster=await ocrRaster(p,c as unknown as Canvas),{recognizeImage}=await import('./browser/ocr');
-   regions=scaleRegions(await recognizeImage(raster,{signal,grouping:'lines',languages,engine,script,accurate}),p.width/raster.width,p.height/raster.height);
-  }
-  return regions.filter(r=>r.text.trim()).map(r=>({text:r.text,left:r.left,top:r.top,width:r.width,height:r.height}));
+   const scale=Math.min(3,3600/Math.max(p.width,p.height)),raster=document.createElement('canvas');
+   raster.width=Math.max(1,Math.ceil(p.width*scale));raster.height=Math.max(1,Math.ceil(p.height*scale));
+   const ctx=raster.getContext('2d')!;ctx.fillStyle=p.color==='transparent'?'#fff':p.color;ctx.fillRect(0,0,raster.width,raster.height);
+   if(p.source)ctx.drawImage(await previewCanvas(p.source,p.index,scale),0,0,raster.width,raster.height);
+   ctx.drawImage(c.toCanvasElement(scale),0,0,raster.width,raster.height);
+   const {recognizeImage}=await import('./browser/ocr');
+   const regions=scaleRegions(await recognizeImage(raster,{signal,grouping:'words',languages,engine,script,accurate}),p.width/raster.width,p.height/raster.height);
+   const textBounds:{text:string;left:number;top:number;width:number;height:number}[]=[...native];
+   const nativeText=(o:FabricObject)=>{
+    if(!o.visible||o.opacity<=0||needsRasterExport(o))return;
+    if(o instanceof Textbox&&!rasterizedText(o)&&o.text.trim())textBounds.push({...o.getBoundingRect(),text:o.text});
+    else if(o instanceof Group)o.getObjects().forEach(nativeText);
+   };
+   if(!hasBlending(c.getObjects()))c.getObjects().forEach(nativeText);
+   return rasterSearchWords(regions,textBounds).map(r=>({text:r.text,left:r.left,top:r.top,width:r.width,height:r.height}));
  }finally{await c.dispose();}
 }
 

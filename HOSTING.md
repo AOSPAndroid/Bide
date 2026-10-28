@@ -107,9 +107,13 @@ The paid, sign-in version is built with `npm run build:saas` and needs the licen
 
 ## Public Sites demo
 
-The demo at https://bide-demo.dalilooksk.chatgpt.site serves `out/`, built with Vite mode `demo`. `npm run build` produces both the full local `dist/` and the hosted `out/`; `npm run build:demo` rebuilds only the demo. The `.openai/hosting.json` manifest identifies this Site.
+The demo at https://bide-demo.daaalil.chatgpt.site serves `out/`, built with Vite mode `demo`. `npm run build` produces both the full local `dist/` and the hosted `out/`; `npm run build:demo` rebuilds only the demo. The `.openai/hosting.json` manifest identifies this Site.
 
 The demo bundles PDF/image tools. It excludes the Office runtime: soffice.wasm and soffice.data exceed Cloudflare Static Assets' 25 MiB per-file limit. Office imports show an immediate local-edition explanation rather than attempting a missing download. The regular local build keeps Office support. Static isolation headers are in `_headers`. No documents, credentials, autosaves or local runtime state are deployed. Public access lets anyone visit the app, not other visitors' documents.
+
+**AI OCR is available on the public site**, including English/French and the other supported alphabets, High accuracy, proofreading, font matching and original-letter replacement. AI image actions are available too. To fit the hosting limits, the demo fetches models only when used from the immutable Hugging Face URLs in `public/ai/manifest.json`, verifies their byte length and SHA-256, and caches verified bytes in browser CacheStorage when supported. The hosted detector uses the original full-precision model; the offline edition uses the tested float16-weight conversion for the large detector and LaMa. Recognition and editing still run on the visitor's device; documents are never sent to Hugging Face. A first use needs internet access and may take longer; model downloads can be blocked by a corporate proxy, and the browser can evict its cache. Standard OCR remains bundled as a fallback. The local ZIP continues to use only bundled models, with no runtime CDN or model downloads.
+
+**Try OCR** in the demo banner adds a generated English/French example page to the current project, preserving existing pages. Click a detected line to edit it with its original letters. Model downloads show byte progress, followed by verification and preparation; a stalled download times out with a retry/Standard OCR explanation.
 
 On narrow phones the demo starts on the PDF tools home. Tap Workspaces to switch sections; landscape or desktop gives more room for detailed editing. Supported browsers can also use the optional WebMCP get_workspace/open_workspace navigation tools.
 

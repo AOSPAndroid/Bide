@@ -20,7 +20,7 @@ test('Object select picks the clicked object',{timeout:600000},async()=>{
   await shot.setContent('<body style="margin:0;background:#cfd8dc"><div style="position:absolute;left:60px;top:80px;width:200px;height:200px;border-radius:50%;background:#e63946"></div><div style="position:absolute;left:340px;top:120px;width:220px;height:160px;background:#1d3557"></div></body>');
   const file=join(await mkdtemp(join(tmpdir(),'bide-sam-')),'shapes.png');await shot.screenshot({path:file});await shot.close();
   const page=await browser.newPage({viewport:{width:1400,height:900}}),errors=[];page.on('pageerror',e=>errors.push(e.message));
-  await page.goto(server.resolvedUrls.local[0]);await page.locator('input[type=file][accept*=".psd"]').setInputFiles(file);await page.getByText(/page added/).waitFor({timeout:60000});
+  await page.goto(server.resolvedUrls.local[0]+'app/');await page.locator('input[type=file][accept*=".psd"]').setInputFiles(file);await page.getByText(/page added/).waitFor({timeout:60000});
   await page.locator('.layer-row').first().click();
   await page.getByRole('button',{name:'Object select (AI)'}).click();
   const at=async(x,y)=>{const b=await page.locator('.artboard').boundingBox(),k=b.width/640;return [b.x+x*k,b.y+y*k];};

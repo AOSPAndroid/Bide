@@ -54,3 +54,22 @@ export function ocrMatchRect(region:RegionLike,match:Match,pad=1.5):Rect{
 
 export const overlaps=(a:Rect,b:Rect)=>a.left<b.left+b.width&&b.left<a.left+a.width&&a.top<b.top+b.height&&b.top<a.top+a.height;
 export const inside=(a:Rect,b:Rect)=>a.left>=b.left&&a.top>=b.top&&a.left+a.width<=b.left+b.width&&a.top+a.height<=b.top+b.height;
+
+// Prefer the chosen characters' native PDF quads. A page-wide string search
+// alone would also redact unchecked occurrences of the same word.
+export function selectedPdfMatches(region:RegionLike&{quads?:number[][]},match:Match,found:Rect[]):Rect[]{
+ const chars=Array.from(region.text),quads=region.quads;
+ if(quads?.length===chars.length){
+  const first=Array.from(region.text.slice(0,match.start)).length,last=Array.from(region.text.slice(0,match.end)).length;
+  const selected=quads.slice(first,last);
+  if(selected.length){
+   const xs=(qs:number[][])=>qs.flatMap(q=>[q[0],q[2],q[4],q[6]]),ys=(qs:number[][])=>qs.flatMap(q=>[q[1],q[3],q[5],q[7]]);
+   const dx=Math.min(...xs(quads))-region.left,dy=Math.min(...ys(quads))-region.top;
+   const left=Math.min(...xs(selected))-dx,top=Math.min(...ys(selected))-dy;
+   return [{left,top,width:Math.max(...xs(selected))-dx-left,height:Math.max(...ys(selected))-dy-top}];
+  }
+ }
+ const target=region.left+region.width*(match.start+match.end)/2/Math.max(1,region.text.length);
+ const scoped=found.filter(b=>overlaps(b,region)).sort((a,b)=>Math.abs(a.left+a.width/2-target)-Math.abs(b.left+b.width/2-target));
+ return scoped.length?[scoped[0]]:[{left:region.left,top:region.top,width:region.width,height:region.height}];
+}

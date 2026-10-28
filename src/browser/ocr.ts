@@ -113,12 +113,12 @@ async function recognizeLevel(image:HTMLCanvasElement,{signal,grouping='smart',l
    // (scripts/ocr-bench.mjs) 1.5x lifted words read on a phone photo from 77%
    // to 88% and on small print from 92% to 100%; more than that lost word
    // spaces, except on the tiniest print, which went from 51% to 76% at 3x.
-   onProgress?.(0,'Loading AI OCR');const {paddleOcr}=await import('./ai-tools');
+   onProgress?.(0,'Loading AI OCR models');const {paddleOcr}=await import('./ai-tools');
    const probe=image.getContext('2d',{willReadFrequently:true})!.getImageData(0,0,image.width,image.height);prepareOcrPixels(probe);
    const lineHeight=estimateLineHeight(probe),k=lineHeight&&lineHeight<22?Math.max(1,Math.min(lineHeight<=5?3:1.5,28/lineHeight,Math.sqrt(12e6/(image.width*image.height)))):1;
    let input=image;
    if(k>1.05){input=Object.assign(document.createElement('canvas'),{width:Math.round(image.width*k),height:Math.round(image.height*k)});const g=input.getContext('2d',{willReadFrequently:true})!;g.imageSmoothingQuality='high';g.drawImage(image,0,0,input.width,input.height);}
-   lines=(await paddleOcr(input,f=>onProgress?.(f,'Recognizing text (AI)'),signal,{script,accurate})).filter(l=>l.confidence>=35);
+   lines=(await paddleOcr(input,(f,label)=>onProgress?.(f,label||'Recognizing text (AI)'),signal,{script,accurate})).filter(l=>l.confidence>=35);
    sx=image.width/input.width;sy=image.height/input.height;
   }else{
   onProgress?.(0,'Preparing image');

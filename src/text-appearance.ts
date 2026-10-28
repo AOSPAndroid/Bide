@@ -2,6 +2,7 @@ import {corporateFonts} from './corporate-fonts';
 import {Textbox as FabricTextbox,classRegistry,util} from 'fabric';
 
 export function clampTextSoftness(value:number){return Number.isFinite(value)?Math.min(2,Math.max(0,value)):0;}
+export const rasterizedText=(o:{textSoftness?:number;fontFamily:string})=>!!clampTextSoftness(o.textSoftness??0)||corporateFonts.includes(o.fontFamily);
 
 // Keep text editable. Apply softness in output pixels, accounting for zoom/DPR.
 export class Textbox extends FabricTextbox {
@@ -23,7 +24,7 @@ export class Textbox extends FabricTextbox {
   ctx.drawImage(raster.bitmap,raster.x,raster.y,raster.width,raster.height);
  }
  _toSVG():string[]{
-  if(!clampTextSoftness(this.textSoftness??0)&&!corporateFonts.includes(this.fontFamily))return super._toSVG();
+  if(!rasterizedText(this))return super._toSVG();
   // Rasterize this text layer only; other page content stays vector-based.
   const raster=this.softRaster(4);
   return [`<image `,'COMMON_PARTS',`x="${raster.x}" y="${raster.y}" width="${raster.width}" height="${raster.height}" opacity="${this.opacity}" visibility="${this.visible?'visible':'hidden'}" xlink:href="${raster.bitmap.toDataURL('image/png')}"/>`];

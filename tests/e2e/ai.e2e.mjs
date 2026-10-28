@@ -17,7 +17,7 @@ test('AI OCR, AI background fill, AI removal and AI sharpening work offline in t
   const image=join(await mkdtemp(join(tmpdir(),'bide-ai-')),'map.png');await shot.screenshot({path:image});await shot.close();
   const page=await browser.newPage({viewport:{width:1500,height:1000}}),errors=[];page.on('pageerror',e=>errors.push(e.message));
   const layers=async()=>{await page.waitForTimeout(1500);return page.evaluate(async()=>{const {restoreLocal}=await import('/src/model.ts');return (await restoreLocal()).pages[0].canvas.objects.map(o=>({name:o.name,width:o.width,scaleX:o.scaleX}));});};
-  await page.goto(server.resolvedUrls.local[0]);await page.locator('input[type=file][accept*=".psd"]').setInputFiles(image);
+  await page.goto(server.resolvedUrls.local[0]+'app/');await page.locator('input[type=file][accept*=".psd"]').setInputFiles(image);
   await page.waitForFunction(()=>/OCR regions/.test(document.querySelector('.text-detection-bar span')?.textContent||''),null,{timeout:180000});
 
   // PaddleOCR reads both label lines.

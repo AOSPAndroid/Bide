@@ -19,7 +19,7 @@ test('an e-invoice is checked, issued as Factur-X, credited and kept',{timeout:6
  const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||undefined});
  try{
   const page=await browser.newPage({viewport:{width:1400,height:900},acceptDownloads:true}),errors=[];page.on('pageerror',e=>errors.push(e.message));
-  await page.goto(server.resolvedUrls.local[0]);await openDocuments(page);
+  await page.goto(server.resolvedUrls.local[0]+'app/');await openDocuments(page);
   await page.getByRole('button',{name:'New invoice'}).first().click();
   const year=new Date().getFullYear();
   await page.getByRole('heading',{name:`Invoice F-${year}-0001`}).waitFor();
