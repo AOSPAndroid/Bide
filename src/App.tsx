@@ -31,6 +31,7 @@ import {selectPages} from './page-range';
 import {blendModes} from './browser/layer-utils';
 import Documents from './Documents';
 import {clampZoom,fitZoom,markerColor} from './editor-tools';
+import {attachTouchGestures} from './touch-gestures';
 import {searchCommands,commandMetadata} from './command-search';
 import WorkspaceNav from './WorkspaceNav';
 import {IconButton,Field,ModalShell} from './ui-kit';
@@ -315,8 +316,13 @@ export default function App() {
     const c = new Canvas(canvasEl.current!, { preserveObjectStacking: true, selection: true, backgroundColor: '', stopContextMenu: true });
     canvas.current = c;
     const detachEvents=attachCanvasEvents(c,{retouch,retouchSettings,retouchTarget,saveCanvasRef,syncSelection,notify,validateTextFont,toolRef,snapRef,projectRef,pageIdRef,zoomRef,penRef,finishPenRef,loading,openLayerMenu,setLayerMenu,zoomOutRef,finishPen,setPenPreview,pageRef,setCrop,cropRef,paintRef,colorRef,regionRef,selectionPixels,selectionLayer,selectModeRef,selectObjectRef,wandRef,showMask,outlineOf,setRegion,workspace,textFont,changeZoom,setTool});
+    // Pinch to zoom and two-finger pan on touch screens.
+    const detachTouch=workspace.current?attachTouchGestures(workspace.current,{canvas:()=>canvas.current,board:()=>artboard.current,zoom:()=>zoomRef.current,
+      zoomAround:(value,at,screen)=>{const z=clampZoom(value),root=workspace.current,b=artboard.current?.getBoundingClientRect();if(!root||!b)return;
+        if(Math.abs(z-zoomRef.current)<1e-4){root.scrollLeft+=b.left+at.x*z-screen.x;root.scrollTop+=b.top+at.y*z-screen.y;return;}
+        zoomAnchor.current={x:at.x,y:at.y,screenX:screen.x,screenY:screen.y};setZoom(z);}}):undefined;
     setReady(true);
-    return () => { retouch.current?.cancel();detachEvents(); void c.dispose(); canvas.current = null; };
+    return () => { retouch.current?.cancel();detachEvents();detachTouch?.(); void c.dispose(); canvas.current = null; };
   }, []);
 
   useEffect(() => {

@@ -6,10 +6,13 @@ import manifest from '../../public/ai/manifest.json';
 import {PUBLIC_DEMO} from '../build-flags';
 
 export type PinnedModel={url:string;bytes:number;sha256:string};
+type ModelSource=PinnedModel&{output?:{bytes:number;sha256:string}};
 export type ModelProgress={loaded:number;total:number;stage:'download'|'verify'|'prepare'};
-type ModelOptions={fetch?:typeof fetch;cacheStorage?:Pick<CacheStorage,'open'>|null;onProgress?:(progress:ModelProgress)=>void;downloadTimeoutMs?:number};
+type ModelOptions={fetch?:typeof fetch;cacheStorage?:Pick<CacheStorage,'open'>|null;onProgress?:(progress:ModelProgress)=>void;downloadTimeoutMs?:number;remote?:string;licence?:string};
 export const MODEL_CACHE='bide-ai-models-sha256-v1';
 const downloadError='AI model download failed. Check your internet connection and try again, or choose Standard OCR.';
+const accessError='An active bide trial or subscription is needed for the AI tools.';
+const denied=(status:number)=>status===401||status===402||status===403;
 
 function keyFor(source:PinnedModel){
  const key=new URL(source.url);key.searchParams.set('bide-sha256',source.sha256);return key.href;
@@ -32,6 +35,7 @@ async function download(source:PinnedModel,request:typeof fetch,onProgress:Model
  try{
   onProgress?.({stage:'download',loaded:0,total:source.bytes});
   const response=await Promise.race([request(source.url,{mode:'cors',credentials:'omit',cache:'no-cache',referrerPolicy:'no-referrer',signal:abort.signal}),stopped]);
+  if(denied(response.status))throw new Error(accessError);
   if(!response.ok)throw new Error(downloadError);
   const bytes=new Uint8Array(source.bytes);let loaded=0,lastProgress=0;
   reader=response.body?.getReader();
@@ -74,39 +78,71 @@ export async function loadPinnedModel(source:PinnedModel,{fetch:request=globalTh
  try{
   bytes=await verified(await download(source,request,onProgress,downloadTimeoutMs),source,onProgress);
  }catch(error){
-  if(error instanceof Error&&error.message.startsWith(downloadError))throw error;
+  if(error instanceof Error&&(error.message.startsWith(downloadError)||error.message===accessError))throw error;
   throw new Error(downloadError);
  }
  try{await cache?.put(key,new Response(bytes,{headers:{'Content-Type':'application/octet-stream'}}));}catch{}
  return bytes;
 }
 
-export async function modelBytes(model:string,base:string,publicDemo=PUBLIC_DEMO,options:ModelOptions={}):Promise<Uint8Array>{
- if(publicDemo){
-  const source=manifest.files[`${model}.onnx` as keyof typeof manifest.files];
-  if(!source)throw new Error('This AI model is unavailable. Choose Standard OCR or try another action.');
-  return loadPinnedModel(source,options);
- }
- // Converted FP16 models have their own build-time checksums. Keep the local
- // path unchanged and never fall back to a network download in this edition.
- const request=options.fetch??globalThis.fetch,url=new URL(`ai/models/${model}.onnx`,base);
+async function bundledBytes(url:URL,source:PinnedModel,options:ModelOptions):Promise<Uint8Array>{
+ const request=options.fetch??globalThis.fetch;
  const response=await request(url);
- if(response.ok)return new Uint8Array(await response.arrayBuffer());
- if(response.status===402)throw new Error('An active bide trial or subscription is needed for the AI tools.');
+ if(denied(response.status))throw new Error(accessError);
+ if(response.ok)return verified(new Uint8Array(await response.arrayBuffer()),source,options.onProgress);
  // Subscription builds split large local models to fit static-host limits.
  // Public-demo models continue through the pinned, verified path above.
  const partsResponse=await request(`${url}.parts.json`);
- if(!partsResponse.ok)throw new Error(`AI model ${model} is not bundled with this build.`);
+ if(denied(partsResponse.status))throw new Error(accessError);
+ if(!partsResponse.ok)throw new Error('This AI model is not bundled with this build.');
  const {size,parts}=await partsResponse.json() as {size:number;parts:number};
- if(!Number.isSafeInteger(size)||size<=0||!Number.isSafeInteger(parts)||parts<=0||parts>size)throw new Error(`AI model ${model} has an invalid parts manifest.`);
+ if(size!==source.bytes||!Number.isSafeInteger(parts)||parts<=0||parts>size)throw new Error('This AI model has an invalid parts manifest.');
  const bytes=new Uint8Array(size);let at=0;
  for(let i=0;i<parts;i++){
   const part=await request(`${url}.part${i}`);
-  if(!part.ok)throw new Error(`Part ${i+1} of AI model ${model} is missing.`);
+  if(denied(part.status))throw new Error(accessError);
+  if(!part.ok)throw new Error(`Part ${i+1} of this AI model is missing.`);
   const chunk=new Uint8Array(await part.arrayBuffer());
-  if(at+chunk.length>size)throw new Error(`AI model ${model} is incomplete.`);
+  if(at+chunk.length>size)throw new Error('This AI model is incomplete.');
   bytes.set(chunk,at);at+=chunk.length;
  }
- if(at!==size)throw new Error(`AI model ${model} is incomplete.`);
+ if(at!==size)throw new Error('This AI model is incomplete.');
+ return verified(bytes,source,options.onProgress);
+}
+
+async function cachedBundledBytes(url:URL,source:PinnedModel,options:ModelOptions){
+ const cache=await optionalCache(options.cacheStorage),key=keyFor({...source,url:url.href});
+ try{
+  const saved=await cache?.match(key);
+  if(saved)return await verified(new Uint8Array(await saved.arrayBuffer()),source,options.onProgress);
+ }catch{try{await cache?.delete(key);}catch{}}
+ const bytes=await bundledBytes(url,source,options);
+ try{await cache?.put(key,new Response(bytes,{headers:{'Content-Type':'application/octet-stream'}}));}catch{}
  return bytes;
+}
+
+// Every source is checked against the pinned manifest. The local/app pack may
+// contain converted FP16 weights, whose output digest differs from upstream.
+// Authentication denial is terminal: it must never turn into a public fallback.
+export async function loadModelSources(source:ModelSource,local:URL,publicDemo:boolean,options:ModelOptions={}):Promise<Uint8Array>{
+ const bundled={...source,...source.output};let failure:unknown;
+ try{return await bundledBytes(local,bundled,options);}catch(error){if(error instanceof Error&&error.message===accessError)throw error;failure=error;}
+ if(options.remote){
+  const root=options.remote.endsWith('/')?options.remote:options.remote+'/';
+  const remote=new URL(`ai/models/${local.pathname.split('/').pop()}`,root);
+  const request=options.fetch??globalThis.fetch;
+  try{
+   return await cachedBundledBytes(remote,bundled,{...options,fetch:(input,init)=>request(input,{mode:'cors',credentials:'omit',cache:'no-cache',referrerPolicy:'no-referrer',...init,headers:{...Object.fromEntries(new Headers(init?.headers)),...(options.licence?{authorization:`Bearer ${options.licence}`}:{})}})});
+  }catch(error){if(error instanceof Error&&error.message===accessError)throw error;failure=error;}
+ }
+ // The downloadable edition remains offline, and paid builds retain their
+ // licence server boundary. Only the public demo uses the Hugging Face source.
+ if(publicDemo)return loadPinnedModel(source,options);
+ throw failure;
+}
+
+export async function modelBytes(model:string,base:string,publicDemo=PUBLIC_DEMO,options:ModelOptions={}):Promise<Uint8Array>{
+ const source=manifest.files[`${model}.onnx` as keyof typeof manifest.files];
+ if(!source)throw new Error('This AI model is unavailable. Choose Standard OCR or try another action.');
+ return loadModelSources(source,new URL(`ai/models/${model}.onnx`,base),publicDemo,options);
 }

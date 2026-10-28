@@ -1,0 +1,50 @@
+// End-to-end on a phone-sized touch screen: two fingers pinch-zoom the page
+// (not the whole interface) and pan it, without drawing or moving anything;
+// one finger still draws with the brush and pans with the hand tool.
+import {test} from 'node:test';import assert from 'node:assert/strict';
+import {createServer} from 'vite';import {chromium} from 'playwright-core';
+
+const objects=page=>page.evaluate(async()=>{const {restoreLocal}=await import('/src/model.ts');const p=(await restoreLocal())?.pages[0];return p?p.canvas.objects.map(o=>({type:o.type,left:Math.round(o.left),top:Math.round(o.top)})):[];});
+const zoomOf=page=>page.evaluate(()=>{const b=document.querySelector('.artboard').getBoundingClientRect();return b.width;});
+async function touches(cdp,steps){
+ for(const [type,points] of steps){await cdp.send('Input.dispatchTouchEvent',{type,touchPoints:points.map(([x,y],id)=>({x,y,id}))});await new Promise(r=>setTimeout(r,20));}
+}
+const pinch=(cx,cy,from,to,n=8)=>[['touchStart',[[cx-from,cy],[cx+from,cy]]],...Array.from({length:n},(_,i)=>{const d=from+(to-from)*(i+1)/n;return ['touchMove',[[cx-d,cy],[cx+d,cy]]];}),['touchEnd',[]]];
+
+test('pinch zooms the page on a phone; one finger keeps drawing and panning',{timeout:600000},async()=>{
+ const server=await createServer({logLevel:'error',server:{port:0,host:'127.0.0.1'}});await server.listen();
+ const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||undefined});
+ try{
+  const context=await browser.newContext({viewport:{width:390,height:844},deviceScaleFactor:2,isMobile:true,hasTouch:true}),page=await context.newPage(),errors=[];
+  page.on('pageerror',e=>errors.push(e.message));const cdp=await context.newCDPSession(page);
+  await page.goto(server.resolvedUrls.local[0]+'app/');await page.locator('.workspace-nav').getByRole('button',{name:'Photo editor',exact:true}).click();await page.locator('.artboard').waitFor({timeout:60000});await page.waitForTimeout(1500);
+  const before=await objects(page),width0=await zoomOf(page),box=await page.locator('.canvas-workspace').boundingBox(),cx=box.x+box.width/2,cy=box.y+box.height/2;
+  // Pinch out over the page: the page grows, the interface does not, nothing is added or moved.
+  await touches(cdp,pinch(cx,cy,40,120));await page.waitForTimeout(600);
+  const width1=await zoomOf(page);
+  assert.ok(width1>width0*2.2,`pinch zoomed the page (${width0} → ${width1})`);
+  assert.equal(await page.evaluate(()=>visualViewport?.scale??1),1,'the browser did not zoom the interface');
+  assert.deepEqual(await objects(page),before,'a pinch does not draw or move layers');
+  // Two-finger pan keeps the zoom and scrolls.
+  const scroll0=await page.evaluate(()=>{const w=document.querySelector('.canvas-workspace');return [w.scrollLeft,w.scrollTop];});
+  await touches(cdp,[['touchStart',[[cx-50,cy],[cx+50,cy]]],...Array.from({length:6},(_,i)=>['touchMove',[[cx-50-(i+1)*15,cy-(i+1)*15],[cx+50-(i+1)*15,cy-(i+1)*15]]]),['touchEnd',[]]]);await page.waitForTimeout(400);
+  const scroll1=await page.evaluate(()=>{const w=document.querySelector('.canvas-workspace');return [w.scrollLeft,w.scrollTop];});
+  assert.ok(scroll1[0]>scroll0[0]+40&&scroll1[1]>scroll0[1]+40,`two fingers panned (${scroll0} → ${scroll1})`);
+  assert.ok(Math.abs(await zoomOf(page)-width1)<width1*.05,'panning keeps the zoom');
+  // Pinch back in.
+  await touches(cdp,pinch(cx,cy,120,40));await page.waitForTimeout(600);
+  assert.ok(await zoomOf(page)<width1*.6,'pinch in zooms out');
+  // One finger with the brush draws a stroke.
+  await page.locator('.tool-rail button[aria-label="Brush"]').click();
+  await touches(cdp,[['touchStart',[[cx-40,cy]]],...Array.from({length:8},(_,i)=>['touchMove',[[cx-40+(i+1)*10,cy+(i%2?6:-6)]]]),['touchEnd',[]]]);await page.waitForTimeout(1200);
+  const drawn=await objects(page);assert.equal(drawn.length,before.length+1,'one finger drew one stroke');
+  // …and a pinch with the brush still draws nothing.
+  await touches(cdp,pinch(cx,cy,40,90));await page.waitForTimeout(1200);
+  assert.equal((await objects(page)).length,drawn.length,'a pinch with the brush draws nothing');
+  // The hand tool pans with one finger.
+  await page.locator('.tool-rail button[aria-label="Pan"]').click();const s0=await page.evaluate(()=>document.querySelector('.canvas-workspace').scrollTop);
+  await touches(cdp,[['touchStart',[[cx,cy+60]]],...Array.from({length:6},(_,i)=>['touchMove',[[cx,cy+60-(i+1)*15]]]),['touchEnd',[]]]);await page.waitForTimeout(300);
+  assert.ok(await page.evaluate(()=>document.querySelector('.canvas-workspace').scrollTop)>s0+40,'the hand tool pans with one finger');
+  assert.deepEqual(errors,[]);
+ }finally{await browser.close();await server.close();}
+});

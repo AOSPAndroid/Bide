@@ -79,6 +79,8 @@ export function attachCanvasEvents(c:Canvas,d:CanvasEventDeps){
     if (Math.abs(o.top) < 5) o.set('top', 0);
   });
   let zoomDrag:{x:number;y:number;initial:number;out:boolean;dragged:boolean}|null=null;
+  // Screen position of a mouse or touch event (Fabric hands either to the tools).
+  const client=(ev:Event)=>{const t=(ev as TouchEvent).touches?.[0]??(ev as TouchEvent).changedTouches?.[0];return t?{clientX:t.clientX,clientY:t.clientY,button:0,altKey:false}:ev as MouseEvent;};
   let selectionDrag:{id:string;points:SelectionPoint[];op:MaskOp;base:SelectionRegion|null;baseOutline?:string}|null=null;
   let gradientDrag:{start:SelectionPoint;line:Line}|null=null,maskStroke:ReturnType<typeof createMaskBrush>|null=null,cropStart:SelectionPoint|null=null;
   let origin = { x: 0, y: 0 }, shape: Obj | null = null;
@@ -93,7 +95,7 @@ export function attachCanvasEvents(c:Canvas,d:CanvasEventDeps){
     if (loading.current) return;
     if((e.e as MouseEvent).button>0)return;
     const t = toolRef.current;
-    if(t==='zoom'){const event=e.e as MouseEvent;if(event.button!==0)return;zoomDrag={x:event.clientX,y:event.clientY,initial:zoomRef.current,out:zoomOutRef.current!==!!event.altKey,dragged:false};return;}
+    if(t==='zoom'){const event=client(e.e);if(event.button!==0)return;zoomDrag={x:event.clientX,y:event.clientY,initial:zoomRef.current,out:zoomOutRef.current!==!!event.altKey,dragged:false};return;}
     if(retouch.current?.down({x:e.scenePoint.x,y:e.scenePoint.y},!!e.e.altKey))return;
     if(t==='pen'){
       const pt={x:e.scenePoint.x,y:e.scenePoint.y},st=penRef.current;
@@ -130,7 +132,7 @@ export function attachCanvasEvents(c:Canvas,d:CanvasEventDeps){
       }
       selectionDrag={id:target.id!,points:[pt],op,base,baseOutline:base?base.outline??outlineOf(base.points):undefined};if(!base)setRegion(null);return;
     }
-    if (t === 'hand') { const event = e.e as MouseEvent; pan = { x: event.clientX, y: event.clientY, left: workspace.current!.scrollLeft, top: workspace.current!.scrollTop }; return; }
+    if (t === 'hand') { const event = client(e.e); pan = { x: event.clientX, y: event.clientY, left: workspace.current!.scrollLeft, top: workspace.current!.scrollTop }; return; }
     if (['select','brush','highlight','eraser'].includes(t)) return;
     const point = e.scenePoint; origin = { x: point.x, y: point.y };
     const shared = { left: point.x, top: point.y, fill: colorRef.current, strokeWidth: 0 };
@@ -142,7 +144,7 @@ export function attachCanvasEvents(c:Canvas,d:CanvasEventDeps){
   });
   c.on('mouse:move', e => {
     if(toolRef.current==='zoom'){c.setCursor(zoomOutRef.current!==!!e.e.altKey?'zoom-out':'zoom-in');}
-    if(zoomDrag){if(toolRef.current!=='zoom'){zoomDrag=null;return;}const event=e.e as MouseEvent,dx=event.clientX-zoomDrag.x;if(Math.abs(dx)>4||zoomDrag.dragged){zoomDrag.dragged=true;changeZoom(zoomDrag.initial*Math.exp(Math.max(-600,Math.min(600,dx))*0.01),{x:zoomDrag.x,y:zoomDrag.y});}return;}
+    if(zoomDrag){if(toolRef.current!=='zoom'){zoomDrag=null;return;}const event=client(e.e),dx=event.clientX-zoomDrag.x;if(Math.abs(dx)>4||zoomDrag.dragged){zoomDrag.dragged=true;changeZoom(zoomDrag.initial*Math.exp(Math.max(-600,Math.min(600,dx))*0.01),{x:zoomDrag.x,y:zoomDrag.y});}return;}
     if(retouch.current?.move({x:e.scenePoint.x,y:e.scenePoint.y}))return;
     if(gradientDrag){gradientDrag.line.set({x2:e.scenePoint.x,y2:e.scenePoint.y});c.requestRenderAll();return;}
     if(toolRef.current==='pen'&&penRef.current){const st=penRef.current,pt={x:e.scenePoint.x,y:e.scenePoint.y};if(st.dragging){const i=st.anchors.length-1;st.anchors[i]=withHandles(st.anchors[i],pt);}setPenPreview({anchors:[...st.anchors],cursor:pt});return;}
@@ -153,7 +155,7 @@ export function attachCanvasEvents(c:Canvas,d:CanvasEventDeps){
       if(toolRef.current==='marquee'){selectionDrag.points=[selectionDrag.points[0],pt];setRegion({id:selectionDrag.id,points:rectanglePoints(selectionDrag.points[0],pt),outline});}
       else {const last=selectionDrag.points.at(-1)!;if(Math.hypot(pt.x-last.x,pt.y-last.y)>2&&selectionDrag.points.length<2000)selectionDrag.points.push(pt);setRegion({id:selectionDrag.id,points:[...selectionDrag.points],outline});}return;
     }
-    if (pan) { const event = e.e as MouseEvent; workspace.current!.scrollLeft = pan.left - event.clientX + pan.x; workspace.current!.scrollTop = pan.top - event.clientY + pan.y; return; }
+    if (pan) { const event = client(e.e); workspace.current!.scrollLeft = pan.left - event.clientX + pan.x; workspace.current!.scrollTop = pan.top - event.clientY + pan.y; return; }
     if (!shape) return;
     const pt = e.scenePoint, dx = pt.x-origin.x, dy = pt.y-origin.y;
     if (toolRef.current === 'text') shape.set({ width: Math.max(80, Math.abs(dx)) });

@@ -1,8 +1,9 @@
 import {test} from 'node:test';import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
-import {loadPinnedModel,modelBytes,MODEL_CACHE} from '../tmp/ai-models.mjs';
+import {loadPinnedModel,loadModelSources,modelBytes,MODEL_CACHE} from '../tmp/ai-models.mjs';
 const bytes=new Uint8Array([1,2,3,4]),sha256=createHash('sha256').update(bytes).digest('hex');
 const source={url:'https://example.test/model/resolve/pinned-revision/model.onnx',bytes:bytes.length,sha256};
+const local=new URL('https://local.test/bide/ai/models/model.onnx');
 function storage(initial){
  const state={value:initial,deleted:0,writes:0,key:undefined};
  return {state,async open(name){assert.equal(name,MODEL_CACHE);return {
@@ -39,11 +40,14 @@ test('network errors show a useful recovery without exposing a download URL',asy
   await assert.rejects(loadPinnedModel(source,{fetch,cacheStorage:null}),error=>/Check your internet.*Standard OCR/.test(error.message)&&!error.message.includes('https://'));
  }
 });
-test('local models use the offline pack only, including converted models',async()=>{
+test('local models use the verified offline pack only, including converted models',async()=>{
  let requested;
- assert.deepEqual(await modelBytes('ppocr-det-server','https://local.test/bide/',false,{fetch:async url=>{requested=String(url);return new Response(bytes);}}),bytes);
- assert.equal(requested,'https://local.test/bide/ai/models/ppocr-det-server.onnx');
- let calls=0;await assert.rejects(modelBytes('ppocr-det','https://local.test/',false,{fetch:async()=>{calls++;return new Response('',{status:404});}}),/not bundled/);assert.equal(calls,2);
+ assert.deepEqual(await loadModelSources(source,local,false,{fetch:async url=>{requested=String(url);return new Response(bytes);}}),bytes);
+ assert.equal(requested,local.href);
+ const converted=new Uint8Array([4,3,2,1]),output={bytes:4,sha256:createHash('sha256').update(converted).digest('hex')};
+ assert.deepEqual(await loadModelSources({...source,output},local,false,{fetch:async()=>new Response(converted)}),converted);
+ await assert.rejects(loadModelSources(source,local,false,{fetch:async()=>new Response(converted)}),/integrity check failed/);
+ let calls=0;await assert.rejects(loadModelSources(source,local,false,{fetch:async()=>{calls++;return new Response('',{status:404});}}),/not bundled/);assert.equal(calls,2);
 });
 test('split local models are assembled in order and never fall back to a remote source',async()=>{
  const requests=[];
@@ -55,23 +59,86 @@ test('split local models are assembled in order and never fall back to a remote 
   if(path.pathname.endsWith('.part2'))return new Response(bytes.slice(2));
   return new Response('',{status:404});
  };
- assert.deepEqual(await modelBytes('ppocr-det','https://local.test/bide/',false,{fetch}),bytes);
- assert.deepEqual(requests,['/bide/ai/models/ppocr-det.onnx','/bide/ai/models/ppocr-det.onnx.parts.json',...['0','1','2'].map(i=>`/bide/ai/models/ppocr-det.onnx.part${i}`)]);
+ assert.deepEqual(await loadModelSources(source,local,false,{fetch}),bytes);
+ assert.deepEqual(requests,['/bide/ai/models/model.onnx','/bide/ai/models/model.onnx.parts.json',...['0','1','2'].map(i=>`/bide/ai/models/model.onnx.part${i}`)]);
 });
 test('split models reject malformed manifests, missing parts and incorrect combined sizes',async()=>{
  for(const [manifest,chunks,message] of [
   [{size:4,parts:0},[],/invalid parts manifest/],
   [{size:4,parts:1},[undefined],/Part 1.*missing/],
   [{size:4,parts:1},[bytes.slice(0,2)],/incomplete/],
-  [{size:2,parts:1},[bytes],/incomplete/],
+  [{size:2,parts:1},[bytes],/invalid parts manifest/],
  ]){
   const fetch=async url=>String(url).endsWith('.parts.json')?Response.json(manifest):/\.part\d+$/.test(String(url))&&chunks[0]?new Response(chunks[0]):new Response('',{status:404});
-  await assert.rejects(modelBytes('test','https://local.test/',false,{fetch}),message);
+  await assert.rejects(loadModelSources(source,local,false,{fetch}),message);
  }
- let calls=0;await assert.rejects(modelBytes('test','https://local.test/',false,{fetch:async()=>{calls++;return new Response('',{status:402});}}),/active bide trial/);assert.equal(calls,1);
+ let calls=0;await assert.rejects(loadModelSources(source,local,false,{fetch:async()=>{calls++;return new Response('',{status:402});}}),/active bide trial/);assert.equal(calls,1);
 });
 test('unknown public model fails before making any request',async()=>{
  let calls=0;await assert.rejects(modelBytes('../untrusted','https://local.test/',true,{fetch:async()=>{calls++;throw new Error('unexpected');}}),/unavailable/);assert.equal(calls,0);
+});
+test('model sources try the local pack before the configured bearer-licence server',async()=>{
+ const requests=[],remote='https://licensed.test/bide';
+ const fetch=async(url,init)=>{requests.push({url:String(url),init});return String(url).startsWith(remote)?new Response(bytes):new Response('',{status:404});};
+ assert.deepEqual(await loadModelSources(source,local,true,{fetch,remote,licence:'test-licence',cacheStorage:null}),bytes);
+ assert.deepEqual(requests.map(r=>r.url),[local.href,local.href+'.parts.json',remote+'/ai/models/model.onnx']);
+ assert.equal(requests[2].init.headers.authorization,'Bearer test-licence');
+ assert.equal(requests[2].init.credentials,'omit');
+ requests.length=0;
+ assert.deepEqual(await loadModelSources(source,local,true,{remote,licence:'test-licence',cacheStorage:null,fetch:async(url,init)=>{requests.push({url:String(url),init});return new Response(bytes);}}),bytes);
+ assert.deepEqual(requests.map(r=>r.url),[local.href]);
+ assert.equal(requests[0].init,undefined,'no licence is sent with local or upstream fetches');
+});
+test('the public demo reaches pinned upstream after unavailable or corrupt licensed sources without leaking the licence',async()=>{
+ for(const damaged of [undefined,new Uint8Array([9,2,3,4])]){
+  const requests=[],remote='https://licensed.test/';
+  const fetch=async(url,init)=>{
+   requests.push(String(url));
+   if(String(url).startsWith(remote))return damaged?new Response(damaged):new Response('',{status:404});
+   if(String(url)===source.url){assert.equal(new Headers(init?.headers).has('authorization'),false);return new Response(bytes);}
+   return new Response('',{status:404});
+  };
+  assert.deepEqual(await loadModelSources(source,local,true,{remote,licence:'test-licence',fetch,cacheStorage:null}),bytes);
+  assert.equal(requests.at(-1),source.url);
+ }
+});
+test('unconfigured model base is never requested and corrupt local models cannot enter inference',async()=>{
+ const requests=[];
+ const fetch=async(url,init)=>{requests.push(String(url));assert.equal(new Headers(init?.headers).has('authorization'),false);return new Response(String(url)===source.url?bytes:new Uint8Array([9,2,3,4]));};
+ assert.deepEqual(await loadModelSources(source,local,true,{fetch,licence:'test-licence',cacheStorage:null}),bytes);
+ assert.deepEqual(requests,[local.href,source.url]);
+});
+test('all model source authentication denials stop without public fallback',async()=>{
+ for(const status of [401,402,403])for(const denialAt of ['local','remote']){
+  const requests=[],remote='https://licensed.test/';
+  const fetch=async url=>{requests.push(String(url));if(denialAt==='local'||String(url).startsWith(remote))return new Response('',{status});return new Response('',{status:404});};
+  await assert.rejects(loadModelSources(source,local,true,{remote,licence:'test-licence',fetch,cacheStorage:null}),/active bide trial/);
+  assert.equal(requests.includes(source.url),false);
+ }
+});
+test('paid and offline builds never bypass an unavailable licence server using the demo upstream',async()=>{
+ const requests=[];
+ await assert.rejects(loadModelSources(source,local,false,{remote:'https://licensed.test/',licence:'test-licence',cacheStorage:null,fetch:async url=>{requests.push(String(url));return new Response('',{status:404});}}),/not bundled/);
+ assert.equal(requests.includes(source.url),false);
+});
+test('licensed app sources assemble split models with bearer authentication and verify their cached copy',async()=>{
+ const remote='https://licensed.test/',requests=[],cacheStorage=storage();
+ const fetch=async(url,init)=>{
+  const path=String(url);requests.push(path);
+  if(!path.startsWith(remote))return new Response('',{status:404});
+  assert.equal(new Headers(init?.headers).get('authorization'),'Bearer test-licence');
+  if(path.endsWith('.parts.json'))return Response.json({size:4,parts:2});
+  if(path.endsWith('.part0'))return new Response(bytes.slice(0,2));
+  if(path.endsWith('.part1'))return new Response(bytes.slice(2));
+  return new Response('',{status:404});
+ };
+ const options={remote,licence:'test-licence',cacheStorage,fetch};
+ assert.deepEqual(await loadModelSources(source,local,false,options),bytes);
+ assert.equal(cacheStorage.state.writes,1);
+ assert.equal(requests.filter(p=>p.startsWith(remote)).length,4);
+ requests.length=0;
+ assert.deepEqual(await loadModelSources(source,local,false,options),bytes);
+ assert.equal(requests.some(p=>p.startsWith(remote)),false);
 });
 test('streamed downloads report bounded bytes and verification before inference',async()=>{
  const progress=[],cacheStorage=storage();

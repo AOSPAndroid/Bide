@@ -490,8 +490,18 @@ function editablePdfText(page:mupdf.PDFPage,bounds:mupdf.Rect){
   return hidden?visible.toStructuredText('preserve-whitespace'):page.toStructuredText('preserve-whitespace');
  }finally{filter.destroy();writer.destroy();visible.destroy();}
 }
+// Count paintable text separately from scanner OCR and clipping-only text.
+function textKinds(page:mupdf.Page){
+ const n={visible:0,invisible:0},opacity=[1];
+ const paint=(_text:unknown,_ctm:unknown,_space:unknown,_color:unknown,alpha:number)=>{n[alpha*opacity[opacity.length-1]>0?'visible':'invisible']++;};
+ const device=new mupdf.Device({fillText:paint,strokeText:(_text,_stroke,_ctm,_space,_color,alpha)=>paint(_text,_ctm,_space,_color,alpha),ignoreText:()=>n.invisible++,clipText:()=>n.invisible++,clipStrokeText:()=>n.invisible++,beginGroup(_area,_space,_isolated,_knockout,_blend,alpha){opacity.push(opacity[opacity.length-1]*alpha);},endGroup(){opacity.pop();}});
+ try{page.run(device,mupdf.Matrix.identity);device.close();}finally{device.destroy();}
+ return n;
+}
 export function detectPdfText(source:string,index:number){
- const data=sources.get(source);if(!data)throw new Error('PDF source unavailable');const doc=open(data) as mupdf.PDFDocument;const page=doc.loadPage(index);const bounds=page.getBounds();const structured=editablePdfText(page,bounds);
+ const data=sources.get(source);if(!data)throw new Error('PDF source unavailable');const doc=open(data) as mupdf.PDFDocument;const page=doc.loadPage(index);
+ const kinds=textKinds(page);if(!kinds.visible&&kinds.invisible){page.destroy();doc.destroy();return {regions:[] as TextRegion[],skipped:0,ocrLayer:true};}
+ const bounds=page.getBounds();const structured=editablePdfText(page,bounds);
  const fonts=new Map<string,{id:string;data:string}>();let budget=0,visited=0;const seen=new Set<number>();
  const resources=(res:mupdf.PDFObject,depth=0)=>{if(depth>8||++visited>128||res.isNull())return;res.get('Font').forEach((font)=>{try{const base=font.get('BaseFont').asName();let descriptor=font.get('FontDescriptor');if(descriptor.isNull())descriptor=font.get('DescendantFonts',0,'FontDescriptor');let stream=descriptor.get('FontFile2');if(stream.isNull()){stream=descriptor.get('FontFile3');if(stream.get('Subtype').asName()!=='OpenType')return;}if(!stream.isStream())return;const buffer=stream.readStream();try{const bytes=buffer.asUint8Array();if(bytes.length>4e6||budget+bytes.length>16e6)return;budget+=bytes.length;fonts.set(cleanFontName(base),{id:'PDFfont-'+source.slice(0,12)+'-'+font.asIndirect(),data:toBase64(bytes)});}finally{buffer.destroy();}}catch{}});res.get('XObject').forEach(obj=>{const id=obj.asIndirect();if(id&&seen.has(id))return;if(id)seen.add(id);resources(obj.get('Resources'),depth+1);});};
  const regions:TextRegion[]=[];let current:TextRegion|undefined,horizontal=true,skipped=0;
