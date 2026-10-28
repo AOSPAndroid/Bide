@@ -1,3 +1,22 @@
+## Unreleased — Phones and tablets
+
+- The interface never pinch-zooms: only the page does. A pinch on the toolbars, the tool rail, the zoom bar, the PDF home or a dialog used to zoom the whole app (up to 5x), with no way back once the fingers reached the canvas.
+- Phones and tablets: tap a selected text box again to edit it where you tapped, even small one-line labels. Text boxes have no top/bottom stretch handles on touch screens, so dragging a label moves it. A new text box from the Text tool opens ready to type over "Your text".
+- Phones and tablets: editing small text zooms in until the letters are readable (16 px) and scrolls the text above the on-screen keyboard; the app no longer shifts up when the keyboard opens.
+- Phones and tablets: the page stays visible at any zoom, including 12 MP photos at 800%. The canvas lowers its pixel density instead of exceeding browser limits; exports are unaffected. Pinching is smooth: the page is scaled while the fingers move and redrawn once when they lift.
+- Phones and tablets: one finger scrolls a zoomed page. To move a layer, tap it first, then drag.
+- Phones and tablets: a pinch never leaves a stray brush stroke, shape or text box, and never moves the object under the first finger, even when the second finger lands late.
+- Phones and tablets: a finger inside a small shape or label moves it; the larger handles resize it from just outside.
+- Phones and tablets: a long press on a layer opens its menu (edit text, arrange, duplicate, lock, delete…), the same menu right-click opens.
+- Phones and tablets: zoom buttons and tool buttons are 44 px finger targets. The tool rail shows a shadow while more tools are scrolled out of view. Pages open larger: an A4 page fills the width of a phone.
+- **Phones: a Menu button** next to a labelled **Find a tool…** button opens File, Edit, Image, View, Layer, Select, Insert, Page, PDF and Help as a full-width sheet, one group at a time. Unavailable commands say why. On touch the command palette drops its keyboard hints and uses a 16px search field.
+- **Phones: touch-sized chrome.** Header, file actions, tool rail, tool options and the bottom bar use 44px targets. The workspaces show their names (PHOTO, PDF, DOCS) and chrome text is at least 11px. The document name shares a row with the file actions and the empty status bar is gone, so the page gets about 36px more on an iPhone. Save project is in Menu › File and the Export dialog.
+- **Phones: Pages and Properties sit in the bottom bar** next to the zoom, below the drawers they open, so the same button closes a drawer. A tap beside an open drawer closes it and no longer selects a layer underneath. The Properties drawer gives Layers and History half its height with 44px rows, and Design & layout wraps inside the panel instead of running off screen.
+- **Phones: tool options** no longer repeat the zoom. Snap to page moved to Menu › View. The options bar and tool rail show edge shadows when they scroll.
+- **OCR bar on phones**: Edit detected text, the status and a **More** button fit one row. More shows the full status plus Proofread, Find & replace, Convert all, OCR settings and Rescan. On tablets the bar wraps instead of covering the Properties panel. OCR settings chosen from the command palette no longer open the Properties drawer.
+- **Clone Stamp and Healing Brush on touch screens**: **Set source** makes the next tap pick the spot to copy from (on by default when there is no source), and a cross marks it. Alt-click still works with a mouse.
+- Invoice editor on iPhones: the date fields keep to their column. Safari drew them wider and taller than the other fields, over the next field, with the date centred (`tests/e2e/invoice-layout.e2e.mjs` checks every field at 320 to 430 px wide).
+
 ## v0.8.16 — Sharp text edits on scanned PDFs
 
 - Includes Claude's higher-resolution sharpness measurement for scanned PDF text. Font, size and position are fitted at page scale; softness is measured on a finer render so crisp scans do not acquire unnecessary blur.
@@ -22,7 +41,6 @@
   - A PDF without invoice data, a photo or a scan is read with OCR into a draft: number, dates, SIREN/SIRET and VAT numbers (checksums), parties by column, IBAN/BIC, table rows (quantity × price = amount decides between "1 450,00" and "1 | 450.00"), discounts, charges, deposits and totals. What was not found is listed on the draft. On our sample invoices rendered to images every field comes back and the totals match; on the benchmark's English invoice all 4 lines and the client are found.
 - Invoice-level discounts and charges in the editor, PDF and XML (BG-20/BG-21); zero-rated lines no longer carry an exemption reason (BR-Z-10).
 - Workspace tabs have accessible names on phones, where only their icons show.
-- Invoice editor on iPhones: the date fields keep to their column. Safari drew them wider and taller than the other fields, over the next field, with the date centred (`tests/e2e/invoice-layout.e2e.mjs` checks every field at 320 to 430 px wide).
 - **Phones and tablets:** two fingers pinch-zoom the page around their midpoint and pan it at the same time; one finger keeps working the current tool (its touch is held back 90 ms, so a pinch never draws, selects or moves anything); one finger on the grey margin scrolls; the hand and zoom tools work with touch. The browser's own pinch zoom is blocked over the canvas only, so the toolbars no longer grow with a pinch.
 - **Editing scanned PDFs, no more blur or doubled text** (tested on an invented scanned quote, `tests/fixtures/scanned-quote*.pdf`, built by `scripts/make-scan-fixture.mjs`):
   - A scan carrying the scanner's invisible OCR text layer (render mode 3, e.g. Tesseract's GlyphLessFont; detected with a MuPDF device that counts visible and invisible text) is now read by bide's own OCR. Before, that layer was edited as if it were the page's text: only the invisible text was removed and the new text was drawn over the scanned digits, which stayed in the image. Such pages count as already searchable, so export adds no second layer.

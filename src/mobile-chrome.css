@@ -1,1 +1,168 @@
 /* Phones and touch screens: chrome. Rules here only apply at phone sizes or to coarse pointers. */
+
+/* Phone-only controls (PhoneMenu.tsx, the OCR bar's More) stay out of wider layouts. */
+@media(min-width:601px){.phone-menu-button,.ocr-more{display:none}}
+
+/* Phones and small tablets: Pages (and Properties) join the zoom in the bottom
+   bar, below the drawers they open, so the same button closes a drawer. A
+   scrim on .workspace-layout itself catches taps beside an open drawer
+   (touch-ui.ts closes it), so they never select or move anything. */
+@media(max-width:820px){
+ .workspace-layout{--bottom-bar:48px}
+ .canvas-footer{height:var(--bottom-bar);min-height:var(--bottom-bar)}
+ .canvas-tab{position:absolute;left:0;bottom:0;z-index:16;height:var(--bottom-bar);padding:0 8px;background:none;border:0}
+ .canvas-tab>button{min-height:40px;padding:4px 10px;font-size:12px}
+ .canvas-tab>span:first-of-type{max-width:140px}
+ .workspace-layout[data-panel=pages] .pages-panel{bottom:var(--bottom-bar)}
+ .workspace-layout[data-panel=pages]::after{content:'';position:absolute;inset:0 0 var(--bottom-bar);z-index:14;background:#25272d40}
+ .workspace-layout[data-panel=pages] .small-pages-button,.workspace-layout[data-panel=properties] .small-properties-button{background:var(--selected);border-color:var(--accent-border);color:var(--accent)}
+ /* Design & layout: long labels wrap inside the narrow panel instead of widening it. */
+ .design-tools-body{grid-template-columns:minmax(0,1fr)}
+ .design-actions{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .design-actions button{white-space:normal;line-height:1.25}
+}
+
+/* Tablets: the OCR bar wraps instead of painting over the Properties panel; the
+   settings stay at the right end so their right-anchored panel opens on screen. */
+@media(min-width:601px) and (max-width:820px),(min-width:601px) and (pointer:coarse){
+ .text-detection-bar{flex-wrap:wrap;row-gap:4px}
+ .text-detection-bar>.ocr-settings{margin-left:auto}
+}
+
+/* Touch screens: no keyboard hints, no tooltips, 16px fields (iOS zooms smaller ones). */
+@media(pointer:coarse){
+ .palette-search>kbd,.palette-footer,.command-list kbd{display:none}
+ .palette-search input{font-size:16px;min-height:40px}
+ .modal:has(.palette-search,.phone-menu) .modal-header>.icon-button{width:44px;height:44px}
+ .command-list>button{min-height:52px}
+ .tip-card,.rail-bottom>button[aria-label="Keyboard shortcuts"]{display:none}
+ /* Clone Stamp and Healing Brush (RetouchSource.tsx). */
+ .options-bar .set-source{min-height:40px;gap:6px;padding:4px 12px;font-weight:600}
+ .options-bar .set-source[aria-pressed=true]{background:var(--selected);border-color:var(--accent);color:var(--accent)}
+ .retouch-source-hint{order:1}
+ .retouch-source-mark{position:absolute;z-index:7;width:30px;height:30px;margin:-15px 0 0 -15px;pointer-events:none;border-radius:50%;border:2px solid var(--accent);box-shadow:0 0 0 2px #fff;background:linear-gradient(var(--accent),var(--accent)) center/2px 100% no-repeat,linear-gradient(var(--accent),var(--accent)) center/100% 2px no-repeat}
+}
+
+@media(max-width:600px){
+ /* Header: logo, the three workspaces with their names, then Menu and Find. */
+ .topbar{height:56px;min-height:56px;gap:6px;padding-left:8px;padding-right:8px}
+ .brand-lockup{display:none}
+ .topbar .workspace-nav{gap:2px}
+ .topbar .workspace-nav>button,.phone-menu-button,.topbar .command-button{flex:0 0 auto;flex-direction:column;justify-content:center;gap:4px;height:48px;min-width:48px;width:auto;padding:2px 6px;border-radius:8px;line-height:1}
+ .topbar .workspace-nav>button>span{display:none}
+ .topbar .workspace-nav>button>svg{width:20px;height:20px}
+ .topbar .workspace-nav small.nav-short{display:block;font-size:10.5px;font-weight:650;letter-spacing:.4px}
+ .topbar-right{margin-left:auto;gap:2px}
+ .phone-menu-button,.topbar .command-button{border:0;background:none;color:var(--ink);font-size:11px;font-weight:600}
+ .topbar .command-button span{display:block;position:static;width:auto;height:auto;min-width:0;overflow:visible;clip-path:none;text-align:center}
+ /* The menus as a sheet (PhoneMenu.tsx). */
+ .modal-backdrop:has(.phone-menu){align-items:flex-end;padding:0}
+ .modal:has(.phone-menu){width:100%;max-width:none;max-height:88dvh;border-radius:16px 16px 0 0;padding:14px 12px 18px}
+ .phone-menu summary{display:flex;align-items:center;min-height:48px;padding:0 10px;border-top:1px solid var(--line);font-size:15px;font-weight:600;cursor:pointer;list-style:none}
+ .phone-menu summary::-webkit-details-marker{display:none}
+ .phone-menu summary::after{content:'';margin-left:auto;width:8px;height:8px;border:solid var(--muted);border-width:0 2px 2px 0;transform:rotate(45deg);translate:0 -2px}
+ .phone-menu details[open]>summary{color:var(--accent)}
+ .phone-menu details[open]>summary::after{transform:rotate(225deg);translate:0 2px}
+ .phone-menu button{width:100%;min-height:48px;justify-content:flex-start;gap:12px;padding:6px 10px 6px 18px;border-radius:8px;text-align:left;font-size:14px;color:var(--ink)}
+ .phone-menu button>span{display:flex;flex-direction:column;gap:2px;min-width:0;white-space:normal}
+ .phone-menu button strong{font-weight:500}
+ .phone-menu small{font-size:12px;color:var(--muted)}
+ .phone-menu button[aria-disabled=true]{opacity:.55}
+
+ /* Document name and file actions share one row (Save is in Menu › File and the
+    Export dialog); the tool options get the row below. */
+ .command-strip .document-name{flex:1 1 0;width:auto;min-width:0;height:52px;padding:0 4px 0 10px}
+ .command-strip .document-name>svg{display:none}
+ .command-strip .document-name>input{width:100%;max-width:none;font-size:16px;padding:4px}
+ .command-strip .document-actions{flex:0 0 auto;width:auto;height:52px;gap:2px;padding:0 6px 0 0;border-left:0;overflow:visible}
+ .command-strip .document-actions>.save-project{display:none}
+ .command-strip .document-actions>.secondary,.command-strip .document-actions>.primary{height:44px;min-height:44px}
+ .command-strip .document-actions>.secondary,.command-strip .document-actions .icon-button{width:44px;height:44px}
+ .command-strip .document-actions>.primary{padding:0 8px;gap:2px}
+ /* Icon-only here, but still named for screen readers. */
+ .command-strip .document-actions>:is(.secondary,.primary) .btn-label{display:block;position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+
+ /* Tool options: one swipeable row. Edge shadows show when more is hidden that
+    way; the zoom is in the bottom bar and Snap to page in Menu › View. */
+ .command-strip>.options-bar{height:52px;min-height:52px;padding:0 10px;gap:10px;overscroll-behavior-x:contain;background-color:var(--soft);background-image:linear-gradient(to right,var(--soft) 30%,#0000),linear-gradient(to left,var(--soft) 30%,#0000),radial-gradient(farthest-side at 0 50%,#25272d40,#0000),radial-gradient(farthest-side at 100% 50%,#25272d40,#0000);background-position:left center,right center,left center,right center;background-size:36px 100%,36px 100%,14px 100%,14px 100%;background-repeat:no-repeat;background-attachment:local,local,scroll,scroll}
+ .options-bar>.tool-caption+.divider+.check-label{display:none}
+ .options-end>.divider:has(+.header-zoom),.options-end>.header-zoom,.options-end>.header-zoom+.icon-button{display:none}
+ .options-bar .tool-caption{font-size:13px}
+ .options-end,.options-bar .marker-setting,.options-bar .check-label,.options-bar .muted{font-size:12px}
+ .options-bar .check-label{min-height:40px}
+ .options-bar input[type=number],.options-bar input[type=text],.options-bar select{height:40px;font-size:16px}
+ .options-bar input[type=color]{width:40px;height:40px}
+ .options-bar button.secondary,.options-bar button.primary,.options-bar .mode-switch>button{min-height:40px}
+ .options-bar .icon-button{width:40px;height:40px}
+ .options-bar input[type=checkbox],.text-detection-bar input[type=checkbox],.inspector input[type=checkbox]{width:20px;height:20px}
+
+ /* Tool rail: 44px tools, with the same edge shadows when the list scrolls. */
+ .tool-rail{width:50px;padding:3px;background-color:var(--surface);background-image:linear-gradient(var(--surface) 30%,#0000),linear-gradient(to top,var(--surface) 30%,#0000),radial-gradient(farthest-side at 50% 0,#25272d40,#0000),radial-gradient(farthest-side at 50% 100%,#25272d40,#0000);background-position:center top,center bottom,center top,center bottom;background-size:100% 36px,100% 36px,100% 14px,100% 14px;background-repeat:no-repeat;background-attachment:local,local,scroll,scroll}
+ .tool-group button{height:44px;min-height:44px}
+ .tool-group button>svg{width:20px;height:20px}
+ .rail-bottom label,.rail-bottom button{width:44px;height:44px}
+ .rail-bottom input{width:30px;height:30px}
+
+ /* OCR bar: Edit detected text, the status and More fit one row; More shows the
+    actions (and the full status) below. */
+ .text-detection-bar{flex-wrap:wrap;gap:4px 8px;padding:4px 8px;font-size:12px}
+ .text-detection-bar>label:first-child{order:0;min-height:44px;font-size:12px}
+ .text-detection-bar>span{order:1;flex:1 1 0;min-width:0}
+ .text-detection-bar>.ocr-more{order:2}
+ .text-detection-bar>:not(label:first-child,span,.ocr-more){order:4}
+ .text-detection-bar:not(.more)>:is(button:not(.ocr-more),details:not([open])){display:none}
+ .text-detection-bar.more>span{order:3;flex-basis:100%;white-space:normal}
+ .text-detection-bar.more>.ocr-more{order:1;margin-left:auto}
+ .text-detection-bar button,.text-detection-bar .ocr-settings>summary{display:flex;align-items:center;min-height:44px;padding:4px 12px;font-size:13px}
+ .ocr-settings-panel{top:auto;bottom:8px;max-height:70dvh}
+ .ocr-settings-panel>label{white-space:normal}
+ .ocr-settings-panel select,.ocr-settings-panel input:not([type=checkbox]){min-height:40px;font-size:16px}
+
+ /* Bottom bar: Pages and Properties at the left edge (the tool rail stops above
+    them), the zoom on the right. The status bar below it is empty on phones. */
+ .workspace-layout{--bottom-bar:52px}
+ .statusbar{display:none}
+ .tool-rail{margin-bottom:var(--bottom-bar)}
+ .canvas-tab{left:-50px;padding:0 4px;gap:2px;background:var(--surface);border-top:1px solid var(--line)}
+ .canvas-tab>button{flex-direction:column;gap:4px;height:48px;min-width:48px;padding:2px 6px;border:0;border-radius:8px;font-size:11px;font-weight:600;line-height:1;color:var(--ink)}
+ .canvas-tab>button>svg{width:18px;height:18px}
+ .canvas-tab>svg,.canvas-tab>.tab-badge{display:none}
+ .canvas-footer{padding:0 4px}
+ .zoom-controls{gap:0}
+ .zoom-controls button{height:44px;min-width:46px;font-size:12px}
+ .zoom-controls .icon-button{width:40px}
+ .zoom-controls svg{width:18px;height:18px}
+
+ /* Drawers: big close buttons and rows, and room for the lists. */
+ .panel-heading{height:52px}
+ .pages-panel .panel-heading .icon-button,.close-small-properties{width:44px;height:44px;min-width:44px;justify-content:center;padding:0}
+ .page-more{width:40px;height:40px}
+ .page-panel-bottom button{min-height:44px;font-size:13px}
+ .workspace-layout[data-panel=properties]::after{content:'';position:absolute;inset:0 0 var(--bottom-bar);z-index:14;background:#25272d40}
+ .workspace-layout[data-panel=properties] .inspector{bottom:var(--bottom-bar);width:min(320px,88vw)}
+ /* Properties and the layer (or history) list share the drawer's height evenly;
+    the footer only repeats the selection state and Delete. */
+ .workspace-layout[data-panel=properties] .inspector .properties-content{flex:1 1 0;max-height:none;min-height:120px}
+ .workspace-layout[data-panel=properties] .inspector :is(.layers-list,.history-list){flex:1 1 0;min-height:132px}
+ .inspector .layer-footer{display:none}
+ .inspector .layer-row{height:44px;font-size:13px}
+ .inspector .layer-row>button{width:40px;height:40px}
+ .inspector .layers-header{height:auto;min-height:48px;flex-wrap:wrap;padding:2px 4px 2px 8px}
+ .inspector .layers-header>div{margin-left:auto}
+ .inspector .layers-header .icon-button{width:40px;height:40px}
+ .inspector .panel-tabs button{min-height:40px;padding:4px 6px;font-size:12px}
+ .inspector .history-list button{min-height:44px;font-size:13px}
+ .layer-retouch-actions button{min-height:40px;font-size:12px;padding:6px 12px}
+ .layer-retouch-actions label{font-size:12px}
+ .form-add button{min-height:40px;padding:8px 10px;font-size:12px}
+ .quick-insert button{min-height:44px;font-size:13px}
+ .alignment-buttons button,.selection-actions button,.filter-buttons button,.design-tools-body button{min-height:40px;font-size:12px}
+ .inspector .design-swatches>div>button{min-width:40px;min-height:40px}
+ .inspector .number-field{height:40px}
+ .inspector .number-field span{font-size:11px}
+ .inspector :is(input:not([type=checkbox],[type=color],[type=range]),select,textarea){font-size:16px}
+ /* Readable text: nothing under 11px. */
+ .section-label,.property-section summary,.tab-badge,.panel-heading b,.layers-header b,.artboard-label,.artboard-label>span:last-child{font-size:11px}
+ .panel-context{font-size:11px!important}
+ .selected-heading>div>span,.design-tools-body p,.design-tools-body label,.color-field,.slider-field>span,.fine-print,.layers-empty{font-size:12px}
+}
