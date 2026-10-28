@@ -37,3 +37,11 @@ test('an OCR match is covered from its letter positions, or the whole line witho
  assert.ok(!overlaps({left:0,top:0,width:10,height:10},{left:10,top:0,width:5,height:5}));
  assert.ok(inside({left:2,top:2,width:3,height:3},{left:0,top:0,width:10,height:10}));
 });
+test('on a tilted line the redaction box covers the match turned with the line',()=>{
+ const region={text:'AB CD',left:0,top:0,width:100,height:10,angle:30,glyphs:[{x0:0,x1:20},{x0:20,x1:40},{x0:60,x1:80},{x0:80,x1:100}]};
+ const r=ocrMatchRect(region,{start:3,end:5,text:'CD'},0);
+ // CD spans x 60-100 of the level box; turned 30° about (50, 5), its lowest corner is at y 5 + 50 sin 30° + 5 cos 30°.
+ assert.ok(Math.abs(r.top+r.height-(5+50*Math.sin(Math.PI/6)+5*Math.cos(Math.PI/6)))<1e-9,'the box reaches the turned letters\' lowest corner');
+ assert.ok(r.left>50&&r.height>20,'only the match, at its turned place');
+ assert.deepEqual(ocrMatchRect({...region,angle:undefined},{start:3,end:5,text:'CD'},0),{left:60,top:0,width:40,height:10});
+});

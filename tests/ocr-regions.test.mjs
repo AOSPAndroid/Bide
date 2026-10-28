@@ -55,3 +55,25 @@ test('doubtful letters map to text positions, skipping spaces',async()=>{
  assert.deepEqual(doubtfulLetters(region),[5]);
  assert.deepEqual(doubtfulLetters({text:'abc'}),[]);
 });
+test('a tilted line is a level box turned about its centre; lines tilted alike only shift between frames',async()=>{
+ const {frameOf,turn,turnedQuad,turnedBounds,inFrame}=await import('../tmp/ocr-regions.mjs');
+ const a={...region('Total',100,50,100,20),angle:90,glyphs:[{ch:'T',x0:100,x1:120}]},f=frameOf(a),near=(p,x,y)=>Math.abs(p.x-x)<1e-9&&Math.abs(p.y-y)<1e-9;
+ assert.deepEqual(f,{angle:90,cx:150,cy:60});
+ const p=turn(f,200,60);assert.ok(near(p,150,110),'the right end of the box turns below its centre (clockwise)');
+ assert.ok(near(turn(f,p.x,p.y,true),200,60));
+ assert.equal(turnedQuad(f,a).length,4);
+ const b=turnedBounds(f,a);assert.ok(near({x:b.left,y:b.top},140,10)&&near({x:b.width,y:b.height},20,100));
+ assert.equal(turnedBounds(frameOf(region('x',1,2)),region('x',1,2)).left,1,'a level box is its own bounds');
+ assert.equal(inFrame(f,a),a,'a line is at home in its own frame');
+ // Another line of the same page, 40 px below this one in its level frame.
+ const at=turn(f,150,100),d={...region('Due',at.x-50,at.y-10,100,20),angle:90,glyphs:[{ch:'D',x0:at.x-50,x1:at.x-40}]},m=inFrame(f,d);
+ assert.ok(Math.abs(m.left-100)<1e-9&&Math.abs(m.top-90)<1e-9&&Math.abs(m.glyphs[0].x0-100)<1e-9,'it only shifts into the frame');
+ assert.equal(inFrame(f,{...d,angle:45}),undefined,'a line tilted otherwise has no place in the frame');
+ const n=inFrame(f,{...d,angle:91},3);assert.ok(Math.abs(n.left-100)<1e-9&&Math.abs(n.top-90)<1e-9,'unless nearly level with it: then it is placed by its centre');
+ const level=region('Level',0,0);assert.equal(inFrame(frameOf(level),level),level);assert.equal(inFrame(frameOf(level),a),undefined);
+});
+test('scaling keeps a tilted line\'s angle, and follows uneven scales',()=>{
+ const [r]=scaleRegions([{...region('Hi',100,50,40,20),angle:-2.5}],.5,.5);assert.equal(r.angle,-2.5);
+ const [s]=scaleRegions([{...region('Hi',100,50,40,20),angle:45}],1,2);assert.ok(Math.abs(s.angle-Math.atan(2)*180/Math.PI)<1e-9);
+ assert.equal('angle' in scaleRegions([region('Hi',1,1)],.5,.25)[0],false,'a level line stays without an angle');
+});

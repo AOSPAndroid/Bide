@@ -16,7 +16,7 @@ import {rasterSearchWords} from './searchable-text';
 import {fallbackFont,fitOcrText,type TextRegion} from './text-regions';
 import {lineCells,planGlyphEdit,ownInk,lineMetrics,type LibraryGlyph} from './glyph-edit';
 import {markDoubts} from './ocr-checks';
-import {mixedWeights,attachNumberParts,recognitionKey,scaleRegions,unconvertedRegions,ocrPatchBounds,ocrScanStatus,isUncertain} from './ocr-regions';
+import {mixedWeights,attachNumberParts,recognitionKey,scaleRegions,unconvertedRegions,ocrPatchBounds,ocrScanStatus,isUncertain,frameOf,turn,turnedBounds,inFrame,type Frame} from './ocr-regions';
 import type {OcrGrouping} from './ocr-segmentation';
 import {uid,type Page} from './model';
 import {bundledOcrLanguages,languageLabel} from './ocr-languages';
@@ -28,6 +28,28 @@ export type ReplacementBackground='repair'|'ai'|'sampled'|'solid'|'transparent';
 async function previewCanvas(source:string,index:number,scale:number,width?:number,height?:number){
  const image=new Image();image.src=await pagePreview(source,index,scale);await image.decode();
  const canvas=document.createElement('canvas');canvas.width=width??image.width;canvas.height=height??image.height;canvas.getContext('2d')!.drawImage(image,0,0,canvas.width,canvas.height);return canvas;
+}
+
+// A tilted line (TextRegion.angle) is worked on level, as OCR read it: the
+// raster turned back about the line's centre (`k` pixels per page unit).
+function levelRaster(raster:HTMLCanvasElement,f:Frame,k:number,fill:string){
+ if(!f.angle)return raster;
+ const out=document.createElement('canvas');out.width=raster.width;out.height=raster.height;const g=out.getContext('2d',{willReadFrequently:true})!;
+ g.fillStyle=fill;g.fillRect(0,0,out.width,out.height);g.translate(f.cx*k,f.cy*k);g.rotate(-f.angle*Math.PI/180);g.translate(-f.cx*k,-f.cy*k);g.drawImage(raster,0,0);return out;
+}
+// The page's lines in a frame (lines tilted otherwise are left out; `near`
+// lets in those within 3°, placed by their centre, to find neighbours).
+const framed=(f:Frame,regions:TextRegion[],near=false)=>regions.flatMap(r=>{const m=inFrame(f,r,near?3:undefined);return m?[m]:[];});
+// A layer made in a tilted line's level frame, turned onto the page with it
+// (layers turn about their top left corner).
+function turnLayer<T extends FabricObject>(o:T,region:TextRegion){
+ const f=frameOf(region);if(!f.angle)return o;
+ const at=turn(f,o.left,o.top);o.set({left:at.x,top:at.y,angle:f.angle});o.setCoords();return o;
+}
+// Paint in a tilted line's frame on a page-unit canvas.
+function inLineFrame(g:CanvasRenderingContext2D,f:Frame,paint:()=>void){
+ if(!f.angle)return paint();
+ g.save();g.translate(f.cx,f.cy);g.rotate(f.angle*Math.PI/180);g.translate(-f.cx,-f.cy);paint();g.restore();
 }
 
 // Page raster for OCR, flattened onto the page colour and capped at 3600px
@@ -101,10 +123,12 @@ export async function scanPageText(p:Page,c:Canvas,{signal,grouping,thorough,lan
 }
 
 // Compare the clearest recognized words against bundled fonts. Only confident
-// regions are used: a misread character skews the shape comparison.
+// regions are used: a misread character skews the shape comparison. A tilted
+// page's words are compared level, on the raster turned back as OCR read it.
 async function suggestFont(raster:HTMLCanvasElement,regions:TextRegion[]){
- const ctx=raster.getContext('2d',{willReadFrequently:true})!;
- const samples=regions.filter(r=>(r.confidence??0)>=85&&r.text.replace(/\s/g,'').length>=4&&r.height>=8).sort((a,b)=>b.width*b.height-a.width*a.height).slice(0,6).map(r=>{
+ const picked=regions.filter(r=>(r.confidence??0)>=85&&r.text.replace(/\s/g,'').length>=4&&r.height>=8).sort((a,b)=>b.width*b.height-a.width*a.height).slice(0,6),f=picked.length?frameOf(picked[0]):undefined;
+ const ctx=(f?levelRaster(raster,f,1,picked[0].background||'#ffffff'):raster).getContext('2d',{willReadFrequently:true})!;
+ const samples=(f?framed(f,picked,true):picked).map(r=>{
   const left=Math.max(0,Math.floor(r.left-2)),top=Math.max(0,Math.floor(r.top-2)),width=Math.min(raster.width-left,Math.ceil(r.width+4)),height=Math.min(raster.height-top,Math.ceil(r.height+4));
   const hex=r.background||'#ffffff';return {text:r.text,pixels:ctx.getImageData(left,top,width,height),background:[1,3,5].map(i=>parseInt(hex.slice(i,i+2),16))};
  });
@@ -114,7 +138,8 @@ async function suggestFont(raster:HTMLCanvasElement,regions:TextRegion[]){
 
 // Editable text positioned so its first baseline matches the detected text.
 // matchBlur gives OCR text the measured softness of the original letters.
-export async function detectedTextbox(region:TextRegion,{ocrFont,ocrStyle,matchBlur=false,pageInk}:{ocrFont:string;ocrStyle:string;matchBlur?:boolean;pageInk?:PageInk}){
+// A tilted line's text is turned with it, unless `level` (for fitting in its frame).
+export async function detectedTextbox(region:TextRegion,{ocrFont,ocrStyle,matchBlur=false,pageInk,level=false}:{ocrFont:string;ocrStyle:string;matchBlur?:boolean;pageInk?:PageInk;level?:boolean}){
  let family=region.kind==='ocr'?ocrFont:fallbackFont(region.fontName),embedded=false;
  if(region.fontData&&region.fontId){try{await ensureEmbeddedFont(region.fontId,region.fontData);family=region.fontId;embedded=true;}catch{}}
  await ensureFont(family);
@@ -151,6 +176,7 @@ export async function detectedTextbox(region:TextRegion,{ocrFont,ocrStyle,matchB
  if(matchBlur&&region.kind==='ocr'&&(region.blur??0)>=.3)Object.assign(text,{textSoftness:clampTextSoftness(region.blur!)});
  // Fabric's top includes its ascender allowance; anchor the first baseline.
  text.top=region.kind==='pdf'?region.baseline-region.size*.93:region.top+ocrAscent-size*.93;
+ if(!level)turnLayer(text,region);
  return {text,embedded};
 }
 
@@ -158,52 +184,56 @@ export async function matchedDetectedTextbox(region:TextRegion,c:Canvas,p:Page,r
  if(region.kind!=='ocr')return detectedTextbox(region,options);
  const all=regions.length?regions:[region],inkCache=new Map<string,Promise<PageInk|undefined>>();
  const ink=(family:string)=>{if(!inkCache.has(family))inkCache.set(family,options.ocrStyle==='auto'?pageInkLevel(all,family):Promise.resolve(undefined));return inkCache.get(family)!;};
- const makeText=async(r:TextRegion,family:string)=>(await detectedTextbox(r,{...options,ocrFont:family,matchBlur:false,pageInk:await ink(family)})).text;
+ const makeText=async(r:TextRegion,family:string)=>(await detectedTextbox(r,{...options,ocrFont:family,matchBlur:false,pageInk:await ink(family),level:true})).text;
  const {matchOcrAppearance,applyOcrAppearance,matchOcrSoftness}=await import('./browser/ocr-appearance');
  // A PDF page's units are points (72 dpi): small scanned letters look soft at
  // that scale however crisp the scan, and replacement text got a blur the
  // page does not have. Font, size and position are fitted at page scale; the
  // softness of a PDF page is measured on a render with ~32 px letters.
- const pdf=!!p.source,regionsAll=options.appearanceRegions??all;
- const raster=await pageComposite(c,p),fit=await matchOcrAppearance(raster,region,regionsAll,options.ocrFont,{autoFont:options.autoFont,matchBlur:options.matchBlur&&!pdf,makeText});
+ // A tilted line is fitted level, on the page turned back about its centre.
+ const pdf=!!p.source,f=frameOf(region),fill=region.background||'#ffffff',regionsAll=framed(f,options.appearanceRegions??all,true);
+ const raster=levelRaster(await pageComposite(c,p),f,1,fill),fit=await matchOcrAppearance(raster,region,regionsAll,options.ocrFont,{autoFont:options.autoFont,matchBlur:options.matchBlur&&!pdf,makeText});
  if(!fit)return detectedTextbox(region,{...options,pageInk:await ink(options.ocrFont)});
  const text=await makeText(region,fit.family);applyOcrAppearance(text,region,fit);
  const k=pdf?Math.max(1,Math.min(4,32/Math.max(1,region.height),Math.sqrt(16e6/(p.width*p.height)))):1;
- if(pdf&&options.matchBlur){const fine=await previewCanvas(p.source!,p.index,k,Math.ceil(p.width*k),Math.ceil(p.height*k));text.textSoftness=matchOcrSoftness(fine,region,regionsAll,text,k);text.initDimensions();}
- return {text,embedded:false};
+ if(pdf&&options.matchBlur){const fine=levelRaster(await previewCanvas(p.source!,p.index,k,Math.ceil(p.width*k),Math.ceil(p.height*k)),f,k,fill);text.textSoftness=matchOcrSoftness(fine,region,regionsAll,text,k);text.initDimensions();}
+ return {text:turnLayer(text,region),embedded:false};
 }
 
 // Hide the original OCR text by clearing, repairing or patching the area under
 // each region. Several regions are handled in one pass (Convert all), so each
 // image layer is rasterized once. Mutates the serialized `objects` list of the page.
+// A tilted line's area is a box in its level frame, turned with it.
 export async function coverOcrText(c:Canvas,p:Page,regions:TextRegion[],objects:unknown[],{mode,color,padding,others=[],onProgress}:{mode:ReplacementBackground;color:string;padding:number;others?:TextRegion[];onProgress?:(fraction:number)=>void}){
- const areas=regions.map(region=>({region,...ocrPatchBounds(region,padding,p,others.filter(o=>o!==region&&o.kind==='ocr'))}));
+ const areas=regions.map(region=>{const f=frameOf(region);return {region,f,...ocrPatchBounds(region,padding,p,framed(f,others.filter(o=>o!==region&&o.kind==='ocr'),true))};});
  if(mode==='transparent'){
-  const overlaps=(o:FabricObject)=>{const b=o.getBoundingRect();return areas.some(a=>b.left<a.left+a.width&&b.top<a.top+a.height&&b.left+b.width>a.left&&b.top+b.height>a.top);};
+  const overlaps=(o:FabricObject)=>{const b=o.getBoundingRect();return areas.some(area=>{const a=turnedBounds(area.f,area);return b.left<a.left+a.width&&b.top<a.top+a.height&&b.left+b.width>a.left&&b.top+b.height>a.top;});};
   const images=c.getObjects().filter(o=>o instanceof FabricImage&&o.visible&&overlaps(o));
   if(!images.length)throw new Error('Select image text to clear its background.');
   if(images.some(o=>o.lockMovementX))throw new Error('Unlock the image layers beneath this text first.');
   for(const image of images){
    const blend=image.globalCompositeOperation;let raster:HTMLCanvasElement;try{image.globalCompositeOperation='source-over';raster=pageRaster(c,p.width,p.height,[image]);}finally{image.globalCompositeOperation=blend;}
-   for(const a of areas)raster.getContext('2d')!.clearRect(a.left,a.top,a.width,a.height);
+   const g=raster.getContext('2d')!;for(const a of areas)inLineFrame(g,a.f,()=>g.clearRect(a.left,a.top,a.width,a.height));
    const replacement=rasterLayer(raster,(image as Tagged).name||'Image',(image as Tagged).id!),index=objects.findIndex(o=>(o as Tagged).id===(image as Tagged).id);
    if(index>=0){if(replacement){replacement.globalCompositeOperation=blend;objects[index]=replacement.toObject();}else objects.splice(index,1);}
   }
  }else if(mode==='ai'){
   // LaMa reconstructs textures (photos, maps, gradients) behind the old text.
   const raster=await pageComposite(c,p),mask=document.createElement('canvas');mask.width=raster.width;mask.height=raster.height;const mctx=mask.getContext('2d')!;mctx.fillStyle='#000';
-  for(const a of areas)mctx.fillRect(a.left,a.top,a.width,a.height);
+  for(const a of areas)inLineFrame(mctx,a.f,()=>mctx.fillRect(a.left,a.top,a.width,a.height));
   const {inpaintCanvas}=await import('./browser/ai-tools');
-  for(const patch of await inpaintCanvas(raster,mask,areas.map(a=>({x:a.left,y:a.top,width:a.width,height:a.height})),onProgress))objects.push(Object.assign(new FabricImage(patch.canvas,{left:patch.x,top:patch.y}),{id:uid(),name:'AI-filled background'}).toObject());
+  for(const patch of await inpaintCanvas(raster,mask,areas.map(area=>{const a=turnedBounds(area.f,area);return {x:a.left,y:a.top,width:a.width,height:a.height};}),onProgress))objects.push(Object.assign(new FabricImage(patch.canvas,{left:patch.x,top:patch.y}),{id:uid(),name:'AI-filled background'}).toObject());
  }else if(mode==='repair'){
   const raster=await pageComposite(c,p);
   const pixels=raster.getContext('2d')!.getImageData(0,0,raster.width,raster.height);
   for(const a of areas){
-   const repaired=repairTextBackground(pixels,{left:a.left,top:a.top,width:a.width,height:a.height});
+   // A tilted line is repaired on the page levelled about its centre.
+   const level=a.f.angle?levelRaster(raster,a.f,1,a.region.background||'#ffffff'):undefined,source=level?level.getContext('2d')!.getImageData(0,0,level.width,level.height):pixels;
+   const repaired=repairTextBackground(source,{left:a.left,top:a.top,width:a.width,height:a.height});
    const patchCanvas=document.createElement('canvas');patchCanvas.width=repaired.width;patchCanvas.height=repaired.height;const context=patchCanvas.getContext('2d')!,patch=context.createImageData(repaired.width,repaired.height);patch.data.set(repaired.data);context.putImageData(patch,0,0);
-   objects.push(Object.assign(new FabricImage(patchCanvas,{left:repaired.left,top:repaired.top}),{id:uid(),name:'Repaired text background'}).toObject());
+   objects.push(Object.assign(turnLayer(new FabricImage(patchCanvas,{left:repaired.left,top:repaired.top}),a.region),{id:uid(),name:'Repaired text background'}).toObject());
   }
- }else for(const a of areas)objects.push(Object.assign(new Rect({left:a.left,top:a.top,width:a.width,height:a.height,fill:mode==='solid'?color:a.region.background||'#ffffff',strokeWidth:0}),{id:uid(),name:'Text background patch'}).toObject());
+ }else for(const a of areas)objects.push(Object.assign(turnLayer(new Rect({left:a.left,top:a.top,width:a.width,height:a.height,fill:mode==='solid'?color:a.region.background||'#ffffff',strokeWidth:0}),a.region),{id:uid(),name:'Text background patch'}).toObject());
 }
 
 // The page as shown under the editable layers, in page units: the PDF preview,
@@ -301,12 +331,18 @@ function letterLibrary(raster:HTMLCanvasElement,regions:TextRegion[],xHeight:num
  });
 }
 
+// A tilted line is edited in its level frame, on the page turned back about
+// its centre as OCR read it (lines tilted the same way only shift into that
+// frame); the patch is turned back onto the line, so it changes only pixels
+// inside the line's own turned box.
 export async function glyphEditPatch(c:Canvas,p:Page,lineRegion:TextRegion,next:string,pageRegions:TextRegion[]=[],sources:LetterSource[]=[]){
  if(lineRegion.kind!=='ocr'||!lineRegion.glyphs)return undefined;
  // Everything below works in raster pixels, `k` per page unit.
- const k=letterScale(lineRegion,p),region=scaledRegion(lineRegion,k),page=pageRegions.map(r=>r===lineRegion?region:scaledRegion(r,k)),otherPages=sources.map(o=>({...o,regions:o.regions.map(r=>scaledRegion(r,k))}));
+ const k=letterScale(lineRegion,p),f=frameOf(lineRegion),fill=lineRegion.background||'#ffffff',region=scaledRegion(lineRegion,k),page=pageRegions.flatMap(r=>r===lineRegion?[region]:framed(f,[r]).map(m=>scaledRegion(m,k)));
+ // Another page's letters are cut in the frame of one of its lines.
+ const otherPages=sources.map(o=>{const of=frameOf(o.regions.find(r=>r.glyphs)??lineRegion);return {...o,frame:of,regions:framed(of,o.regions).map(r=>scaledRegion(r,k))};});
  const cells=lineCells(region.text,region.glyphs!);if(!cells)return undefined;
- const raster=k===1?await pageComposite(c,p):await previewCanvas(p.source!,p.index,k,Math.ceil(p.width*k),Math.ceil(p.height*k)),W=raster.width,H=raster.height;
+ const raster=levelRaster(k===1?await pageComposite(c,p):await previewCanvas(p.source!,p.index,k,Math.ceil(p.width*k),Math.ceil(p.height*k)),f,k,fill),W=raster.width,H=raster.height;
  const target=rowInk(raster,region),metrics=lineMetrics(target.rows);if(!metrics)return undefined;
  const baseline=target.y0+metrics.baseline,rasters=new Map<string,HTMLCanvasElement>([[p.id,raster]]);
  let plan=planGlyphEdit(region.text,cells,next,letterLibrary(raster,page,metrics.xHeight,region,p.id));
@@ -314,7 +350,7 @@ export async function glyphEditPatch(c:Canvas,p:Page,lineRegion:TextRegion,next:
  for(const other of otherPages){
   if(plan||other.page.id===p.id)continue;
   if(!planGlyphEdit(region.text,cells,next,other.regions.flatMap(r=>r.glyphs?lineCells(r.text,r.glyphs)?.filter(g=>!g.space).map(g=>({...g,y0:0,y1:0,source:r.id}))??[]:[]))&&!plan)continue;
-  const source=await offscreenComposite(other.page,k);rasters.set(other.page.id,source);
+  const source=levelRaster(await offscreenComposite(other.page,k),other.frame,k,fill);rasters.set(other.page.id,source);
   plan=planGlyphEdit(region.text,cells,next,[...letterLibrary(raster,page,metrics.xHeight,region,p.id),...letterLibrary(source,other.regions,metrics.xHeight,region,other.page.id)]);
  }
  if(!plan)return undefined;
@@ -345,7 +381,10 @@ export async function glyphEditPatch(c:Canvas,p:Page,lineRegion:TextRegion,next:
   }
   x+=w;
  }
+ // A turned patch leaves the pixels it did not change to the page: turned
+ // twice they would only come back softer.
+ if(f.angle)for(let y=0;y<patchH&&y+top<ay1;y++)for(let u=0;u<patchW;u++){const o=(y*patchW+u)*4,ai=((y+top-ay0)*area.width+(u+startX-ax0))*4;if(out.data[o]===area.data[ai]&&out.data[o+1]===area.data[ai+1]&&out.data[o+2]===area.data[ai+2]&&out.data[o+3]===area.data[ai+3])out.data[o+3]=0;}
  const patch=document.createElement('canvas');patch.width=patchW;patch.height=patchH;patch.getContext('2d')!.putImageData(out,0,0);
- return Object.assign(new FabricImage(patch,{left:startX/k,top:top/k,scaleX:1/k,scaleY:1/k}),{id:uid(),name:`Edited text: ${next.slice(0,40)}`,editedText:next});
+ return Object.assign(turnLayer(new FabricImage(patch,{left:startX/k,top:top/k,scaleX:1/k,scaleY:1/k}),lineRegion),{id:uid(),name:`Edited text: ${next.slice(0,40)}`,editedText:next});
 }
 const hexRgb=(hex:string)=>[1,3,5].map(i=>parseInt(hex.slice(i,i+2),16)||0);

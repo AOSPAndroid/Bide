@@ -2,7 +2,11 @@ export type TextRegion={id:string;text:string;script?:string;left:number;top:num
  // An edited field: the region as first read (a new edit starts again from its letters) and the layer showing the new text.
  original?:TextRegion;layer?:string;
  // Why the OCR may have misread this field (see ocr-checks.ts).
- doubt?:string};
+ doubt?:string;
+ // A line on a tilted page or a sheet photographed at an angle: its box,
+ // baseline and letter cells are level, and it lies on the page turned
+ // clockwise by this many degrees about the box's centre.
+ angle?:number};
 // The bundled face replacing a PDF font that cannot draw the new text: a
 // metric-compatible one where it exists, so the line keeps its width and look
 // (Liberation Sans for Helvetica and Arial, Liberation Serif for Times, Carlito
