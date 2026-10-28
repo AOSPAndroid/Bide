@@ -59,3 +59,27 @@ test('fields stay live across edits, Undo and Rescan on a scanned quote',{timeou
   assert.deepEqual(errors,[]);
  }finally{await browser.close();await server.close();}
 });
+
+test('a digital PDF line in Helvetica is edited in its metric-compatible face',{timeout:300000},async()=>{
+ const {PDFDocument,StandardFonts}=await import('pdf-lib'),{mkdtemp,writeFile}=await import('node:fs/promises'),{tmpdir}=await import('node:os'),{join}=await import('node:path');
+ // An invented statement line set in the standard (not embedded) Helvetica.
+ const pdf=await PDFDocument.create(),font=await pdf.embedFont(StandardFonts.Helvetica),p=pdf.addPage([420,200]);
+ p.drawText('Closing balance 3 412,85 EUR',{x:30,y:120,size:14,font});
+ const file=join(await mkdtemp(join(tmpdir(),'bide-digital-')),'statement.pdf');await writeFile(file,await pdf.save());
+ const server=await createServer({logLevel:'error',server:{port:0,host:'127.0.0.1'}});await server.listen();
+ const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||undefined});
+ try{
+  const page=await browser.newPage({viewport:{width:1400,height:900}}),errors=[];page.on('pageerror',e=>errors.push(e.message));
+  await page.goto(server.resolvedUrls.local[0]+'app/');await page.locator('input[type=file][accept*=".psd"]').setInputFiles(file);
+  const field=page.locator('button[aria-label^="Edit detected text: Closing balance"]').first();await field.waitFor({timeout:60000});
+  await field.click();
+  // The line opens as a text layer being edited, its text selected: typing replaces it.
+  await page.waitForFunction(()=>document.activeElement?.tagName==='TEXTAREA',null,{timeout:60000});
+  await page.keyboard.type('Closing balance 3 421,85 EUR');await page.keyboard.press('Escape');await page.waitForTimeout(1500);
+  const layer=await page.evaluate(async()=>{const {restoreLocal}=await import('/src/model.ts');return (await restoreLocal()).pages[0].canvas.objects.find(o=>o.type?.toLowerCase()==='textbox');});
+  assert.ok(layer,'the line became a text layer');
+  assert.equal(layer.text,'Closing balance 3 421,85 EUR');
+  assert.equal(layer.fontFamily,'Liberation Sans','Helvetica is replaced by the metric-compatible Liberation Sans, not Lato');
+  assert.deepEqual(errors,[]);
+ }finally{await browser.close();await server.close();}
+});
