@@ -40,7 +40,8 @@ export function ocrPatchBounds(region:Bounds,padding:number,page:{width:number;h
 }
 
 // Below this Tesseract confidence a region is flagged for proofreading.
-export const isUncertain=(r:{kind:string;confidence?:number})=>r.kind==='ocr'&&r.confidence!==undefined&&r.confidence<70;
+// A field to check: its scan gave a reason (ocr-checks.ts), or, for fields read before that, a low confidence.
+export const isUncertain=(r:{kind:string;confidence?:number;doubt?:string})=>r.kind==='ocr'&&(r.doubt!==undefined||r.confidence!==undefined&&r.confidence<70);
 
 export function ocrScanStatus(count:number,languages:string,converted:boolean,uncertain=0){
  return count?`${count} OCR regions${uncertain?` · ${uncertain} to check`:''} · ${languages} · choose a matching font`:converted?'Original text converted. Double-click the text layer to edit.':'No text detected. Use Text to add your own.';
@@ -89,7 +90,7 @@ export function regionsAfterEdit(regions:TextRegion[],edits:{region:TextRegion;t
  const byId=new Map(edits.map(e=>[e.region.id,e]));
  return regions.flatMap(r=>{
   const e=byId.get(r.id);if(!e)return [r];if(!e.letters)return [];
-  const original=r.original??e.region,{glyphs:_glyphs,confidence:_confidence,...rest}=original;
+  const original=r.original??e.region,{glyphs:_glyphs,confidence:_confidence,doubt:_doubt,...rest}=original;
   return [{...rest,text:e.text??original.text,original,layer:e.layer}];
  });
 }

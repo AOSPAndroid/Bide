@@ -91,7 +91,7 @@ export const sirenOf=(p:Party)=>p.siren||(p.siret?.slice(0,9))||'';
 export const electronicAddress=(p:Party)=>p.electronicAddress||sirenOf(p);
 // The French invoicing frame (BT-23): goods, services or both, first issued.
 export const invoicingFrame=(op:Operation)=>op==='goods'?'B1':op==='services'?'S1':'M1';
-const ibanValid=(iban:string)=>{const s=iban.replace(/\s+/g,'').toUpperCase();if(!/^[A-Z]{2}\d{2}[A-Z0-9]{10,30}$/.test(s))return false;const n=(s.slice(4)+s.slice(0,4)).replace(/[A-Z]/g,c=>String(c.charCodeAt(0)-55));let r=0;for(const ch of n)r=(r*10+ +ch)%97;return r===1;};
+export const ibanValid=(iban:string)=>{const s=iban.replace(/\s+/g,'').toUpperCase();if(!/^[A-Z]{2}\d{2}[A-Z0-9]{10,30}$/.test(s))return false;const n=(s.slice(4)+s.slice(0,4)).replace(/[A-Z]/g,c=>String(c.charCodeAt(0)-55));let r=0;for(const ch of n)r=(r*10+ +ch)%97;return r===1;};
 const isDate=(s?:string)=>!!s&&/^\d{4}-\d{2}-\d{2}$/.test(s)&&!Number.isNaN(Date.parse(s));
 
 // EN 16931 names the intra-EU rules BR-IC-*.

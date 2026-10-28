@@ -1,6 +1,8 @@
 export type TextRegion={id:string;text:string;script?:string;left:number;top:number;width:number;height:number;size:number;baseline:number;fontName:string;bold:boolean;italic:boolean;color:string;kind:'pdf'|'ocr';quads?:number[][];fontId?:string;fontData?:string;confidence?:number;background?:string;inkDensity?:number;words?:{text:string;inkDensity?:number;inkMass?:number;width?:number}[];blur?:number;glyphs?:{ch:string;x0:number;x1:number;p?:number}[];line?:{words:{text:string;inkDensity?:number;inkMass?:number;width?:number}[];start:number;count:number};
  // An edited field: the region as first read (a new edit starts again from its letters) and the layer showing the new text.
- original?:TextRegion;layer?:string};
+ original?:TextRegion;layer?:string;
+ // Why the OCR may have misread this field (see ocr-checks.ts).
+ doubt?:string};
 // The bundled face replacing a PDF font that cannot draw the new text: a
 // metric-compatible one where it exists, so the line keeps its width and look
 // (Liberation Sans for Helvetica and Arial, Liberation Serif for Times, Carlito

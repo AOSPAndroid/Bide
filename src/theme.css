@@ -184,6 +184,7 @@ h1,h2,.brand {color:var(--ink)}
 .invoice-checks li button>svg {flex-shrink:0;margin-top:2px}
 .invoice-checks li.error svg {color:#c0392b}
 .invoice-checks li.warning svg {color:#b7791f}
+.proofread-reason {display:flex;align-items:center;justify-content:space-between;gap:10px;margin:6px 0 2px;font-size:11px;line-height:1.5;color:#8a5a12}
 .invoice-ok {display:flex;gap:7px;font-size:11px;line-height:1.5;color:var(--success)}
 .invoice-ok svg {flex-shrink:0;margin-top:2px}
 .invoice-actions {display:flex;flex-direction:column;gap:8px}

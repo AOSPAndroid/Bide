@@ -15,6 +15,7 @@ import {ensureFont,ensureEmbeddedFont,ensureDocumentFonts} from './fonts';
 import {rasterSearchWords} from './searchable-text';
 import {fallbackFont,fitOcrText,type TextRegion} from './text-regions';
 import {lineCells,planGlyphEdit,ownInk,lineMetrics,type LibraryGlyph} from './glyph-edit';
+import {markDoubts} from './ocr-checks';
 import {mixedWeights,attachNumberParts,recognitionKey,scaleRegions,unconvertedRegions,ocrPatchBounds,ocrScanStatus,isUncertain} from './ocr-regions';
 import type {OcrGrouping} from './ocr-segmentation';
 import {uid,type Page} from './model';
@@ -92,7 +93,7 @@ export async function scanPageText(p:Page,c:Canvas,{signal,grouping,thorough,lan
  }
  const {recognizeImage}=await import('./browser/ocr');const detected=await recognizeImage(raster,{signal,grouping,thorough,languages,engine,script,accurate,onProgress:(fraction,label)=>onStatus(`${label}… ${Math.round(fraction*100)}%`)});signal.throwIfAborted();
  const layers=c.getObjects().map(o=>({recognizedKey:(o as Tagged).recognizedKey,bounds:o.getBoundingRect()}));
- const all=scaleRegions(detected,p.width/raster.width,p.height/raster.height),regions=unconvertedRegions(all,layers);
+ const all=scaleRegions(detected,p.width/raster.width,p.height/raster.height),regions=markDoubts(unconvertedRegions(all,layers),{ai:engine==='paddle'});
  let suggestedFont:string|undefined;
  // The fields can be tapped while the font is matched (1.5 to 3 s).
  if(regions.length){onRegions?.(regions);onStatus(`${regions.length} OCR regions · matching the font…`);try{suggestedFont=await suggestFont(raster,detected);}catch{}signal.throwIfAborted();}
