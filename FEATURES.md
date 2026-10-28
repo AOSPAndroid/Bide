@@ -5,6 +5,7 @@
 
 ## Unreleased — Open, edit, download
 
+- When an edit cannot keep the original lettering, the edit dialog says why and keeps the typed text: which characters the line lacks (“5” does not appear in this line, and only its own letters are reused), or that the line has no letter positions to reuse. A **Use a font for this edit** button then sets that one line in the OCR font, as an explicit choice; nothing changes otherwise. It used to show a separate error box with the same message for every case.
 - Typographic marks come out right in image text (AI OCR): ’ instead of ', − in front of an amount instead of -, – between spaces or digits, and — when much longer. The recognizer has no en dash and used to drop it ("10–12" read as "1012"). Each mark is judged from its own ink: a dash by its length against the line's x-height and the page's own hyphens, an apostrophe by its comma-like tail; marks too small to tell follow the page's clear ’, and anything unclear keeps the recognizer's reading. On 490 invented fields: exact 447 → 463, and fields wrong only by typography 22 → 6.
 - Symbols the recognizer cannot read, such as ★, keep a letter cell of their own. The field text shows only what was read; an edit with the page's own letters redraws the star from its own pixels (it used to vanish with the letter whose cell had swallowed it) (`tests/e2e/ocr-typography.e2e.mjs`).
 - A coloured badge next to a label ("Livret A" then "NOUVEAU" on a banking screenshot) is a field of its own: words are split where one sits on a flat patch of another colour.

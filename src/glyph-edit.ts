@@ -150,6 +150,19 @@ export function planGlyphEdit(text:string,cells:Cell[],next:string,library:Libra
  return {startX,oldEnd:cells[cells.length-1].x1,pieces};
 }
 
+// The characters of `next` an edit cannot take from the line itself (as
+// planGlyphEdit would, with no library): letters the line lacks, and a space
+// when the line has none to copy. Each listed once, in typing order.
+export function missingLetters(text:string,cells:Cell[],next:string){
+ const a=Array.from(text),b=Array.from(next),keep=align(a,b),out:string[]=[];
+ let p=0;while(p<a.length&&p<b.length&&a[p]===b[p])p++;
+ for(let j=p;j<b.length;j++){
+  const ch=b[j];if(keep[j]>=p||out.includes(ch))continue;
+  if(/\s/.test(ch)?!cells.some(c=>c.space):!cells.some(c=>!c.space&&c.ch===ch))out.push(/\s/.test(ch)?' ':ch);
+ }
+ return out;
+}
+
 // Pixels of this line's letters within an analysis area (RGBA, width x height):
 // ink (contrast > 16 with the background, so anti-aliasing is included) in
 // 8-connected blobs that stay within rows [top, bottom). Blobs reaching outside

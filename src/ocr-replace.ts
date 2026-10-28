@@ -5,9 +5,14 @@ import type {Textbox} from './text-appearance';
 import type {Page} from './model';
 import type {TextRegion} from './text-regions';
 import type {OcrSettings} from './TextDetectionBar';
-import {detectedTextbox,matchedDetectedTextbox,coverOcrText,pageInkLevel,glyphEditPatch,type LetterSource} from './detected-text';
+import {detectedTextbox,matchedDetectedTextbox,coverOcrText,pageInkLevel,glyphEditPatch,type LetterSource,letterEditBlocker} from './detected-text';
 
 export type OcrEdit={region:TextRegion;text?:string};
+// An edit the line's own letters cannot rebuild: nothing changes, and the
+// reason says why (which letters the line lacks, or that it has none to reuse).
+export class LetteringError extends Error{
+ constructor(readonly reason:string){super(`Cannot preserve the original lettering for this edit: ${reason} Nothing was changed. Choose New font explicitly to allow a replacement font.`);}
+}
 
 // Everything is rendered before the page is touched; `apply` then adds the
 // result to the page's serialized objects (clearing the background under
@@ -21,7 +26,7 @@ export async function planOcrReplacement(c:Canvas,page:Page,items:OcrEdit[],{set
    // Neighbouring lines/pages may use another face or weight. Preserve this
    // line's own pixels instead of borrowing unverified lettering.
    const patch=item.text!==undefined?await glyphEditPatch(c,page,item.region,item.text):undefined;
-   if(!patch)throw new Error('Cannot preserve the original lettering for this edit. Nothing was changed. Choose New font explicitly to allow a replacement font.');
+   if(!patch)throw new LetteringError(letterEditBlocker(item.region,item.text??item.region.text));
    patches.push(patch);edits.push({region:item.region,text:item.text,layer:(patch as FabricObject&{id:string}).id,letters:true});
   }else fonts.push(item);
  }

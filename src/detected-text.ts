@@ -14,7 +14,7 @@ import {darkenToInk,prepareOcrPixels,estimateLineHeight} from './ocr-image';
 import {ensureFont,ensureEmbeddedFont,ensureDocumentFonts} from './fonts';
 import {rasterSearchWords} from './searchable-text';
 import {fallbackFont,fitOcrText,type TextRegion} from './text-regions';
-import {lineCells,planGlyphEdit,withUnread,ownInk,lineMetrics,UNREAD,type LibraryGlyph} from './glyph-edit';
+import {lineCells,planGlyphEdit,missingLetters,withUnread,ownInk,lineMetrics,UNREAD,type LibraryGlyph} from './glyph-edit';
 import {markDoubts} from './ocr-checks';
 import {mixedWeights,attachNumberParts,recognitionKey,scaleRegions,unconvertedRegions,ocrPatchBounds,ocrScanStatus,isUncertain,frameOf,turn,turnedBounds,inFrame,type Frame} from './ocr-regions';
 import type {OcrGrouping} from './ocr-segmentation';
@@ -336,6 +336,14 @@ function letterLibrary(raster:HTMLCanvasElement,regions:TextRegion[],xHeight:num
 // its centre as OCR read it (lines tilted the same way only shift into that
 // frame); the patch is turned back onto the line, so it changes only pixels
 // inside the line's own turned box.
+// Why an edit with the line's own letters is impossible, in the user's words.
+export function letterEditBlocker(region:TextRegion,next:string){
+ if(region.kind!=='ocr'||!region.glyphs)return 'this line was read without the positions of its letters, so they cannot be reused.';
+ const cells=lineCells(region.text,region.glyphs);if(!cells)return "the recognized text does not line up with this line's letters.";
+ const missing=missingLetters(cells.map(c=>c.ch).join(''),cells,withUnread(region.text,cells,next)).map(c=>c===' '?'a space':`“${c}”`);
+ if(missing.length)return `${missing.length===1?'':'the characters '}${missing.join(', ')} ${missing.length===1?'does':'do'} not appear in this line, and only its own letters are reused.`;
+ return 'this line could not be measured precisely enough to rebuild it.';
+}
 export async function glyphEditPatch(c:Canvas,p:Page,lineRegion:TextRegion,next:string,pageRegions:TextRegion[]=[],sources:LetterSource[]=[]){
  if(lineRegion.kind!=='ocr'||!lineRegion.glyphs)return undefined;
  // Everything below works in raster pixels, `k` per page unit.
