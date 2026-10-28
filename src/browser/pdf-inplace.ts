@@ -158,7 +158,7 @@ function learnKerning(glyphs:Glyph[]){
   const a=glyphs[i-1],b=glyphs[i],f=b.show.font;if(!f||a.show.font!==f||!Number.isFinite(a.x+b.x))continue;const key=a.code+','+b.code;
   if(a.show===b.show){if(Math.abs(b.before.reduce((n,k)=>n+k.v,0))<=300&&(!f.kerns.has(key)||b.before.length&&!f.kerns.get(key)!.length))f.kerns.set(key,b.before);continue;}
   const gap=b.x-(a.x+a.adv),k=b.show.k;
-  if(Math.abs(b.y-a.y)<1e-3&&k>0&&Math.abs(gap)>1e-4&&!f.kerns.get(key)?.length){const v=Math.round(-gap/k*1e4)/1e4;if(Math.abs(v)<=300)f.kerns.set(key,[{raw:String(v),v}]);}
+  if(Math.abs(b.y-a.y)<1e-3&&k>0&&!f.kerns.get(key)?.length){const v=Math.round(-gap/k*1e4)/1e4;if(Math.abs(v)<=300)f.kerns.set(key,Math.abs(gap)>1e-4?[{raw:String(v),v}]:[]);}
  }
 }
 
@@ -193,17 +193,23 @@ function segments(m:Match,size:number){
 }
 const boxOf=(gs:{x:number;adv:number}[],r:TextRegion):Box=>{const ys=(r.quads??[]).flatMap(q=>[q[1],q[3],q[5],q[7]]);return {left:Math.min(...gs.map(g=>g.x)),right:Math.max(...gs.map(g=>g.x+g.adv)),top:Math.min(...ys),bottom:Math.max(...ys)};};
 
-// Whether another page draws one of the streams `nums` (its contents or a form it uses).
+// A changed content stream must not also be used elsewhere: another page's
+// contents/resources, or an annotation appearance on any page. Walk the full
+// reference graph (including soft masks and named appearance states), and
+// refuse if a depth/budget limit prevents proving the stream is unshared.
 function usedElsewhere(doc:mupdf.PDFDocument,index:number,nums:Set<number>){
  let budget=20000,hit=false;const seen=new Set<number>();
  const visit=(o:mupdf.PDFObject,depth:number)=>{
-  if(hit||--budget<0){hit=true;return;}
+  if(hit||o.isNull())return;
+  if(--budget<0||depth>64){hit=true;return;}
   if(o.isIndirect()){const n=o.asIndirect();if(nums.has(n)){hit=true;return;}if(seen.has(n))return;seen.add(n);}
-  if(depth<6&&o.isStream())o.get('Resources','XObject').forEach(x=>visit(x,depth+1));
+  if(o.isArray()||o.isDictionary())o.forEach(v=>visit(v,depth+1));
  };
- for(let i=0;i<doc.countPages()&&!hit;i++){if(i===index)continue;const p=doc.findPage(i),c=p.get('Contents');
-  if(c.isArray())c.forEach(s=>visit(s,0));else if(!c.isNull())visit(c,0);
-  at(p.getInheritable('Resources'),'XObject').forEach(x=>visit(x,0));}
+ for(let i=0;i<doc.countPages()&&!hit;i++){
+  const p=doc.findPage(i);
+  if(i!==index){visit(p.get('Contents'),0);visit(p.getInheritable('Resources'),0);}
+  p.get('Annots').forEach(a=>visit(a.get('AP'),0));
+ }
  return hit;
 }
 
@@ -246,7 +252,17 @@ export function rewriteText(doc:mupdf.PDFDocument,pdoc:mupdf.PDFDocument,index:n
    }
   }
   const codes=fresh.map(ch=>choices.get(ch)!),width=(c:number)=>((f.info.get(c)!.w/1000)*ins.size+ins.tc+(f.size===1&&c===32?ins.tw:0))*ins.th*ins.sx;
-  const kern=(a:number|undefined,b:number|undefined)=>a===undefined||b===undefined?undefined:f.kerns.get(a+','+b);
+  // New letter pairs need evidence from this font on this page. A subset often
+  // omits its producer's kerning/shaping tables: an unseen AV or To pair must
+  // not silently acquire zero kerning. Numbers/punctuation keep the PDF's own
+  // advances, Tc/Tw and observed adjustments; absent producer layout tables
+  // still prevent a universal claim of regenerated-document equivalence.
+  const kern=(a:number|undefined,b:number|undefined)=>{
+   if(a===undefined||b===undefined)return;
+   const known=f.kerns.get(a+','+b),left=f.info.get(a)?.u??'',right=f.info.get(b)?.u??'';
+   if(known===undefined&&/^\p{L}+$/u.test(left)&&/^\p{L}+$/u.test(right))throw new Unsafe(`This PDF does not establish the original spacing for “${left}${right}”.`);
+   return known;
+  };
   const effect=(k?:Kern[])=>-(k?.reduce((n,x)=>n+x.v,0)??0)*ins.k;
   // The new codes from the end of the kept start, with the producer's kerning.
   const lastP=P[P.length-1],firstX=X[0],same=(g?:Glyph)=>g&&g.show.font===f?g.code:undefined;

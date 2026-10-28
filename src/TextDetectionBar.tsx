@@ -39,10 +39,11 @@ export default function TextDetectionBar({ai,status,regions,show,onShow,settings
     <option value="auto">Auto (match strokes)</option><option value="regular">Regular</option><option value="bold">Bold</option><option value="italic">Italic</option><option value="bold-italic">Bold italic</option>
    </select></label>
    <label title="Soften each replacement to match the blur measured on the original letters, so it blends in. Convert all always makes crisp text."><input type="checkbox" aria-label="Match original blur" checked={settings.matchBlur} onChange={e=>onChange({matchBlur:e.target.checked})}/>Match blur</label>
-   <label title="Original letters preserves the scan's lettering and sharpness; edits that cannot be reconstructed are refused. New font explicitly allows a replacement typeface.">Edit with<select aria-label="Edit image text with" value={settings.editMode} onChange={e=>onChange({editMode:e.target.value as OcrSettings['editMode']})}>
-    <option value="letters">Original letters</option><option value="font">New font</option>
-   </select></label>
+
   </>}
+   <label title="Original lettering keeps the scan pixels or exact embedded PDF font. New font explicitly allows a replacement typeface.">Edit with<select aria-label="Edit image text with" value={settings.editMode} onChange={e=>onChange({editMode:e.target.value as OcrSettings['editMode']})}>
+    <option value="letters">{ocr?'Original letters':'Original PDF font'}</option><option value="font">New font</option>
+   </select></label>
   <label title="Smart splits large gaps such as avatar initials beside a message. Words lets you edit each word separately.">OCR selection<select aria-label="OCR selection grouping" value={settings.grouping} onChange={e=>onChange({grouping:e.target.value as OcrGrouping})}>
    <option value="smart">Smart groups</option><option value="words">Individual words</option><option value="lines">Whole lines</option>
   </select></label>

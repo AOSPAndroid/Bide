@@ -23,6 +23,7 @@ import {bundledOcrLanguages,languageLabel} from './ocr-languages';
 import {scriptLabels,type OcrScript} from './ai-image';
 
 type Tagged=FabricObject&{recognizedKey?:string;id?:string;name?:string};
+const originalFieldBounds=(r:TextRegion)=>turnedBounds(frameOf(r),{left:r.left,top:r.top,width:r.width,height:r.height});
 export type ReplacementBackground='repair'|'ai'|'sampled'|'solid'|'transparent';
 
 async function previewCanvas(source:string,index:number,scale:number,width?:number,height?:number){
@@ -171,7 +172,7 @@ export async function detectedTextbox(region:TextRegion,{ocrFont,ocrStyle,matchB
   // Box wide enough for the fitted line, so Fabric never wraps it.
   boxWidth=Math.max(boxWidth,width*size/100+(Array.from(region.text).length-1)*charSpacing*size/1000+6);
  }
- const text=Object.assign(new Textbox(region.text,{left:region.left,top:region.top,width:boxWidth,fontSize:size,charSpacing,fontFamily:family,fontWeight:embedded?'normal':bold?'bold':'normal',fontStyle:embedded?'normal':italic?'italic':'normal',fill:region.kind==='ocr'?darkenToInk(region.color,region.background,inkLevel):region.color,lineHeight:1,splitByGrapheme:true,objectCaching:false}),{id:uid(),name:region.text.slice(0,40),pdfOriginalFont:region.fontName,pdfFontData:embedded?region.fontData:undefined,pdfFontFallback:fallbackFont(region.fontName),pdfFontBold:bold,pdfFontItalic:italic,recognizedKey:recognitionKey(region)});
+ const text=Object.assign(new Textbox(region.text,{left:region.left,top:region.top,width:boxWidth,fontSize:size,charSpacing,fontFamily:family,fontWeight:embedded?'normal':bold?'bold':'normal',fontStyle:embedded?'normal':italic?'italic':'normal',fill:region.kind==='ocr'?darkenToInk(region.color,region.background,inkLevel):region.color,lineHeight:1,splitByGrapheme:true,objectCaching:false}),{id:uid(),name:region.text.slice(0,40),pdfOriginalFont:region.fontName,pdfFontData:embedded?region.fontData:undefined,pdfFontFallback:fallbackFont(region.fontName),pdfFontBold:bold,pdfFontItalic:italic,recognizedKey:recognitionKey(region),...(region.kind==='ocr'?{ocrOriginalBounds:originalFieldBounds(region)}:{})});
  for(const r of weights?.ranges??[])text.setSelectionStyles({fontWeight:r.bold?'bold':'normal'},r.start,r.end);
  if(matchBlur&&region.kind==='ocr'&&(region.blur??0)>=.3)Object.assign(text,{textSoftness:clampTextSoftness(region.blur!)});
  // Fabric's top includes its ascender allowance; anchor the first baseline.
@@ -388,6 +389,6 @@ export async function glyphEditPatch(c:Canvas,p:Page,lineRegion:TextRegion,next:
  // twice they would only come back softer.
  if(f.angle)for(let y=0;y<patchH&&y+top<ay1;y++)for(let u=0;u<patchW;u++){const o=(y*patchW+u)*4,ai=((y+top-ay0)*area.width+(u+startX-ax0))*4;if(out.data[o]===area.data[ai]&&out.data[o+1]===area.data[ai+1]&&out.data[o+2]===area.data[ai+2]&&out.data[o+3]===area.data[ai+3])out.data[o+3]=0;}
  const patch=document.createElement('canvas');patch.width=patchW;patch.height=patchH;patch.getContext('2d')!.putImageData(out,0,0);
- return Object.assign(turnLayer(new FabricImage(patch,{left:startX/k,top:top/k,scaleX:1/k,scaleY:1/k}),lineRegion),{id:uid(),name:`Edited text: ${next.slice(0,40)}`,editedText:next});
+ return Object.assign(turnLayer(new FabricImage(patch,{left:startX/k,top:top/k,scaleX:1/k,scaleY:1/k}),lineRegion),{id:uid(),name:`Edited text: ${next.slice(0,40)}`,editedText:next,ocrOriginalBounds:originalFieldBounds(lineRegion)});
 }
 const hexRgb=(hex:string)=>[1,3,5].map(i=>parseInt(hex.slice(i,i+2),16)||0);

@@ -4,7 +4,7 @@
 import {test} from 'node:test';import assert from 'node:assert/strict';
 import * as mupdf from 'mupdf';import PDFKit from 'pdfkit';
 import {tokenize,parseOps,codesOf,encodeCodes,parseToUnicode,splitEdit,alignsRight,placeGlyphs,showOp} from '../tmp/pdf-content.mjs';
-import {importBytes,detectPdfText,replacePdfText} from '../tmp/browser-core.mjs';
+import {importBytes,detectPdfText,replacePdfText,render} from '../tmp/browser-core.mjs';
 
 test('tokens keep their byte offsets; strings, names, numbers and inline images decode',()=>{
  const s='%c\nBT /F#201 12 Tf .5 -3 4. Td (a\\(b\\)\\\\\\101\\\nc(d)) Tj <48 65 6c6> Tj [(x) -120 <0001>] TJ ET BI /W 1 ID \x00EI\xff EI Q';
@@ -126,13 +126,13 @@ test('page contents in several streams, and a page box away from the origin',asy
  assert.equal(differing(out,build([page('15/11/2026')],{box})),0);
 });
 
-test('MacRoman and /Differences codes are found for new characters',async()=>{
+test('MacRoman and /Differences codes are found for new characters with observed pair spacing',async()=>{
  const mac=t=>`BT /F1 14 Tf 40 120 Td (${t}) Tj ET`;
- let out=await edit(build([mac('Caf\\216 cr\\217me')],{encoding:'MacRomanEncoding'}),'Café','Cafè');
- assert.equal(differing(out,build([mac('Caf\\217 cr\\217me')],{encoding:'MacRomanEncoding'})),0);assert.match(contents(out),/Caf\\217/);
+ let out=await edit(build([mac('Caf\\216 f\\217 cr\\217me')],{encoding:'MacRomanEncoding'}),'Café','Cafè');
+ assert.equal(differing(out,build([mac('Caf\\217 f\\217 cr\\217me')],{encoding:'MacRomanEncoding'})),0);assert.match(contents(out),/Caf\\217/);
  const differences={BaseEncoding:'WinAnsiEncoding',Differences:[200,'Lslash']};
- out=await edit(build([mac('Office Lodz')],{encoding:differences}),'Lodz','Łodz');
- assert.equal(differing(out,build([mac('Office \\310odz')],{encoding:differences})),0);assert.match(contents(out),/Office \\310odz/);
+ out=await edit(build([mac('Office Lodz \\310odz')],{encoding:differences}),'Lodz','Łodz');
+ assert.equal(differing(out,build([mac('Office \\310odz \\310odz')],{encoding:differences})),0);assert.match(contents(out),/Office \\310odz/);
  assert.match(await edit(build([mac('Office Lodz')]),'Lodz','Łodz'),/no “Ł”/,'plain WinAnsi has no Ł');
 });
 
@@ -144,7 +144,8 @@ test('a right-aligned amount keeps its right edge; text that runs on, or would c
  const sentence=v=>`BT /F1 12 Tf 40 120 Td (Total: ) Tj /F2 12 Tf (${v}) Tj /F1 12 Tf ( EUR due) Tj ET`;
  assert.match(await edit(build([sentence('42')]),'42','142'),/would have to move/);
  const same=await edit(build([sentence('42')]),'42','43');assert.equal(differing(same,build([sentence('43')])),0,'the same width needs no move');
- const columns=`BT /F1 12 Tf 40 120 Td (Label) Tj ET BT /F1 12 Tf 110 120 Td (Value) Tj ET`;
+ // The added line supplies pair spacing so this assertion tests collision, not missing kerning evidence.
+ const columns=`BT /F1 12 Tf 40 120 Td (Label) Tj ET BT /F1 12 Tf 110 120 Td (Value) Tj ET BT /F1 12 Tf 40 180 Td (Label with more words) Tj ET`;
  assert.match(await edit(build([columns]),'Label','Label with more words'),/run into/);
 });
 
@@ -154,4 +155,43 @@ test('pdfkit kerning is reused from the page for the new letters',async()=>{
  const original=await make('Acme');assert.match(contents(original),/\] TJ/,'pdfkit kerns with TJ numbers');
  const out=await edit(original,'Acme','Tours');
  assert.equal(differing(out,await make('Tours')),0,'the same kerning as pdfkit gives the new word');
+});
+
+// The editable leaf is also reachable through another page's deep resource
+// graph or annotation appearance. The source must be refused before any page
+// can inherit the edit through that shared object.
+function referenceGraph(mode){
+ const doc=new mupdf.PDFDocument(),font=doc.addObject({Type:'Font',Subtype:'Type1',BaseFont:'Helvetica',Encoding:'WinAnsiEncoding'}),box=[0,0,400,200];
+ const leaf=doc.addStream('BT /F1 12 Tf 40 120 Td (Amount 12,50) Tj ET',{Type:'XObject',Subtype:'Form',BBox:box,Resources:{Font:{F1:font}}});
+ const first=doc.addPage(box,0,{XObject:{Leaf:leaf}},'q /Leaf Do Q');doc.insertPage(-1,first);
+ if(mode==='annotation'){
+  const second=doc.addPage(box,0,{},'');
+  const annotation=doc.addObject({Type:'Annot',Subtype:'Stamp',Rect:[40,20,360,180],AP:{N:{On:leaf}},AS:'On'});second.put('Annots',[annotation]);doc.insertPage(-1,second);
+ }else{
+  let top=mode==='shared'?leaf:doc.addStream('',{Type:'XObject',Subtype:'Form',BBox:box,Resources:{}});
+  for(let i=0;i<(mode==='depth'?70:7);i++)top=doc.addStream('q /Child Do Q',{Type:'XObject',Subtype:'Form',BBox:box,Resources:{XObject:{Child:top}}});
+  const resources={XObject:{Top:top}};
+  if(mode==='budget')resources.Properties={ManyReferences:Array.from({length:21000},(_,i)=>i)};
+  const second=doc.addPage(box,0,resources,mode==='shared'?'q /Top Do Q':'');doc.insertPage(-1,second);
+ }
+ const buffer=doc.saveToBuffer('');try{return buffer.asUint8Array().slice();}finally{buffer.destroy();doc.destroy();}
+}
+for(const [mode,label] of [['shared','a form shared through seven nested forms'],['annotation','a form reused as another page’s named annotation appearance'],['depth','an unchecked resource graph beyond the depth limit'],['budget','an unchecked resource graph beyond the work budget']])test(`in-place edit refuses ${label} without changing its source`,async()=>{
+ const source=await importBytes(referenceGraph(mode),'shared.pdf'),before=source.pages.map((_,i)=>render(source.id,i,2));
+ const region=detectPdfText(source.id,0).regions.find(r=>r.text==='Amount 12,50');assert.ok(region);
+ const result=await replacePdfText(source.id,0,region.id,'Amount 21,50');
+ assert.ok('fallback' in result,`${label} must fail closed instead of altering a shared or unchecked page`);
+ assert.match(result.fallback,/other pages share/);
+ assert.equal(detectPdfText(source.id,0).regions.find(r=>r.id===region.id).text,'Amount 12,50');
+ source.pages.forEach((_,i)=>assert.deepEqual(render(source.id,i,2),before[i],`page ${i+1} remains byte-identical after refusal`));
+});
+
+// Glyph availability does not establish how an unseen letter pair was kerned
+// by the producer. Both of these edits formerly succeeded with visibly wider
+// spacing than a regenerated PDF (1,271 and 545 differing pixels at 144 dpi).
+for(const [from,to] of [['Pay to: A V A','Pay to: AVA'],['Pay to: T o','Pay to: To']])test(`unobserved letter-pair spacing refuses ${from} → ${to} without replacing the font`,async()=>{
+ const bytes=await new Promise(resolve=>{const doc=new PDFKit({size:[400,200],margin:20}),chunks=[];doc.on('data',c=>chunks.push(c));doc.on('end',()=>resolve(Buffer.concat(chunks)));doc.registerFont('R','src/browser/fonts/LiberationSans-Regular.ttf');doc.font('R').fontSize(24).text(from,30,70);doc.end();});
+ const source=await importBytes(bytes,'unknown-kerning.pdf'),before=render(source.id,0,2),region=detectPdfText(source.id,0).regions.find(r=>r.text===from);assert.ok(region);
+ const result=await replacePdfText(source.id,0,region.id,to);assert.ok('fallback' in result,'an unobserved new letter pair must not be accepted with invented zero kerning');assert.match(result.fallback,/original spacing/);
+ assert.deepEqual(render(source.id,0,2),before,'refusal retains every source pixel');assert.equal(detectPdfText(source.id,0).regions.find(r=>r.id===region.id).text,from);
 });

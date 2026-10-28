@@ -11,7 +11,7 @@ const types:Record<string,string>={png:'image/png',jpg:'image/jpeg',svg:'image/s
 const zipped={png:['PNG images · ZIP','PNG image'],jpg:['JPEG images · ZIP','JPEG image'],svg:['SVG pages · ZIP','SVG image'],split:['Separate PDF pages · ZIP','PDF page']};
 export const zipFormats=Object.keys(zipped) as (keyof typeof zipped)[];
 export function zipFormatLabel(format:keyof typeof zipped,pages:number,range:string){
- let one=pages===1;try{one=new Set(selectPages(range,pages)).size===1;}catch{/* an unfinished range */}
+ let one=pages===1;try{one=selectPages(range,pages).length===1;}catch{/* an unfinished range */}
  return zipped[format][+(one&&matchMedia('(pointer:coarse)').matches)];
 }
 const nativeApp=()=>!!(globalThis as {Capacitor?:{isNativePlatform?:()=>boolean}}).Capacitor?.isNativePlatform?.();

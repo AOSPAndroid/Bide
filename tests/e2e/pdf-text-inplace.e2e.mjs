@@ -3,11 +3,12 @@
 // Helvetica, pdfkit with an embedded subset, Chromium's print to PDF), one
 // field is edited in the app and downloaded; the download is rendered at 144
 // dpi and compared with the same document generated with the new value.
-// A character the subset lacks falls back to the text-box path and says why;
+// A character the subset lacks keeps the original and typed input unless a
+// replacement font was explicitly allowed;
 // a right-aligned amount keeps its right edge; everything else is unchanged.
 import {test,before,after} from 'node:test';import assert from 'node:assert/strict';
 import {createServer} from 'vite';import {chromium} from 'playwright-core';
-import {readFile} from 'node:fs/promises';
+import {readFile} from 'node:fs/promises';import {createHash} from 'node:crypto';
 import * as mupdf from 'mupdf';import {PDFDocument,StandardFonts,rgb} from 'pdf-lib';import PDFKit from 'pdfkit';
 
 let server,browser;
@@ -67,6 +68,24 @@ function compare(edited,reference,field){
 }
 const union=boxes=>({left:Math.min(...boxes.map(b=>b.left)),right:Math.max(...boxes.map(b=>b.right)),top:Math.min(...boxes.map(b=>b.top)),bottom:Math.max(...boxes.map(b=>b.bottom))});
 const lines=(bytes,i=0)=>{const d=mupdf.Document.openDocument(bytes,'application/pdf'),p=d.loadPage(i),t=p.toStructuredText('');try{return t.asText().split('\n').map(l=>l.trim()).filter(Boolean);}finally{t.destroy();p.destroy();d.destroy();}};
+// The downloaded PDF keeps the exact font programs and Unicode maps, not
+// merely a similar family name or a substitute with similar metrics.
+function fonts(bytes,i=0){
+ const d=mupdf.Document.openDocument(bytes,'application/pdf'),p=d.loadPage(i),out=new Set(),seen=new Set();
+ const name=o=>o.isName()?o.asName():null;
+ const hash=o=>{if(!o.isStream())return null;const b=o.readStream();try{return createHash('sha256').update(b.asUint8Array()).digest('hex');}finally{b.destroy();}};
+ const scan=resources=>{
+  if(resources.isNull())return;
+  resources.get('Font').forEach(f=>{
+   const descriptor=f.get('Subtype').asName()==='Type0'?f.get('DescendantFonts',0,'FontDescriptor'):f.get('FontDescriptor');
+   out.add(JSON.stringify({base:name(f.get('BaseFont')),subtype:name(f.get('Subtype')),encoding:name(f.get('Encoding')),unicode:hash(f.get('ToUnicode')),program:['FontFile','FontFile2','FontFile3'].map(k=>descriptor.isNull()?null:hash(descriptor.get(k)))}));
+  });
+  // Export preserves original pages as Form XObjects; their resources may
+  // sit several levels down, with unrelated local resource names.
+  resources.get('XObject').forEach(x=>{if(!x.isStream())return;const n=x.isIndirect()?x.asIndirect():null;if(n!==null&&seen.has(n))return;if(n!==null)seen.add(n);scan(x.get('Resources'));});
+ };
+ try{scan(p.getObject().getInheritable('Resources'));return [...out].sort().map(s=>JSON.parse(s));}finally{p.destroy();d.destroy();}
+}
 // Every image drawn on a page: where, and its pixels.
 function images(bytes,i=0){
  const d=mupdf.Document.openDocument(bytes,'application/pdf'),p=d.loadPage(i),out=[];
@@ -81,15 +100,18 @@ async function open(name,bytes){
  return {page,errors};
 }
 const field=(page,text)=>page.locator(`button[aria-label^="Edit detected text"][aria-label*="${text}"]`).first();
-// Tap the field, replace `from` with `to`: in the New text dialog, or (the
-// code before this feature) in the text box the tap opened.
+// Native PDF edits must take the in-place path: no text-box fallback may
+// satisfy any of the regenerated-document pixel assertions below.
 async function edit(page,from,to){
  await field(page,from).waitFor({timeout:120000});await field(page,from).click();
- const how=await Promise.race([page.getByLabel('New text').waitFor({timeout:60000}).then(()=>'dialog'),page.waitForFunction(()=>document.activeElement?.tagName==='TEXTAREA',null,{timeout:60000}).then(()=>'text box')]);
- if(how==='dialog'){const input=page.getByLabel('New text');await input.fill((await input.inputValue()).replace(from,to));await page.getByRole('button',{name:'Apply',exact:true}).click();
-  const toast=page.locator('.toast').filter({hasText:/own font|text box/});await toast.waitFor({timeout:60000});return {how,toast:await toast.innerText()};}
- const value=await page.evaluate(()=>document.activeElement.value);await page.keyboard.press('ControlOrMeta+a');await page.keyboard.insertText(value.replace(from,to));await page.keyboard.press('Escape');await page.waitForTimeout(1500);
- return {how,toast:''};
+ const input=page.getByLabel('New text');await input.waitFor({timeout:60000});
+ await input.fill((await input.inputValue()).replace(from,to));await page.getByRole('button',{name:'Apply',exact:true}).click();
+ const toast=page.locator('.toast').filter({hasText:/own font/});await toast.waitFor({timeout:60000});
+ assert.equal(await page.getByRole('dialog',{name:'Edit PDF text'}).count(),0,'a successful in-place edit closes its dialog');
+ return {how:'dialog',toast:await toast.innerText()};
+}
+async function state(page){
+ return page.evaluate(async()=>{const {restoreLocal}=await import('/src/model.ts');await new Promise(r=>setTimeout(r,1200));const p=await restoreLocal();return {source:p.pages[0].source,sources:p.sources,canvas:p.pages[0].canvas};});
 }
 async function download(page){
  await page.waitForTimeout(800);await page.locator('.document-actions .primary').click();
@@ -104,7 +126,7 @@ test('a) a standard-Helvetica line is rewritten in place: identical to the regen
  const {page,errors}=await open('statement.pdf',original);
  try{
   const {how}=await edit(page,'3 412,85','3 421,85');
-  const edited=await download(page),r=compare(edited,reference,union([...find(original,'3 412,85'),...find(reference,'3 421,85')]));report('a',r);
+  const edited=await download(page),r=compare(edited,reference,union([...find(original,'3 412,85'),...find(reference,'3 421,85')]));report('a',r);assert.deepEqual(fonts(edited),fonts(original),'the exact original PDF fonts are kept');
   assert.equal(how,'dialog','a native PDF field opens the New text dialog');
   assert.equal(r.pixels,0,`the download is the regenerated statement (${JSON.stringify(r)})`);
   assert.deepEqual(errors,[]);
@@ -116,7 +138,7 @@ test('b, f) an amount in a pdfkit subset is rewritten in its own glyphs; text, i
  const {page,errors}=await open('invoice.pdf',original);
  try{
   const {how,toast}=await edit(page,'4,920.65','4,290.65');
-  const edited=await download(page),r=compare(edited,reference,union([...find(original,'4,920.65'),...find(reference,'4,290.65')]));report('b',r);
+  const edited=await download(page),r=compare(edited,reference,union([...find(original,'4,920.65'),...find(reference,'4,290.65')]));report('b',r);assert.deepEqual(fonts(edited),fonts(original),'the subset font programs and Unicode maps are unchanged');
   assert.equal(how,'dialog');assert.match(toast,/own font/,'written in place');
   assert.ok(r.pixels<=4,`the download matches the regenerated invoice (${JSON.stringify(r)})`);
   // The page is read again from its new source: the field shows the new value; Undo and Redo switch sources.
@@ -140,22 +162,32 @@ test('c) an amount in a Chromium-printed invoice is rewritten in its own subset'
  const {page,errors}=await open('facture.pdf',original);
  try{
   await edit(page,'1 284,50','1 248,50');
-  const edited=await download(page),r=compare(edited,reference,union([...find(original,'1 284,50'),...find(reference,'1 248,50')]));report('c',r);
+  const edited=await download(page),r=compare(edited,reference,union([...find(original,'1 284,50'),...find(reference,'1 248,50')]));report('c',r);assert.deepEqual(fonts(edited),fonts(original),'Chromium subset font programs and Unicode maps are unchanged');
   assert.ok(r.pixels<=4,`the download matches the regenerated invoice (${JSON.stringify(r)})`);
   assert.ok(lines(edited).some(l=>l.includes('1 248,50')));
   assert.deepEqual(errors,[]);
  }finally{await page.close();}
 });
 
-test('d) a character the subset lacks falls back to a text box, saying why',{timeout:300000},async()=>{
- const {page,errors}=await open('invoice.pdf',await invoice());
+test('d) a character the subset lacks keeps the PDF and typed input until New font is explicitly chosen',{timeout:300000},async()=>{
+ const original=await invoice(),{page,errors}=await open('invoice.pdf',original);
  try{
-  const {how,toast}=await edit(page,'EUR 785.65','EUR 785.65 Ω');
-  assert.equal(how,'dialog');
-  assert.match(toast,/Ω/,`the toast names the missing character (${toast})`);assert.match(toast,/text box/);
+  await field(page,'EUR 785.65').waitFor({timeout:120000});const before=await state(page);
+  await field(page,'EUR 785.65').click();const typed=(await page.getByLabel('New text').inputValue()).replace('EUR 785.65','EUR 785.65 Ω');
+  await page.getByLabel('New text').fill(typed);await page.getByRole('button',{name:'Apply',exact:true}).click();
+  await page.getByRole('dialog',{name:'Something needs your attention'}).getByText(/Ω/).waitFor();
+  assert.deepEqual(await state(page),before,'the unsupported default edit changes neither PDF source nor canvas');
+  await page.getByRole('button',{name:'Got it',exact:true}).click();assert.equal(await page.getByLabel('New text').inputValue(),typed,'the refused dialog keeps the typed value');
+  // Compare the retained native source as well as its state, then opt in
+  // directly from the still-open dialog without discarding the typed value.
+  const kept=await state(page),r=compare(Buffer.from(kept.sources[kept.source],'base64'),original,union(find(original,'EUR 785.65')));report('d-refused',r);
+  assert.equal(r.pixels,0,'a refused edit preserves the exact original PDF pixels');
+  await page.getByRole('button',{name:'New font text box',exact:true}).click();
   await page.waitForFunction(()=>document.activeElement?.tagName==='TEXTAREA',null,{timeout:60000});
-  assert.equal(await page.evaluate(()=>document.activeElement.value),'EUR 785.65 Ω','the text box holds the typed text');
-  assert.equal(await page.locator('.error-message').count(),0,'no error');
+  assert.equal(await page.evaluate(()=>document.activeElement.value),typed,'explicit fallback retains the exact current typed value');
+  await page.keyboard.press('Escape');const after=await state(page),layer=after.canvas.objects.find(o=>o.type?.toLowerCase()==='textbox');
+  assert.equal(layer?.text,typed);assert.equal(layer?.fontFamily,'Liberation Sans','the explicitly permitted replacement uses the matching family');
+  assert.equal(await page.getByLabel('Edit image text with').inputValue(),'letters','per-field font consent does not change the global default');
   assert.deepEqual(errors,[]);
  }finally{await page.close();}
 });
@@ -165,7 +197,7 @@ test('e) a right-aligned amount that gets wider keeps its right edge',{timeout:3
  const {page,errors}=await open('statement.pdf',original);
  try{
   await edit(page,'2 845,00','12 845,00');
-  const edited=await download(page),r=compare(edited,reference,union([...find(original,'2 845,00'),...find(reference,'12 845,00')]));report('e',r);
+  const edited=await download(page),r=compare(edited,reference,union([...find(original,'2 845,00'),...find(reference,'12 845,00')]));report('e',r);assert.deepEqual(fonts(edited),fonts(original),'right alignment uses the original fonts');
   const [was]=find(original,'2 845,00'),[now]=find(edited,'12 845,00');
   assert.ok(now&&Math.abs(now.right-was.right)<.05,`right edge ${now?.right} (was ${was.right})`);
   assert.ok(now.left<was.left-4,'the start moved left by the new digit');

@@ -73,7 +73,9 @@ test('#24 a drawn signature keeps its shape on phones',{timeout:300000},async()=
   const drawn=await inkOf(page);
   assert.ok(Math.abs(drawn.w/drawn.h-1)<.1,`a circle stays round in the pad (${drawn.w}×${drawn.h})`);
   await tap(page,page.getByRole('button',{name:'Place signature'}));
-  let signature;for(let i=0;i<40&&!signature;i++){await page.waitForTimeout(250);signature=(await savedObjects(page)).find(o=>o.name==='Signature');}
+  // Image decoding and the following canvas autosave can take longer on a
+  // CPU-only runner. Wait for the saved image, keeping every shape assertion.
+  let signature;for(let i=0;i<240&&!signature;i++){await page.waitForTimeout(250);signature=(await savedObjects(page)).find(o=>o.name==='Signature');}
   assert.ok(signature,'the signature was placed');
   const placed=await inkOf(page,signature.src),w=signature.width*signature.scaleX,h=signature.height*signature.scaleY;
   assert.ok(Math.abs(placed.w/placed.h-1)<.1,`the placed circle is round (${placed.w}×${placed.h})`);
@@ -263,6 +265,7 @@ test('Export names a one-page image or split export as the file itself on touch 
   const pages=page.getByPlaceholder('All 2 pages (or 1-3, 5)');
   await pages.fill('2');assert.deepEqual(await formats(page),single,'a range of one page');
   await pages.fill('1-2');assert.deepEqual(await formats(page),zip,'a range of two pages');
+  await pages.fill('1,1');assert.deepEqual(await formats(page),zip,'a repeated page exports two pages in a ZIP');
   assert.deepEqual(errors,[]);await context.close();}
  {const {context,page,errors}=await open(desktop);
   await page.keyboard.press('Control+k');await page.locator('input[aria-label="Search commands"]').fill('Export pages as PNG');await page.keyboard.press('Enter');

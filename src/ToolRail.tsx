@@ -27,7 +27,7 @@ export default function ToolRail({tool,setTool,ai,color,setColor,shortcuts}:{too
  // The flyout opens beside its button, inside the screen, with focus on the group's tool.
  useLayoutEffect(()=>{
   const f=flyout.current,b=open?buttons.current[open]:null,g=groups.find(g=>g.name===open);if(!f||!b||!g)return;
-  const r=b.getBoundingClientRect();f.style.left=`${r.right+6}px`;f.style.top=`${Math.max(4,Math.min(r.top,innerHeight-f.offsetHeight-4))}px`;
+  const r=b.getBoundingClientRect();f.style.left=`${Math.max(4,Math.min(r.right+6,innerWidth-f.offsetWidth-4))}px`;f.style.top=`${Math.max(4,Math.min(r.top,innerHeight-f.offsetHeight-4))}px`;
   f.querySelectorAll('button')[g.ids.indexOf(shownOf(g))]?.focus();
  },[open]);
  const close=(name:string)=>{const back=flyout.current?.contains(document.activeElement);setOpen(null);if(back)buttons.current[name]?.focus();};
