@@ -29,7 +29,7 @@ export default function TextDetectionBar({ai,status,regions,show,onShow,settings
    <button disabled={scanning} title="Replace a word or phrase everywhere it was detected, in one step." onClick={onFindReplace}>Find & replace</button>
    <button disabled={scanning} title="Replace every detected line with crisp editable text in one step. Undo restores the original." onClick={onConvertAll}>Convert all</button>
   </>}
-  <details ref={menu} className="ocr-settings"><summary title="OCR font, weight, engine, languages and background cleanup">OCR settings</summary><div className="ocr-settings-panel">
+  <details ref={menu} className="ocr-settings"><summary title="OCR font, weight, engine, languages and background cleanup">OCR settings</summary><div className="ocr-settings-panel"><button className="ocr-settings-done" onClick={()=>{if(menu.current)menu.current.open=false;}}>Done</button>
   {ocr&&<>
    <label title="Images contain no font metadata. Choose the closest appearance before editing; use Font family afterward.">OCR font<select aria-label="OCR replacement font" value={settings.font} onChange={e=>onChange({font:e.target.value})}>
     <optgroup label="Bundled · available offline">{bundledFonts.map(f=><option key={f.family} value={f.family}>{f.family}</option>)}</optgroup>

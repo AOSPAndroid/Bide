@@ -166,3 +166,6 @@
  .panel-context{font-size:11px!important}
  .selected-heading>div>span,.design-tools-body p,.design-tools-body label,.color-field,.slider-field>span,.fine-print,.layers-empty{font-size:12px}
 }
+/* The OCR settings sheet covers the bar on phones: Done closes it (desktop closes it with the summary). */
+.ocr-settings-done{display:none}
+@media (max-width:600px){.ocr-settings-done{display:flex;position:sticky;top:0;z-index:1;margin:-4px 0 6px auto;min-width:64px;min-height:40px;font-size:14px;font-weight:600;color:var(--accent);background:var(--panel,#fff);border-radius:8px}}
