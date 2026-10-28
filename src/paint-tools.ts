@@ -33,11 +33,23 @@ export function bucketFill(sample:ImageData,point:XY,color:string,{tolerance,con
 }
 
 // Mask brush: paints a layer's mask along a stroke. The mask is created
-// (showing everything) on the first dab if the layer has none.
-export function createMaskBrush(object:FabricObject,{size,softness,opacity,reveal}:{size:number;softness:number;opacity:number;reveal:boolean}){
- if(!hasLayerMask(object))object.set({clipPath:blankLayerMask(object,true)});
+// (showing everything) on the first dab if the layer has none. A `cancellable`
+// stroke (a touch, which a pinch may take over) can put the layer and its mask
+// back exactly as they were.
+export function createMaskBrush(object:FabricObject,{size,softness,opacity,reveal}:{size:number;softness:number;opacity:number;reveal:boolean},cancellable=false){
+ // Painting turns a mask image into a canvas, so an image is simply kept; a canvas is copied.
+ const prior=object.clipPath,source=hasLayerMask(object)?object.clipPath.getElement():undefined;
+ let copy:HTMLCanvasElement|undefined;
+ if(cancellable&&source instanceof HTMLCanvasElement){copy=Object.assign(document.createElement('canvas'),{width:source.width,height:source.height});copy.getContext('2d')!.drawImage(source,0,0);}
+ if(!source)object.set({clipPath:blankLayerMask(object,true)});
  const mask=object.clipPath as LayerMask;let last:XY|undefined;
  return {
+  cancel(){
+   if(!source)object.set({clipPath:prior});
+   else if(!(source instanceof HTMLCanvasElement))mask.setElement(source);
+   else if(copy){const g=source.getContext('2d')!;g.save();g.globalCompositeOperation='copy';g.drawImage(copy,0,0);g.restore();}
+   mask.set('dirty',true);object.set('dirty',true);object.canvas?.requestRenderAll();
+  },
   to(point:XY){
    // Dabs every quarter brush width so strokes stay continuous.
    const step=Math.max(1,size/4),from=last??point,d=Math.hypot(point.x-from.x,point.y-from.y),n=Math.max(1,Math.ceil(d/step));

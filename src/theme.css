@@ -331,3 +331,10 @@ h1,h2,.brand {color:var(--ink)}
 .toolkit-grid>button>span {background:var(--accent-soft);border-color:var(--accent-border);color:var(--accent)}
 .toolkit-grid strong {color:var(--ink)}
 .toolkit-grid p,.toolkit-arrow,.toolkit-foot {color:var(--muted)}
+
+/* Find & redact: each match with the words around it (RedactDialog cuts long lines), wrapped,
+   so the list never scrolls sideways and a match at the end of a long line stays in view. */
+.redact-list .redact-hit {align-items:flex-start;padding:4px 0}
+.redact-list .redact-hit>input {margin-top:1px}
+.redact-list .redact-hit .line-text {white-space:normal;overflow-wrap:anywhere;min-width:0;line-height:1.6}
+.redact-gap::before {content:'…'}

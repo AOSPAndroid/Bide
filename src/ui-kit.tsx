@@ -8,12 +8,13 @@ export function IconButton({ icon: Icon, label, onClick, disabled, active }: { i
 export function Field({ label, value, onChange, min, max, step = 1 }: { label: string; value: number; onChange: (v: number) => void; min?: number; max?: number; step?: number }) {
   return <label className="number-field"><span>{label}</span><input aria-label={label} type="number" value={Number.isFinite(value) ? Math.round(value * 100) / 100 : 0} min={min} max={max} step={step} onChange={e => { const v = Number(e.target.value); if (Number.isFinite(v)) onChange(Math.min(max ?? Infinity, Math.max(min ?? -Infinity, v))); }}/></label>;
 }
-export function ModalShell({ title, children, close, wide }: { title: string; children: ReactNode; close: () => void; wide?: boolean }) {
+// focusField=false starts on the first button, so a touch screen keeps its keyboard down.
+export function ModalShell({ title, children, close, wide, focusField = true }: { title: string; children: ReactNode; close: () => void; wide?: boolean; focusField?: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null;
     const root = ref.current;
-    ((root?.querySelector('input:not([type=color]),textarea,select') || root?.querySelector('button')) as HTMLElement)?.focus();
+    (((focusField && root?.querySelector('input:not([type=color]),textarea,select')) || root?.querySelector('button')) as HTMLElement)?.focus();
     const key = (e: KeyboardEvent) => {
       if (e.key === 'Escape') close();
       if (e.key !== 'Tab' || !root) return;
