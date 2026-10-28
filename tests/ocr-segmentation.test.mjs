@@ -15,6 +15,16 @@ test('normal names and accented phrases stay together; absent word boxes are saf
  assert.equal(segmentOcrLine(l).length,1);assert.equal(segmentOcrLine(l)[0].text,l.text);
  assert.equal(segmentOcrLine({...l,words:[]})[0].text,l.text);
 });
+test('monospace numbers and references stay one field though their spaces are wider than the letters',()=>{
+ // Digits 14 px high on a 12 px pitch, spaces 20 px: wider than the letter height, narrower than two characters.
+ const phone={text:'06 12 34 56 78',bbox:{x0:0,x1:200,y0:0,y1:14},words:['06','12','34','56','78'].map((t,i)=>word(t,i*44,i*44+24,0,14))};
+ assert.deepEqual(segmentOcrLine(phone).map(r=>r.text),['06 12 34 56 78']);
+ const cheque={text:'Chèque n° 0004127',bbox:{x0:0,x1:190,y0:0,y1:14},words:[word('Chèque',0,60,0,14),word('n°',80,100,0,14),word('0004127',120,190,0,14)]};
+ assert.deepEqual(segmentOcrLine(cheque).map(r=>r.text),['Chèque n° 0004127']);
+ // A table's columns are still separate fields.
+ const row={text:'Total 1 250,00',bbox:{x0:0,x1:400,y0:0,y1:14},words:[word('Total',0,50,0,14),word('1',300,310,0,14),word('250,00',318,378,0,14)]};
+ assert.deepEqual(segmentOcrLine(row).map(r=>r.text),['Total','1 250,00']);
+});
 test('low-confidence symbol noise is dropped but real low-confidence words stay',()=>{
  const l={text:'| Bonjour ~ 42',bbox:{x0:0,x1:200,y0:0,y1:20},words:[{...word('|',0,4),confidence:10},{...word('Bonjour',10,80),confidence:20},{...word('~',90,96),confidence:5},{...word('42',100,120),confidence:90}]};
  assert.deepEqual(segmentOcrLine(l,'words').map(r=>r.text),['Bonjour','42']);

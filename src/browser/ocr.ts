@@ -85,7 +85,11 @@ export function pageTilt(image:HTMLCanvasElement){
  const small=Object.assign(document.createElement('canvas'),{width:w,height:h}),g=small.getContext('2d',{willReadFrequently:true})!;
  g.fillStyle='#fff';g.fillRect(0,0,w,h);g.drawImage(image,0,0,w,h);
  const result=estimateSkew(inkMap(g.getImageData(0,0,w,h).data,w,h),w,h);
- return result&&result.confidence>=1.3&&Math.abs(result.angle)>=.5?result.angle:undefined;
+ // Below 0.5° a page is straightened only when its lines drift by 6 px or more
+ // across its width: at 0.4° a long scanned line drifts half its height and is misread.
+ if(!result||result.confidence<1.3)return undefined;
+ const angle=Math.abs(result.angle);
+ return angle>=.5||angle>=.2&&image.width*Math.tan(angle*Math.PI/180)>=6?result.angle:undefined;
 }
 // The image turned back by `tilt` on a canvas large enough for its corners,
 // filled with the page's own background colour.

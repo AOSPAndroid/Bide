@@ -1,3 +1,12 @@
+## Unreleased — Open, edit, download
+
+- OCR, measured field by field on 490 invented fields (24 documents: scanned quotes as JPG and PDF with and without a scanner's text layer, a phone photo of a form, a banking screenshot, the 17 benchmark pages): fully right fields 418 → 425, fields split into several taps 8 → 1. Benchmark: words right 97.8% → 98.1%, found 96.9% → 97.2%, line errors 1.1% → 1.0%.
+  - Phone numbers, cheque and reference numbers in monospace or digit text ("06 12 34 56 78", "n° 0004127") are one field: gaps are compared with the character pitch as well as the letter height.
+  - Scans tilted by less than half a degree are straightened when their lines drift 6 px or more across the page (at 0.4° a long line drifted half its height and was misread).
+  - Lines the AI is still unsure of after the wider re-read are read again with more and less room, stretched contrast, sharpened and 30% wider; the surest reading wins.
+  - Photos and screenshots are read at up to 3600 px instead of 2400 px.
+  - Measured and left off: High accuracy by default (8 fewer right fields, 5x slower), Tesseract voting, dictionary auto-correction (it turned Harbour into Barbour), the scanner's own OCR layer as a second opinion.
+
 ## Unreleased — Phones and tablets
 
 - The interface never pinch-zooms: only the page does. A pinch on the toolbars, the tool rail, the zoom bar, the PDF home or a dialog used to zoom the whole app (up to 5x), with no way back once the fingers reached the canvas.

@@ -35,12 +35,16 @@ export function segmentOcrLine(line:Line,mode:OcrGrouping='smart'):OcrGroup[]{
  if(mode==='lines')return [{...group(kept,rtl),...kept.length===words.length?{bbox:{...line.bbox}}:{}}];
  if(mode==='words')return (rtl?[...kept].reverse():kept).map(w=>group([w]));
  const heights=kept.map(w=>w.bbox.y1-w.bbox.y0).sort((a,b)=>a-b),height=heights[Math.floor(heights.length/2)];
+ // Monospace and digit text ("06 12 34 56 78", "n° 0004127") has spaces wider
+ // than its letter height: gaps are also measured against the character pitch.
+ const pitches=kept.map(w=>Array.from(w.text.trim()).length>=2?(w.bbox.x1-w.bbox.x0)/Array.from(w.text.trim()).length:0).filter(Boolean).sort((a,b)=>a-b);
+ const limit=Math.max(10,height*1.1,pitches.length?pitches[pitches.length>>1]*2.2:0);
  const runs:Word[][]=[];let last:Word|undefined;
  for(const word of kept){
   const gap=last?word.bbox.x0-last.bbox.x1:0;
   // UI avatar initials and adjacent chat text often share an OCR line but are
   // separated by a gap much larger than a normal space. Keep tight phrases.
-  if(!last||gap>Math.max(10,height*1.1))runs.push([word]);else runs[runs.length-1].push(word);
+  if(!last||gap>limit)runs.push([word]);else runs[runs.length-1].push(word);
   last=word;
  }
  return (rtl?runs.reverse():runs).map(words=>group(words,rtl));

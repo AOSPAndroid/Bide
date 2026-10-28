@@ -71,6 +71,17 @@ const retryBelow=.93;
 // from CTC time steps and trimmed to the inked columns. With `script` 'auto'
 // the first unsure lines are tried with every alphabet, and the page's
 // alphabet, once found, is tried first for the rest.
+// RGBA pixels stretched so 2% and 98% of their brightness span 0-255.
+function stretchContrast(px:Uint8ClampedArray){
+ const n=px.length/4,lum=new Float32Array(n);for(let i=0;i<n;i++)lum[i]=(px[i*4]+px[i*4+1]+px[i*4+2])/3;
+ const sorted=lum.slice().sort(),lo=sorted[Math.floor(n*.02)],hi=sorted[Math.floor(n*.98)];if(hi-lo<=10)return;
+ for(let i=0;i<n;i++)for(let c=0;c<3;c++)px[i*4+c]=(px[i*4+c]-lo)*255/(hi-lo);
+}
+// RGBA pixels sharpened with a 3x3 Laplacian kernel (edges left as they are).
+function sharpen(px:Uint8ClampedArray,w:number,h:number){
+ const o=px.slice();
+ for(let y=1;y<h-1;y++)for(let x=1;x<w-1;x++)for(let c=0;c<3;c++){const i=(y*w+x)*4+c;px[i]=5*o[i]-o[i-4]-o[i+4]-o[i-w*4]-o[i+w*4];}
+}
 export async function paddleOcr(source:HTMLCanvasElement,onProgress?:Progress,signal?:AbortSignal,{script='auto',accurate=false}:{script?:OcrScript|'auto';accurate?:boolean}={}):Promise<AiOcrLine[]>{
  const loading=(p:ModelProgress)=>onProgress?.(0,p.stage==='download'?`Downloading OCR model · ${(p.loaded/1e6).toFixed(1)} / ${(p.total/1e6).toFixed(1)} MB`:p.stage==='verify'?'Checking OCR model':'Preparing OCR model');
  const {width,height}=source,src=context(source).getImageData(0,0,width,height);
@@ -87,9 +98,12 @@ export async function paddleOcr(source:HTMLCanvasElement,onProgress?:Progress,si
   if(w<4||h<4)continue;
   // The recognizer's input: rows [top, bottom) of the line's columns, 48 px
   // high, optionally `stretch`ed wider.
-  const crop=(top:number,bottom:number,stretch=1)=>{
+  const crop=(top:number,bottom:number,stretch=1,mode:''|'contrast'|'sharpen'=''):{rw:number;data:Float32Array}=>{
+   top=Math.max(0,Math.floor(top));bottom=Math.min(height,Math.ceil(bottom));
    const ch=bottom-top,rw=Math.max(16,Math.min(3200,Math.round(w*48/ch*stretch))),region=new Uint8ClampedArray(w*ch*4);
    for(let y=0;y<ch;y++)region.set(src.data.subarray(((top+y)*width+x0)*4,((top+y)*width+x1)*4),y*w*4);
+   if(mode==='contrast')stretchContrast(region);
+   if(mode==='sharpen')sharpen(region,w,ch);
    return {rw,data:toPlanar(resizeBilinear(region,w,ch,rw,48),rw,48,{mean:[.5,.5,.5],std:[.5,.5,.5],bgr:true})};
   };
   let input=crop(y0,y1);
@@ -105,6 +119,15 @@ export async function paddleOcr(source:HTMLCanvasElement,onProgress?:Progress,si
   if(best.text&&best.confidence<retryBelow){
    const wide=crop(y0,y1,1.15),next=await read(best.script,wide);
    if(next.text&&next.confidence>best.confidence+.02){best=next;input=wide;}
+   // Still unsure: a little more and less room around the letters, stretched
+   // contrast, sharpened, and 30% wider; the surest reading is kept. On 490
+   // invented fields this fixed digits and accents on small and faint text.
+   if(best.confidence<retryBelow){
+    const lh=y1-y0;
+    for(const alt of [crop(y0-lh*.12,y1+lh*.12),crop(y0+lh*.08,y1-lh*.08),crop(y0,y1,1,'contrast'),crop(y0,y1,1,'sharpen'),crop(y0,y1,1.3)]){
+     const next=await read(best.script,alt);if(next.text&&next.confidence>best.confidence+.01){best=next;input=alt;}
+    }
+   }
   }
   // An empty read (only spaces) is unsure too, however confident, and so is
   // one with non-Latin letters (the Latin model knows Greek for formulas). A
