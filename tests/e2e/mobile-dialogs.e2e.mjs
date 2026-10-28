@@ -20,7 +20,10 @@ after(async()=>{await browser?.close();await server?.close();if(dir)await rm(dir
 async function open(device){
  const context=await browser.newContext(device),page=await context.newPage(),errors=[];
  page.on('pageerror',e=>errors.push(e.message));
- await page.goto(server.resolvedUrls.local[0]+'app/');await page.locator('.artboard').waitFor({timeout:60000});await page.waitForTimeout(1200);
+ await page.goto(server.resolvedUrls.local[0]+'app/');
+ // Phones start on the PDF tools home; these checks begin in the editor.
+ if(!await page.locator('.artboard').isVisible())await page.locator('.workspace-nav').getByRole('button',{name:'Photo editor',exact:true}).click();
+ await page.locator('.artboard').waitFor({timeout:60000});await page.waitForTimeout(1200);
  return {context,page,errors,cdp:device.hasTouch?await context.newCDPSession(page):null};
 }
 const center=async locator=>{const l=locator.first();await l.scrollIntoViewIfNeeded();const b=await l.boundingBox();return [b.x+b.width/2,b.y+b.height/2];};
