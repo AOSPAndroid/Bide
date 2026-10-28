@@ -4,7 +4,8 @@
 // tool, but its first touch is held back for a moment and only handed to the
 // canvas (Fabric) if no second finger follows, so a pinch never draws, selects
 // or moves anything. The browser's own page zoom is blocked over the workspace
-// (touch-action: none), so the toolbars no longer grow with a pinch.
+// (touch-action: none) and on the rest of the interface (mobile-shell.css,
+// main.tsx), so the toolbars and dialogs never grow with a pinch.
 import type {Canvas} from 'fabric';
 
 type XY={x:number;y:number};

@@ -25,6 +25,15 @@ test('pinch zooms the page on a phone; one finger keeps drawing and panning',{ti
   assert.ok(width1>width0*2.2,`pinch zoomed the page (${width0} → ${width1})`);
   assert.equal(await page.evaluate(()=>visualViewport?.scale??1),1,'the browser did not zoom the interface');
   assert.deepEqual(await objects(page),before,'a pinch does not draw or move layers');
+  // A pinch on the toolbars, the tool rail or the zoom footer zooms nothing.
+  for(const selector of ['.topbar','.tool-rail','.canvas-footer','.options-bar']){
+   const b=await page.locator(selector).first().boundingBox();if(!b)continue;
+   const vertical=b.width<b.height,x=b.x+b.width/2,y=b.y+b.height/2;
+   await touches(cdp,vertical?[['touchStart',[[x,y-20],[x,y+20]]],...Array.from({length:8},(_,i)=>['touchMove',[[x,y-20-(i+1)*12],[x,y+20+(i+1)*12]]]),['touchEnd',[]]]:pinch(x,y,20,110));
+   await page.waitForTimeout(300);
+   assert.equal(await page.evaluate(()=>visualViewport?.scale??1),1,`a pinch on ${selector} does not zoom the interface`);
+  }
+  assert.ok(Math.abs(await zoomOf(page)-width1)<width1*.05,'a pinch on the toolbars leaves the document zoom alone');
   // Two-finger pan keeps the zoom and scrolls.
   const scroll0=await page.evaluate(()=>{const w=document.querySelector('.canvas-workspace');return [w.scrollLeft,w.scrollTop];});
   await touches(cdp,[['touchStart',[[cx-50,cy],[cx+50,cy]]],...Array.from({length:6},(_,i)=>['touchMove',[[cx-50-(i+1)*15,cy-(i+1)*15],[cx+50-(i+1)*15,cy-(i+1)*15]]]),['touchEnd',[]]]);await page.waitForTimeout(400);

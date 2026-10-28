@@ -1,0 +1,3 @@
+/* Phones and touch screens: shell. Rules here only apply at phone sizes or to coarse pointers. */
+/* The interface never pinch-zooms (only the canvas does, src/touch-gestures.ts). */
+html,body,#root{touch-action:pan-x pan-y}
