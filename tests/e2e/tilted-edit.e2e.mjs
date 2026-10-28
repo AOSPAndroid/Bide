@@ -47,10 +47,24 @@ const insideQuad=(q,x,y,pad)=>q.every((a,i)=>{const b=q[(i+1)%4],len=Math.hypot(
 const pixels=(page,bytes)=>page.evaluate(async b64=>{const bmp=await createImageBitmap(await (await fetch('data:image/png;base64,'+b64)).blob(),{premultiplyAlpha:'none',colorSpaceConversion:'none'}),c=new OffscreenCanvas(bmp.width,bmp.height),g=c.getContext('2d');g.drawImage(bmp,0,0);return {width:bmp.width,height:bmp.height,data:[...g.getImageData(0,0,bmp.width,bmp.height).data]};},bytes.toString('base64'));
 const button=(page,text)=>page.locator(`button[aria-label^="Edit detected text"][aria-label*="${text}"]`).first();
 // Edge width (ink-to-paper transition, edgeWidth from src/ocr-image.ts) of a field on screen, as tests/e2e/scan-edit.e2e.mjs measures it.
-async function edgeOf(page,text){
- await button(page,text).evaluate(b=>{const ws=document.querySelector('.canvas-workspace'),w=ws.getBoundingClientRect(),r=b.getBoundingClientRect();ws.scrollTop+=r.top-w.top-200;ws.scrollLeft+=r.left-w.left-100;});
- await page.waitForTimeout(800);
- const r=await button(page,text).evaluate(b=>{const r=b.getBoundingClientRect();document.querySelector('.detected-text-overlay').style.visibility='hidden';return {x:r.left,y:r.top,width:r.width,height:r.height};});
+async function edgeOf(page,text,reference){
+ let r;
+ if(reference){
+  // Reference lettering is known from the independent fixture's DOM, not its
+  // OCR spelling. A punctuation misread must not prevent a sharpness check.
+  r=await page.evaluate(({quad,width})=>{
+   const x=Math.min(...quad.map(p=>p.x)),y=Math.min(...quad.map(p=>p.y)),right=Math.max(...quad.map(p=>p.x)),bottom=Math.max(...quad.map(p=>p.y));
+   const ws=document.querySelector('.canvas-workspace'),w=ws.getBoundingClientRect(),a=document.querySelector('.artboard'),b=a.getBoundingClientRect(),z=b.width/width;
+   ws.scrollTop+=b.top+y*z-w.top-200;ws.scrollLeft+=b.left+x*z-w.left-100;
+   const at=a.getBoundingClientRect();document.querySelector('.detected-text-overlay').style.visibility='hidden';
+   return {x:at.left+x*z,y:at.top+y*z,width:(right-x)*z,height:(bottom-y)*z};
+  },reference);
+  await page.waitForTimeout(800);
+ }else{
+  await button(page,text).evaluate(b=>{const ws=document.querySelector('.canvas-workspace'),w=ws.getBoundingClientRect(),r=b.getBoundingClientRect();ws.scrollTop+=r.top-w.top-200;ws.scrollLeft+=r.left-w.left-100;});
+  await page.waitForTimeout(800);
+  r=await button(page,text).evaluate(b=>{const r=b.getBoundingClientRect();document.querySelector('.detected-text-overlay').style.visibility='hidden';return {x:r.left,y:r.top,width:r.width,height:r.height};});
+ }
  await page.waitForTimeout(300);
  const png=await page.screenshot({clip:{x:Math.max(0,r.x-6),y:Math.max(0,r.y-6),width:Math.min(1300,r.width+12),height:r.height+12}});
  await page.evaluate(()=>{document.querySelector('.detected-text-overlay').style.visibility='';});
@@ -66,7 +80,7 @@ async function editTilted(browser,url,photo,{from,to,line,reference}){
  const dir=await mkdtemp(join(tmpdir(),'bide-tilted-')),file=join(dir,'photo.png');await writeFile(file,photo.png);
  const page=await browser.newPage({viewport:{width:1400,height:900},acceptDownloads:true}),errors=[];page.on('pageerror',e=>errors.push(e.message));
  await page.goto(url);await page.locator('input[type=file][accept*=".psd"]').setInputFiles(file);
- await button(page,from).waitFor({timeout:240000});await button(page,reference).waitFor({timeout:10000});
+ await button(page,from).waitFor({timeout:240000});
  // The tap target follows the line's angle.
  const turn=await button(page,from).evaluate(b=>b.style.transform),angle=Number(turn.match(/rotate\((-?[\d.]+)deg\)/)?.[1]),truth=photo.lines[line];
  assert.ok(Math.abs(angle-truth.angle)<.5,`the field is drawn turned with its line (${turn}, line at ${truth.angle.toFixed(2)}°)`);
@@ -79,7 +93,7 @@ async function editTilted(browser,url,photo,{from,to,line,reference}){
  const objects=await page.evaluate(async()=>{const {restoreLocal}=await import('/src/model.ts');return (await restoreLocal()).pages[0].canvas.objects.map(o=>({type:o.type,name:o.name,angle:o.angle,height:o.height*o.scaleY}));});
  const edits=objects.filter(o=>/^Edited text/.test(o.name??''));
  const zoom=page.getByLabel('Zoom percentage');await zoom.fill('300');await zoom.press('Enter');await page.waitForTimeout(2500);
- const edges={edited:await edgeOf(page,to),reference:await edgeOf(page,reference)};
+ const edges={edited:await edgeOf(page,to),reference:await edgeOf(page,reference,{quad:photo.lines[1].quad,width:photo.width})};
  await zoom.fill('100');await zoom.press('Enter');await page.waitForTimeout(1000);
  await page.locator('.document-actions .primary').click();
  const [download]=await Promise.all([page.waitForEvent('download',{timeout:60000}),page.locator('.modal .dialog-actions .primary').click()]);
