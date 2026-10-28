@@ -4,6 +4,7 @@ import {installLayerStyles} from './layer-style-render';
 import ErrorBoundary from './ErrorBoundary';
 import Paywall from './Paywall';
 import {startMeasurement} from './measurement';
+import {gateTouchHover} from './touch-hover';
 import './styles.css';
 import './theme.css';
 installLayerStyles();
@@ -12,6 +13,8 @@ installLayerStyles();
 // fingers land on the canvas. Safari ignores maximum-scale, so its pinch events
 // are cancelled here; other browsers follow touch-action (mobile-shell.css).
 for(const type of ['gesturestart','gesturechange'])document.addEventListener(type,e=>e.preventDefault(),{passive:false});
+// Touch screens: hover looks only where there is a real hover (touch-hover.ts). Imports run first, so every stylesheet is in.
+gateTouchHover();
 startMeasurement({measurementId:import.meta.env.VITE_GA_MEASUREMENT_ID,page:'app'});
 createRoot(document.getElementById('root')!).render(<ErrorBoundary><Paywall><App /></Paywall></ErrorBoundary>);
 import './workspace-ui.css';

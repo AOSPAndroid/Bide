@@ -3,7 +3,7 @@ import {workspaces, type Workspace} from './WorkspaceDock';
 export default function WorkspaceNav({active,onSelect}:{active:Workspace;onSelect:(view:Workspace)=>void}) {
   return <nav className="workspace-nav" aria-label="Choose workspace">
     {workspaces.map(item=><button key={item.id} aria-label={item.label} title={item.detail} aria-current={active===item.id?'page':undefined} onClick={()=>onSelect(item.id)}>
-      <item.icon size={19}/><span><strong>{item.label}</strong><small>{item.detail}</small></span>
+      <item.icon size={19}/><span><strong>{item.label}</strong><small>{item.detail}</small></span><span className="ws-short" aria-hidden="true">{item.short}</span>
     </button>)}
     <span className="workspace-nav-note">One toolkit. Three workspaces.</span>
   </nav>;
