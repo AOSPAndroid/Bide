@@ -14,7 +14,7 @@ import {darkenToInk,prepareOcrPixels,estimateLineHeight} from './ocr-image';
 import {ensureFont,ensureEmbeddedFont,ensureDocumentFonts} from './fonts';
 import {rasterSearchWords} from './searchable-text';
 import {fallbackFont,fitOcrText,type TextRegion} from './text-regions';
-import {lineCells,planGlyphEdit,ownInk,lineMetrics,type LibraryGlyph} from './glyph-edit';
+import {lineCells,planGlyphEdit,withUnread,ownInk,lineMetrics,UNREAD,type LibraryGlyph} from './glyph-edit';
 import {markDoubts} from './ocr-checks';
 import {mixedWeights,attachNumberParts,recognitionKey,scaleRegions,unconvertedRegions,ocrPatchBounds,ocrScanStatus,isUncertain,frameOf,turn,turnedBounds,inFrame,type Frame} from './ocr-regions';
 import type {OcrGrouping} from './ocr-segmentation';
@@ -327,7 +327,7 @@ const scaledRegion=(r:TextRegion,k:number):TextRegion=>k===1?r:{...r,left:r.left
 function letterLibrary(raster:HTMLCanvasElement,regions:TextRegion[],xHeight:number,exclude:TextRegion,page?:string):LibraryGlyph[]{
  return regions.filter(r=>r!==exclude&&r.kind==='ocr'&&r.glyphs).flatMap(r=>{
   const {rows,y0}=rowInk(raster,r),m=lineMetrics(rows);if(!m||Math.abs(m.xHeight-xHeight)>Math.max(1,xHeight*.12))return [];
-  const own=lineCells(r.text,r.glyphs!);return own?own.filter(g=>!g.space).map(g=>({...g,y0:r.top,y1:r.top+r.height,source:r.id,baseline:y0+m.baseline,page})):[];
+  const own=lineCells(r.text,r.glyphs!);return own?own.filter(g=>!g.space&&g.ch!==UNREAD).map(g=>({...g,y0:r.top,y1:r.top+r.height,source:r.id,baseline:y0+m.baseline,page})):[];
  });
 }
 
@@ -341,17 +341,20 @@ export async function glyphEditPatch(c:Canvas,p:Page,lineRegion:TextRegion,next:
  const k=letterScale(lineRegion,p),f=frameOf(lineRegion),fill=lineRegion.background||'#ffffff',region=scaledRegion(lineRegion,k),page=pageRegions.flatMap(r=>r===lineRegion?[region]:framed(f,[r]).map(m=>scaledRegion(m,k)));
  // Another page's letters are cut in the frame of one of its lines.
  const otherPages=sources.map(o=>{const of=frameOf(o.regions.find(r=>r.glyphs)??lineRegion);return {...o,frame:of,regions:framed(of,o.regions).map(r=>scaledRegion(r,k))};});
+ // Placeholder cells (ink the recognizer did not read) are planned as
+ // characters of their own, kept where the edit leaves them alone.
  const cells=lineCells(region.text,region.glyphs!);if(!cells)return undefined;
+ const read=cells.map(c=>c.ch).join(''),wanted=withUnread(region.text,cells,next);
  const raster=levelRaster(k===1?await pageComposite(c,p):await previewCanvas(p.source!,p.index,k,Math.ceil(p.width*k),Math.ceil(p.height*k)),f,k,fill),W=raster.width,H=raster.height;
  const target=rowInk(raster,region),metrics=lineMetrics(target.rows);if(!metrics)return undefined;
  const baseline=target.y0+metrics.baseline,rasters=new Map<string,HTMLCanvasElement>([[p.id,raster]]);
- let plan=planGlyphEdit(region.text,cells,next,letterLibrary(raster,page,metrics.xHeight,region,p.id));
+ let plan=planGlyphEdit(read,cells,wanted,letterLibrary(raster,page,metrics.xHeight,region,p.id));
  // A letter missing from this page: look for it on the other pages.
  for(const other of otherPages){
   if(plan||other.page.id===p.id)continue;
-  if(!planGlyphEdit(region.text,cells,next,other.regions.flatMap(r=>r.glyphs?lineCells(r.text,r.glyphs)?.filter(g=>!g.space).map(g=>({...g,y0:0,y1:0,source:r.id}))??[]:[]))&&!plan)continue;
+  if(!planGlyphEdit(read,cells,wanted,other.regions.flatMap(r=>r.glyphs?lineCells(r.text,r.glyphs)?.filter(g=>!g.space&&g.ch!==UNREAD).map(g=>({...g,y0:0,y1:0,source:r.id}))??[]:[]))&&!plan)continue;
   const source=levelRaster(await offscreenComposite(other.page,k),other.frame,k,fill);rasters.set(other.page.id,source);
-  plan=planGlyphEdit(region.text,cells,next,[...letterLibrary(raster,page,metrics.xHeight,region,p.id),...letterLibrary(source,other.regions,metrics.xHeight,region,other.page.id)]);
+  plan=planGlyphEdit(read,cells,wanted,[...letterLibrary(raster,page,metrics.xHeight,region,p.id),...letterLibrary(source,other.regions,metrics.xHeight,region,other.page.id)]);
  }
  if(!plan)return undefined;
  const pieces=plan.pieces.map(q=>({...q,x0:Math.round(q.x0),x1:Math.round(q.x1)})),startX=Math.max(0,Math.round(plan.startX)),width=pieces.reduce((s,q)=>s+q.x1-q.x0,0);

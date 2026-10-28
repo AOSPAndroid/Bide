@@ -76,3 +76,11 @@ test('Arabic smart grouping splits visual gaps and returns groups in reading ord
  assert.deepEqual(groups.map(g=>[g.bbox.x0,g.bbox.x1]),[[200,225],[10,120]]);
  assert.deepEqual(groups[1].words.map(w=>[w.text,w.bbox.x0]),[['مرحبا',78],['بالعالم',10]]);
 });
+test('a badge after a label is a field of its own, a stripe behind a word is not',async()=>{
+ const {splitAtBackgrounds}=await import('../tmp/ocr-segmentation.mjs');
+ const part=segmentOcrLine({text:'Livret A NOUVEAU',bbox:{x0:10,x1:120,y0:10,y1:20},words:[word('Livret',10,40,10,20),word('A',44,50,10,20),word('NOUVEAU',56,120,10,20)]})[0];
+ const white={rgb:[255,255,255],badge:false},pill={rgb:[232,240,254],badge:true};
+ assert.deepEqual(splitAtBackgrounds(part,[white,white,pill]).map(g=>g.text),['Livret A','NOUVEAU']);
+ assert.deepEqual(splitAtBackgrounds(part,[white,white,{...pill,badge:false}]).map(g=>g.text),['Livret A NOUVEAU'],'a road crossing a map label');
+ assert.deepEqual(splitAtBackgrounds(part,[white,white,{rgb:[250,250,250],badge:true}]).map(g=>g.text),['Livret A NOUVEAU'],'nearly the same colour');
+});
