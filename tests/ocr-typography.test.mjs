@@ -45,7 +45,8 @@ test('a minus, an en dash and an em dash are read from the bars themselves',()=>
  assert.equal(read([...word('ab'),[' ','gap',5],['-','bar',10],...word('12')]).text,'ab −12');
  assert.equal(read([...word('ab'),[' ','gap',5],['-','bar',4],...word('12')]).text,'ab -12','a short dash is a hyphen');
  assert.equal(read([...word('ab'),[' ','gap',5],['-','bar',10],[' ','gap',5],...word('cd')]).text,'ab – cd');
- assert.equal(read([...word('ab'),[' ','gap',5],['—','bar',10],[' ','gap',5],...word('cd')]).text,'ab – cd','read as — but only en-dash long');
+ assert.equal(read([...word('ab'),[' ','gap',5],['—','bar',8],[' ','gap',5],...word('cd')]).text,'ab – cd','read as — but en-dash long');
+ assert.equal(read([...word('ab'),[' ','gap',5],['—','bar',12],[' ','gap',5],...word('cd')]).text,'ab — cd','a monospace em dash is no longer than that');
  assert.equal(read([...word('ab'),[' ','gap',5],['-','bar',19],[' ','gap',5],...word('cd')]).text,'ab — cd');
  assert.equal(read([...word('10'),['-','bar',10],...word('12')]).text,'10–12');
  assert.equal(read([...word('ab'),['-','bar',4],...word('cd')]).text,'ab-cd','hyphens in words stay');

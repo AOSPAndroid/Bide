@@ -197,9 +197,10 @@ export function typesetRegions<T extends TypeRegion>(regions:T[],img:Pixels):T[]
  const page=quotes.some(curly);
  for(const q of quotes)if(q.t.ch!=='’'&&(page||curly(q))){q.t.ch='’';q.t.glyph!.ch='’';}
  for(const l of lines)if(l)l.tokens.forEach((t,i)=>{
-  if(!DASH.test(t.ch)||!t.glyph)return;const r=own(l,t),ch=r&&dashFor(barLength(l.m,r),near(l.tokens,i,-1),near(l.tokens,i,1),H);
-  // A bar the recognizer did not read is most likely the en dash it lacks.
-  const next=ch??(t.found?'–':undefined);if(next){t.ch=next;t.glyph.ch=next;}
+  if(!DASH.test(t.ch)||!t.glyph)return;const r=own(l,t),L=r?barLength(l.m,r):0,ch=r&&dashFor(L,near(l.tokens,i,-1),near(l.tokens,i,1),H);
+  // A bar the recognizer did not read is most likely the en dash it lacks;
+  // one it read as — stays so from an x-height long (a monospace em dash).
+  const next=ch==='–'&&t.ch==='—'&&L>=1?undefined:ch??(t.found?'–':undefined);if(next){t.ch=next;t.glyph.ch=next;}
  });
  // The recognizer's letter centres are not kept (later mappings move cells only).
  const bare=(g:Glyph):Glyph=>{const {c:_,...rest}=g;return rest;};
