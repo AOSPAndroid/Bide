@@ -10,7 +10,9 @@ Not on the live site yet (newest first):
 
 | Commit | What it does | Files you also changed |
 |---|---|---|
-| (mobile, see section 4) | Pinch-to-zoom and two-finger pan on the canvas, phone layout fixes | `src/App.tsx`, `src/theme.css` |
+| (later commits) | Phone layout fixes from the mobile audit, if merged by the time you read this | — |
+| `5963aab` | Scanned PDFs: a page whose only text is the scanner's invisible OCR layer is read by bide's own OCR (editing that layer drew new text over the old digits); "original letters" edits on PDF pages are cut from a render ~3x the 72 dpi page units (edits were a blurry bitmap: edge width 3.8 → 1.3 px, untouched scan 1.33 px) | `src/detected-text.ts`, `src/browser/pdf-core.ts` |
+| `a962d5e` | Phones: pinch-to-zoom and two-finger pan on the canvas (`src/touch-gestures.ts`) | `src/App.tsx`, `src/theme.css` |
 | `fa13933` | Scanned PDFs: the softness of replacement text is measured on a finer render (it was measured at 72 dpi, so a crisp scan got 0.4 pt of blur, now 0.12 pt) | `src/detected-text.ts` |
 | `638549f` | "Download bide" follows `releases/latest` instead of a fixed version | `src/build-flags.ts` (the live site still links v0.8.14, which still has draw.io) |
 
@@ -25,7 +27,8 @@ Already live, and to be kept through the merge: angled-photo flattening, two-sid
 
   Keep the sha256 check on all three.
 - **`src/browser/ai.ts`:** keep your `PUBLIC_DEMO ? true : HEAD check` for `aiAvailable()`. Keep this branch's `remoteModels()` init fields (`remote`, `licence`).
-- **`src/detected-text.ts`:** keep both sides. This branch only changed `matchedDetectedTextbox()` (PDF pages fit font/size/position at page scale, then call `matchOcrSoftness()` on a render with ~32 px letters).
+- **`src/detected-text.ts`:** keep both sides. This branch changed `matchedDetectedTextbox()` (PDF pages fit font/size/position at page scale, then call `matchOcrSoftness()` on a render with ~32 px letters), `glyphEditPatch()` (works at `letterScale()` pixels per page unit and returns a FabricImage scaled by 1/k), `searchableText()` and `scanPageText()` (the `ocrLayer` flag from `detectPdfText`).
+- **`src/browser/pdf-core.ts`:** `detectPdfText()` first calls `textKinds(page)` (a MuPDF `Device` counting visible vs ignored text) and returns `{regions:[],ocrLayer:true}` for scanner OCR layers. Keep your other `pdf-core.ts` changes around it.
 - **`src/App.tsx`, `src/theme.css`:** additive on this branch: the touch gestures are wired after `new Canvas(...)`, and the CSS adds `.canvas-workspace {touch-action:none}` plus phone rules.
 
 ## 2. Make sure the best OCR is what users get
@@ -45,7 +48,7 @@ Already live, and to be kept through the merge: angled-photo flattening, two-sid
 Run these on your merged branch:
 
 1. `npm test`: unit tests, 173 at the time of writing, all passing.
-2. `npm run test:e2e`: browser tests, 25 at the time of writing. The OCR ones are `ocr-replace`, `ocr-appearance`, `ai`, `alphabets`, `straighten`, `searchable`, `proofread`, `pdf-scan-softness` and `invoices`. The phone ones are `touch` and `invoices` at 390 px.
+2. `npm run test:e2e`: browser tests, 25 at the time of writing. The OCR ones are `ocr-replace`, `ocr-appearance`, `ai`, `alphabets`, `straighten`, `searchable`, `proofread`, `pdf-scan-softness`, `scan-edit` and `invoices`. The phone ones are `touch` and `invoices` at 390 px. `scan-edit` uses the invented scanned quotes in `tests/fixtures/` (rebuild them with `node scripts/make-scan-fixture.mjs`).
 3. `npm run bench:ocr -- tesseract ai`: the OCR benchmark (17 invented pages). Expected on this branch:
 
    | Engine | Line error rate | Words found | Words right |
@@ -56,7 +59,7 @@ Run these on your merged branch:
    Pages to watch: `letter-angle` and `invoice-angle` at 100% words found (sheet flattening), `invoice-photo` at about 87.5%. A drop on these means a piece of the OCR chain was lost in the merge.
 4. On the deployed site (a phone and a desktop):
    1. Open an image of text: the status bar says "AI OCR".
-   2. Open a scanned PDF and convert a line to text: the new text is not visibly blurrier than the page.
+   2. Open `tests/fixtures/scanned-quote-ocr-layer.pdf` and change "1 947,80 €" to "1 974,80 €": the regions are labelled "OCR" (not "Font: Helvetica"), the old digits are gone (no doubled text), and at 300% the edit is as sharp as the line below it.
    3. Photograph a sheet on a desk at an angle: the Straighten hint offers to flatten it.
    4. On a phone, pinch zooms the page (not the toolbars), and two fingers pan it.
 
@@ -71,7 +74,7 @@ See the "Phones" entries in `FEATURES.md` and `tests/e2e/touch.e2e.mjs`:
 
 ## 5. Not done yet (do not assume it is)
 
-- Scanned PDFs with an invisible OCR text layer ("GlyphLessFont", added by scanners): bide uses that layer as the page's real text. It can be misplaced and has no font to match. Better: detect GlyphLessFont text and run bide's own OCR on the image instead.
+- Pages that mix visible text with a scanner's invisible layer still use the PDF text (only pages whose text is all invisible are re-read by OCR).
 - The PDF/A-3 conformance of the Factur-X PDFs has not been checked with veraPDF.
 - A new GitHub release is needed before "Download bide" serves the version without draw.io. Note that the owner chose closed source with a subscription: confirm with them before publishing a free ZIP.
 
