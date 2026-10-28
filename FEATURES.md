@@ -27,6 +27,11 @@
 ## Unreleased — Phones and tablets
 
 - The interface never pinch-zooms: only the page does. A pinch on the toolbars, the tool rail, the zoom bar, the PDF home or a dialog used to zoom the whole app (up to 5x), with no way back once the fingers reached the canvas.
+- **Phones: a grouped tool rail.** Upright or on their side, phones show one rail button per tool group (Select, Create, Draw, Retouch), for the tool used last, so the rail never scrolls (it hid 8 tools on a 390×844 iPhone and 10 on a 360×740 Android). A tap selects the tool; a second tap or a long press opens a flyout with the group's tools by name, and the pick becomes the group's button. 44 px targets; Enter, the arrow keys and Escape work from a keyboard, and screen readers hear the tool, whether the flyout is open and the group's tools. Desktop and tablets keep the full rail.
+- Mask brush on touch screens: a slow pinch (the first finger had already moved) puts the layer mask back exactly as it was and adds no history step.
+- Touch screens: the command palette opens with its list in view and the on-screen keyboard down; tap the search field to type. Ctrl K from a hardware keyboard, and desktop, still focus the field.
+- Touch screens: the Export dialog names a one-page PNG, JPEG, SVG or split export "PNG image", "JPEG image", "SVG image" or "PDF page", the file it now saves; several pages, and desktop, keep "… · ZIP".
+- Find & redact at every size shows each match with the words around it, wrapped, instead of a desktop list that scrolled sideways and cut off matches at the end of long lines; the full line is the tooltip.
 - Phones and tablets: tap a selected text box again to edit it where you tapped, even small one-line labels. Text boxes have no top/bottom stretch handles on touch screens, so dragging a label moves it. A new text box from the Text tool opens ready to type over "Your text".
 - Phones and tablets: editing small text zooms in until the letters are readable (16 px) and scrolls the text above the on-screen keyboard; the app no longer shifts up when the keyboard opens.
 - Phones and tablets: the page stays visible at any zoom, including 12 MP photos at 800%. The canvas lowers its pixel density instead of exceeding browser limits; exports are unaffected. Pinching is smooth: the page is scaled while the fingers move and redrawn once when they lift.

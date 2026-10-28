@@ -4,7 +4,7 @@
 // finger-sized zoom and tool controls, and a page that fills the phone.
 // The desktop editor is checked to look exactly as before.
 import {test,before,after} from 'node:test';import assert from 'node:assert/strict';
-import {createServer} from 'vite';import {chromium} from 'playwright-core';
+import {createServer} from 'vite';import {chromium} from 'playwright-core';import {pickTool} from './rail.mjs';
 import {mkdtemp,readFile} from 'node:fs/promises';import {tmpdir} from 'node:os';import {join} from 'node:path';
 
 const phone={viewport:{width:390,height:844},deviceScaleFactor:2,isMobile:true,hasTouch:true};
@@ -55,7 +55,7 @@ test('a tap on a selected small text box edits it where tapped; a drag moves it;
   await context.close();}
  // The Text tool's new box starts in editing with its placeholder selected.
  {const {context,page}=await boot();
-  await page.locator('.tool-rail button[aria-label="Text box"]').click();
+  await pickTool(page,'Text box');
   await page.touchscreen.tap(...await at(page,300,560));await page.waitForTimeout(700);
   assert.deepEqual(await editing(page),{value:'Your text',start:0,end:9},'editing with the text selected');
   await page.keyboard.type('Hello');await page.waitForTimeout(1000);
@@ -118,7 +118,7 @@ test('a pinch whose second finger lands late leaves no stroke, shape or move beh
   ['touchStart',[[x0+driftX,y0+driftY],[x0+70,y0+30]]],...Array.from({length:6},(_,i)=>['touchMove',[[x0+driftX-(i+1)*6,y0+driftY-(i+1)*3],[x0+70+(i+1)*6,y0+30+(i+1)*3]]]),['touchEnd',[]]];
  const count=(await saved(page)).length;
  for(const tool of ['Brush','Rectangle','Text box','Paint bucket']){
-  await page.locator(`.tool-rail button[aria-label="${tool}"]`).click();
+  await pickTool(page,tool);
   const z=await zoomOf(page);await touches(cdp,late(x-60,y,150));await page.waitForTimeout(400);
   assert.ok(await zoomOf(page)>z*1.2,`${tool}: the pinch zoomed`);
   await touches(cdp,late(x-60,y,20,10,8));
@@ -126,18 +126,42 @@ test('a pinch whose second finger lands late leaves no stroke, shape or move beh
   await page.locator('.zoom-controls button[aria-label="Fit to screen"]').click();await page.waitForTimeout(400);
  }
  // One finger still draws.
- await page.locator('.tool-rail button[aria-label="Brush"]').click();
+ await pickTool(page,'Brush');
  await touches(cdp,drag(x-40,y,80,10,8));assert.equal((await saved(page)).length,count+1,'one finger drew');
  await page.keyboard.press('Control+z');await page.waitForTimeout(500);
  // A tap still fills (the bucket acts when the finger lifts).
- await page.locator('.tool-rail button[aria-label="Paint bucket"]').click();
+ await pickTool(page,'Paint bucket');
  await touches(cdp,[['touchStart',[[x-60,y]],60],['touchEnd',[]]]);assert.equal((await saved(page)).length,count+1,'one tap filled');
  await page.keyboard.press('Control+z');await page.waitForTimeout(500);
  // Move tool: the selected headline, a finger that drifts 12 px, then the pinch.
- await page.locator('.tool-rail button[aria-label="Move & select"]').click();
+ await pickTool(page,'Move & select');
  const before=await saved(page),p=await at(page,100,140);await page.touchscreen.tap(...p);await page.waitForTimeout(450);
  await touches(cdp,late(...p,20,9,8));
  assert.deepEqual(await saved(page),before,'the headline did not move');
+ await context.close();
+});
+
+test('a slow pinch with the Mask brush puts the mask back exactly, without a history step',{timeout:300000},async()=>{
+ const {context,page,cdp}=await boot();
+ // The first finger drifts 13 px, so the brush has painted, then the second lands.
+ const late=(x0,y0)=>[['touchStart',[[x0,y0]],10],['touchMove',[[x0+5,y0+4]]],['touchMove',[[x0+10,y0+8]],40],['touchStart',[[x0+10,y0+8],[x0+70,y0+30]]],...Array.from({length:6},(_,i)=>['touchMove',[[x0+10-(i+1)*6,y0+8-(i+1)*3],[x0+70+(i+1)*6,y0+30+(i+1)*3]]]),['touchEnd',[]]];
+ const drawer=async tab=>{await page.locator('.small-properties-button').tap();await page.locator('.panel-tabs button',{hasText:tab}).tap();await page.waitForTimeout(300);};
+ const steps=async()=>{await drawer('History');const n=await page.locator('.inspector .history-list button').count();await page.locator('.small-properties-button').tap();return n;};
+ // Hiding and showing the layer saves it as it is now, mask pixels and all.
+ const live=async()=>{await drawer('Layers');for(const a of ['Hide','Show']){await page.locator(`button[aria-label="${a} Sage circle"]`).tap();await page.waitForTimeout(200);}
+  await page.locator('.small-properties-button').tap();return (await saved(page)).find(o=>o.name==='Sage circle').clipPath?.src??null;};
+ const fit=async()=>{await page.locator('.zoom-controls button[aria-label="Fit to screen"]').click();await page.waitForTimeout(400);};
+ const pinch=async()=>{const [x,y]=await at(page,190,561),before=await saved(page),n=await steps();
+  await touches(cdp,late(x,y));await page.waitForTimeout(400);await fit();
+  assert.deepEqual(await saved(page),before,'nothing saved');assert.equal(await steps(),n,'no history step');};
+ await page.touchscreen.tap(...await at(page,209,561));await page.waitForTimeout(450);
+ await pickTool(page,'Mask brush');
+ // A layer without a mask gets none.
+ await pinch();assert.equal(await live(),null,'the layer has no mask');
+ // A real stroke masks it; a pinch then leaves those pixels exactly as they were.
+ await touches(cdp,drag(...await at(page,170,561),80,0,8));await page.waitForTimeout(300);
+ const mask=(await saved(page)).find(o=>o.name==='Sage circle').clipPath?.src;assert.ok(mask,'one finger painted a mask');
+ await pinch();assert.equal(await live(),mask,'the mask is pixel-identical');
  await context.close();
 });
 
@@ -161,7 +185,7 @@ test('editing small text zooms it to a readable size and keeps it above the keyb
 
 test('a finger inside a small shape moves it; its handles still resize it from outside',{timeout:300000},async()=>{
  const {context,page,cdp}=await boot();
- await page.locator('.tool-rail button[aria-label="Rectangle"]').click();
+ await pickTool(page,'Rectangle');
  await page.touchscreen.tap(...await at(page,200,300));await page.waitForTimeout(600);
  const rect=async()=>(await saved(page)).find(o=>o.name==='Rect');
  let r=await rect();assert.deepEqual([r.width,r.height],[160,100]);

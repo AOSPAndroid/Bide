@@ -47,15 +47,10 @@
  .toast{pointer-events:none}
 }
 
-/* Find & redact on narrow screens: each match is shown with a few words around
-   it (RedactDialog marks the rest .redact-far), wrapped, never scrolled sideways. */
+/* Find & redact on narrow screens: the search field goes under its label. Each
+   match is shown with the words around it at every size (theme.css). */
 @media (max-width:820px),(pointer:coarse){
  .modal .field-label{display:flex;flex-direction:column;gap:6px}
- .redact-hit{align-items:flex-start;padding:4px 0}
- .redact-hit>input{margin-top:1px}
- .redact-hit .line-text{white-space:normal;overflow-wrap:anywhere;min-width:0;line-height:1.6}
- .redact-far{display:none}
- .redact-gap::before{content:'…'}
 }
 
 /* Phones: Organize pages opens the page strip; its page menu is a finger-sized

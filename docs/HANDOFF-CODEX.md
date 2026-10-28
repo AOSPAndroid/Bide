@@ -1,6 +1,6 @@
 # Handoff to Codex: phones and the open → edit → download flow
 
-Current update: `claude/lucid-fermat-jvmf9l` through `6c8d676` adds native PDF text rewrites. The older handoff below describes the preceding batch; current integration notes at the end record the safeguards retained during merging.
+Current update: `claude/lucid-fermat-jvmf9l` through `004ccf5` adds native PDF text rewrites and a further phone/desktop UI batch. The older handoff below describes the preceding batch; current integration notes at the end record the safeguards retained during merging.
 
 `main` (9e37c66) already has the OCR, scanned-PDF and pinch-zoom work up to 6be8fcf, and your original-letters rule. Everything below is on `claude/lucid-fermat-jvmf9l` and not on `main` yet.
 
@@ -116,3 +116,10 @@ Privacy: never commit anything from `tests/real/` (private user documents; git-i
 - Preserve every pixel-reference assertion and compare original font resources, embedded font-program bytes and ToUnicode maps in the PDF download. No private document belongs in the source tree or public build.
 - Validation for this integration: 263 unit tests, 257 passed and six existing Windows-only skips. All nine native-PDF/edit-flow browser cases passed; the Helvetica, pdfkit, Chromium and wider right-aligned examples each had zero differing pixels at 144 dpi, with unchanged original font programs and Unicode maps. The build and discovery checks passed.
 - The 17-page benchmark ran with both Tesseract and AI. All 34 recognized outputs were identical to the preceding integration. AI: 1.2170% character error, 96.2760% words found, 97.3113% right; Tesseract: 12.1440%, 81.0209%, 91.1600%. Recognition scores are separate from the font and rendered-edit checks.
+
+## Phone and desktop follow-up — 2026-10-28
+
+- The whole additional branch batch through `004ccf5` is included: grouped phone tool rail with keyboard/accessibility support, mask-brush rollback on a late second finger, a touch palette that does not raise the keyboard until tapped, single-file export labels and desktop redaction previews with surrounding words.
+- The original-font and scanned-text safeguards remain. Explicit Export PDF and Protect PDF still select PDF, while the general image download keeps its original-format default.
+- Export labels count selected page entries, including duplicates. A range such as `1,1` exports two pages and must say ZIP; deduplicating the range for labels incorrectly promised a single file. The new mobile regression preserves the original single-page, multi-page, range and desktop assertions.
+- The additional batch was merged in an isolated checkout so its source changes could not reload the native PDF tests already running. Affected UI tests are rechecked on the final batch; no test is disabled to obtain a pass.

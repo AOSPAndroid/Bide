@@ -2,7 +2,7 @@
 // (not the whole interface) and pan it, without drawing or moving anything;
 // one finger still draws with the brush and pans with the hand tool.
 import {test} from 'node:test';import assert from 'node:assert/strict';
-import {createServer} from 'vite';import {chromium} from 'playwright-core';
+import {createServer} from 'vite';import {chromium} from 'playwright-core';import {pickTool} from './rail.mjs';
 
 const objects=page=>page.evaluate(async()=>{const {restoreLocal}=await import('/src/model.ts');const p=(await restoreLocal())?.pages[0];return p?p.canvas.objects.map(o=>({type:o.type,left:Math.round(o.left),top:Math.round(o.top)})):[];});
 const zoomOf=page=>page.evaluate(()=>{const b=document.querySelector('.artboard').getBoundingClientRect();return b.width;});
@@ -44,14 +44,14 @@ test('pinch zooms the page on a phone; one finger keeps drawing and panning',{ti
   await touches(cdp,pinch(cx,cy,120,40));await page.waitForTimeout(600);
   assert.ok(await zoomOf(page)<width1*.6,'pinch in zooms out');
   // One finger with the brush draws a stroke.
-  await page.locator('.tool-rail button[aria-label="Brush"]').click();
+  await pickTool(page,'Brush');
   await touches(cdp,[['touchStart',[[cx-40,cy]]],...Array.from({length:8},(_,i)=>['touchMove',[[cx-40+(i+1)*10,cy+(i%2?6:-6)]]]),['touchEnd',[]]]);await page.waitForTimeout(1200);
   const drawn=await objects(page);assert.equal(drawn.length,before.length+1,'one finger drew one stroke');
   // …and a pinch with the brush still draws nothing.
   await touches(cdp,pinch(cx,cy,40,90));await page.waitForTimeout(1200);
   assert.equal((await objects(page)).length,drawn.length,'a pinch with the brush draws nothing');
   // The hand tool pans with one finger.
-  await page.locator('.tool-rail button[aria-label="Pan"]').click();const s0=await page.evaluate(()=>document.querySelector('.canvas-workspace').scrollTop);
+  await pickTool(page,'Pan');const s0=await page.evaluate(()=>document.querySelector('.canvas-workspace').scrollTop);
   await touches(cdp,[['touchStart',[[cx,cy+60]]],...Array.from({length:6},(_,i)=>['touchMove',[[cx,cy+60-(i+1)*15]]]),['touchEnd',[]]]);await page.waitForTimeout(300);
   assert.ok(await page.evaluate(()=>document.querySelector('.canvas-workspace').scrollTop)>s0+40,'the hand tool pans with one finger');
   assert.deepEqual(errors,[]);

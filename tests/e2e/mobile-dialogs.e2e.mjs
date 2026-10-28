@@ -27,7 +27,8 @@ async function open(device){
  return {context,page,errors,cdp:device.hasTouch?await context.newCDPSession(page):null};
 }
 const center=async locator=>{const l=locator.first();await l.scrollIntoViewIfNeeded();const b=await l.boundingBox();return [b.x+b.width/2,b.y+b.height/2];};
-const tap=async(page,locator)=>{const [x,y]=await center(locator);await page.touchscreen.tap(x,y);await page.waitForTimeout(250);};
+// A finger, or the mouse on desktop.
+const tap=async(page,locator)=>{const [x,y]=await center(locator);if(await page.evaluate(()=>navigator.maxTouchPoints>0))await page.touchscreen.tap(x,y);else await page.mouse.click(x,y);await page.waitForTimeout(250);};
 async function touches(cdp,steps){
  for(const [type,points] of steps){await cdp.send('Input.dispatchTouchEvent',{type,touchPoints:points.map(([x,y],id)=>({x,y,id}))});await new Promise(r=>setTimeout(r,16));}
 }
@@ -142,8 +143,8 @@ async function redactDialog(device){
  return session;
 }
 
-test('#26 Find & redact shows every match on a phone or tablet',{timeout:300000},async()=>{
- for(const device of [iphone,tablet]){
+test('#26 Find & redact shows every match on a phone, a tablet and desktop',{timeout:300000},async()=>{
+ for(const device of [iphone,tablet,desktop]){
   const {context,page,errors}=await redactDialog(device);
   const list=await page.locator('.redact-list').evaluate(l=>({client:l.clientWidth,scroll:l.scrollWidth,...l.getBoundingClientRect().toJSON()}));
   assert.ok(list.scroll<=list.client+1,`the list does not scroll sideways (${list.scroll} > ${list.client})`);
@@ -250,6 +251,25 @@ test('#33 PDF to images saves a single page as the image itself on a phone',{tim
   await page.locator('button[aria-label="PDF MasterTool"]:visible').first().click();await page.locator('.pdf-tool-card',{hasText:'PDF to images'}).click();
   const [download]=await Promise.all([page.waitForEvent('download',{timeout:60000}),page.getByRole('button',{name:'Export PNG'}).click()]);
   assert.match(download.suggestedFilename(),/\.zip$/);
+  assert.deepEqual(errors,[]);await context.close();}
+});
+
+test('Export names a one-page image or split export as the file itself on touch screens; several pages and desktop keep the ZIP',{timeout:300000},async()=>{
+ const zip=['PNG images · ZIP','JPEG images · ZIP','SVG pages · ZIP','Separate PDF pages · ZIP'],single=['PNG image','JPEG image','SVG image','PDF page'];
+ const formats=async page=>(await page.locator('.modal select').first().locator('option').allTextContents()).filter(t=>zip.includes(t)||single.includes(t));
+ {const {context,page,errors}=await open(iphone);
+  await command(page,'Export pages as PNG');
+  assert.deepEqual(await formats(page),single,'one page: the image itself');
+  await closeDialog(page);await command(page,'Add blank page');await command(page,'Export pages as PNG');
+  assert.deepEqual(await formats(page),zip,'two pages: a ZIP');
+  const pages=page.getByPlaceholder('All 2 pages (or 1-3, 5)');
+  await pages.fill('2');assert.deepEqual(await formats(page),single,'a range of one page');
+  await pages.fill('1-2');assert.deepEqual(await formats(page),zip,'a range of two pages');
+  await pages.fill('1,1');assert.deepEqual(await formats(page),zip,'a repeated page exports two pages in a ZIP');
+  assert.deepEqual(errors,[]);await context.close();}
+ {const {context,page,errors}=await open(desktop);
+  await page.keyboard.press('Control+k');await page.locator('input[aria-label="Search commands"]').fill('Export pages as PNG');await page.keyboard.press('Enter');
+  assert.deepEqual(await formats(page),zip,'desktop downloads a ZIP, so it says ZIP');
   assert.deepEqual(errors,[]);await context.close();}
 });
 
