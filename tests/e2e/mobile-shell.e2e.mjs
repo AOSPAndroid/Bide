@@ -175,6 +175,8 @@ test('subscription build on phones: paywall card fits and scrolls, account chip 
    await page.getByRole('heading',{name:'Your free trial has ended'}).waitFor({timeout:60000});
    const card=await rect(page.locator('.paywall-card'));assert.ok(card.x>=0&&card.right<=width,`${width}px: the card is ${card.x}-${card.right}`);
    for(const part of await page.locator('.paywall-card>*').evaluateAll(e=>e.map(e=>e.getBoundingClientRect().right)))assert.ok(part<=card.right+1,`${width}px: card content ends at ${part}, past ${card.right}`);
+   // The address in "Sign out (…)" wraps inside its button instead of running past it.
+   assert.deepEqual(await page.locator('.paywall-card button').evaluateAll(b=>b.filter(e=>e.scrollWidth>e.clientWidth+1).map(e=>e.textContent)),[],`${width}px: button text fits`);
    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
    assert.deepEqual(errors,[]);await context.close();
   }
