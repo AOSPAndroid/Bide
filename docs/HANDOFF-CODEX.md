@@ -1,10 +1,10 @@
 # Handoff to Codex: phones and the open → edit → download flow
 
-`main` (7c9e8a5, release 0.8.16) already has the OCR, scanned-PDF and pinch-zoom work up to 6be8fcf. Everything below is on `claude/lucid-fermat-jvmf9l` and not on `main` yet.
+`main` (9e37c66) already has the OCR, scanned-PDF and pinch-zoom work up to 6be8fcf, and your original-letters rule. Everything below is on `claude/lucid-fermat-jvmf9l` and not on `main` yet.
 
 ## 1. Merge
 
-The branch already contains `main` up to 7c9e8a5 (merged in 50dc8a8, conflict in `src/main.tsx` resolved by keeping both sides). If `main` has not moved since, the merge is a fast-forward:
+The branch already contains `main` up to 9e37c66 (merged in efd2f13; the conflicts in `App.tsx`, `ocr-replace.ts` and `TextEditDialogs.tsx` were resolved keeping your rule). If `main` has not moved since, the merge is a fast-forward:
 
 ```
 git fetch origin && git merge origin/claude/lucid-fermat-jvmf9l
@@ -33,6 +33,9 @@ The owner's target flow: open a file → it is scanned with the best method, no 
 
   Fields to check are flagged with a reason (IBAN check digits, impossible dates, SIREN/SIRET checksums, amount grouping, AI confidence < 93, unsure letters): 14 of the 23 still misread are flagged, with 6.6% false flags. Proofread lists them first. (`src/ocr-checks.ts`.)
 
+- Tilted scans and phone photos keep their letter cells (as a level box turned with the line, `TextRegion.angle`), so "Original letters" works on them: invoice photo 0/38 → 38/38 regions with letters, an angled sheet 0/35 → 35/35. Level pages are byte-identical to before. (`browser/ocr.ts`, `detected-text.ts` `glyphEditPatch`/`levelRaster`, one `transform` on the overlay buttons in `App.tsx`; `tests/e2e/tilted-edit.e2e.mjs`.)
+- Your rule from 9e37c66 is merged and kept: Original letters only reuses the edited line's own pixels, a refused edit changes nothing, and a font needs New font. The live-fields code follows it (a refused re-edit puts the earlier edit back).
+
 **Phones and tablets** (60 audited findings; details in `FEATURES.md`, "Unreleased — Phones and tablets")
 - The interface never pinch-zooms (`index.html` `maximum-scale=1`, `mobile-shell.css`, `main.tsx`).
 - Canvas:
@@ -42,6 +45,8 @@ The owner's target flow: open a file → it is scanned with the best method, no 
   - long press opens the layer menu;
   - a pinch whose second finger lands late leaves nothing behind.
 - Chrome:
+  - workspace names under the icons, and phones start on the PDF tools home;
+  - landscape phones fit the screen, no sticky hover on touch, Add to Home Screen icons;
   - Menu sheet;
   - 44 px targets;
   - the OCR bar folds behind More, and its settings sheet has a Done button;
@@ -65,12 +70,13 @@ The owner's target flow: open a file → it is scanned with the best method, no 
 
 ## 3. Verify before deploying
 
-1. `npm test`: 238 unit tests, 232 pass, 6 platform skips.
-2. `npm run test:e2e`: 27 browser test files. The new ones:
+1. `npm test`: 243 unit tests, 237 pass, 6 platform skips.
+2. `npm run test:e2e`: 29 browser test files. The new ones:
    - `edit-flow`: live fields, Undo, Rescan, the Helvetica fallback, the scanner text layer;
+   - `tilted-edit`: original-letter edits on a tilted photo, a tilted scan and two angled sheets;
    - `image-download`;
    - `invoice-layout`;
-   - `mobile-canvas`, `mobile-chrome`, `mobile-dialogs`, `mobile-documents`;
+   - `mobile-canvas`, `mobile-chrome`, `mobile-dialogs`, `mobile-documents`, `mobile-shell`;
    - `touch`.
 3. `npm run bench:ocr -- ai`: line error rate 1.0%, words found 97.2%, words right 98.1%. A drop means part of the OCR chain was lost in the merge.
 4. On the deployed site:
@@ -82,8 +88,6 @@ The owner's target flow: open a file → it is scanned with the best method, no 
 
 ## 4. Not done yet (do not assume it is)
 
-- Phone fixes for sign-in, paywall and navigation (landscape height, paywall card overflow, workspace switcher, account chip, sticky hover, web app manifest) are still being made, and so are independent reviews of each phone area. They will land on the same branch; merge its head again afterwards.
-- Phone photos and pages tilted more than 1° still edit with a font instead of the page's own letters (letter cells are dropped on rotated and flattened pages: `browser/ocr.ts`).
 - Digital PDF edits still replace the line with a text layer. Rewriting the text in place, in the PDF's own font codes, matched a regenerated document exactly in a prototype, but it is not built.
 - Typographic ’ and − come back as ' and -; – and ★ are missing from the Latin recognizer's dictionary.
 - veraPDF was not run on the Factur-X PDFs.

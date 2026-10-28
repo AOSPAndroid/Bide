@@ -161,7 +161,7 @@ async function ocrImage(page){
  await page.locator('input[type=file][accept*=".psd"]').setInputFiles(file);
  await page.waitForFunction(()=>/\d+ OCR regions?/.test(document.querySelector('.text-detection-bar>span')?.textContent||''),null,{timeout:240000});await page.waitForTimeout(500);
 }
-const actions=['Proofread','Find & replace','Convert all','OCR settings','Rescan'];
+const actions=['Proofread','Find & replace','Convert all to font text','OCR settings','Rescan'];
 // Actions that are missing, off screen, covered or shorter than `min`.
 const unreachable=(page,min)=>page.evaluate(([names,min])=>names.map(name=>{const e=[...document.querySelectorAll('.text-detection-bar button, .text-detection-bar summary')].find(b=>b.textContent.trim()===name);if(!e)return `${name}: missing`;
  const r=e.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);
