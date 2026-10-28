@@ -251,6 +251,24 @@ test('#33 PDF to images saves a single page as the image itself on a phone',{tim
   assert.deepEqual(errors,[]);await context.close();}
 });
 
+test('Export names a one-page image or split export as the file itself on touch screens; several pages and desktop keep the ZIP',{timeout:300000},async()=>{
+ const zip=['PNG images · ZIP','JPEG images · ZIP','SVG pages · ZIP','Separate PDF pages · ZIP'],single=['PNG image','JPEG image','SVG image','PDF page'];
+ const formats=async page=>(await page.locator('.modal select').first().locator('option').allTextContents()).filter(t=>zip.includes(t)||single.includes(t));
+ {const {context,page,errors}=await open(iphone);
+  await command(page,'Export pages as PNG');
+  assert.deepEqual(await formats(page),single,'one page: the image itself');
+  await closeDialog(page);await command(page,'Add blank page');await command(page,'Export pages as PNG');
+  assert.deepEqual(await formats(page),zip,'two pages: a ZIP');
+  const pages=page.getByPlaceholder('All 2 pages (or 1-3, 5)');
+  await pages.fill('2');assert.deepEqual(await formats(page),single,'a range of one page');
+  await pages.fill('1-2');assert.deepEqual(await formats(page),zip,'a range of two pages');
+  assert.deepEqual(errors,[]);await context.close();}
+ {const {context,page,errors}=await open(desktop);
+  await page.keyboard.press('Control+k');await page.locator('input[aria-label="Search commands"]').fill('Export pages as PNG');await page.keyboard.press('Enter');
+  assert.deepEqual(await formats(page),zip,'desktop downloads a ZIP, so it says ZIP');
+  assert.deepEqual(errors,[]);await context.close();}
+});
+
 test('#34 PDF home: readable labels and no keyboard shortcut on touch screens',{timeout:300000},async()=>{
  {const {context,page,errors}=await open(iphone);
   await tap(page,page.locator('button[aria-label="PDF MasterTool"]:visible'));

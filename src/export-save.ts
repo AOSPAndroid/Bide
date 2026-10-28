@@ -3,8 +3,17 @@
 // sheet is offered for any single file where the browser has one. Desktop keeps
 // its downloads.
 import {download} from './model';
+import {selectPages} from './page-range';
 
 const types:Record<string,string>={png:'image/png',jpg:'image/jpeg',svg:'image/svg+xml',pdf:'application/pdf'};
+// The Export dialog's names for the formats a ZIP carries; on a touch screen a
+// one-page export is saved as the file itself (below), so it says so.
+const zipped={png:['PNG images · ZIP','PNG image'],jpg:['JPEG images · ZIP','JPEG image'],svg:['SVG pages · ZIP','SVG image'],split:['Separate PDF pages · ZIP','PDF page']};
+export const zipFormats=Object.keys(zipped) as (keyof typeof zipped)[];
+export function zipFormatLabel(format:keyof typeof zipped,pages:number,range:string){
+ let one=pages===1;try{one=new Set(selectPages(range,pages)).size===1;}catch{/* an unfinished range */}
+ return zipped[format][+(one&&matchMedia('(pointer:coarse)').matches)];
+}
 const nativeApp=()=>!!(globalThis as {Capacitor?:{isNativePlatform?:()=>boolean}}).Capacitor?.isNativePlatform?.();
 export async function saveExport(blob:Blob,filename:string){
  try{
