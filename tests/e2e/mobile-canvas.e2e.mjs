@@ -199,7 +199,8 @@ test('zoom and tool controls are finger-sized and the page fills the phone; desk
   const bar=await page.evaluate(()=>{const b=document.querySelector('.options-bar'),r=document.querySelector('.tool-rail');return {overflow:b.scrollWidth-b.clientWidth,zoom:!!document.querySelector('.header-zoom')?.offsetParent,shadow:getComputedStyle(r).backgroundAttachment};});
   assert.ok(bar.overflow<=0&&!bar.zoom,`${device}: the options bar fits without its duplicate zoom`);
   assert.match(bar.shadow,/local/,`${device}: the rail shows when more tools are scrolled away`);
-  if(device==='tablet')assert.ok(await page.evaluate(()=>{const r=document.querySelector('.tool-rail');return r.scrollHeight<=r.clientHeight;}),'tablet: every tool fits the rail');
+  // A self-hosted build without Office shows a hosting notice above the editor; the hosted site does not.
+  if(device==='tablet')assert.ok(await page.evaluate(()=>{const r=document.querySelector('.tool-rail'),n=document.querySelector('.hosting-notice');return r.scrollHeight<=r.clientHeight+(n?n.getBoundingClientRect().height:0);}),'tablet: every tool fits the rail');
   if(device!=='tablet'){
    const fit=await page.evaluate(()=>{const w=document.querySelector('.canvas-workspace'),a=document.querySelector('.artboard').getBoundingClientRect();return {page:a.width,room:w.clientWidth,overflow:w.scrollWidth-w.clientWidth};});
    assert.ok(fit.page>=fit.room*.85&&fit.overflow<=0,`${device}: the page fills the width (${fit.page} of ${fit.room})`);

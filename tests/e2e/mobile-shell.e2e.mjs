@@ -46,7 +46,8 @@ test('phone shell: labelled workspaces, PDF home start, landscape fits, no stick
    await nav(page,'Photo editor').tap();await page.locator('.artboard').waitFor({timeout:60000});
    assert.equal(await current(page),'Photo editor');
    // A tapped button keeps its own look, not the pale hover tint that reads as "active".
-   const zoom=page.getByRole('button',{name:'Increase zoom',exact:true}).first(),plain=await background(zoom);
+   // The footer's zoom button: the options bar's duplicate zoom is hidden on touch screens.
+   const zoom=page.locator('.zoom-controls button[aria-label="Zoom in"]').first(),plain=await background(zoom);
    await zoom.tap();await page.waitForTimeout(400);
    assert.ok(await zoom.evaluate(e=>e.matches(':hover')),'the tapped button is :hover, as on a real phone');
    assert.equal(await background(zoom),plain,`${at}: the tapped button keeps its colour`);
