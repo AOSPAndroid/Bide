@@ -27,7 +27,8 @@ async function open(device){
  return {context,page,errors,cdp:device.hasTouch?await context.newCDPSession(page):null};
 }
 const center=async locator=>{const l=locator.first();await l.scrollIntoViewIfNeeded();const b=await l.boundingBox();return [b.x+b.width/2,b.y+b.height/2];};
-const tap=async(page,locator)=>{const [x,y]=await center(locator);await page.touchscreen.tap(x,y);await page.waitForTimeout(250);};
+// A finger, or the mouse on desktop.
+const tap=async(page,locator)=>{const [x,y]=await center(locator);if(await page.evaluate(()=>navigator.maxTouchPoints>0))await page.touchscreen.tap(x,y);else await page.mouse.click(x,y);await page.waitForTimeout(250);};
 async function touches(cdp,steps){
  for(const [type,points] of steps){await cdp.send('Input.dispatchTouchEvent',{type,touchPoints:points.map(([x,y],id)=>({x,y,id}))});await new Promise(r=>setTimeout(r,16));}
 }
@@ -140,8 +141,8 @@ async function redactDialog(device){
  return session;
 }
 
-test('#26 Find & redact shows every match on a phone or tablet',{timeout:300000},async()=>{
- for(const device of [iphone,tablet]){
+test('#26 Find & redact shows every match on a phone, a tablet and desktop',{timeout:300000},async()=>{
+ for(const device of [iphone,tablet,desktop]){
   const {context,page,errors}=await redactDialog(device);
   const list=await page.locator('.redact-list').evaluate(l=>({client:l.clientWidth,scroll:l.scrollWidth,...l.getBoundingClientRect().toJSON()}));
   assert.ok(list.scroll<=list.client+1,`the list does not scroll sideways (${list.scroll} > ${list.client})`);
