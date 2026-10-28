@@ -17,7 +17,7 @@ after(async()=>{await browser?.close();await server?.close();});
 const check=(name,device,body,timeout=120000)=>test(name,{timeout},async()=>{
  const context=await browser.newContext(device),page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
  try{
-  await page.goto(server.resolvedUrls.local[0]);await page.locator('.artboard').waitFor({timeout:60000});await page.waitForTimeout(1200);
+  await page.goto(server.resolvedUrls.local[0]+'app/');await page.locator('.workspace-nav').getByRole('button',{name:'Photo editor',exact:true}).click();await page.locator('.artboard').waitFor({timeout:60000});await page.waitForTimeout(1200);
   await body(page,await context.newCDPSession(page));assert.deepEqual(errors,[]);
  }finally{await context.close();}
 });

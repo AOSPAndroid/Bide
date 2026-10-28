@@ -17,7 +17,7 @@ after(async()=>{await browser?.close();await server?.close();});
 async function boot(device='phone'){
  const context=await browser.newContext({...devices[device],acceptDownloads:true}),page=await context.newPage(),errors=[];
  page.on('pageerror',e=>errors.push(e.message));
- await page.goto(server.resolvedUrls.local[0]);await page.locator('.artboard').waitFor({timeout:60000});await page.waitForTimeout(1500);
+ await page.goto(server.resolvedUrls.local[0]+'app/');await page.locator('.workspace-nav').getByRole('button',{name:'Photo editor',exact:true}).click();await page.locator('.artboard').waitFor({timeout:60000});await page.waitForTimeout(1500);
  return {context,page,errors,cdp:devices[device].hasTouch?await context.newCDPSession(page):null};
 }
 const wait=ms=>new Promise(r=>setTimeout(r,ms));
