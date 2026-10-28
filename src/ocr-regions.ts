@@ -27,9 +27,11 @@ export function turnedBounds(f:Frame,b:Bounds):Bounds{
 }
 // Another region in the frame's level coordinates. A tilted page is read on
 // one levelled copy, so its lines differ from each other only by a shift;
-// a line tilted otherwise has no place in the frame (undefined).
-export function inFrame(f:Frame,r:TextRegion):TextRegion|undefined{
- const angle=r.angle??0;if(Math.abs(angle-f.angle)>.01)return undefined;if(!angle)return r;
+// a line tilted otherwise has no place in the frame (undefined), unless
+// within `tolerance` degrees (lines of a sheet photographed at an angle):
+// placed by its centre, close enough to find neighbours or stop a patch.
+export function inFrame(f:Frame,r:TextRegion,tolerance=.01):TextRegion|undefined{
+ const angle=r.angle??0;if(Math.abs(angle-f.angle)>tolerance)return undefined;if(!angle&&!f.angle)return r;
  const cx=r.left+r.width/2,cy=r.top+r.height/2,c=turn(f,cx,cy,true),dx=c.x-cx,dy=c.y-cy;
  return dx||dy?{...r,left:r.left+dx,top:r.top+dy,baseline:r.baseline+dy,...r.glyphs?{glyphs:r.glyphs.map(g=>({...g,x0:g.x0+dx,x1:g.x1+dx}))}:{}}:r;
 }

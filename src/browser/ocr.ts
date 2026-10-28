@@ -9,6 +9,7 @@ import {inkMap,estimateSkew} from '../deskew';
 import {findSheet,sheetSize} from '../page-quad';
 import {unwarpPixels,mapSquare,type XY} from '../perspective';
 import {settleMarks} from '../glyph-edit';
+import {frameOf,turn} from '../ocr-regions';
 
 export type OcrProgress=(fraction:number,label:string)=>void;
 export type OcrReader='tesseract'|'paddle';
@@ -79,20 +80,30 @@ export function pageSheet(image:HTMLCanvasElement){
  return findSheet(g.getImageData(0,0,w,h).data,w,h)?.map(p=>({x:p.x/k,y:p.y/k}));
 }
 // Perspective bends each line differently, so a photographed sheet is read
-// flattened to a rectangle, then every region's box is carried back onto the
-// photo through the same mapping (letter cells are dropped: they would lean).
+// flattened to a rectangle, then every region is carried back onto the photo
+// through the same mapping. Along one line perspective is close to a turn:
+// a region becomes the level box, turned along its mapped line, that holds
+// its mapped box, with its letter cells mapped along the line, so its letters
+// can be edited like a tilted page's. On a level flattened sheet boxes grow
+// over faint ink and marks settle first, as on a levelled copy.
 async function readSheet(image:HTMLCanvasElement,corners:XY[],options:OcrOptions){
  let {width,height}=sheetSize(corners);const k=Math.min(1,4000/Math.max(width,height));width=Math.max(1,Math.round(width*k));height=Math.max(1,Math.round(height*k));
  const src=image.getContext('2d',{willReadFrequently:true})!.getImageData(0,0,image.width,image.height);
- const flat=Object.assign(document.createElement('canvas'),{width,height});
- flat.getContext('2d')!.putImageData(new ImageData(unwarpPixels(src,corners,width,height),width,height),0,0);
+ const flat=Object.assign(document.createElement('canvas'),{width,height}),pixels=new ImageData(unwarpPixels(src,corners,width,height),width,height);
+ flat.getContext('2d',{willReadFrequently:true})!.putImageData(pixels,0,0);
  const at=(x:number,y:number)=>mapSquare(corners,x/width,y/height);
  return (await recognizeImage(flat,{...options,flatten:false})).map(r=>{
-  const box=[at(r.left,r.top),at(r.left+r.width,r.top),at(r.left+r.width,r.top+r.height),at(r.left,r.top+r.height)];
-  const left=Math.min(...box.map(p=>p.x)),top=Math.min(...box.map(p=>p.y)),right=Math.max(...box.map(p=>p.x)),bottom=Math.max(...box.map(p=>p.y));
-  const across=Math.hypot(box[1].x-box[0].x,box[1].y-box[0].y)/Math.max(1,r.width),down=Math.hypot(box[3].x-box[0].x,box[3].y-box[0].y)/Math.max(1,r.height);
+  const bg=[1,3,5].map(i=>parseInt((r.background||'#ffffff').slice(i,i+2),16)),b=r.angle?{x0:r.left,y0:r.top,x1:r.left+r.width,y1:r.top+r.height}:growToInk(pixels,{x0:r.left,y0:r.top,x1:r.left+r.width,y1:r.top+r.height},bg),cells=r.glyphs&&!r.angle?markCells(pixels,r,bg):r.glyphs;
+  // Flattened (possibly tilted) frame -> photo -> the line's turned frame.
+  const f=frameOf(r),onPhoto=(x:number,y:number)=>{const p=turn(f,x,y);return at(p.x,p.y);},middle=(b.y0+b.y1)/2,start=onPhoto(b.x0,middle),end=onPhoto(b.x1,middle),centre=onPhoto((b.x0+b.x1)/2,middle);
+  const line={angle:Math.atan2(end.y-start.y,end.x-start.x)*180/Math.PI,cx:centre.x,cy:centre.y},local=(x:number,y:number)=>{const p=onPhoto(x,y);return turn(line,p.x,p.y,true);};
+  const q=[local(b.x0,b.y0),local(b.x1,b.y0),local(b.x1,b.y1),local(b.x0,b.y1)],x0=Math.min(...q.map(p=>p.x)),x1=Math.max(...q.map(p=>p.x)),y0=Math.min(...q.map(p=>p.y)),y1=Math.max(...q.map(p=>p.y));
+  // The box's own centre is its turning point.
+  const mid=turn(line,(x0+x1)/2,(y0+y1)/2),dx=mid.x-(x0+x1)/2,dy=mid.y-(y0+y1)/2;
+  const across=Math.hypot(end.x-start.x,end.y-start.y)/Math.max(1,b.x1-b.x0),down=(y1-y0)/Math.max(1,b.y1-b.y0);
   const {glyphs:_,angle:_angle,...rest}=r;
-  return {...rest,left,top,width:right-left,height:bottom-top,size:r.size*down,baseline:at(r.left+r.width/2,r.baseline).y,
+  return {...rest,left:x0+dx,top:y0+dy,width:x1-x0,height:y1-y0,angle:line.angle,size:r.size*down,baseline:local((b.x0+b.x1)/2,r.baseline).y+dy,
+   ...(cells?{glyphs:cells.map(g=>({...g,x0:local(g.x0,middle).x+dx,x1:local(g.x1,middle).x+dx}))}:{}),
    ...(r.words?{words:r.words.map(w=>w.width===undefined?w:{...w,width:w.width*across})}:{}),
    ...(r.line?{line:{...r.line,words:r.line.words.map(w=>w.width===undefined?w:{...w,width:w.width*across})}}:{})};
  });

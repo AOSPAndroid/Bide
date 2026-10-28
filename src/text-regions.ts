@@ -3,8 +3,9 @@ export type TextRegion={id:string;text:string;script?:string;left:number;top:num
  original?:TextRegion;layer?:string;
  // Why the OCR may have misread this field (see ocr-checks.ts).
  doubt?:string;
- // A line on a tilted page: its box, baseline and letter cells are level, and
- // it lies on the page turned clockwise by this many degrees about the box's centre.
+ // A line on a tilted page or a sheet photographed at an angle: its box,
+ // baseline and letter cells are level, and it lies on the page turned
+ // clockwise by this many degrees about the box's centre.
  angle?:number};
 // The bundled face replacing a PDF font that cannot draw the new text: a
 // metric-compatible one where it exists, so the line keeps its width and look

@@ -37,8 +37,9 @@ function levelRaster(raster:HTMLCanvasElement,f:Frame,k:number,fill:string){
  const out=document.createElement('canvas');out.width=raster.width;out.height=raster.height;const g=out.getContext('2d',{willReadFrequently:true})!;
  g.fillStyle=fill;g.fillRect(0,0,out.width,out.height);g.translate(f.cx*k,f.cy*k);g.rotate(-f.angle*Math.PI/180);g.translate(-f.cx*k,-f.cy*k);g.drawImage(raster,0,0);return out;
 }
-// The page's lines in a frame (lines tilted otherwise are left out).
-const framed=(f:Frame,regions:TextRegion[])=>regions.flatMap(r=>{const m=inFrame(f,r);return m?[m]:[];});
+// The page's lines in a frame (lines tilted otherwise are left out; `near`
+// lets in those within 3°, placed by their centre, to find neighbours).
+const framed=(f:Frame,regions:TextRegion[],near=false)=>regions.flatMap(r=>{const m=inFrame(f,r,near?3:undefined);return m?[m]:[];});
 // A layer made in a tilted line's level frame, turned onto the page with it
 // (layers turn about their top left corner).
 function turnLayer<T extends FabricObject>(o:T,region:TextRegion){
@@ -127,7 +128,7 @@ export async function scanPageText(p:Page,c:Canvas,{signal,grouping,thorough,lan
 async function suggestFont(raster:HTMLCanvasElement,regions:TextRegion[]){
  const picked=regions.filter(r=>(r.confidence??0)>=85&&r.text.replace(/\s/g,'').length>=4&&r.height>=8).sort((a,b)=>b.width*b.height-a.width*a.height).slice(0,6),f=picked.length?frameOf(picked[0]):undefined;
  const ctx=(f?levelRaster(raster,f,1,picked[0].background||'#ffffff'):raster).getContext('2d',{willReadFrequently:true})!;
- const samples=(f?framed(f,picked):picked).map(r=>{
+ const samples=(f?framed(f,picked,true):picked).map(r=>{
   const left=Math.max(0,Math.floor(r.left-2)),top=Math.max(0,Math.floor(r.top-2)),width=Math.min(raster.width-left,Math.ceil(r.width+4)),height=Math.min(raster.height-top,Math.ceil(r.height+4));
   const hex=r.background||'#ffffff';return {text:r.text,pixels:ctx.getImageData(left,top,width,height),background:[1,3,5].map(i=>parseInt(hex.slice(i,i+2),16))};
  });
@@ -190,7 +191,7 @@ export async function matchedDetectedTextbox(region:TextRegion,c:Canvas,p:Page,r
  // page does not have. Font, size and position are fitted at page scale; the
  // softness of a PDF page is measured on a render with ~32 px letters.
  // A tilted line is fitted level, on the page turned back about its centre.
- const pdf=!!p.source,f=frameOf(region),fill=region.background||'#ffffff',regionsAll=framed(f,options.appearanceRegions??all);
+ const pdf=!!p.source,f=frameOf(region),fill=region.background||'#ffffff',regionsAll=framed(f,options.appearanceRegions??all,true);
  const raster=levelRaster(await pageComposite(c,p),f,1,fill),fit=await matchOcrAppearance(raster,region,regionsAll,options.ocrFont,{autoFont:options.autoFont,matchBlur:options.matchBlur&&!pdf,makeText});
  if(!fit)return detectedTextbox(region,{...options,pageInk:await ink(options.ocrFont)});
  const text=await makeText(region,fit.family);applyOcrAppearance(text,region,fit);
@@ -204,7 +205,7 @@ export async function matchedDetectedTextbox(region:TextRegion,c:Canvas,p:Page,r
 // image layer is rasterized once. Mutates the serialized `objects` list of the page.
 // A tilted line's area is a box in its level frame, turned with it.
 export async function coverOcrText(c:Canvas,p:Page,regions:TextRegion[],objects:unknown[],{mode,color,padding,others=[],onProgress}:{mode:ReplacementBackground;color:string;padding:number;others?:TextRegion[];onProgress?:(fraction:number)=>void}){
- const areas=regions.map(region=>{const f=frameOf(region);return {region,f,...ocrPatchBounds(region,padding,p,framed(f,others.filter(o=>o!==region&&o.kind==='ocr')))};});
+ const areas=regions.map(region=>{const f=frameOf(region);return {region,f,...ocrPatchBounds(region,padding,p,framed(f,others.filter(o=>o!==region&&o.kind==='ocr'),true))};});
  if(mode==='transparent'){
   const overlaps=(o:FabricObject)=>{const b=o.getBoundingRect();return areas.some(area=>{const a=turnedBounds(area.f,area);return b.left<a.left+a.width&&b.top<a.top+a.height&&b.left+b.width>a.left&&b.top+b.height>a.top;});};
   const images=c.getObjects().filter(o=>o instanceof FabricImage&&o.visible&&overlaps(o));

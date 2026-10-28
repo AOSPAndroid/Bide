@@ -69,6 +69,7 @@ test('a tilted line is a level box turned about its centre; lines tilted alike o
  const at=turn(f,150,100),d={...region('Due',at.x-50,at.y-10,100,20),angle:90,glyphs:[{ch:'D',x0:at.x-50,x1:at.x-40}]},m=inFrame(f,d);
  assert.ok(Math.abs(m.left-100)<1e-9&&Math.abs(m.top-90)<1e-9&&Math.abs(m.glyphs[0].x0-100)<1e-9,'it only shifts into the frame');
  assert.equal(inFrame(f,{...d,angle:45}),undefined,'a line tilted otherwise has no place in the frame');
+ const n=inFrame(f,{...d,angle:91},3);assert.ok(Math.abs(n.left-100)<1e-9&&Math.abs(n.top-90)<1e-9,'unless nearly level with it: then it is placed by its centre');
  const level=region('Level',0,0);assert.equal(inFrame(frameOf(level),level),level);assert.equal(inFrame(frameOf(level),a),undefined);
 });
 test('scaling keeps a tilted line\'s angle, and follows uneven scales',()=>{
