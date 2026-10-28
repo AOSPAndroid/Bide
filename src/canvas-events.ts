@@ -219,8 +219,8 @@ export function attachCanvasEvents(c:Canvas,d:CanvasEventDeps){
   };
   const targetAt=(e:Event)=>{const skip=c.skipTargetFind;c.skipTargetFind=false;try{return c.findTarget(e as MouseEvent).target;}finally{c.skipTargetFind=skip;}};
   const touchHooks:TouchHooks={cancel,
-    // Tools that act once where the finger lifts (or paint pixels at once) wait for it, so a slow pinch never triggers them.
-    wait:()=>['select','bucket','wand','object','mask'].includes(toolRef.current),
+    // Tools that act at once where the finger lands wait until it lifts (Move and the mask brush: until it moves), so a slow pinch never triggers them.
+    wait:()=>['bucket','wand','object'].includes(toolRef.current)?'lift':['select','mask'].includes(toolRef.current),
     // Move tool: one finger scrolls unless it lands on the selected, unlocked layer (tap a layer first to move it).
     dragPans:e=>{if(toolRef.current!=='select'||loading.current)return false;const t=targetAt(e);return !t||!!t.lockMovementX||!c.getActiveObjects().concat(c.getActiveObject()??[]).includes(t);},
     // Long press = right-click: the layer menu.

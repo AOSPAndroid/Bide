@@ -14,6 +14,7 @@
    radial-gradient(farthest-side at 50% 0,#0005,#0000) top/100% 16px no-repeat scroll,
    radial-gradient(farthest-side at 50% 100%,#0005,#0000) bottom/100% 16px no-repeat scroll,
    var(--surface)}
+ .tool-group>div{gap:0}
  .tool-group button{width:44px;height:44px;min-height:44px;margin:0 auto}
  .tool-group button svg{width:20px;height:20px}
  .rail-bottom label,.rail-bottom button{width:44px;height:44px}

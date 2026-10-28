@@ -117,7 +117,7 @@ test('a pinch whose second finger lands late leaves no stroke, shape or move beh
  const late=(x0,y0,gap,driftX=0,driftY=0)=>[['touchStart',[[x0,y0]],driftX?10:gap],...(driftX?[['touchMove',[[x0+driftX/2,y0+driftY/2]]],['touchMove',[[x0+driftX,y0+driftY]],40]]:[]),
   ['touchStart',[[x0+driftX,y0+driftY],[x0+70,y0+30]]],...Array.from({length:6},(_,i)=>['touchMove',[[x0+driftX-(i+1)*6,y0+driftY-(i+1)*3],[x0+70+(i+1)*6,y0+30+(i+1)*3]]]),['touchEnd',[]]];
  const count=(await saved(page)).length;
- for(const tool of ['Brush','Rectangle','Text box']){
+ for(const tool of ['Brush','Rectangle','Text box','Paint bucket']){
   await page.locator(`.tool-rail button[aria-label="${tool}"]`).click();
   const z=await zoomOf(page);await touches(cdp,late(x-60,y,150));await page.waitForTimeout(400);
   assert.ok(await zoomOf(page)>z*1.2,`${tool}: the pinch zoomed`);
@@ -128,6 +128,10 @@ test('a pinch whose second finger lands late leaves no stroke, shape or move beh
  // One finger still draws.
  await page.locator('.tool-rail button[aria-label="Brush"]').click();
  await touches(cdp,drag(x-40,y,80,10,8));assert.equal((await saved(page)).length,count+1,'one finger drew');
+ await page.keyboard.press('Control+z');await page.waitForTimeout(500);
+ // A tap still fills (the bucket acts when the finger lifts).
+ await page.locator('.tool-rail button[aria-label="Paint bucket"]').click();
+ await touches(cdp,[['touchStart',[[x-60,y]],60],['touchEnd',[]]]);assert.equal((await saved(page)).length,count+1,'one tap filled');
  await page.keyboard.press('Control+z');await page.waitForTimeout(500);
  // Move tool: the selected headline, a finger that drifts 12 px, then the pinch.
  await page.locator('.tool-rail button[aria-label="Move & select"]').click();
@@ -149,6 +153,9 @@ test('editing small text zooms it to a readable size and keeps it above the keyb
  assert.ok(top>=ws.y&&bottom<=ws.y+ws.height,`the text (${top}–${bottom}) is in the visible workspace (${ws.y}–${ws.y+ws.height})`);
  assert.equal(await page.evaluate(()=>scrollY),0,'the app itself did not scroll');
  assert.equal((await editing(page))?.value,'DESIGNED TO BEGIN AGAIN','still editing');
+ // The typing textarea sits at the caret, which is what the browser keeps above the keyboard.
+ const ta=await page.evaluate(()=>document.activeElement.getBoundingClientRect().top);
+ assert.ok(ta>=ws.y&&ta<=ws.y+ws.height,`the hidden textarea (${ta}) is at the visible text`);
  await context.close();
 });
 
@@ -192,6 +199,7 @@ test('zoom and tool controls are finger-sized and the page fills the phone; desk
   const bar=await page.evaluate(()=>{const b=document.querySelector('.options-bar'),r=document.querySelector('.tool-rail');return {overflow:b.scrollWidth-b.clientWidth,zoom:!!document.querySelector('.header-zoom')?.offsetParent,shadow:getComputedStyle(r).backgroundAttachment};});
   assert.ok(bar.overflow<=0&&!bar.zoom,`${device}: the options bar fits without its duplicate zoom`);
   assert.match(bar.shadow,/local/,`${device}: the rail shows when more tools are scrolled away`);
+  if(device==='tablet')assert.ok(await page.evaluate(()=>{const r=document.querySelector('.tool-rail');return r.scrollHeight<=r.clientHeight;}),'tablet: every tool fits the rail');
   if(device!=='tablet'){
    const fit=await page.evaluate(()=>{const w=document.querySelector('.canvas-workspace'),a=document.querySelector('.artboard').getBoundingClientRect();return {page:a.width,room:w.clientWidth,overflow:w.scrollWidth-w.clientWidth};});
    assert.ok(fit.page>=fit.room*.85&&fit.overflow<=0,`${device}: the page fills the width (${fit.page} of ${fit.room})`);
