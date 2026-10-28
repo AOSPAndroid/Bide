@@ -86,12 +86,15 @@ test('a bold label and a regular value on one line keep their own weights',{time
   const region=page.locator('button[aria-label^="Edit detected text: Nom du client: Dalil"]');await region.waitFor({timeout:180000});
   await (await ocrSetting(page,'Edit image text with')).selectOption('font');
   // The confirmation toast is brief; the saved text layer below is the real check.
-  await region.click();
+  // Appearance fitting can hold the main thread longer than Playwright's
+  // default action timeout on a CPU-only runner. Keep its normal action wait.
+  await region.click({timeout:120000});
   // Read the saved text layer and the weight of every character.
   const read=()=>page.evaluate(async()=>{const {restoreLocal}=await import('/src/model.ts');const o=(await restoreLocal())?.pages[0].canvas.objects.find(o=>o.recognizedKey?.startsWith('ocr:'));if(!o)return null;
    const at=i=>{const s=o.styles;if(Array.isArray(s)){for(const r of s)if(i>=r.start&&i<r.end&&r.style?.fontWeight)return r.style.fontWeight;return o.fontWeight;}return s?.[0]?.[i]?.fontWeight??o.fontWeight;};
    return {text:o.text,weights:Array.from(o.text).map((_,i)=>at(i)==='bold'?'B':'r').join('')};});
   let weights=null;for(let i=0;i<60&&!weights;i++){weights=await read();if(!weights)await page.waitForTimeout(500);}
+  assert.ok(weights,'the matched editable text layer was saved');
   assert.equal(weights.text,'Nom du client: Dalil REDOUANE');
   assert.match(weights.weights,/^B{14}.r{14}$/,'label bold, value regular: '+weights.weights);
   assert.deepEqual(errors,[]);
