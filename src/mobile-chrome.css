@@ -200,6 +200,15 @@
  .tool-rail .tool-flyout button.active{color:var(--accent)}
 }
 
+/* Short landscape phones use the small-screen footer, leaving too little
+   height for four tool groups and Color in one column. Keep the same 44px
+   targets in two columns, including the flyout's longer Select group. */
+@media (pointer:coarse) and (min-width:601px) and (max-width:820px) and (max-height:500px){
+ .tool-rail.grouped{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-content:start;align-items:start;width:102px;padding:4px;gap:4px}
+ .tool-rail.grouped .rail-bottom{grid-column:1/-1;flex-direction:row;justify-content:center;margin-top:0;padding-top:4px}
+ .tool-flyout{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:max-content;max-width:calc(100vw - 8px)}
+}
+
 /* The OCR settings sheet covers the bar on phones: Done closes it (desktop closes it with the summary). */
 .ocr-settings-done{display:none}
 @media (max-width:600px){.ocr-settings-done{display:flex;position:sticky;top:0;z-index:1;margin:-4px 0 6px auto;min-width:64px;min-height:40px;font-size:14px;font-weight:600;color:var(--accent);background:var(--panel,#fff);border-radius:8px}}
