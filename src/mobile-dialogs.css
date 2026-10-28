@@ -6,6 +6,9 @@
 @media (max-width:600px),(max-height:500px){
  .modal{--modal-pad:18px;padding:var(--modal-pad);overscroll-behavior:contain}
  .modal .dialog-actions{position:sticky;bottom:calc(-1*var(--modal-pad));z-index:3;margin:16px calc(-1*var(--modal-pad)) calc(-1*var(--modal-pad));padding:10px var(--modal-pad) var(--modal-pad);background:var(--surface);border-top:1px solid var(--line)}
+ /* Native PDF editing adds a third action. Keep each touch target intact when
+    the three labels cannot share a row on a narrow phone. */
+ .modal .text-edit-actions{flex-wrap:wrap}
  .modal input:not([type=checkbox]):not([type=color]):not([type=range]),.modal select,.modal textarea,.pdf-tool-search input{font-size:16px}
 }
 

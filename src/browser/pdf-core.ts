@@ -6,6 +6,7 @@ import * as mupdf from 'mupdf';
 import formFontUrl from './fonts/LiberationSans-Regular.ttf';
 
 import type {TextRegion} from '../text-regions';
+import {rewriteText,verifyRewrite,Unsafe} from './pdf-inplace';
 // Export-only dependencies are loaded when conversion is requested.
 async function svgToPdf(...args:Parameters<typeof import('./svg-pdf').svgToPdf>){return (await import('./svg-pdf')).svgToPdf(...args);}
 
@@ -532,6 +533,20 @@ export function detectPdfText(source:string,index:number){
 export async function removePdfText(source:string,index:number,regionId:string){
  const region=detectPdfText(source,index).regions.find(r=>r.id===regionId);if(!region)throw new Error('Text changed. Select the detected text again.');const data=sources.get(source)!;const doc=open(data) as mupdf.PDFDocument;const page=doc.loadPage(index);
  try{if(page.getAnnotations().some(a=>a.getType()==='Redact'))throw new Error('This page has pending redactions. Resolve them before editing text.');const links=page.getLinks().map(link=>({bounds:link.getBounds(),uri:link.getURI()}));const annotation=page.createAnnotation('Redact');annotation.setQuadPoints(region.quads as mupdf.Quad[]);page.applyRedactions(false,mupdf.PDFPage.REDACT_IMAGE_NONE,mupdf.PDFPage.REDACT_LINE_ART_NONE,mupdf.PDFPage.REDACT_TEXT_REMOVE);const remaining=page.getLinks().map(link=>({bounds:link.getBounds(),uri:link.getURI()}));for(const link of links)if(!remaining.some(other=>other.uri===link.uri&&other.bounds.every((v,i)=>v===link.bounds[i])))page.createLink(link.bounds,link.uri).destroy();return await register(bytesOf(doc.saveToBuffer(opts)));}finally{page.destroy();doc.destroy();}
+}
+
+// The line drawn again in its own font with `text` (see pdf-inplace.ts), as a
+// new source; or why it cannot be, for the text-box path.
+export async function replacePdfText(source:string,index:number,regionId:string,text:string):Promise<{id:string;data:string}|{fallback:string}>{
+ const {regions}=detectPdfText(source,index),region=regions.find(r=>r.id===regionId);if(!region)throw new Error('Text changed. Select the detected text again.');
+ const data=sources.get(source)!,doc=open(data) as mupdf.PDFDocument,scratch=open(data) as mupdf.PDFDocument,original=open(data) as mupdf.PDFDocument;let saved:mupdf.Document|undefined;
+ try{
+  const predicted=rewriteText(doc,scratch,index,region,regions,text),bytes=bytesOf(doc.saveToBuffer(opts));
+  saved=open(bytes);if(saved.countPages()!==original.countPages())throw new Unsafe('The rewrite changed the pages.');
+  const before=original.loadPage(index),after=saved.loadPage(index);try{verifyRewrite(before,after,region,predicted);}finally{before.destroy();after.destroy();}
+  return await register(bytes);
+ }catch(e){if(e instanceof Unsafe)return {fallback:e.message};console.warn('In-place text edit failed:',e);return {fallback:'This line could not be rewritten safely.'};}
+ finally{saved?.destroy();original.destroy();scratch.destroy();doc.destroy();}
 }
 
 export type PageRect = { left: number; top: number; width: number; height: number };

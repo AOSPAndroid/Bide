@@ -7,13 +7,15 @@ import type {TextRegion} from './text-regions';
 
 // Edit one detected line: the new text is drawn with the image's own letters
 // when they are available. Unavailable lettering leaves the original unchanged.
-export function EditTextDialog({region,pending=false,close,apply}:{region:TextRegion;pending?:boolean;close:()=>void;apply:(text:string)=>void}){
- const [value,setValue]=useState(region.text),doubts=useDoubts(value,value===region.text?doubtfulLetters(region):[]);
- return <ModalShell title="Edit image text" close={close}>
-  <p className="muted">Changes reuse this line's own letters and sharpness. If the original lettering cannot be preserved, nothing is changed. A replacement font is used only when you explicitly choose New font in OCR settings.</p>
+// A digital PDF's line is written again in its own font; `asTextbox` opens it
+// as a text layer instead.
+export function EditTextDialog({region,pending=false,close,apply,asTextbox}:{region:TextRegion;pending?:boolean;close:()=>void;apply:(text:string)=>void;asTextbox?:(text:string)=>void}){
+ const [value,setValue]=useState(region.text),doubts=useDoubts(value,value===region.text?doubtfulLetters(region):[]),pdf=region.kind==='pdf';
+ return <ModalShell title={pdf?'Edit PDF text':'Edit image text'} close={close}>
+  <p className="muted">{pdf?'Apply edits the PDF in its original font. If an exact edit is unavailable, your document and input stay unchanged unless you explicitly allow New font. New font text box permits a replacement typeface and may change the appearance.':"Changes reuse this line's own letters and sharpness. If the original lettering cannot be preserved, nothing is changed. A replacement font is used only when you explicitly choose New font in OCR settings."}</p>
   <label className="stacked-label">Text<input aria-label="New text" value={value} onChange={e=>setValue(e.target.value)} onKeyDown={e=>{if(!pending&&e.key==='Enter'&&value!==region.text)apply(value);}}/></label>
   <DoubtList doubts={doubts} onPick={(d,s)=>setValue(v=>applySuggestion(v,d,s))}/>
-  <div className="dialog-actions"><button className="secondary" onClick={close}>Cancel</button><button className="primary" disabled={pending||!value.trim()||value===region.text} onClick={()=>apply(value)}>{pending?'Applying…':'Apply'}</button></div>
+  <div className="dialog-actions text-edit-actions"><button className="secondary" disabled={pending} onClick={close}>Cancel</button>{asTextbox&&<button className="secondary" disabled={pending} onClick={()=>asTextbox(value)}>New font text box</button>}<button className="primary" disabled={pending||!value.trim()||value===region.text} onClick={()=>apply(value)}>{pending?'Applying…':'Apply'}</button></div>
  </ModalShell>;
 }
 

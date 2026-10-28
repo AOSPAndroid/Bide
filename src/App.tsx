@@ -27,6 +27,7 @@ import {autosave,blankPage,demoProject,download,restoreLocal,safeName,uid,type P
 import Signature,{placeInk} from './Signature';
 import {saveExport} from './export-save';
 import {engineHealth,restoreSources,importDocument,exportInBrowser,removePdfText,pagePreview,fontSupportsText,findPdfText,redactPdf,pdfFormFields,fillPdfField,sanitizePdf} from './browser/engine';
+import {replacePdfText} from './browser/engine';
 import PDFPreview from './browser/PDFPreview';
 import {StampForm,CropForm,PasswordForm,type StampOptions,type CropMargins} from './DocumentTools';
 import {selectPages} from './page-range';
@@ -407,29 +408,49 @@ export default function App() {
   }
   async function validateTextFont(o:Obj){
     const data=o.pdfFontData;if(!(o instanceof Textbox)||!data||!o.fontFamily.startsWith('PDFfont-'))return;
-    const text=o.text;if(await fontSupportsText(data,text))return;
-    if(!canvas.current?.getObjects().includes(o)||o.text!==text||!o.fontFamily.startsWith('PDFfont-'))return;
+    const text=o.text,family=o.fontFamily;if(await fontSupportsText(data,text))return;
+    if(!canvas.current?.getObjects().includes(o)||o.text!==text||o.fontFamily!==family||(o as Obj).pdfFontData!==data)return;
     fail(new Error('The embedded PDF font does not contain some typed characters. Your text and font were kept. Remove those characters or choose Font family explicitly before downloading.'));
   }
-  async function editDetectedText(region:TextRegion){
-    if(busy||loading.current)return;const originalPage=page;setBusy('Making text editable…');
+  // Native PDF edits first use their original text operators. A text layer is
+  // an explicit alternative; substituting its font still needs New font mode.
+  async function editDetectedText(region:TextRegion,asTextbox?:{text?:string;note?:string;allowNewFont?:boolean}){
+    if(busy||loading.current)return;if(region.kind==='pdf'&&!asTextbox){setTextEdit(region);return;}const originalPage=page;setBusy('Making text editable…');
     try{if(region.kind==='ocr'&&ocr.background==='transparent'&&originalPage.source)throw new Error('Unlock Original PDF first to clear scanned text to transparency.');
-      const exactFontError='The exact PDF font is unavailable for this text. Original PDF font mode keeps this page unchanged. Choose New font explicitly in OCR settings to allow a metric-compatible replacement.';
-      const native=region.kind==='pdf',canDraw=native&&region.fontData&&region.fontId?await fontSupportsText(region.fontData,region.text):false;
-      if(native&&!canDraw&&ocr.editMode!=='font')throw new Error(exactFontError);
-      const editableRegion=native&&!canDraw?{...region,fontData:undefined,fontId:undefined}:region;
+      const exactFontError='The exact PDF font is unavailable for this text. Original PDF font mode keeps this page unchanged. Choose New font text box explicitly to allow a metric-compatible replacement.';
+      const shown=asTextbox?.text===undefined?region:{...region,text:asTextbox.text};
+      const native=region.kind==='pdf',allowNewFont=ocr.editMode==='font'||!!asTextbox?.allowNewFont,canDraw=native&&region.fontData&&region.fontId?await fontSupportsText(region.fontData,shown.text):false;
+      if(native&&!canDraw&&!allowNewFont)throw new Error(exactFontError);
+      const editableRegion=native&&!canDraw?{...shown,fontData:undefined,fontId:undefined}:shown;
       const {text,embedded}=await matchedDetectedTextbox(editableRegion,canvas.current!,originalPage,pageOcrRegions.current.get(originalPage.id)??textRegions,{ocrFont:ocr.font,ocrStyle:ocr.style,matchBlur:ocr.matchBlur,autoFont:!ocrFontChosen.current,appearanceRegions:textRegions});
-      if(native&&!embedded&&ocr.editMode!=='font')throw new Error(exactFontError);
+      if(native&&!embedded&&!allowNewFont)throw new Error(exactFontError);
       let nextSource=originalPage.source,nextData:string|undefined;
       if(region.kind==='pdf'&&originalPage.source){const result=await removePdfText(originalPage.source,originalPage.index,region.id);nextSource=result.id;nextData=result.data;}
       if(pageIdRef.current!==originalPage.id)return;const current=capture();const objects=[...((current.pages.find(p=>p.id===originalPage.id)!.canvas.objects||[]) as unknown[])].filter(o=>!region.layer||(o as {id?:string}).id!==region.layer);
       if(region.kind==='ocr')await coverOcrText(canvas.current!,originalPage,[region],objects,{mode:ocr.background,color:ocr.color,padding:ocr.padding,others:textRegions,onProgress:f=>setBusy(`AI filling background… ${Math.round(f*100)}%`)});
       if(pageIdRef.current!==originalPage.id)return;
       objects.push(text.toObject());pendingTextEdit.current=text.id;setTool('select');const before=projectRef.current;setTextRegions([]);commit({...current,sources:nextData&&nextSource?{...current.sources,[nextSource]:nextData}:current.sources,pages:current.pages.map(p=>p.id===originalPage.id?{...p,source:nextSource,color:region.kind==='ocr'&&ocr.background==='transparent'?'transparent':p.color,canvas:{...p.canvas,objects},thumb:undefined}:p)},true);
+      if(native)setTextEdit(null);
       // OCR fields stay as they are (a PDF's own text is read again, quickly, from its new source).
       if(region.kind==='ocr'){const rest=textRegions.filter(r=>r.id!==region.id);keepRegions(before,originalPage.id,textRegions);keepRegions(projectRef.current,originalPage.id,rest);setTextRegions(rest);}
-      notify(region.kind==='ocr'?(ocr.background==='transparent'?'Old image text cleared to transparency. Undo restores the cleared area.':'OCR text is editable. Check recognition, font and background patch.'):embedded?'Editing with the embedded PDF font.':'Text is editable using a matching bundled font.');
+      notify(asTextbox?.note??(region.kind==='ocr'?(ocr.background==='transparent'?'Old image text cleared to transparency. Undo restores the cleared area.':'OCR text is editable. Check recognition, font and background patch.'):embedded?'Editing with the embedded PDF font.':'Text is editable using a matching bundled font.'));
     }catch(e){fail(e);}finally{setBusy('');}
+  }
+  // A digital PDF's line is written again in its own font, in place (pdf-inplace.ts);
+  // Unsafe rewrites preserve the document and input; only an explicit New font
+  // choice permits the existing replacement-text path.
+  async function editPdfText(region:TextRegion,text:string){
+    const originalPage=page;if(busy||loading.current||!originalPage.source)return;setBusy('Writing the new text into the PDF…');let why='';
+    try{const result=await replacePdfText(originalPage.source,originalPage.index,region.id,text);
+      if('fallback' in result)why=result.fallback;
+      else if(pageIdRef.current===originalPage.id){const current=capture();setTextEdit(null);setTextRegions([]);
+        commit({...current,sources:{...current.sources,[result.id]:result.data},pages:current.pages.map(p=>p.id===originalPage.id?{...p,source:result.id,thumb:undefined}:p)},true);
+        notify("Edited in the PDF's own font. Undo restores the original.");}
+    }catch(e){fail(e);}finally{setBusy('');}
+    if(why&&pageIdRef.current===originalPage.id){
+      if(ocr.editMode==='font')await editDetectedText(region,{text,note:`${why} New font was explicitly selected; the line is now an editable text box.`});
+      else fail(new Error(`${why} Cannot preserve the original PDF lettering for this edit. Nothing was changed and your input was kept. Choose New font text box explicitly to allow a replacement font.`));
+    }
   }
 
   // Replace OCR regions in one undo step (see ocr-replace.ts).
@@ -451,7 +472,7 @@ export default function App() {
     }catch(e){fail(e);return false;}finally{if(earlier.length&&pageIdRef.current===originalPage.id){earlier.forEach(({o,at})=>c.insertAt(at,o));c.requestRenderAll();}setBusy('');}
   }
   const convertAllDetectedText=async()=>{if(ocr.editMode!=='font'){fail(new Error('Convert all creates new font text. Choose New font explicitly in OCR settings first.'));return;}await replaceOcrRegions(textRegions.filter(r=>r.kind==='ocr').map(region=>({region})),{letters:false,done:(_,n)=>`${n} text regions are now crisp editable text. Undo restores the original.`});};
-  const editRegionText=async(region:TextRegion,text:string)=>{if(await replaceOcrRegions([{region,text}],{letters:true,done:lettersNote}))setTextEdit(null);};
+  const editRegionText=async(region:TextRegion,text:string)=>{if(region.kind==='pdf'){await editPdfText(region,text);return;}if(await replaceOcrRegions([{region,text}],{letters:true,done:lettersNote}))setTextEdit(null);};
   const findAndReplace=async(find:string,replacement:string,matchCase:boolean)=>{const matches=findMatches(textRegions,find,matchCase);if(await replaceOcrRegions(matches.map(region=>({region,text:replaceText(region.text,find,replacement,matchCase)})),{letters:ocr.editMode==='letters',done:(l,f)=>`Replaced in ${l+f} line${l+f===1?'':'s'}. `+(ocr.editMode==='letters'?lettersNote(l,f):'Undo restores the original.')}))setFindOpen(false);};
 
   // Selection helpers -----------------------------------------------------
@@ -1177,7 +1198,7 @@ export default function App() {
     {modal==='crop'&&<ModalShell title="Crop page" close={()=>setModal(null)}><CropForm width={page.width} height={page.height} onApply={crop=>runExport({format:'pdf',range:String(project.pages.findIndex(p=>p.id===pageId)+1),crop,reimport:true})}/></ModalShell>}
     {modal==='signature'&&<ModalShell title="Your signature, your way" close={()=>setModal(null)}><Signature onAdd={(value,drawn,inkColor,ink)=>{if(drawn)void addImage(value,'Signature',ink&&placeInk(ink,page.width,page.height));else addObject(new Textbox(value,{left:70,top:page.height-170,width:380,fontFamily:'cursive',fontStyle:'italic',fontSize:44,fill:inkColor}),'Signature');setModal(null);}}/></ModalShell>}
     {modal==='new'&&<ModalShell title="Start with a blank canvas" close={()=>setModal(null)}><p className="muted">Create a document, a design, or something in between. Your previous workspace remains available with Undo.</p><label className="stacked-label">Document name<input value={newName} onChange={e=>setNewName(e.target.value)}/></label><div className="preset-grid">{[{name:'A4 document',w:595,h:842,detail:'210 × 297 mm'},{name:'US Letter',w:612,h:792,detail:'8.5 × 11 in'},{name:'Square canvas',w:1080,h:1080,detail:'1080 × 1080'},{name:'Presentation',w:1280,h:720,detail:'16:9 landscape'}].map(p=><button className={newWidth===p.w&&newHeight===p.h?'active':''} key={p.name} onClick={()=>{setNewWidth(p.w);setNewHeight(p.h);}}><FileText size={22}/><strong>{p.name}</strong><span>{p.detail}</span></button>)}</div><div className="field-grid"><Field label="Width" value={newWidth} min={50} max={5000} onChange={setNewWidth}/><Field label="Height" value={newHeight} min={50} max={5000} onChange={setNewHeight}/></div><p className="fine-print">PDF dimensions use points (72 points = 1 inch).</p><div className="dialog-actions"><button className="secondary" onClick={()=>setModal(null)}>Cancel</button><button className="primary" onClick={()=>{const p=blankPage(newWidth,newHeight);p.name='Page 1';commit({version:1,name:newName||'Untitled',pages:[p],sources:{}},true);setPageId(p.id);setModal(null);}}>Create document<ArrowUpRight size={15}/></button></div></ModalShell>}
-    {textEdit&&<EditTextDialog region={textEdit} pending={!!busy} close={()=>setTextEdit(null)} apply={text=>editRegionText(textEdit,text)}/>}
+    {textEdit&&<EditTextDialog region={textEdit} pending={!!busy} close={()=>{if(!busy)setTextEdit(null);}} apply={text=>editRegionText(textEdit,text)} asTextbox={textEdit.kind==='pdf'?text=>{void editDetectedText(textEdit,{text,allowNewFont:true});}:undefined}/>}
     {colorRange&&<ColorRangeDialog initial={color} preview={previewColorRange} apply={()=>{setColorRange(null);setTool(t=>['marquee','lasso','wand','object'].includes(t)?t:'wand');}} close={()=>{setRegion(colorRange.before);setColorRange(null);}}/>}
     {modal==='imagesize'&&<ImageSizeDialog width={page.width} height={page.height} close={()=>setModal(null)} apply={resizeImage}/>}
     {modal==='canvassize'&&<CanvasSizeDialog width={page.width} height={page.height} close={()=>setModal(null)} apply={resizeCanvas}/>}

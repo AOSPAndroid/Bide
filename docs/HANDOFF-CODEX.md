@@ -1,5 +1,7 @@
 # Handoff to Codex: phones and the open → edit → download flow
 
+Current update: `claude/lucid-fermat-jvmf9l` through `6c8d676` adds native PDF text rewrites. The older handoff below describes the preceding batch; current integration notes at the end record the safeguards retained during merging.
+
 `main` (9e37c66) already has the OCR, scanned-PDF and pinch-zoom work up to 6be8fcf, and your original-letters rule. Everything below is on `claude/lucid-fermat-jvmf9l` and not on `main` yet.
 
 ## 1. Merge
@@ -88,7 +90,7 @@ The owner's target flow: open a file → it is scanned with the best method, no 
 
 ## 4. Not done yet (do not assume it is)
 
-- Digital PDF edits still replace the line with a text layer. Rewriting the text in place, in the PDF's own font codes, matched a regenerated document exactly in a prototype, but it is not built.
+- Native PDF in-place editing was subsequently implemented in `c1519a8` / `30b0fc9` and integrated below. Unsupported fonts, glyphs, layouts or uncertain new letter-pair spacing still require refusal or an explicit replacement-font choice.
 - Typographic ’ and − come back as ' and -; – and ★ are missing from the Latin recognizer's dictionary.
 - veraPDF was not run on the Factur-X PDFs.
 
@@ -100,7 +102,17 @@ Privacy: never commit anything from `tests/real/` (private user documents; git-i
 - Scanner-text downloads now remove the whole old OCR field, even when the visible edit patch covers only a changed suffix. The download regression compares every extracted token, including unchanged neighbouring text, and covers deletion.
 - Explicit Export PDF and Protect PDF commands still select PDF; the general download button keeps the new same-kind image default.
 - Font fidelity takes priority over making an edit succeed: scans reuse only their own line's pixels. Native PDF text requires a usable original embedded font unless the user explicitly chooses New font. Newly typed characters missing from an embedded font are kept with an error; export is blocked until the user removes them or explicitly chooses another font. No automatic substitute is allowed at download time.
-- The exact native PDF rewrite mentioned above remains unbuilt. A metric-compatible replacement is still available through the explicit New font choice.
+- The native PDF rewrite was unbuilt at this earlier integration; the subsequent native PDF integration below addresses that gap. A metric-compatible replacement remains available through an explicit New font choice.
 - On all four tilted fixtures, the edited line was measured at 300% both before and after editing. Edge-width changes were -0.24%, -8.67%, +2.44% and +2.32%; the comparison with a different reference line can otherwise suggest blur that was already present in the edited line. Existing pixel, angle, size and sharpness assertions were retained.
 - Final validation: 244 unit tests, 238 passed and six existing Windows-only platform skips; all 79 browser cases across the 29 files passed in partitions, including the new native-font guard case. No browser case was skipped or disabled. Three phone OCR settings cases also passed again after the font guard.
 - `npm run bench:ocr -- tesseract ai` completed all 17 pages for each engine. AI: 1.2170% line character error, 96.2760% words found, 97.3113% right; Tesseract: 12.1440%, 81.0209%, 91.1600%. Both AI angle pages found and correctly read all words. All AI outputs matched the earlier AI-only run; font safeguards do not alter recognition. These recognition scores do not measure the appearance of an edit; the image-patch and 300% checks above do.
+
+## Native PDF integration — 2026-10-28
+
+- The whole branch through `6c8d676` is integrated with the preceding original-letter, scanner-text, export and licence safeguards. The native editor changes PDF text operators in their original font instead of rasterizing or substituting a font.
+- Default Apply never falls back automatically. If the edit is unsafe, the PDF and typed input stay intact. New font text box gives explicit consent for that field and uses the current typed text without changing the global mode; global New font remains available too. Existing text layers still keep unsupported typed input and block download until repaired or a new font is chosen.
+- Shared content checks follow other pages and annotation appearances, including nested Forms; incomplete depth/work checks refuse. This prevents an edit on one page from changing another page through shared objects.
+- New adjacent letter pairs require observed spacing in the same font. A PDF does not necessarily retain the producer's complete kerning tables; defaulting unseen pairs to zero produced visible spacing errors for AV and To. Those edits now refuse atomically. Numeric edits use original glyph advances and observed spacing, and successful reference comparisons are measured separately; they are not a universal guarantee for arbitrary text or producer typography.
+- Preserve every pixel-reference assertion and compare original font resources, embedded font-program bytes and ToUnicode maps in the PDF download. No private document belongs in the source tree or public build.
+- Validation for this integration: 263 unit tests, 257 passed and six existing Windows-only skips. All nine native-PDF/edit-flow browser cases passed; the Helvetica, pdfkit, Chromium and wider right-aligned examples each had zero differing pixels at 144 dpi, with unchanged original font programs and Unicode maps. The build and discovery checks passed.
+- The 17-page benchmark ran with both Tesseract and AI. All 34 recognized outputs were identical to the preceding integration. AI: 1.2170% character error, 96.2760% words found, 97.3113% right; Tesseract: 12.1440%, 81.0209%, 91.1600%. Recognition scores are separate from the font and rendered-edit checks.
