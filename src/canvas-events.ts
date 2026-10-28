@@ -125,7 +125,7 @@ export function attachCanvasEvents(c:Canvas,d:CanvasEventDeps){
     if(t==='mask'){
       const target=retouchTarget.current;
       if(!target||target.lockMovementX||!c.getObjects().includes(target)||target instanceof ActiveSelection){notify('Select one unlocked layer, then paint its mask.');return;}
-      const m=paintRef.current.maskBrush;maskStroke=createMaskBrush(target,m);maskStroke.to({x:e.scenePoint.x,y:e.scenePoint.y});return;
+      const m=paintRef.current.maskBrush;maskStroke=createMaskBrush(target,m,touch(e.e));maskStroke.to({x:e.scenePoint.x,y:e.scenePoint.y});return;
     }
     if(t==='marquee'||t==='lasso'||t==='wand'||t==='object'){
       const target=selectionLayer();
@@ -209,6 +209,8 @@ export function attachCanvasEvents(c:Canvas,d:CanvasEventDeps){
     f._groupSelector=null;tapText=null;zoomDrag=null;pan=null;retouch.current?.cancel();
     if(shape){c.remove(shape);shape=null;}
     if(gradientDrag){c.remove(gradientDrag.line);gradientDrag=null;}
+    // The mask pixels painted so far go; with maskStroke gone, the lift saves no history step.
+    if(maskStroke){maskStroke.cancel();maskStroke=null;}
     if(selectionDrag){setRegion(selectionDrag.prior);selectionDrag=null;}
     if(cropStart){cropStart=null;setCrop(cropBefore);}
     const pen=penRef.current;if(pen?.dragging){pen.dragging=false;pen.anchors.pop();if(pen.anchors.length)setPenPreview({anchors:[...pen.anchors]});else{penRef.current=null;setPenPreview(null);}}

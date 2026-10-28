@@ -141,6 +141,30 @@ test('a pinch whose second finger lands late leaves no stroke, shape or move beh
  await context.close();
 });
 
+test('a slow pinch with the Mask brush puts the mask back exactly, without a history step',{timeout:300000},async()=>{
+ const {context,page,cdp}=await boot();
+ // The first finger drifts 13 px, so the brush has painted, then the second lands.
+ const late=(x0,y0)=>[['touchStart',[[x0,y0]],10],['touchMove',[[x0+5,y0+4]]],['touchMove',[[x0+10,y0+8]],40],['touchStart',[[x0+10,y0+8],[x0+70,y0+30]]],...Array.from({length:6},(_,i)=>['touchMove',[[x0+10-(i+1)*6,y0+8-(i+1)*3],[x0+70+(i+1)*6,y0+30+(i+1)*3]]]),['touchEnd',[]]];
+ const drawer=async tab=>{await page.locator('.small-properties-button').tap();await page.locator('.panel-tabs button',{hasText:tab}).tap();await page.waitForTimeout(300);};
+ const steps=async()=>{await drawer('History');const n=await page.locator('.inspector .history-list button').count();await page.locator('.small-properties-button').tap();return n;};
+ // Hiding and showing the layer saves it as it is now, mask pixels and all.
+ const live=async()=>{await drawer('Layers');for(const a of ['Hide','Show']){await page.locator(`button[aria-label="${a} Sage circle"]`).tap();await page.waitForTimeout(200);}
+  await page.locator('.small-properties-button').tap();return (await saved(page)).find(o=>o.name==='Sage circle').clipPath?.src??null;};
+ const fit=async()=>{await page.locator('.zoom-controls button[aria-label="Fit to screen"]').click();await page.waitForTimeout(400);};
+ const pinch=async()=>{const [x,y]=await at(page,190,561),before=await saved(page),n=await steps();
+  await touches(cdp,late(x,y));await page.waitForTimeout(400);await fit();
+  assert.deepEqual(await saved(page),before,'nothing saved');assert.equal(await steps(),n,'no history step');};
+ await page.touchscreen.tap(...await at(page,209,561));await page.waitForTimeout(450);
+ await pickTool(page,'Mask brush');
+ // A layer without a mask gets none.
+ await pinch();assert.equal(await live(),null,'the layer has no mask');
+ // A real stroke masks it; a pinch then leaves those pixels exactly as they were.
+ await touches(cdp,drag(...await at(page,170,561),80,0,8));await page.waitForTimeout(300);
+ const mask=(await saved(page)).find(o=>o.name==='Sage circle').clipPath?.src;assert.ok(mask,'one finger painted a mask');
+ await pinch();assert.equal(await live(),mask,'the mask is pixel-identical');
+ await context.close();
+});
+
 test('editing small text zooms it to a readable size and keeps it above the keyboard',{timeout:300000},async()=>{
  const {context,page}=await boot('android');
  // Footer: 9 pt at (44,757), near the bottom of the page.
