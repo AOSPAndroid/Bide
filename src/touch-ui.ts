@@ -1,11 +1,13 @@
 // Small hooks for the phone and touch layout of the editor chrome.
 import {useEffect,useRef,useSyncExternalStore} from 'react';
 
-// True on touch-first devices (phones, tablets): no hover, no Alt key, no tooltips.
-const coarse=()=>globalThis.matchMedia?.('(pointer:coarse)');
-export function useCoarsePointer(){
- return useSyncExternalStore(change=>{const m=coarse();m?.addEventListener('change',change);return()=>m?.removeEventListener('change',change);},()=>!!coarse()?.matches,()=>false);
+// Whether a media query matches, following changes (rotation, resizing).
+export function useMedia(query:string){
+ const m=()=>globalThis.matchMedia?.(query);
+ return useSyncExternalStore(change=>{const l=m();l?.addEventListener('change',change);return()=>l?.removeEventListener('change',change);},()=>!!m()?.matches,()=>false);
 }
+// True on touch-first devices (phones, tablets): no hover, no Alt key, no tooltips.
+export const useCoarsePointer=()=>useMedia('(pointer:coarse)');
 
 // Scroll `row` into view inside `list` only; scrollIntoView would also scroll
 // the clipped app shell.

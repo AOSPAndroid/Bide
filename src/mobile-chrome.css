@@ -183,6 +183,23 @@
  .panel-context{font-size:11px!important}
  .selected-heading>div>span,.design-tools-body p,.design-tools-body label,.color-field,.slider-field>span,.fine-print,.layers-empty{font-size:12px}
 }
+/* Phones, upright or on their side: the grouped tool rail (ToolRail.tsx). One
+   button per group, its corner marked, so the rail never scrolls; the group's
+   flyout opens beside the rail over a scrim that takes the tap that closes it. */
+@media (max-width:600px),(pointer:coarse) and (max-height:500px){
+ .tool-rail.grouped{gap:2px}
+ .tool-rail.grouped .tool-group{padding:0;border:0}
+ .tool-rail.grouped .tool-group>div>button{-webkit-touch-callout:none;user-select:none}
+ .tool-rail.grouped .tool-group>div>button::after{content:'';position:absolute;right:3px;bottom:3px;border:3px solid transparent;border-right-color:currentColor;border-bottom-color:currentColor;opacity:.5}
+ .tool-flyout-scrim{position:fixed;inset:0;z-index:39}
+ .tool-flyout{position:fixed;z-index:40;display:flex;flex-direction:column;min-width:200px;max-height:calc(100dvh - 8px);overflow-y:auto;overscroll-behavior:contain;padding:4px;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 30px #25272d38}
+ .tool-rail .tool-flyout button{flex:none;flex-direction:row;justify-content:flex-start;width:100%;height:44px;min-height:44px;margin:0;padding:0 12px;gap:12px;border-radius:8px;color:var(--ink)}
+ .tool-rail .tool-flyout button>svg{width:20px;height:20px;flex:none}
+ .tool-rail .tool-flyout button>span{display:block;font-size:14px;white-space:nowrap}
+ .tool-rail .tool-flyout button>kbd{position:static;margin-left:auto;padding-left:12px;font-size:11px;opacity:1;color:var(--muted)}
+ .tool-rail .tool-flyout button.active{color:var(--accent)}
+}
+
 /* The OCR settings sheet covers the bar on phones: Done closes it (desktop closes it with the summary). */
 .ocr-settings-done{display:none}
 @media (max-width:600px){.ocr-settings-done{display:flex;position:sticky;top:0;z-index:1;margin:-4px 0 6px auto;min-width:64px;min-height:40px;font-size:14px;font-weight:600;color:var(--accent);background:var(--panel,#fff);border-radius:8px}}

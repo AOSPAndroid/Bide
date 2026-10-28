@@ -3,7 +3,7 @@
 // bar folds its actions behind More; drawers close from their own buttons or a
 // tap beside them; Clone Stamp picks its source with a tap. Desktop keeps its layout.
 import {test,before,after} from 'node:test';import assert from 'node:assert/strict';
-import {createServer} from 'vite';import {chromium} from 'playwright-core';import * as mupdf from 'mupdf';
+import {createServer} from 'vite';import {chromium} from 'playwright-core';import * as mupdf from 'mupdf';import {pickTool} from './rail.mjs';
 import {mkdtemp,writeFile} from 'node:fs/promises';import {tmpdir} from 'node:os';import {join} from 'node:path';
 
 const iphone={viewport:{width:390,height:844},deviceScaleFactor:2,isMobile:true,hasTouch:true};
@@ -54,11 +54,67 @@ check('finding 14: a labelled Menu button opens File…Help as a sheet; Find is 
  assert.deepEqual(await small(page,'.modal-header .icon-button'),[]);
 });
 
+// Phones group the tool rail: one button per group, a flyout for the rest.
+const railButtons=page=>page.locator('.tool-rail .tool-group>div>button');
+const railGroups=page=>railButtons(page).evaluateAll(bs=>bs.map(b=>b.title.split(': ')[1].split(', ')));
+const centre=async locator=>{const b=await locator.boundingBox();return [b.x+b.width/2,b.y+b.height/2];};
+async function longPress(cdp,[x,y]){await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x,y,id:1}]});await new Promise(r=>setTimeout(r,700));await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await new Promise(r=>setTimeout(r,200));}
+for(const [name,device] of [['390×844',iphone],['360×740',android],['844×390',landscape]])check(`phones (${name}): the tool rail shows one button per group, never scrolls, and reaches every tool in two touches`,device,async(page,cdp)=>{
+ const rail=await page.locator('.tool-rail').evaluate(r=>({scroll:r.scrollHeight,client:r.clientHeight,overflow:[...r.querySelectorAll('button,label')].filter(e=>e.checkVisibility()&&e.getBoundingClientRect().bottom>r.getBoundingClientRect().bottom).map(e=>e.getAttribute('aria-label')||e.textContent)}));
+ assert.ok(rail.scroll<=rail.client&&!rail.overflow.length,`the rail does not scroll (${rail.scroll} > ${rail.client}; below the fold: ${rail.overflow})`);
+ const groups=await railGroups(page);
+ assert.deepEqual(groups.map(g=>g[0]),['Move & select','Text box','Brush','Clone Stamp'],'one button per group');
+ for(const s of await railButtons(page).evaluateAll(bs=>bs.map(b=>b.getBoundingClientRect()).map(r=>[r.width,r.height])))assert.ok(s[0]>=44&&s[1]>=44,`group buttons are 44px (${s})`);
+ const flyout=page.locator('.tool-flyout');
+ for(const [g,tools] of groups.entries())for(const label of tools){
+  // A long press opens the group's flyout and a tap picks the tool: two touches from anywhere.
+  await longPress(cdp,await centre(railButtons(page).nth(g)));
+  assert.ok(await flyout.isVisible(),`${label}: a long press opens the flyout`);
+  for(const [w,h] of await flyout.locator('button').evaluateAll(bs=>bs.map(b=>[b.offsetWidth,b.offsetHeight])))assert.ok(w>=44&&h>=44,'flyout rows are 44px');
+  const item=await flyout.locator(`button[aria-label="${label}"]`).boundingBox();assert.ok(item.y>=0&&item.y+item.height<=device.viewport.height,`${label} is on screen`);
+  await touchTap(cdp,item.x+item.width/2,item.y+item.height/2);await page.waitForTimeout(200);
+  assert.equal(await flyout.count(),0,'the pick closes the flyout');
+  assert.equal(await railButtons(page).nth(g).getAttribute('aria-label'),label,`${label} becomes its group's button`);
+  assert.equal(await railButtons(page).nth(g).getAttribute('aria-pressed'),'true',`${label} is the tool`);
+ }
+ // A tap on another group selects its last tool; a tap on the selected tool opens the
+ // flyout; a tap beside it closes it and draws nothing.
+ const create='.tool-rail .tool-group:nth-of-type(2)>div>button';
+ await tapCentre(page,cdp,create);
+ assert.match(await page.locator('.options-bar .tool-caption').textContent(),/Line$/,'a tap picks the group’s last tool');assert.equal(await flyout.count(),0,'…without the flyout');
+ await tapCentre(page,cdp,create);assert.ok(await flyout.isVisible(),'a second tap opens the flyout');
+ const layers=await page.locator('.layers-list .layer-row').count(),board=await box(page,'.artboard');
+ await touchTap(cdp,board.x+board.width*.7,board.y+board.height*.5);await page.waitForTimeout(400);
+ assert.equal(await flyout.count(),0,'a tap beside the flyout closes it');assert.equal(await page.locator('.layers-list .layer-row').count(),layers,'…and draws no line');
+});
+
+check('phones: the grouped rail works from the keyboard and names its groups for screen readers',iphone,async page=>{
+ const draw=railButtons(page).nth(2),flyout=page.locator('.tool-flyout');
+ assert.equal(await draw.getAttribute('aria-expanded'),'false');assert.match(await draw.getAttribute('title'),/^Draw: Brush, Highlight, Eraser, Gradient, Paint bucket, Mask brush$/);
+ await draw.focus();await page.keyboard.press('Enter');assert.equal(await draw.getAttribute('aria-pressed'),'true','Enter picks the group’s tool');
+ await page.keyboard.press('Enter');assert.equal(await draw.getAttribute('aria-expanded'),'true','Enter again opens the flyout');
+ assert.equal(await page.evaluate(()=>document.querySelector(`#${CSS.escape(document.activeElement.closest('.tool-flyout')?.id??'')}`)?.getAttribute('aria-label')),'Draw tools','focus moves into the named flyout');
+ assert.equal(await draw.getAttribute('aria-controls'),await flyout.getAttribute('id'));
+ assert.equal(await page.evaluate(()=>document.activeElement.getAttribute('aria-label')),'Brush','on the current tool');
+ await page.keyboard.press('ArrowDown');await page.keyboard.press('ArrowDown');await page.keyboard.press('Enter');
+ assert.equal(await flyout.count(),0);assert.equal(await draw.getAttribute('aria-label'),'Eraser','ArrowDown and Enter pick a tool');
+ assert.equal(await page.evaluate(()=>document.activeElement.getAttribute('aria-label')),'Eraser','focus returns to the group');
+ await page.keyboard.press('ArrowRight');assert.ok(await flyout.isVisible(),'ArrowRight opens the flyout');
+ await page.keyboard.press('Escape');assert.equal(await flyout.count(),0,'Escape closes it');
+ assert.equal(await page.evaluate(()=>document.activeElement.getAttribute('aria-label')),'Eraser','…back on the group');
+ assert.match(await page.locator('.options-bar .tool-caption').textContent(),/Eraser$/,'Escape kept the tool');
+});
+
+check('tablets from 821px keep every tool in the rail',{...tablet,viewport:{width:1180,height:820}},async page=>{
+ assert.equal(await page.locator('.tool-rail.grouped').count(),0);
+ assert.equal(await railButtons(page).count(),await page.evaluate(async()=>(await import('/src/editor-types.ts')).TOOLS.length),'one button per tool');
+});
+
 check('finding 19: header, file actions, tool rail, bottom bar and drawers are touch-sized and named',iphone,async(page,cdp)=>{
  assert.deepEqual(await small(page,'.topbar button, .document-actions>button, .document-actions .icon-button, .tool-group button, .rail-bottom>*, .canvas-tab>button, .zoom-controls button'),[]);
  for(const name of ['Photo editor','PDF MasterTool','Documents','Place image','Export'])assert.ok(await page.getByRole('button',{name,exact:true}).isVisible(),`${name} has a name`);
  assert.ok(await page.locator('.topbar .nav-short',{hasText:'PDF'}).isVisible(),'workspaces show their names');
- await page.locator('.tool-rail button[aria-label="Magic wand"]').tap();
+ await pickTool(page,'Magic wand',{tap:true});
  assert.deepEqual(await small(page,'.options-bar .check-label, .options-bar input:not([type=checkbox])'),[]);
  assert.ok((await page.locator('.options-end input[type=checkbox]').first().boundingBox()).width>=20,'checkboxes are 20px');
  await tapCentre(page,cdp,'.small-pages-button');
@@ -124,15 +180,14 @@ check('finding 17: the options bar drops the duplicate zoom and Snap to page, an
  assert.equal(await box(page,'.options-bar .header-zoom'),null,'the zoom is left to the bottom bar');
  assert.equal(await page.locator('.options-bar .check-label',{hasText:'Snap to page'}).isVisible(),false,'Snap to page moved to Menu › View');
  for(const s of ['.options-bar','.tool-rail'])assert.match(await page.locator(s).evaluate(e=>getComputedStyle(e).backgroundImage),/radial-gradient/,`${s} shows a scroll cue`);
- await page.locator('.tool-rail button[aria-label="Brush"]').tap();
+ await pickTool(page,'Brush',{tap:true});
  const hidden=await page.locator('.options-bar').evaluate(e=>e.scrollWidth-e.clientWidth);assert.ok(hidden<354,`less of the Brush options is hidden (${hidden}px, was 354)`);
  await page.locator('.phone-menu-button').tap();await page.locator('.phone-menu summary',{hasText:'View'}).tap();
  assert.ok(await page.getByRole('button',{name:'Toggle snapping to page'}).isVisible(),'Snap to page is in Menu › View');
 });
 
 check('finding 12: Clone Stamp takes its source from a tap, marks it, then paints with a drag',iphone,async(page,cdp)=>{
- await page.locator('.tool-rail button[aria-label="Clone Stamp"]').evaluate(b=>b.scrollIntoView({block:'center'}));
- await page.locator('.tool-rail button[aria-label="Clone Stamp"]').tap();
+ await pickTool(page,'Clone Stamp',{tap:true});
  const source=page.locator('.options-bar .set-source');
  assert.equal(await source.count(),1,'a Set source button');
  assert.equal(await source.getAttribute('aria-pressed'),'true','…on for the first tap');
