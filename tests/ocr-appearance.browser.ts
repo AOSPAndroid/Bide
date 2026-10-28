@@ -60,18 +60,27 @@ document.querySelector('#run')!.addEventListener('click',async()=>{
   const sourcePixels=ctx.getImageData(0,0,65,50),sourceEdges=coverageEdgeWidth(contrastCoverage(sourcePixels.data,65,50,[250,250,250])),replacementEdges=outputEdges(text,65,50);
   if(sourceEdges===undefined||replacementEdges===undefined||replacementEdges>sourceEdges+.15)throw Error(`Soft neighbour blurred the name: ${JSON.stringify({sourceEdges,replacementEdges,fitted})}`);
   results.push({case:'Small name beside soft label',sourceEdges,replacementEdges,fit:fitted});document.body.append(canvas);
-  // The letters-first planner must retain matching when it falls back to font
-  // text, while Convert all stays crisp even on a page with only one region.
+  // Original-letter edits must leave the page unchanged when its letters
+  // cannot build the requested text. Font replacement requires an explicit
+  // choice, and still uses appearance matching after that choice.
   const scene=new Canvas(document.createElement('canvas'),{width:280,height:50,renderOnAddRemove:false,enableRetinaScaling:false});
   try{
    scene.add(new FabricImage(canvas,{left:0,top:0}));const page=blankPage(280,50),settings={...defaultOcrSettings,font:'Inter',style:'regular',matchBlur:true};
-   const plan=await planOcrReplacement(scene,page,[{region:regions[0],text:'Dali'}],{settings,pageRegions:regions,others:regions,letters:true,autoFont:false});
+   const before=JSON.stringify(scene.toObject()),pixels=scene.toDataURL(),originalObjects=scene.toObject().objects,unchanged=JSON.stringify(originalObjects);
+   let refused:unknown;
+   try{
+    const blocked=await planOcrReplacement(scene,page,[{region:regions[0],text:'Dali'}],{settings,pageRegions:regions,others:regions,letters:true,autoFont:false});
+    await blocked.apply(originalObjects);
+   }catch(error){refused=error;}
+   if(!(refused instanceof Error)||!/original letter/.test(refused.message)||!/New font explicitly/.test(refused.message))throw Error(`Unmatchable original letters must ask for an explicit font choice: ${String(refused)}`);
+   if(JSON.stringify(scene.toObject())!==before||scene.toDataURL()!==pixels||JSON.stringify(originalObjects)!==unchanged)throw Error('A refused original-letter edit changed the page');
+   const plan=await planOcrReplacement(scene,page,[{region:regions[0],text:'Dali'}],{settings:{...settings,editMode:'font'},pageRegions:regions,others:regions,letters:false,autoFont:false});
    const objects:unknown[]=[];await plan.apply(objects);const edited=objects.at(-1) as {text:string;fontFamily:string;textSoftness?:number};
-   if(plan.letters||plan.fonts!==1||edited.text!=='Dali'||edited.fontFamily!=='Inter'||(edited.textSoftness??0)!==fitted.softness)throw Error(`Letters fallback lost appearance matching: ${JSON.stringify({edited,fitted})}`);
+   if(plan.letters||plan.fonts!==1||edited.text!=='Dali'||edited.fontFamily!=='Inter'||(edited.textSoftness??0)!==fitted.softness)throw Error(`Explicit font edit lost appearance matching: ${JSON.stringify({edited,fitted})}`);
    const bulk=await planOcrReplacement(scene,page,[{region:regions[0]}],{settings,pageRegions:regions,others:regions,letters:false,autoFont:false});
    const bulkObjects:unknown[]=[];await bulk.apply(bulkObjects);const converted=bulkObjects.at(-1) as {textSoftness?:number};
    if(converted.textSoftness)throw Error('Convert all softened a single-region page');
-   results.push({case:'Planner fallback and crisp bulk conversion',font:edited.fontFamily,softness:edited.textSoftness,bulkSoftness:converted.textSoftness??0});
+   results.push({case:'Original lettering refusal, explicit font choice and crisp bulk conversion',originalUnchanged:true,font:edited.fontFamily,softness:edited.textSoftness,bulkSoftness:converted.textSoftness??0});
   }finally{await scene.dispose();}
   result.textContent=JSON.stringify({passed:true,results},null,2);
  }catch(error){result.textContent=String(error);}

@@ -25,7 +25,7 @@ export default function TextDetectionBar({ai,status,regions,show,onShow,settings
   {ocr&&<>
    <button disabled={scanning} title="List words the dictionary does not know or letters the recognizer was unsure of, with one-click fixes." onClick={onProofread}>Proofread</button>
    <button disabled={scanning} title="Replace a word or phrase everywhere it was detected, in one step." onClick={onFindReplace}>Find & replace</button>
-   <button disabled={scanning} title="Replace every detected line with crisp editable text in one step. Undo restores the original." onClick={onConvertAll}>Convert all</button>
+   <button disabled={scanning} title="Replace every detected line with new font text. Choose New font in OCR settings first; this can change the original lettering." onClick={onConvertAll}>Convert all to font text</button>
   </>}
   <details ref={menu} className="ocr-settings"><summary title="OCR font, weight, engine, languages and background cleanup">OCR settings</summary><div className="ocr-settings-panel">
   {ocr&&<>
@@ -37,7 +37,7 @@ export default function TextDetectionBar({ai,status,regions,show,onShow,settings
     <option value="auto">Auto (match strokes)</option><option value="regular">Regular</option><option value="bold">Bold</option><option value="italic">Italic</option><option value="bold-italic">Bold italic</option>
    </select></label>
    <label title="Soften each replacement to match the blur measured on the original letters, so it blends in. Convert all always makes crisp text."><input type="checkbox" aria-label="Match original blur" checked={settings.matchBlur} onChange={e=>onChange({matchBlur:e.target.checked})}/>Match blur</label>
-   <label title="Original letters: clicking a line opens a text box; changes are rebuilt from the image's own letters (exact font). New font: the line becomes editable text in the OCR font.">Edit with<select aria-label="Edit image text with" value={settings.editMode} onChange={e=>onChange({editMode:e.target.value as OcrSettings['editMode']})}>
+   <label title="Original letters preserves the scan's lettering and sharpness; edits that cannot be reconstructed are refused. New font explicitly allows a replacement typeface.">Edit with<select aria-label="Edit image text with" value={settings.editMode} onChange={e=>onChange({editMode:e.target.value as OcrSettings['editMode']})}>
     <option value="letters">Original letters</option><option value="font">New font</option>
    </select></label>
   </>}

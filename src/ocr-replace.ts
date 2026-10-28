@@ -1,6 +1,5 @@
 // Replacing detected image text: each line is rebuilt from the image's own
-// letters when asked and possible, otherwise it becomes editable text in the
-// OCR font over a cleaned background.
+// letters when requested. A substitute font is used only in explicit font mode.
 import type {Canvas,FabricObject} from 'fabric';
 import type {Textbox} from './text-appearance';
 import type {Page} from './model';
@@ -13,12 +12,21 @@ export type OcrEdit={region:TextRegion;text?:string};
 // Everything is rendered before the page is touched; `apply` then adds the
 // result to the page's serialized objects (clearing the background under
 // font-rendered lines first), so the caller can commit it as one undo step.
-export async function planOcrReplacement(c:Canvas,page:Page,items:OcrEdit[],{settings,pageRegions,others,letters,autoFont,otherPages=[]}:{settings:OcrSettings;pageRegions:TextRegion[];others:TextRegion[];letters:boolean;autoFont:boolean;otherPages?:LetterSource[]}){
+export async function planOcrReplacement(c:Canvas,page:Page,items:OcrEdit[],{settings,pageRegions,others,letters,autoFont}:{settings:OcrSettings;pageRegions:TextRegion[];others:TextRegion[];letters:boolean;autoFont:boolean;otherPages?:LetterSource[]}){
  const patches:FabricObject[]=[],fonts:OcrEdit[]=[];
- for(const item of items){const patch=letters&&item.text!==undefined?await glyphEditPatch(c,page,item.region,item.text,pageRegions,otherPages):undefined;if(patch)patches.push(patch);else fonts.push(item);}
+ for(const item of items){
+  if(letters){
+   if(item.text===item.region.text)continue;
+   // Neighbouring lines/pages may use another face or weight. Preserve this
+   // line's own pixels instead of borrowing unverified lettering.
+   const patch=item.text!==undefined?await glyphEditPatch(c,page,item.region,item.text):undefined;
+   if(!patch)throw new Error('Cannot preserve the original lettering for this edit. Nothing was changed. Choose New font explicitly to allow a replacement font.');
+   patches.push(patch);
+  }else fonts.push(item);
+ }
  const transparent=fonts.length>0&&settings.background==='transparent';
  if(transparent&&page.source)throw new Error('Unlock Original PDF first to clear scanned text to transparency.');
- // Single edits (including missing-letter fallbacks) keep the native-pixel
+ // Explicit single font edits keep the native-pixel
  // appearance fit and its edge-clarity guard. Bulk conversion stays crisp and
  // uses the scan's suggested face without re-ranking every line on the page.
  const single=items.length===1&&items[0].text!==undefined,pageInk=!single&&settings.style==='auto'?await pageInkLevel(pageRegions,settings.font):undefined,texts:Textbox[]=[];
@@ -34,4 +42,4 @@ export async function planOcrReplacement(c:Canvas,page:Page,items:OcrEdit[],{set
 }
 
 // Toast after a letters-first edit.
-export const lettersNote=(letters:number,fonts:number)=>letters&&!fonts?'Edited with the image\'s own letters. Undo restores the original.':letters?`${letters} line${letters===1?'':'s'} edited with the image's own letters; ${fonts} needed letters not found on the page and use the OCR font.`:'Some letters do not appear on the page, so the OCR font was used. Check font and spacing.';
+export const lettersNote=(letters:number,_fonts:number)=>letters?'Edited with the image\'s own letters. Undo restores the original.':'No text was changed.';

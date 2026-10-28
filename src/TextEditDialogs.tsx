@@ -6,14 +6,14 @@ import {ModalShell} from './ui-kit';
 import type {TextRegion} from './text-regions';
 
 // Edit one detected line: the new text is drawn with the image's own letters
-// when they are all available, otherwise with the OCR font.
-export function EditTextDialog({region,close,apply}:{region:TextRegion;close:()=>void;apply:(text:string)=>void}){
+// when they are available. Unavailable lettering leaves the original unchanged.
+export function EditTextDialog({region,pending=false,close,apply}:{region:TextRegion;pending?:boolean;close:()=>void;apply:(text:string)=>void}){
  const [value,setValue]=useState(region.text),doubts=useDoubts(value,value===region.text?doubtfulLetters(region):[]);
  return <ModalShell title="Edit image text" close={close}>
-  <p className="muted">Changed letters are rebuilt from the image's own letters, so the font matches exactly. If a letter does not appear anywhere on the page, the line uses the OCR font instead.</p>
-  <label className="stacked-label">Text<input aria-label="New text" value={value} onChange={e=>setValue(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&value!==region.text)apply(value);}}/></label>
+  <p className="muted">Changes reuse this line's own letters and sharpness. If the original lettering cannot be preserved, nothing is changed. A replacement font is used only when you explicitly choose New font in OCR settings.</p>
+  <label className="stacked-label">Text<input aria-label="New text" value={value} onChange={e=>setValue(e.target.value)} onKeyDown={e=>{if(!pending&&e.key==='Enter'&&value!==region.text)apply(value);}}/></label>
   <DoubtList doubts={doubts} onPick={(d,s)=>setValue(v=>applySuggestion(v,d,s))}/>
-  <div className="dialog-actions"><button className="secondary" onClick={close}>Cancel</button><button className="primary" disabled={!value.trim()||value===region.text} onClick={()=>apply(value)}>Apply</button></div>
+  <div className="dialog-actions"><button className="secondary" onClick={close}>Cancel</button><button className="primary" disabled={pending||!value.trim()||value===region.text} onClick={()=>apply(value)}>{pending?'Applying…':'Apply'}</button></div>
  </ModalShell>;
 }
 
@@ -52,12 +52,12 @@ export function DoubtList({doubts,onPick}:{doubts:Doubt[];onPick:(d:Doubt,replac
 }
 
 // Every doubtful word on the page, with one-click fixes rebuilt from the image's own letters.
-export function ProofreadDialog({regions,close,apply}:{regions:TextRegion[];close:()=>void;apply:(region:TextRegion,text:string)=>Promise<void>|void}){
+export function ProofreadDialog({regions,close,apply}:{regions:TextRegion[];close:()=>void;apply:(region:TextRegion,text:string)=>Promise<boolean|void>|boolean|void}){
  const ocr=regions.filter(r=>r.kind==='ocr'),[items,setItems]=useState<{region:TextRegion;doubts:Doubt[]}[]|null>(null);
  useEffect(()=>{let live=true;void import('./browser/spelling').then(async m=>{const out=[];for(const region of ocr){const doubts=await m.proofread(region.text,doubtfulLetters(region));if(doubts.length)out.push({region,doubts});}if(live)setItems(out);}).catch(()=>{if(live)setItems([]);});return()=>{live=false;};},[]);
  return <ModalShell title="Proofread image text" close={close}>
   <p className="muted">Words the dictionary does not know, or with letters the recognizer was unsure of. A fix rebuilds the word from the image's own letters; Undo restores it.</p>
-  {items===null?<p className="muted" aria-live="polite">Checking {ocr.length} lines…</p>:items.length?<div className="proofread-list">{items.map(({region,doubts})=><div key={region.id} className="proofread-line"><span className="line-text">{region.text}</span><DoubtList doubts={doubts} onPick={(d,s)=>{void Promise.resolve(apply(region,applySuggestion(region.text,d,s))).then(()=>setItems(list=>list&&list.filter(i=>i.region!==region)));}}/></div>)}</div>:<p className="muted" aria-live="polite">Nothing to check: every word is in the dictionary.</p>}
+  {items===null?<p className="muted" aria-live="polite">Checking {ocr.length} lines…</p>:items.length?<div className="proofread-list">{items.map(({region,doubts})=><div key={region.id} className="proofread-line"><span className="line-text">{region.text}</span><DoubtList doubts={doubts} onPick={(d,s)=>{void Promise.resolve(apply(region,applySuggestion(region.text,d,s))).then(success=>{if(success!==false)setItems(list=>list&&list.filter(i=>i.region!==region));});}}/></div>)}</div>:<p className="muted" aria-live="polite">Nothing to check: every word is in the dictionary.</p>}
   <div className="dialog-actions"><button className="secondary" onClick={close}>Close</button></div>
  </ModalShell>;
 }

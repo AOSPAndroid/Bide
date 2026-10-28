@@ -1,3 +1,8 @@
+## Hosted update — preserve scanned lettering
+
+- Original letters mode reuses pixels from the edited line. It never switches to an OCR font or borrows unverified lettering from another line or page. If it cannot reconstruct an edit, the original stays unchanged and the typed text remains available.
+- New font remains an explicit choice. Find & replace and proofreading follow the same original-letter safeguard; an unsupported replacement does not silently change the page's typography.
+
 ## v0.8.16 — Sharp text edits on scanned PDFs
 
 - Includes Claude's higher-resolution sharpness measurement for scanned PDF text. Font, size and position are fitted at page scale; softness is measured on a finer render so crisp scans do not acquire unnecessary blur.
