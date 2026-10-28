@@ -78,12 +78,19 @@ const railButtons=page=>page.locator('.tool-rail .tool-group>div>button');
 const railGroups=page=>railButtons(page).evaluateAll(bs=>bs.map(b=>b.title.split(': ')[1].split(', ')));
 const centre=async locator=>{const b=await locator.boundingBox();return [b.x+b.width/2,b.y+b.height/2];};
 async function longPress(cdp,[x,y]){await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x,y,id:1}]});await new Promise(r=>setTimeout(r,700));await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await new Promise(r=>setTimeout(r,200));}
-for(const [name,device] of [['390×844',iphone],['360×740',android],['844×390',landscape],['740×360',{...android,viewport:{width:740,height:360}}],['740×390',{...android,viewport:{width:740,height:390}}]])check(`phones (${name}): the tool rail shows one button per group, never scrolls, and reaches every tool in two touches`,device,async(page,cdp)=>{
+for(const [name,device] of [['390×844',iphone],['360×740',android],['844×390',landscape],['740×360',{...android,viewport:{width:740,height:360}}],['740×390',{...android,viewport:{width:740,height:390}}],['568×320',{...android,viewport:{width:568,height:320}}],['600×360',{...android,viewport:{width:600,height:360}}]])check(`phones (${name}): the tool rail shows one button per group, never scrolls, and reaches every tool in two touches`,device,async(page,cdp)=>{
  const rail=await page.locator('.tool-rail').evaluate(r=>({scroll:r.scrollHeight,client:r.clientHeight,overflow:[...r.querySelectorAll('button,label')].filter(e=>e.checkVisibility()&&e.getBoundingClientRect().bottom>r.getBoundingClientRect().bottom).map(e=>e.getAttribute('aria-label')||e.textContent)}));
  assert.ok(rail.scroll<=rail.client&&!rail.overflow.length,`the rail does not scroll (${rail.scroll} > ${rail.client}; below the fold: ${rail.overflow})`);
  const layout=await page.evaluate(()=>({railRight:document.querySelector('.tool-rail').getBoundingClientRect().right,canvasLeft:document.querySelector('.canvas-workspace').getBoundingClientRect().left,scroll:document.documentElement.scrollWidth,width:innerWidth}));
  assert.ok(layout.canvasLeft>=layout.railRight-1,`the rail leaves the canvas its own space (${JSON.stringify(layout)})`);
  assert.ok(layout.scroll<=layout.width,`the document does not scroll sideways (${JSON.stringify(layout)})`);
+ const footer=await page.evaluate(()=>{
+  const visible=e=>e.checkVisibility()&&e.getBoundingClientRect().width>0;
+  const buttons=[...document.querySelectorAll('.canvas-tab>button,.zoom-controls button')].filter(visible),rail=[...document.querySelectorAll('.tool-rail .tool-group>div>button,.rail-bottom>label')].filter(visible);
+  const overlap=(a,b)=>{a=a.getBoundingClientRect();b=b.getBoundingClientRect();return Math.min(a.right,b.right)-Math.max(a.left,b.left)>.5&&Math.min(a.bottom,b.bottom)-Math.max(a.top,b.top)>.5;};
+  return buttons.filter((b,i)=>{const r=b.getBoundingClientRect();return r.left<0||r.right>innerWidth||!b.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2))||rail.some(t=>overlap(b,t))||buttons.slice(i+1).some(t=>overlap(b,t));}).map(b=>b.getAttribute('aria-label')||b.textContent);
+ });
+ assert.deepEqual(footer,[],'Pages, Properties and zoom stay reachable without overlapping each other or the rail');
  const groups=await railGroups(page);
  assert.deepEqual(groups.map(g=>g[0]),['Move & select','Text box','Brush','Clone Stamp'],'one button per group');
  assert.deepEqual(groups.flat().sort(),await page.evaluate(async()=>(await import('/src/editor-types.ts')).TOOLS.map(t=>t.label).sort()),'every tool remains in a group');
@@ -107,8 +114,17 @@ for(const [name,device] of [['390×844',iphone],['360×740',android],['844×390'
  await tapCentre(page,cdp,create);
  assert.match(await page.locator('.options-bar .tool-caption').textContent(),/Line$/,'a tap picks the group’s last tool');assert.equal(await flyout.count(),0,'…without the flyout');
  await tapCentre(page,cdp,create);assert.ok(await flyout.isVisible(),'a second tap opens the flyout');
- const layers=await page.locator('.layers-list .layer-row').count(),board=await box(page,'.artboard');
- await touchTap(cdp,board.x+board.width*.7,board.y+board.height*.5);await page.waitForTimeout(400);
+ const layers=await page.locator('.layers-list .layer-row').count();
+ // A wider landscape flyout can cover the old fixed point on the page. Tap a
+ // measured uncovered part of the page (or workspace), where the scrim is hit.
+ const outside=await page.evaluate(()=>{
+  for(const selector of ['.artboard','.canvas-workspace']){
+   const r=document.querySelector(selector).getBoundingClientRect(),x0=Math.max(0,r.left),x1=Math.min(innerWidth,r.right),y0=Math.max(0,r.top),y1=Math.min(innerHeight,r.bottom);
+   for(let y=1;y<10;y++)for(let x=1;x<10;x++){const p={x:x0+(x1-x0)*x/10,y:y0+(y1-y0)*y/10};if(document.elementFromPoint(p.x,p.y)?.classList.contains('tool-flyout-scrim'))return p;}
+  }return null;
+ });
+ assert.ok(outside,'the canvas has a visible point beside the flyout on its scrim');
+ await touchTap(cdp,outside.x,outside.y);await page.waitForTimeout(400);
  assert.equal(await flyout.count(),0,'a tap beside the flyout closes it');assert.equal(await page.locator('.layers-list .layer-row').count(),layers,'…and draws no line');
 });
 

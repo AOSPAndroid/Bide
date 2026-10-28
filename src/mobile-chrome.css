@@ -208,6 +208,15 @@
  .tool-rail.grouped .rail-bottom{grid-column:1/-1;flex-direction:row;justify-content:center;margin-top:0;padding-top:4px}
  .tool-flyout{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:max-content;max-width:calc(100vw - 8px)}
 }
+/* Narrow landscape phones also have the taller phone header. Two rows of
+   three controls fit there; the page tabs stay beside the zoom in the canvas
+   footer, so the rail can use its full height without covering a tab. */
+@media (pointer:coarse) and (orientation:landscape) and (max-width:600px) and (max-height:500px){
+ .tool-rail.grouped{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));align-content:start;align-items:start;width:150px;margin-bottom:0;padding:4px;gap:4px}
+ .tool-rail.grouped .rail-bottom{grid-column:auto;flex-direction:row;justify-content:center;width:44px;height:44px;margin:0;padding:0;border:0}
+ .canvas-tab{left:0}
+ .tool-flyout{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:max-content;max-width:calc(100vw - 8px)}
+}
 
 /* The OCR settings sheet covers the bar on phones: Done closes it (desktop closes it with the summary). */
 .ocr-settings-done{display:none}
