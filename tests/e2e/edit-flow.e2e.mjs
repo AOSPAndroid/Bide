@@ -83,3 +83,27 @@ test('a digital PDF line in Helvetica is edited in its metric-compatible face',{
   assert.deepEqual(errors,[]);
  }finally{await browser.close();await server.close();}
 });
+
+test("a scanned PDF's own invisible text follows the edit in the download",{timeout:600000},async()=>{
+ const mupdf=await import('mupdf'),{mkdtemp,readFile}=await import('node:fs/promises'),{tmpdir}=await import('node:os'),{join}=await import('node:path');
+ const textOf=bytes=>{const doc=mupdf.Document.openDocument(bytes,'application/pdf'),page=doc.loadPage(0),t=page.toStructuredText().asText();page.destroy();doc.destroy();return t.replace(/\s+/g,' ');};
+ const server=await createServer({logLevel:'error',server:{port:0,host:'127.0.0.1'}});await server.listen();
+ const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||undefined});
+ try{
+  const original=textOf(await readFile('tests/fixtures/scanned-quote-ocr-layer.pdf'));
+  assert.match(original,/1 947,80/,'the fixture carries a scanner text layer');
+  const page=await browser.newPage({viewport:{width:1400,height:900},acceptDownloads:true}),errors=[];page.on('pageerror',e=>errors.push(e.message));
+  await page.goto(server.resolvedUrls.local[0]+'app/');await page.locator('input[type=file][accept*=".psd"]').setInputFiles('tests/fixtures/scanned-quote-ocr-layer.pdf');
+  await page.locator('button[aria-label^="Edit detected text: 1 947,80"]').first().waitFor({timeout:240000});
+  await editField(page,'1 947,80','1 974,80 €');await page.waitForTimeout(800);
+  await page.locator('.document-actions .primary').click();
+  assert.equal(await page.locator('.modal select').first().inputValue(),'pdf');
+  const [download]=await Promise.all([page.waitForEvent('download',{timeout:120000}),page.locator('.modal .dialog-actions .primary').click()]);
+  const file=join(await mkdtemp(join(tmpdir(),'bide-layer-')),download.suggestedFilename());await download.saveAs(file);
+  const text=textOf(await readFile(file));
+  assert.match(text,/1 974,80/,'search and copy find the new amount');
+  assert.doesNotMatch(text,/1 947,80/,'and no longer the old one');
+  for(const word of ['3 612,50','12 480,00','289,70','RÉCAPITULATIF','Électricité'])assert.ok(text.includes(word),`the rest of the scanner's text is kept (${word})`);
+  assert.deepEqual(errors,[]);
+ }finally{await browser.close();await server.close();}
+});

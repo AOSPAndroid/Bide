@@ -345,6 +345,6 @@ export async function glyphEditPatch(c:Canvas,p:Page,lineRegion:TextRegion,next:
   x+=w;
  }
  const patch=document.createElement('canvas');patch.width=patchW;patch.height=patchH;patch.getContext('2d')!.putImageData(out,0,0);
- return Object.assign(new FabricImage(patch,{left:startX/k,top:top/k,scaleX:1/k,scaleY:1/k}),{id:uid(),name:`Edited text: ${next.slice(0,40)}`});
+ return Object.assign(new FabricImage(patch,{left:startX/k,top:top/k,scaleX:1/k,scaleY:1/k}),{id:uid(),name:`Edited text: ${next.slice(0,40)}`,editedText:next});
 }
 const hexRgb=(hex:string)=>[1,3,5].map(i=>parseInt(hex.slice(i,i+2),16)||0);

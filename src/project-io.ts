@@ -1,6 +1,6 @@
 // Reading files into a project: data URLs, .bide validation, image pages, and
 // the page renderings sent to the export engine.
-import {FabricImage,StaticCanvas} from 'fabric';
+import {FabricImage,StaticCanvas,type FabricObject} from 'fabric';
 import {blankPage,uid,type Page,type Project} from './model';
 import {Textbox} from './text-appearance';
 import {pdfFallbackStyle} from './text-regions';
@@ -48,6 +48,8 @@ export async function exportPayload(current:Project,ocr?:Map<string,{text:string
   try {
    await ensureDocumentFonts(p.canvas);
    await c.loadFromJSON(p.canvas);
+   // OCR edits over a PDF page: letters edits carry their new text; text layers made from OCR text are real text already.
+   const edits=p.source?c.getObjects().flatMap(o=>{const t=o as FabricObject&{editedText?:string;recognizedKey?:string};if(!t.editedText&&!(o instanceof Textbox&&t.recognizedKey?.startsWith('ocr:')))return [];const b=o.getBoundingRect();return [{text:t.editedText,left:b.left,top:b.top,width:b.width,height:b.height}];}):[];
    for(const object of c.getObjects()){const o=object as Textbox&PdfText;if(o instanceof Textbox&&o.pdfFontData&&o.fontFamily.startsWith('PDFfont-')&&!await fontSupportsText(o.pdfFontData,o.text)){const family=o.pdfFontFallback||'Lato';await ensureFont(family);o.set({fontFamily:family,...pdfFallbackStyle(o)});o.initDimensions();}}
    // Layer styles and painted masks have no SVG form here: those layers go in as pixels.
    const objects=c.getObjects(),flattenBlends=hasBlending(objects);
@@ -66,7 +68,7 @@ export async function exportPayload(current:Project,ocr?:Map<string,{text:string
     const png = c.toDataURL({ format: 'png', multiplier: Math.min(2, 4096 / Math.max(p.width, p.height)) });
     svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${p.width}" height="${p.height}"><image href="${png}" width="${p.width}" height="${p.height}"/></svg>`;
    }
-   pages.push({ width: p.width, height: p.height, source: p.source, index: p.index, svg, fonts:documentEmbeddedFonts(p.canvas), ocr:ocr?.get(p.id), forms:p.forms });
+   pages.push({ width: p.width, height: p.height, source: p.source, index: p.index, svg, fonts:documentEmbeddedFonts(p.canvas), ocr:ocr?.get(p.id), forms:p.forms, edits:edits.length?edits:undefined });
   }
   finally { await c.dispose(); }
  }
