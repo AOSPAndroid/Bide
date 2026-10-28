@@ -95,7 +95,7 @@ export async function scanPageText(p:Page,c:Canvas,{signal,grouping,thorough,lan
  const all=scaleRegions(detected,p.width/raster.width,p.height/raster.height),regions=unconvertedRegions(all,layers);
  let suggestedFont:string|undefined;
  // The fields can be tapped while the font is matched (1.5 to 3 s).
- if(regions.length){onRegions?.(regions);onStatus('Matching font…');try{suggestedFont=await suggestFont(raster,detected);}catch{}signal.throwIfAborted();}
+ if(regions.length){onRegions?.(regions);onStatus(`${regions.length} OCR regions · matching the font…`);try{suggestedFont=await suggestFont(raster,detected);}catch{}signal.throwIfAborted();}
  return {regions,all,suggestedFont,status:ocrScanStatus(regions.length,engine==='paddle'?aiOcrLabel(detected):languageLabel(languages,await bundledOcrLanguages()),layers.some(l=>l.recognizedKey),regions.filter(isUncertain).length)+(suggestedFont?` · closest font: ${suggestedFont}`:'')};
 }
 
