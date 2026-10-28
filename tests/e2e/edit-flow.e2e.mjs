@@ -193,7 +193,14 @@ test('an edit needing a letter the line lacks says which, and a font can then be
   const latest='289,57 €';await input.fill(latest);
   await page.getByRole('button',{name:'Use a font for this edit'}).click();
   await page.getByText('This line is now text in the OCR font',{exact:false}).waitFor({timeout:60000});
-  await page.waitForFunction(async text=>{const {restoreLocal}=await import('/src/model.ts');const p=await restoreLocal();return p?.pages[0].canvas.objects.some(o=>o.type?.toLowerCase()==='textbox'&&o.text===text);},latest,{polling:200,timeout:30000});
+  // Read the resolved autosave state: waitForFunction treats an async predicate's
+  // Promise as truthy before the IndexedDB read has returned its condition.
+  const savedBy=Date.now()+30000;let persisted=false;
+  while(!persisted&&Date.now()<savedBy){
+   persisted=(await canvasState()).objects.some(o=>o.type?.toLowerCase()==='textbox'&&o.text===latest);
+   if(!persisted)await page.waitForTimeout(200);
+  }
+  assert.ok(persisted,'autosave contains the current explicitly permitted text');
   const layers=(await canvasState()).objects.filter(o=>o.type?.toLowerCase()==='textbox').map(o=>o.text);
   assert.deepEqual(layers,[latest]);
   assert.equal(await mode.inputValue(),'letters','font consent applies only to this line and does not change the global mode');
