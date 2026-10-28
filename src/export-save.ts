@@ -13,7 +13,9 @@ export async function saveExport(blob:Blob,filename:string){
    const {unzipSync}=await import('fflate'),files=Object.entries(unzipSync(new Uint8Array(await blob.arrayBuffer())));
    if(files.length!==1)return download(blob,filename);
    const [name,bytes]=files[0],ext=name.split('.').pop()!;
-   blob=new Blob([bytes as Uint8Array<ArrayBuffer>],{type:types[ext]??'application/octet-stream'});filename=filename.replace(/(-pages)?\.zip$/,(_,many)=>`${many?'-page':''}.${ext}`);
+   blob=new Blob([bytes as Uint8Array<ArrayBuffer>],{type:types[ext]??'application/octet-stream'});
+   // Only a split export (PDF pages) adds -pages; a project named "x-pages" keeps its name.
+   filename=filename.replace(ext==='pdf'?/-pages\.zip$/:/\.zip$/,`${ext==='pdf'?'-page':''}.${ext}`);
   }
   // The share sheet needs the tap that started the export to be recent; when
   // it is too old the browser refuses and the file is downloaded instead.

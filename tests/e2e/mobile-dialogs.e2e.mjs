@@ -3,7 +3,7 @@
 // images). Phone and tablet tests use real touch sequences; the last test checks
 // that desktop keeps its dialogs.
 import {test,before,after} from 'node:test';import assert from 'node:assert/strict';
-import {createServer} from 'vite';import {chromium} from 'playwright-core';import * as mupdf from 'mupdf';
+import {createServer} from 'vite';import {chromium} from 'playwright-core';import * as mupdf from 'mupdf';import {zipSync} from 'fflate';
 import {mkdtemp,writeFile,readFile,rm} from 'node:fs/promises';import {tmpdir} from 'node:os';import {join} from 'node:path';
 
 const touch={deviceScaleFactor:2,isMobile:true,hasTouch:true};
@@ -226,6 +226,12 @@ test('#33 PDF to images saves a single page as the image itself on a phone',{tim
  {const {context,page,errors}=await open(iphone);
   const download=await exportPng(page),bytes=await readFile(await download.path());
   assert.match(download.suggestedFilename(),/\.png$/);assert.deepEqual([...bytes.subarray(0,4)],[0x89,0x50,0x4e,0x47],'a PNG, not a ZIP');
+  // Only a split export's -pages becomes -page: a project named "Trip-pages" keeps its name.
+  for(const [inner,want] of [['page-001.png','Trip-pages.png'],['page-001.pdf','Trip-page.pdf']]){
+   const zip=[...zipSync({[inner]:new Uint8Array([1,2,3])})];
+   const [d]=await Promise.all([page.waitForEvent('download',{timeout:30000}),page.evaluate(async zip=>{const {saveExport}=await import('/src/export-save.ts');await saveExport(new Blob([new Uint8Array(zip)],{type:'application/zip'}),'Trip-pages.zip');},zip)]);
+   assert.equal(d.suggestedFilename(),want);
+  }
   assert.deepEqual(errors,[]);await context.close();}
  // Where the browser can share files, the system share sheet gets the PNG.
  {const {context,page,errors}=await open(iphone);
