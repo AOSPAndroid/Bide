@@ -1,1 +1,71 @@
 /* Phones and touch screens: dialogs. Rules here only apply at phone sizes or to coarse pointers. */
+
+/* Small screens: the dialog's buttons stay pinned to its bottom edge, so Apply
+   or Export is on screen however long the dialog is. The negative offsets cancel
+   the modal's padding (sticky stops at its content edge). */
+@media (max-width:600px),(max-height:500px){
+ .modal{--modal-pad:18px;padding:var(--modal-pad);overscroll-behavior:contain}
+ .modal .dialog-actions{position:sticky;bottom:calc(-1*var(--modal-pad));z-index:3;margin:16px calc(-1*var(--modal-pad)) calc(-1*var(--modal-pad));padding:10px var(--modal-pad) var(--modal-pad);background:var(--surface);border-top:1px solid var(--line)}
+ .modal input:not([type=checkbox]):not([type=color]):not([type=range]),.modal select,.modal textarea,.pdf-tool-search input{font-size:16px}
+}
+
+/* Landscape phones: the dialog uses the whole height, and the warp grid and the
+   signature pad shrink to fit beside their buttons. */
+@media (max-height:500px){
+ .modal-backdrop{padding:8px}
+ .modal{--modal-pad:14px;max-height:calc(100dvh - 16px)}
+ .modal-header{margin-bottom:8px}
+ .modal>.muted{margin-bottom:10px}
+ .warp-editor{max-height:calc(100dvh - 215px);margin-top:8px}
+ .modal .segmented{margin:8px 0}
+ .signature-pad canvas{height:min(170px,calc(100dvh - 235px))}
+ .signature-pad span{top:auto;bottom:18px}
+}
+
+/* Touch: targets of at least 40-44px, and the explanations that desktop shows
+   as tooltips are written out under their checkbox. */
+@media (pointer:coarse){
+ .modal-header>.icon-button{width:44px;height:44px;margin:-8px -8px 0 0}
+ .modal .dialog-actions button{min-height:44px;padding-left:16px;padding-right:16px}
+ .modal .dialog-actions input[type=color]{width:44px;height:44px}
+ .modal .check-label,.redact-presets label,.redact-hit{min-height:44px;font-size:14px;gap:10px}
+ .modal .check-label[title]{flex-wrap:wrap;align-content:center}
+ .modal .check-label[title]::after{content:attr(title);flex-basis:100%;padding:0 0 6px 30px;font-size:12px;line-height:1.45;color:var(--muted)}
+ .modal input[type=checkbox]{width:20px;height:20px;flex:none}
+ .modal .color-field{min-height:44px;font-size:13px}
+ .redact-presets{gap:0 16px}
+ .redact-list{gap:0}
+ .doubts{gap:10px}
+ .doubt{gap:8px}
+ .doubt button{min-height:40px;padding:8px 14px;font-size:14px}
+ .warp-editor{overflow:visible}
+ .pdf-start-actions kbd{display:none}
+ /* A toast has no controls: a tap on it reaches the dialog or page strip below. */
+ .toast{pointer-events:none}
+}
+
+/* Find & redact on narrow screens: each match is shown with a few words around
+   it (RedactDialog marks the rest .redact-far), wrapped, never scrolled sideways. */
+@media (max-width:820px),(pointer:coarse){
+ .modal .field-label{display:flex;flex-direction:column;gap:6px}
+ .redact-hit{align-items:flex-start;padding:4px 0}
+ .redact-hit>input{margin-top:1px}
+ .redact-hit .line-text{white-space:normal;overflow-wrap:anywhere;min-width:0;line-height:1.6}
+ .redact-far{display:none}
+ .redact-gap::before{content:'…'}
+}
+
+/* Phones: Organize pages opens the page strip; its page menu is a finger-sized
+   button and the hint about it is shown. */
+@media (max-width:820px){
+ .workspace-layout[data-panel=pages] .page-more{min-width:40px;min-height:40px;display:flex;align-items:center;justify-content:center}
+ .workspace-layout[data-panel=pages] .panel-guide{display:block;font-size:12px}
+ .pdf-home-note{font-size:12px}
+}
+
+/* PDF home: no label below 11px on a phone. */
+@media (max-width:600px){
+ .workspace-eyebrow{font-size:12px}
+ .current-document small{font-size:11px}
+ .pdf-categories button>span{font-size:11px}
+}
