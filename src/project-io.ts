@@ -1,10 +1,9 @@
 // Reading files into a project: data URLs, .bide validation, image pages, and
 // the page renderings sent to the export engine.
-import {FabricImage,StaticCanvas,type FabricObject} from 'fabric';
+import {FabricImage,StaticCanvas,Group,type FabricObject} from 'fabric';
 import {blankPage,uid,type Page,type Project} from './model';
 import {Textbox} from './text-appearance';
-import {pdfFallbackStyle} from './text-regions';
-import {ensureFont,ensureDocumentFonts,documentEmbeddedFonts} from './fonts';
+import {ensureDocumentFonts,documentEmbeddedFonts} from './fonts';
 import {fontSupportsText} from './browser/engine';
 import {hasBlending} from './browser/layer-utils';
 import {needsRasterExport,rasterExportBounds} from './layer-style-render';
@@ -38,9 +37,9 @@ export async function imageFilePage(file:File):Promise<Page>{
  return p;
 }
 
-// Every page rendered to SVG for the export engine. Embedded PDF fonts that
-// lack typed characters fall back to their bundled match; pages with blend
-// modes are flattened to a PNG inside the SVG.
+// Every page rendered to SVG for the export engine. Unsupported embedded-font
+// characters stop export so the user can choose a font explicitly; pages with
+// blend modes are flattened to a PNG inside the SVG.
 export async function exportPayload(current:Project,ocr?:Map<string,{text:string;left:number;top:number;width:number;height:number}[]>){
  const pages = [];
  for (const p of current.pages) {
@@ -50,7 +49,8 @@ export async function exportPayload(current:Project,ocr?:Map<string,{text:string
    await c.loadFromJSON(p.canvas);
    // OCR edits over a PDF page: letters edits carry their new text; text layers made from OCR text are real text already.
    const edits=p.source?c.getObjects().flatMap(o=>{const t=o as FabricObject&{editedText?:string;recognizedKey?:string;ocrOriginalBounds?:{left:number;top:number;width:number;height:number}};if(typeof t.editedText!=='string'&&!(o instanceof Textbox&&t.recognizedKey?.startsWith('ocr:')))return [];const b=o.getBoundingRect();return [{text:t.editedText,left:b.left,top:b.top,width:b.width,height:b.height,original:t.ocrOriginalBounds}];}):[];
-   for(const object of c.getObjects()){const o=object as Textbox&PdfText;if(o instanceof Textbox&&o.pdfFontData&&o.fontFamily.startsWith('PDFfont-')&&!await fontSupportsText(o.pdfFontData,o.text)){const family=o.pdfFontFallback||'Lato';await ensureFont(family);o.set({fontFamily:family,...pdfFallbackStyle(o)});o.initDimensions();}}
+   const validateFonts=async(objects:FabricObject[])=>{for(const object of objects){const o=object as Textbox&PdfText;if(o instanceof Textbox&&o.pdfFontData&&o.fontFamily.startsWith('PDFfont-')&&!await fontSupportsText(o.pdfFontData,o.text))throw new Error('The embedded PDF font cannot draw some text. Remove unsupported characters or choose Font family explicitly before exporting. The font was not changed.');if(object instanceof Group)await validateFonts(object.getObjects());}};
+   await validateFonts(c.getObjects());
    // Layer styles and painted masks have no SVG form here: those layers go in as pixels.
    const objects=c.getObjects(),flattenBlends=hasBlending(objects);
    for(let i=0;i<objects.length;i++){

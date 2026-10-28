@@ -50,7 +50,7 @@ import {type SelectionPoint} from './selection-mask';
 import {makeBrush,brushWidth,brushNames,type BrushKind} from './brushes';
 import PageMenu from './PageMenu';
 import WarpEditor from './WarpEditor';
-import {pdfFallbackStyle,type TextRegion} from './text-regions';
+import {type TextRegion} from './text-regions';
 import DesignTools,{type ColorStyle} from './DesignTools';
 import {framePresets,layoutOffsets,type LayoutAction} from './design-layout';
 import {pageRaster,trimRaster,rasterLayer} from './retouch-canvas';
@@ -405,11 +405,21 @@ export default function App() {
       notify('PDF unlocked as an image. Use Marquee or Lasso; Undo restores the original PDF.');
     }catch(e){fail(e);}finally{setBusy('');}
   }
-  async function validateTextFont(o:Obj){if(!(o instanceof Textbox)||!(o as Obj).pdfFontData||!o.fontFamily.startsWith('PDFfont-'))return;const text=o.text;if(await fontSupportsText((o as Obj).pdfFontData!,text))return;if(!canvas.current?.getObjects().includes(o)||o.text!==text)return;const fallback=(o as Obj).pdfFontFallback||'Lato';await ensureFont(fallback);o.set({fontFamily:fallback,...pdfFallbackStyle(o as Obj)});o.initDimensions();canvas.current.requestRenderAll();saveCanvasRef.current();syncSelection();notify('The embedded font lacks newly typed characters. A matching bundled font was used.');}
+  async function validateTextFont(o:Obj){
+    const data=o.pdfFontData;if(!(o instanceof Textbox)||!data||!o.fontFamily.startsWith('PDFfont-'))return;
+    const text=o.text;if(await fontSupportsText(data,text))return;
+    if(!canvas.current?.getObjects().includes(o)||o.text!==text||!o.fontFamily.startsWith('PDFfont-'))return;
+    fail(new Error('The embedded PDF font does not contain some typed characters. Your text and font were kept. Remove those characters or choose Font family explicitly before downloading.'));
+  }
   async function editDetectedText(region:TextRegion){
     if(busy||loading.current)return;const originalPage=page;setBusy('Making text editable…');
     try{if(region.kind==='ocr'&&ocr.background==='transparent'&&originalPage.source)throw new Error('Unlock Original PDF first to clear scanned text to transparency.');
-      const {text,embedded}=await matchedDetectedTextbox(region,canvas.current!,originalPage,pageOcrRegions.current.get(originalPage.id)??textRegions,{ocrFont:ocr.font,ocrStyle:ocr.style,matchBlur:ocr.matchBlur,autoFont:!ocrFontChosen.current,appearanceRegions:textRegions});
+      const exactFontError='The exact PDF font is unavailable for this text. Original PDF font mode keeps this page unchanged. Choose New font explicitly in OCR settings to allow a metric-compatible replacement.';
+      const native=region.kind==='pdf',canDraw=native&&region.fontData&&region.fontId?await fontSupportsText(region.fontData,region.text):false;
+      if(native&&!canDraw&&ocr.editMode!=='font')throw new Error(exactFontError);
+      const editableRegion=native&&!canDraw?{...region,fontData:undefined,fontId:undefined}:region;
+      const {text,embedded}=await matchedDetectedTextbox(editableRegion,canvas.current!,originalPage,pageOcrRegions.current.get(originalPage.id)??textRegions,{ocrFont:ocr.font,ocrStyle:ocr.style,matchBlur:ocr.matchBlur,autoFont:!ocrFontChosen.current,appearanceRegions:textRegions});
+      if(native&&!embedded&&ocr.editMode!=='font')throw new Error(exactFontError);
       let nextSource=originalPage.source,nextData:string|undefined;
       if(region.kind==='pdf'&&originalPage.source){const result=await removePdfText(originalPage.source,originalPage.index,region.id);nextSource=result.id;nextData=result.data;}
       if(pageIdRef.current!==originalPage.id)return;const current=capture();const objects=[...((current.pages.find(p=>p.id===originalPage.id)!.canvas.objects||[]) as unknown[])].filter(o=>!region.layer||(o as {id?:string}).id!==region.layer);

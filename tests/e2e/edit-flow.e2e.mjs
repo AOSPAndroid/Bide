@@ -60,7 +60,7 @@ test('fields stay live across edits, Undo and Rescan on a scanned quote',{timeou
  }finally{await browser.close();await server.close();}
 });
 
-test('a digital PDF line in Helvetica is edited in its metric-compatible face',{timeout:300000},async()=>{
+test('a digital PDF keeps its unavailable original font until a matching font is explicitly chosen',{timeout:300000},async()=>{
  const {PDFDocument,StandardFonts}=await import('pdf-lib'),{mkdtemp,writeFile}=await import('node:fs/promises'),{tmpdir}=await import('node:os'),{join}=await import('node:path');
  // An invented statement line set in the standard (not embedded) Helvetica.
  const pdf=await PDFDocument.create(),font=await pdf.embedFont(StandardFonts.Helvetica),p=pdf.addPage([420,200]);
@@ -72,6 +72,15 @@ test('a digital PDF line in Helvetica is edited in its metric-compatible face',{
   const page=await browser.newPage({viewport:{width:1400,height:900}}),errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.goto(server.resolvedUrls.local[0]+'app/');await page.locator('input[type=file][accept*=".psd"]').setInputFiles(file);
   const field=page.locator('button[aria-label^="Edit detected text: Closing balance"]').first();await field.waitFor({timeout:60000});
+  const state=()=>page.evaluate(async()=>{const {restoreLocal}=await import('/src/model.ts');await new Promise(r=>setTimeout(r,1000));const p=await restoreLocal();return {source:p.pages[0].source,sources:p.sources,canvas:p.pages[0].canvas};});
+  const before=await state();await field.click();
+  await page.getByRole('dialog',{name:'Something needs your attention'}).getByText(/exact PDF font is unavailable/).waitFor();
+  assert.deepEqual(await state(),before,'the default refuses before removing native PDF text or adding a replacement layer');
+  await page.getByRole('button',{name:'Got it',exact:true}).click();
+  // Native-only pages expose the same explicit New font choice as scans.
+  await page.locator('.ocr-settings').evaluate(e=>e.setAttribute('open',''));
+  await page.getByLabel('Edit image text with').selectOption('font');
+  await page.locator('.ocr-settings').evaluate(e=>e.removeAttribute('open'));
   await field.click();
   // The line opens as a text layer being edited, its text selected: typing replaces it.
   await page.waitForFunction(()=>document.activeElement?.tagName==='TEXTAREA',null,{timeout:60000});
@@ -81,6 +90,45 @@ test('a digital PDF line in Helvetica is edited in its metric-compatible face',{
   assert.equal(layer.text,'Closing balance 3 421,85 EUR');
   assert.equal(layer.fontFamily,'Liberation Sans','Helvetica is replaced by the metric-compatible Liberation Sans, not Lato');
   assert.deepEqual(errors,[]);
+ }finally{await browser.close();await server.close();}
+});
+
+
+test('unsupported embedded PDF glyphs keep the typed text and font, and block export even inside groups',{timeout:300000},async()=>{
+ const mupdf=await import('mupdf'),{mkdtemp,readFile,writeFile}=await import('node:fs/promises'),{tmpdir}=await import('node:os'),{join}=await import('node:path');
+ const bytes=new Uint8Array(await readFile('src/browser/fonts/LiberationSans-Regular.ttf')),pdf=new mupdf.PDFDocument(),font=new mupdf.Font('LiberationSans',bytes),ref=pdf.addSimpleFont(font);
+ const p=pdf.addPage([0,0,420,200],0,{Font:{F1:ref}},'BT /F1 18 Tf 30 100 Td (Embedded sample) Tj ET');pdf.insertPage(-1,p);const buffer=pdf.saveToBuffer('');
+ const file=join(await mkdtemp(join(tmpdir(),'bide-embedded-')),'embedded.pdf');await writeFile(file,buffer.asUint8Array());buffer.destroy();p.destroy();ref.destroy();font.destroy();pdf.destroy();
+ const server=await createServer({logLevel:'error',server:{port:0,host:'127.0.0.1'}});await server.listen();
+ const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||undefined});
+ try{
+  const page=await browser.newPage({viewport:{width:1400,height:900},acceptDownloads:true}),errors=[],downloads=[];page.on('pageerror',e=>errors.push(e.message));page.on('download',d=>downloads.push(d));
+  const layer=()=>page.evaluate(async()=>{const {restoreLocal}=await import('/src/model.ts');await new Promise(r=>setTimeout(r,1000));return (await restoreLocal()).pages[0].canvas.objects.find(o=>o.type?.toLowerCase()==='textbox');});
+  await page.goto(server.resolvedUrls.local[0]+'app/');await page.locator('input[type=file][accept*=".psd"]').setInputFiles(file);
+  await page.locator('button[aria-label^="Edit detected text: Embedded sample"]').first().click({timeout:60000});
+  await page.waitForFunction(()=>document.activeElement?.tagName==='TEXTAREA',null,{timeout:60000});
+  const original=await layer();assert.match(original.fontFamily,/^PDFfont-/,'the initial edit uses the embedded PDF font');
+  // Global New font may allow a later edit to start with a replacement; it must
+  // never silently change the already selected embedded face after typing.
+  await page.keyboard.type('Embedded sample 🧑');await page.keyboard.press('Escape');
+  await page.getByRole('dialog',{name:'Something needs your attention'}).getByText(/embedded PDF font does not contain/).waitFor();
+  await page.getByRole('button',{name:'Got it',exact:true}).click();
+  const typed=await layer();assert.equal(typed.text,'Embedded sample 🧑');assert.equal(typed.fontFamily,original.fontFamily);assert.equal(typed.pdfFontData,original.pdfFontData);
+  await page.locator('.ocr-settings').evaluate(e=>e.setAttribute('open',''));await page.getByLabel('Edit image text with').selectOption('font');await page.locator('.ocr-settings').evaluate(e=>e.removeAttribute('open'));
+  // The actual download action refuses instead of silently substituting a font.
+  await page.locator('.document-actions .primary').click();await page.locator('.modal .dialog-actions .primary').click();
+  await page.getByRole('dialog',{name:'Something needs your attention'}).getByText(/choose Font family explicitly before exporting/).waitFor();
+  assert.equal(downloads.length,0);assert.deepEqual(await layer(),typed,'failed export leaves the typed text and font untouched');await page.getByRole('button',{name:'Got it',exact:true}).click();
+  await page.getByRole('dialog',{name:'Export document'}).getByRole('button',{name:'Close dialog',exact:true}).click();
+  // Groups go through the same export guard, including nested groups.
+  const grouped=await page.evaluate(async()=>{
+   const {restoreLocal}=await import('/src/model.ts'),{exportPayload}=await import('/src/project-io.ts');const current=await restoreLocal(),copy=structuredClone(current);
+   const group=objects=>({type:'Group',left:0,top:0,width:420,height:200,objects});copy.pages[0].canvas={objects:[group([group(copy.pages[0].canvas.objects)])]};const before=JSON.stringify(copy);let message='';try{await exportPayload(copy);}catch(e){message=e.message;}return {message,unchanged:JSON.stringify(copy)===before};
+  });assert.match(grouped.message,/choose Font family explicitly before exporting/);assert.equal(grouped.unchanged,true);
+  // Removing the unsupported character repairs export without changing the face.
+  await page.getByLabel('Text content').fill('Embedded sample updated');await page.waitForTimeout(1200);assert.equal((await layer()).fontFamily,original.fontFamily);
+  await page.locator('.document-actions .primary').click();const [download]=await Promise.all([page.waitForEvent('download',{timeout:120000}),page.locator('.modal .dialog-actions .primary').click()]);assert.match(download.suggestedFilename(),/\.pdf$/);
+  assert.equal((await layer()).fontFamily,original.fontFamily);assert.deepEqual(errors,[]);
  }finally{await browser.close();await server.close();}
 });
 

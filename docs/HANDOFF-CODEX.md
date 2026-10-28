@@ -93,3 +93,14 @@ The owner's target flow: open a file → it is scanned with the best method, no 
 - veraPDF was not run on the Factur-X PDFs.
 
 Privacy: never commit anything from `tests/real/` (private user documents; git-ignored). All test documents are invented.
+
+## Codex integration — 2026-10-28
+
+- The whole branch through `cf52f68` was merged into main in `8e99a5b`, without cherry-picking or merge conflicts. The pinned model downloader, authenticated model source, SHA checks, all model entries and the AI OCR default were retained.
+- Scanner-text downloads now remove the whole old OCR field, even when the visible edit patch covers only a changed suffix. The download regression compares every extracted token, including unchanged neighbouring text, and covers deletion.
+- Explicit Export PDF and Protect PDF commands still select PDF; the general download button keeps the new same-kind image default.
+- Font fidelity takes priority over making an edit succeed: scans reuse only their own line's pixels. Native PDF text requires a usable original embedded font unless the user explicitly chooses New font. Newly typed characters missing from an embedded font are kept with an error; export is blocked until the user removes them or explicitly chooses another font. No automatic substitute is allowed at download time.
+- The exact native PDF rewrite mentioned above remains unbuilt. A metric-compatible replacement is still available through the explicit New font choice.
+- On all four tilted fixtures, the edited line was measured at 300% both before and after editing. Edge-width changes were -0.24%, -8.67%, +2.44% and +2.32%; the comparison with a different reference line can otherwise suggest blur that was already present in the edited line. Existing pixel, angle, size and sharpness assertions were retained.
+- Final validation: 244 unit tests, 238 passed and six existing Windows-only platform skips; all 79 browser cases across the 29 files passed in partitions, including the new native-font guard case. No browser case was skipped or disabled. Three phone OCR settings cases also passed again after the font guard.
+- `npm run bench:ocr -- tesseract ai` completed all 17 pages for each engine. AI: 1.2170% line character error, 96.2760% words found, 97.3113% right; Tesseract: 12.1440%, 81.0209%, 91.1600%. Both AI angle pages found and correctly read all words. All AI outputs matched the earlier AI-only run; font safeguards do not alter recognition. These recognition scores do not measure the appearance of an edit; the image-patch and 300% checks above do.
