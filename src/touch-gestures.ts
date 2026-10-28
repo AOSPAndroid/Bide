@@ -20,8 +20,9 @@ export const HOLD_MS=90,MOVE_PX=8,LONG_MS=500;
 export type TouchHooks={
  // A pinch took over a touch the canvas had already started: undo what it did.
  cancel?:()=>void;
- // Keep a still finger until it moves or lifts, instead of handing it over after HOLD_MS.
- wait?:()=>boolean;
+ // Keep a still finger until it moves or lifts, instead of handing it over after HOLD_MS;
+ // 'lift': until it lifts, however it moves (tools that act once where it landed).
+ wait?:()=>boolean|'lift';
  // A one-finger drag starting here scrolls the workspace instead of reaching the canvas.
  dragPans?:(e:TouchEvent)=>boolean;
  // A finger held still for LONG_MS; true if it opened a menu, which then owns the touch.
@@ -34,7 +35,7 @@ export function attachTouchGestures(root:HTMLElement,{canvas,board,zoom,zoomArou
  zoomAround:(value:number,page:XY,screen:XY)=>void;
 }&TouchHooks){
  const fabric=()=>canvas() as unknown as FabricTouch|null;
- let held:{start:TouchEvent;moves:TouchEvent[];x:number;y:number;timer:number;pans:boolean}|undefined;
+ let held:{start:TouchEvent;moves:TouchEvent[];x:number;y:number;timer:number;pans:boolean;lift:boolean}|undefined;
  let pinch:{distance:number;zoom:number;page:XY}|undefined,pan:{x:number;y:number;left:number;top:number}|undefined;
  let forwarded=false,pressed=false,press=0,frame=0,latest:{zoom:number;screen:XY}|undefined;
  // The CSS preview: the page's untransformed position and real zoom, and the zoom and midpoint shown.
@@ -75,8 +76,8 @@ export function attachTouchGestures(root:HTMLElement,{canvas,board,zoom,zoomArou
   }
   const t=e.touches[0],f=fabric();
   if(f&&e.target===f.upperCanvasEl){
-   forwarded=false;const pans=!!dragPans?.(e);
-   held={start:e,moves:[],x:t.clientX,y:t.clientY,pans,timer:pans||wait?.()?0:window.setTimeout(flush,HOLD_MS)};
+   forwarded=false;const pans=!!dragPans?.(e),w=wait?.();
+   held={start:e,moves:[],x:t.clientX,y:t.clientY,pans,lift:w==='lift',timer:pans||w?0:window.setTimeout(flush,HOLD_MS)};
    if(longPress)press=window.setTimeout(()=>{press=0;if(held&&longPress(held.start)){drop();pressed=true;}},LONG_MS);
    swallow(e);return;
   }
@@ -93,7 +94,7 @@ export function attachTouchGestures(root:HTMLElement,{canvas,board,zoom,zoomArou
   if(pan){scroll(e.touches[0]);swallow(e);return;}
   if(held){
    const t=e.touches[0];held.moves.push(e);swallow(e);
-   if(Math.hypot(t.clientX-held.x,t.clientY-held.y)<=MOVE_PX)return;
+   if(held.lift||Math.hypot(t.clientX-held.x,t.clientY-held.y)<=MOVE_PX)return;
    // A finger that moves is a drag: a scroll from where it landed, or for the tool now.
    if(held.pans){pan={x:held.x,y:held.y,left:root.scrollLeft,top:root.scrollTop};drop();scroll(t);}else flush();
   }

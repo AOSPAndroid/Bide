@@ -24,7 +24,8 @@ export function revealEditedText(c:Canvas,{zoomRef,workspace,changeZoom}:{zoomRe
   c.calcOffset();const caret=t._calcTextareaPosition(),y=box.height<bottom-top-16?box.top+box.height/2:parseFloat(caret.top)-(caret.charHeight??0)*z/2;
   root.scrollTop+=y-(top+bottom)/2;
   if(box.left<ws.left+8||box.left+box.width>ws.right-8)root.scrollLeft+=box.width<ws.width-16?box.left+box.width/2-(ws.left+ws.right)/2:box.left-ws.left-8;
-  t.updateTextareaPosition();
+  // The canvas moved with the scroll: the typing textarea follows the caret, where the keyboard looks.
+  c.calcOffset();t.updateTextareaPosition();
  };
  let frame=0;const later=()=>{cancelAnimationFrame(frame);frame=requestAnimationFrame(()=>{frame=requestAnimationFrame(reveal);});};
  c.on('text:editing:entered',({target})=>{
