@@ -30,8 +30,9 @@ import {StampForm,CropForm,PasswordForm,type StampOptions,type CropMargins} from
 import {selectPages} from './page-range';
 import {blendModes} from './browser/layer-utils';
 import Documents from './Documents';
-import {clampZoom,fitZoom,markerColor} from './editor-tools';
+import {clampZoom,fitZoom,fitMargin,markerColor} from './editor-tools';
 import {attachTouchGestures} from './touch-gestures';
+import {sizeCanvas} from './canvas-backing';
 import {searchCommands,commandMetadata} from './command-search';
 import WorkspaceNav from './WorkspaceNav';
 import {IconButton,Field,ModalShell} from './ui-kit';
@@ -263,7 +264,7 @@ export default function App() {
   function fit() {
     const root = workspace.current;
     const p = projectRef.current.pages.find(p => p.id === pageIdRef.current) || projectRef.current.pages[0];
-    if (root && root.clientWidth>0 && root.clientHeight>0) { fittedPage.current=p.id;zoomAnchor.current = null; setZoom(fitZoom(p.width, p.height, root.clientWidth, root.clientHeight)); root.scrollTo(0,0); }
+    if (root && root.clientWidth>0 && root.clientHeight>0) { fittedPage.current=p.id;zoomAnchor.current = null; setZoom(fitZoom(p.width, p.height, root.clientWidth, root.clientHeight, fitMargin(root))); root.scrollTo(0,0); }
   }
   function changeZoom(value: number, at?: {x:number;y:number}) {
     const root = workspace.current, board = artboard.current;
@@ -317,7 +318,7 @@ export default function App() {
     canvas.current = c;
     const detachEvents=attachCanvasEvents(c,{retouch,retouchSettings,retouchTarget,saveCanvasRef,syncSelection,notify,validateTextFont,toolRef,snapRef,projectRef,pageIdRef,zoomRef,penRef,finishPenRef,loading,openLayerMenu,setLayerMenu,zoomOutRef,finishPen,setPenPreview,pageRef,setCrop,cropRef,paintRef,colorRef,regionRef,selectionPixels,selectionLayer,selectModeRef,selectObjectRef,wandRef,showMask,outlineOf,setRegion,workspace,textFont,changeZoom,setTool});
     // Pinch to zoom and two-finger pan on touch screens.
-    const detachTouch=workspace.current?attachTouchGestures(workspace.current,{canvas:()=>canvas.current,board:()=>artboard.current,zoom:()=>zoomRef.current,
+    const detachTouch=workspace.current?attachTouchGestures(workspace.current,{canvas:()=>canvas.current,board:()=>artboard.current,zoom:()=>zoomRef.current,...detachEvents.touch,
       zoomAround:(value,at,screen)=>{const z=clampZoom(value),root=workspace.current,b=artboard.current?.getBoundingClientRect();if(!root||!b)return;
         if(Math.abs(z-zoomRef.current)<1e-4){root.scrollLeft+=b.left+at.x*z-screen.x;root.scrollTop+=b.top+at.y*z-screen.y;return;}
         zoomAnchor.current={x:at.x,y:at.y,screenX:screen.x,screenY:screen.y};setZoom(z);}}):undefined;
@@ -632,7 +633,7 @@ export default function App() {
   useLayoutEffect(() => {
     const c = canvas.current; if (!c) return;
     c.backgroundColor = page.source ? '' : page.color;
-    c.setDimensions({ width: page.width * zoom, height: page.height * zoom });
+    sizeCanvas(c, page.width * zoom, page.height * zoom);
     c.setViewportTransform([zoom,0,0,zoom,0,0]); c.requestRenderAll();
     const anchor=zoomAnchor.current,root=workspace.current,bounds=artboard.current?.getBoundingClientRect();
     if(anchor&&root&&bounds){root.scrollLeft+=bounds.left+anchor.x*zoom-anchor.screenX;root.scrollTop+=bounds.top+anchor.y*zoom-anchor.screenY;zoomAnchor.current=null;}

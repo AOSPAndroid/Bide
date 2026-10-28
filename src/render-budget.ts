@@ -5,6 +5,11 @@ export function editorPreviewScale(zoom:number,pixelRatio=1){
  const requested=Math.max(.5,zoom*Math.max(1,pixelRatio));
  return [.5,1,1.5,2,3,300/72].find(scale=>scale>=requested)??300/72;
 }
+// Editor canvas backing pixels per CSS pixel: the screen density, lowered (even below 1)
+// so the canvas stays within `budget` pixels and 16384 px a side, where browsers still draw it.
+export function canvasBackingScale(width:number,height:number,ratio:number,budget:number){
+ return Math.min(ratio,Math.sqrt(budget/Math.max(1,width*height)),16384/Math.max(1,width,height));
+}
 // Keep 300 DPI available for normal pages without allocating huge canvases.
 export function pdfRasterScale(width:number,height:number,requested:number){
  const w=Math.max(1,width),h=Math.max(1,height);
