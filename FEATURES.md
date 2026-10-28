@@ -44,6 +44,13 @@
 - Touch screens get 44 px close buttons, dialog buttons, option rows and colour swatches, and 40 px spelling suggestions. Checkbox explanations that desktop shows as tooltips are written out under the option. A notice toast no longer blocks taps.
 - PDF to images and Split & extract on a touch screen save a single page as the PNG, JPEG, SVG or PDF itself, not a ZIP, and offer the system share sheet where the browser has one (Save Image, Files…). Desktop keeps the ZIP.
 - PDF home on phones: no label under 11 px, no Ctrl O badge on touch screens, and 16 px text inputs in phone dialogs.
+- The OCR bar folds its actions behind More but keeps the Straighten hint in view; on small tablets the bottom bar shows Pages and the page number beside the zoom; Properties section headers are touch-sized and Design & layout fits the inspector on any touch screen.
+- **Phones and tablets:** the workspace switcher shows PHOTO, PDF and DOCS under its icons as 44px targets. Phones, upright or on their side, start on the PDF tools home in every edition.
+- **Landscape phones:** the editor fits the screen instead of scrolling past its 570px desktop height. The status bar stays visible, and the Properties/Layers panel scrolls as one column.
+- **Touch screens:** a tapped button no longer keeps its hover colour (an orange button turned pale and looked disabled, a tapped icon looked active); hover looks apply only where a real hover exists (src/touch-hover.ts).
+- **Demo notice on phones:** the close button is 44px and the links 40px. The Windows download is not offered on touch screens, and in landscape the notice takes one line.
+- **Subscription build on phones:** the trial-ended card wraps long email addresses instead of running off the screen; sign-in cards scroll when taller than the screen (landscape, keyboard open); the account pill is 40px tall and covers no tool, and its menu has 44px buttons and closes on the first tap outside it, without that tap reaching the canvas.
+- **Add to Home Screen:** a web app manifest and bide icons (home screen, maskable, apple-touch-icon). The shortcut opens in the browser.
 
 ## v0.8.16 — Sharp text edits on scanned PDFs
 
