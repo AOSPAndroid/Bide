@@ -1,6 +1,6 @@
 import {inkDensity} from '../ocr-weight';
 import {segmentOcrLine,missingLines,type OcrGrouping} from '../ocr-segmentation';
-import {sampleBackground,estimateTextColor,toHex,edgeWidth,blurFromEdgeWidth,inkMass,prepareOcrPixels,estimateLineHeight} from '../ocr-image';
+import {sampleBackground,estimateTextColor,toHex,edgeWidth,blurFromEdgeWidth,inkMass,prepareOcrPixels,estimateLineHeight,growToInk} from '../ocr-image';
 import {prepareOcrImage} from './ocr-prepare';
 import {createWorker,PSM,type Worker as OcrEngine,type LoggerMessage} from 'tesseract.js';
 import type {TextRegion} from '../text-regions';
@@ -8,6 +8,7 @@ import type {OcrScript} from '../ai-image';
 import {inkMap,estimateSkew} from '../deskew';
 import {findSheet,sheetSize} from '../page-quad';
 import {unwarpPixels,mapSquare,type XY} from '../perspective';
+import {settleMarks} from '../glyph-edit';
 
 export type OcrProgress=(fraction:number,label:string)=>void;
 export type OcrReader='tesseract'|'paddle';
@@ -37,20 +38,37 @@ async function prepare(image:HTMLCanvasElement,signal?:AbortSignal):Promise<{inp
 
 // A tilted page is read straightened: the AI recognizer cuts each line out
 // as a level rectangle, so even 1.2° of tilt made it miss three words in
-// four. Regions are mapped back onto the original image; on a clearly tilted
-// page their letter cells are dropped (letter editing needs level text).
+// four. Each region keeps its level box and letter cells, moved to where its
+// centre lies on the original, and the tilt as its angle: turned by it, the
+// box covers the line's ink (a level box missed 9-14% of it) and letters can
+// be edited on a copy levelled the same way (detected-text.ts). The levelled
+// copy is softer than the photo: boxes first grow over their letters' faint
+// rows and columns (on an invented invoice photo they covered 89% of the
+// ink, 98% after), and commas and full stops get back the columns a
+// neighbouring letter's cell took from them.
 export async function recognizeImage(image:HTMLCanvasElement,options:OcrOptions={}):Promise<TextRegion[]>{
  options.signal?.throwIfAborted();
  const sheet=options.flatten===false||options.deskew===false?undefined:pageSheet(image);
  if(sheet)return readSheet(image,sheet,options);
  const tilt=options.deskew===false?undefined:pageTilt(image);
  if(!tilt)return recognizeLevel(image,options);
- const {canvas,toOriginal}=levelled(image,tilt);
+ const {canvas,toOriginal}=levelled(image,tilt),pixels=canvas.getContext('2d',{willReadFrequently:true})!.getImageData(0,0,canvas.width,canvas.height);
  return (await recognizeLevel(canvas,options)).map(r=>{
-  const c=toOriginal(r.left+r.width/2,r.top+r.height/2),dx=c.x-(r.left+r.width/2),dy=c.y-(r.top+r.height/2);
-  const {glyphs,...rest}=r;
-  return {...rest,left:r.left+dx,top:r.top+dy,baseline:r.baseline+dy,...(glyphs&&Math.abs(tilt)<=1?{glyphs:glyphs.map(g=>({...g,x0:g.x0+dx,x1:g.x1+dx}))}:{})};
+  const bg=[1,3,5].map(i=>parseInt((r.background||'#ffffff').slice(i,i+2),16)),b=growToInk(pixels,{x0:r.left,y0:r.top,x1:r.left+r.width,y1:r.top+r.height},bg),width=b.x1-b.x0,height=b.y1-b.y0;
+  const c=toOriginal(b.x0+width/2,b.y0+height/2),dx=c.x-(b.x0+width/2),dy=c.y-(b.y0+height/2),glyphs=r.glyphs&&markCells(pixels,r,bg);
+  return {...r,left:b.x0+dx,top:b.y0+dy,width,height,baseline:r.baseline+dy,angle:tilt,...(glyphs?{glyphs:glyphs.map(g=>({...g,x0:g.x0+dx,x1:g.x1+dx}))}:{})};
  }).filter(r=>r.left+r.width>0&&r.top+r.height>0&&r.left<image.width&&r.top<image.height);
+}
+// Letter cells with commas and full stops settled (glyph-edit.ts): ink per
+// column of the region's box, above and below 60% of its height.
+function markCells(img:ImageData,r:TextRegion,bg:number[]){
+ if(!r.glyphs!.some(g=>g.ch===','||g.ch==='.'))return r.glyphs;
+ const {data,width}=img,x0=Math.max(0,Math.floor(r.left)),x1=Math.min(width,Math.ceil(r.left+r.width)),y0=Math.max(0,Math.floor(r.top)),y1=Math.min(img.height,Math.ceil(r.top+r.height)),split=Math.round(y0+(y1-y0)*.6);
+ const contrast=(x:number,y:number)=>{const i=(y*width+x)*4;return Math.max(Math.abs(data[i]-bg[0]),Math.abs(data[i+1]-bg[1]),Math.abs(data[i+2]-bg[2]));};
+ let peak=0;for(let y=y0;y<y1;y++)for(let x=x0;x<x1;x++)peak=Math.max(peak,contrast(x,y));
+ const t=Math.max(40,peak*.45),upper=new Float32Array(x1-x0),lower=new Float32Array(x1-x0);
+ for(let y=y0;y<y1;y++)for(let x=x0;x<x1;x++)if(contrast(x,y)>t)(y<split?upper:lower)[x-x0]++;
+ return settleMarks(r.glyphs!,upper,lower,x0);
 }
 // A sheet photographed at an angle on a darker surface (page-quad.ts), found
 // on a copy at most 600 px across; corners in the image's pixels.
@@ -73,7 +91,7 @@ async function readSheet(image:HTMLCanvasElement,corners:XY[],options:OcrOptions
   const box=[at(r.left,r.top),at(r.left+r.width,r.top),at(r.left+r.width,r.top+r.height),at(r.left,r.top+r.height)];
   const left=Math.min(...box.map(p=>p.x)),top=Math.min(...box.map(p=>p.y)),right=Math.max(...box.map(p=>p.x)),bottom=Math.max(...box.map(p=>p.y));
   const across=Math.hypot(box[1].x-box[0].x,box[1].y-box[0].y)/Math.max(1,r.width),down=Math.hypot(box[3].x-box[0].x,box[3].y-box[0].y)/Math.max(1,r.height);
-  const {glyphs:_,...rest}=r;
+  const {glyphs:_,angle:_angle,...rest}=r;
   return {...rest,left,top,width:right-left,height:bottom-top,size:r.size*down,baseline:at(r.left+r.width/2,r.baseline).y,
    ...(r.words?{words:r.words.map(w=>w.width===undefined?w:{...w,width:w.width*across})}:{}),
    ...(r.line?{line:{...r.line,words:r.line.words.map(w=>w.width===undefined?w:{...w,width:w.width*across})}}:{})};

@@ -59,6 +59,24 @@ export function segmentGlyphs(text:string,centers:number[],x0:number,x1:number,c
  return chars.map((ch,i)=>({ch,x0:bounds[i],x1:bounds[i+1]}));
 }
 
+// A comma or full stop touching the next letter (blurred photos) was often
+// cut through its middle, so the neighbour, reused elsewhere, carried half
+// of it. A mark's cell grows over the run of columns around it that are
+// inked low (`lower`) with nothing above (`upper`: ink per column, index
+// x - offset), and the cells next to it give those columns up.
+export function settleMarks(glyphs:Glyph[],upper:ArrayLike<number>,lower:ArrayLike<number>,offset=0):Glyph[]{
+ const out=glyphs.map(g=>({...g})),mark=(x:number)=>(upper[x-offset]??1)===0&&(lower[x-offset]??0)>0;
+ out.forEach((g,i)=>{
+  if(!/^[.,]$/.test(g.ch))return;
+  const prev=out[i-1],next=out[i+1],from=Math.ceil(prev?(prev.x0+prev.x1)/2:g.x0-1),to=Math.floor(next?(next.x0+next.x1)/2:g.x1+1);
+  let run:{a:number;b:number}|undefined,distance=Infinity;
+  for(let x=from;x<to;){if(!mark(x)){x++;continue;}let b=x;while(b<to&&mark(b))b++;const d=b<=g.x0?g.x0-b:x>=g.x1?x-g.x1:0;if(d<distance){distance=d;run={a:x,b};}x=b;}
+  if(!run||distance>1||run.a>=g.x0&&run.b<=g.x1||prev&&run.a<prev.x0+1||next&&run.b>next.x1-1)return;
+  g.x0=Math.min(g.x0,run.a);g.x1=Math.max(g.x1,run.b);if(prev&&prev.x1>g.x0)prev.x1=g.x0;if(next&&next.x0<g.x1)next.x0=g.x1;
+ });
+ return out;
+}
+
 // Contiguous cells for every character of a line, spaces included, from the
 // glyph boxes of its non-space characters (in order). Within a word, gaps or
 // overlaps between boxes are split at their midpoint; a space spans the gap

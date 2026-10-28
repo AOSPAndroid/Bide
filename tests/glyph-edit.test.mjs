@@ -51,3 +51,12 @@ test('line metrics find the baseline and x-height whatever the descenders',async
  const descending=[2,2,3,9,10,10,9,3,2,2];assert.deepEqual(lineMetrics(descending),{xTop:3,baseline:7,xHeight:4},'descenders do not move the baseline');
  assert.equal(lineMetrics([0,0]),undefined);
 });
+test('a comma cut through its middle by its neighbour\'s cell gets its columns back',async()=>{
+ const {settleMarks}=await import('../tmp/glyph-edit.mjs');
+ // "2,2": a 2 at 0-8, a comma inked low at 9-12 with nothing above, and a 2 at 13-19 whose cell took 10-12.
+ const upper=[3,3,3,3,3,3,3,3,0,0,0,0,0,3,3,3,3,3,3,3],lower=[3,3,3,3,3,3,3,3,0,2,2,2,1,3,3,3,3,3,3,3];
+ assert.deepEqual(settleMarks([{ch:'2',x0:0,x1:9},{ch:',',x0:9,x1:10},{ch:'2',x0:10,x1:20}],upper,lower).map(g=>[g.ch,g.x0,g.x1]),[['2',0,9],[',',9,13],['2',13,20]]);
+ // A mark whose cell already holds its ink keeps it.
+ const fine=[{ch:'2',x0:0,x1:9},{ch:',',x0:8.5,x1:13.5},{ch:'2',x0:13.5,x1:20}];
+ assert.deepEqual(settleMarks(fine,upper,lower),fine);
+});
