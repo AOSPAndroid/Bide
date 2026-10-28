@@ -1,5 +1,5 @@
 import {Textbox} from './text-appearance';
-import { Circle, Rect, FabricObject } from 'fabric';
+import { Circle, Rect, FabricObject, Point, util, controlsUtils } from 'fabric';
 import { uuid } from './browser/crypto';
 // Registers the adjustment layer class so saved pages load it.
 import './adjustment-layer';
@@ -7,6 +7,24 @@ import './adjustment-layer';
 FabricObject.customProperties = ['id', 'name','pdfFontData','pdfOriginalFont','pdfFontFallback','pdfFontBold','pdfFontItalic','recognizedKey','objectCaching','textSoftness','layerMask','layerStyle'];
 // The editor's coordinates use top-left anchors. Fabric 7 defaults to centered anchors.
 Object.assign(FabricObject.ownDefaults, { originX: 'left', originY: 'top', cornerColor: '#ffffff', cornerStrokeColor: '#a83c1c', borderColor: '#c44c28', cornerSize: 9, transparentCorners: false, padding: 3 });
+// Phones and tablets: handles a finger can see and grab, just outside the object.
+if (typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches) {
+  Object.assign(FabricObject.ownDefaults, { cornerSize: 13, touchCornerSize: 32, padding: 8 });
+  // Top/bottom handles only stretch the letters, and on a one-line box their touch areas cover its middle.
+  Textbox.createControls = () => { const { mt: _mt, mb: _mb, ...controls } = controlsUtils.createTextboxDefaultControls(); return { controls }; };
+}
+// A finger inside a small object drags it: the touch areas of its box handles
+// would otherwise cover nearly all of it. Its handles stay reachable just outside.
+const BOX = new Set(['tl', 'tr', 'bl', 'br', 'ml', 'mr', 'mt', 'mb']);
+const findControl = FabricObject.prototype.findControl;
+FabricObject.prototype.findControl = function (this: FabricObject, pointer: Point, forTouch = false) {
+  const hit = findControl.call(this, pointer, forTouch), c = this.canvas;
+  if (!hit || !forTouch || !c || !BOX.has(hit.key)) return hit;
+  if (Math.min(this.getScaledWidth(), this.getScaledHeight()) * c.getZoom() >= 3 * this.touchCornerSize) return hit;
+  if (!this.containsPoint(pointer.transform(util.invertTransform(c.viewportTransform)))) return hit;
+  (this as unknown as { __corner?: string }).__corner = undefined;
+  return undefined;
+};
 
 export type Page = { id: string; name: string; width: number; height: number; color: string; source?: string; index: number; canvas: Record<string, unknown>; thumb?: string; guides?: { x: number[]; y: number[] }; forms?: import('./forms').FormField[] };
 export type Project = { version: 1; name: string; pages: Page[]; sources: Record<string, string> };
