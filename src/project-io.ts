@@ -33,6 +33,7 @@ export async function imageFilePage(file:File):Promise<Page>{
  Object.assign(image, { id: uid(), name: file.name });
  const p = blankPage(image.width * ratio, image.height * ratio);
  p.name = file.name.replace(/\.[^.]+$/, '');
+ if (/^image\/(png|jpeg|webp)$/.test(file.type)) p.file = { type: file.type, width: image.width, height: image.height };
  p.canvas = { objects: [image.toObject()] };
  return p;
 }

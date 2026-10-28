@@ -32,7 +32,11 @@ async function previewCanvas(source:string,index:number,scale:number,width?:numb
 // Page raster for OCR, flattened onto the page colour and capped at 3600px
 // (photos are read at up to 3600px too: small print reads better at full size).
 async function ocrRaster(p:Page,c:Canvas){
- const source=p.source?await previewCanvas(p.source,p.index,Math.min(4,3600/Math.max(p.width,p.height))):pageRaster(c,p.width,p.height,c.getObjects().filter(o=>o instanceof FabricImage),3600);
+ const pdfScale=Math.min(4,3600/Math.max(p.width,p.height));
+ const source=p.source?await previewCanvas(p.source,p.index,pdfScale):pageRaster(c,p.width,p.height,c.getObjects().filter(o=>o instanceof FabricImage),3600);
+ // Edits drawn over a PDF page are read too: a rescan after an edit used to read the old digits again.
+ const edits=p.source?c.getObjects().filter(o=>o instanceof FabricImage&&o.visible):[];
+ if(edits.length){const z=c.getZoom(),background=c.backgroundColor;c.backgroundColor='';try{source.getContext('2d')!.drawImage(c.toCanvasElement(pdfScale/z,{width:p.width*z,height:p.height*z,filter:o=>edits.includes(o as FabricObject)}),0,0,source.width,source.height);}finally{c.backgroundColor=background;}}
  const ratio=Math.min(1,3600/Math.max(source.width,source.height)),reduced=document.createElement('canvas');reduced.width=Math.round(source.width*ratio);reduced.height=Math.round(source.height*ratio);
  const ctx=reduced.getContext('2d')!;ctx.fillStyle=p.color==='transparent'?'#ffffff':p.color;ctx.fillRect(0,0,reduced.width,reduced.height);ctx.drawImage(source,0,0,reduced.width,reduced.height);return reduced;
 }
@@ -74,7 +78,7 @@ function aiOcrLabel(regions:TextRegion[]){
  const scripts=[...new Set(regions.map(r=>r.script).filter((s):s is OcrScript=>!!s))];
  return scripts.length?`AI OCR (${scripts.map(s=>scriptLabels[s]).join(' + ')})`:'AI OCR (Latin languages)';
 }
-export async function scanPageText(p:Page,c:Canvas,{signal,grouping,thorough,languages,engine='tesseract',aiSharpen=false,script='auto',accurate=false,onStatus}:{signal:AbortSignal;grouping:OcrGrouping;thorough:boolean;languages:string[];engine?:'tesseract'|'paddle';aiSharpen?:boolean;script?:OcrScript|'auto';accurate?:boolean;onStatus:(status:string)=>void}):Promise<{regions:TextRegion[];all?:TextRegion[];status:string;suggestedFont?:string}>{
+export async function scanPageText(p:Page,c:Canvas,{signal,grouping,thorough,languages,engine='tesseract',aiSharpen=false,script='auto',accurate=false,onStatus,onRegions}:{signal:AbortSignal;grouping:OcrGrouping;thorough:boolean;languages:string[];engine?:'tesseract'|'paddle';aiSharpen?:boolean;script?:OcrScript|'auto';accurate?:boolean;onStatus:(status:string)=>void;onRegions?:(regions:TextRegion[])=>void}):Promise<{regions:TextRegion[];all?:TextRegion[];status:string;suggestedFont?:string}>{
  onStatus('Detecting text…');
  let ocrLayer=false;
  if(p.source){const detected=await detectPdfText(p.source,p.index);signal.throwIfAborted();ocrLayer=!!detected.ocrLayer;if(detected.regions.length)return {regions:detected.regions,status:`${detected.regions.length} editable text regions${detected.skipped?' · rotated text kept unchanged':''}`};}
@@ -90,7 +94,8 @@ export async function scanPageText(p:Page,c:Canvas,{signal,grouping,thorough,lan
  const layers=c.getObjects().map(o=>({recognizedKey:(o as Tagged).recognizedKey,bounds:o.getBoundingRect()}));
  const all=scaleRegions(detected,p.width/raster.width,p.height/raster.height),regions=unconvertedRegions(all,layers);
  let suggestedFont:string|undefined;
- if(regions.length){onStatus('Matching font…');try{suggestedFont=await suggestFont(raster,detected);}catch{}signal.throwIfAborted();}
+ // The fields can be tapped while the font is matched (1.5 to 3 s).
+ if(regions.length){onRegions?.(regions);onStatus('Matching font…');try{suggestedFont=await suggestFont(raster,detected);}catch{}signal.throwIfAborted();}
  return {regions,all,suggestedFont,status:ocrScanStatus(regions.length,engine==='paddle'?aiOcrLabel(detected):languageLabel(languages,await bundledOcrLanguages()),layers.some(l=>l.recognizedKey),regions.filter(isUncertain).length)+(suggestedFont?` · closest font: ${suggestedFont}`:'')};
 }
 

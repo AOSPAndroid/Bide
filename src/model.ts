@@ -26,7 +26,9 @@ FabricObject.prototype.findControl = function (this: FabricObject, pointer: Poin
   return undefined;
 };
 
-export type Page = { id: string; name: string; width: number; height: number; color: string; source?: string; index: number; canvas: Record<string, unknown>; thumb?: string; guides?: { x: number[]; y: number[] }; forms?: import('./forms').FormField[] };
+export type Page = { id: string; name: string; width: number; height: number; color: string; source?: string; index: number; canvas: Record<string, unknown>; thumb?: string; guides?: { x: number[]; y: number[] }; forms?: import('./forms').FormField[];
+  // A page opened from a picture: its file type and pixel size, so it downloads as the same kind of file.
+  file?: { type: string; width: number; height: number } };
 export type Project = { version: 1; name: string; pages: Page[]; sources: Record<string, string> };
 export const uid = uuid;
 export const blankPage = (width = 595, height = 842): Page => ({ id: uid(), name: 'Untitled page', width, height, color: '#ffffff', index: 0, canvas: { objects: [] } });

@@ -82,3 +82,15 @@ export function doubtfulLetters(region:{text:string;glyphs?:{p?:number}[]},thres
  Array.from(region.text).forEach((ch,i)=>{if(/\s/.test(ch))return;const p=region.glyphs![g++]?.p;if(p!==undefined&&p<threshold)out.push(i);});
  return out;
 }
+// The fields after an edit, without rescanning the page: an edited field shows
+// its new text, keeps its place and remembers the region as first read; a field
+// turned into a text layer leaves the overlay (the layer itself is editable).
+export function regionsAfterEdit(regions:TextRegion[],edits:{region:TextRegion;text?:string;layer:string;letters:boolean}[]):TextRegion[]{
+ const byId=new Map(edits.map(e=>[e.region.id,e]));
+ return regions.flatMap(r=>{
+  const e=byId.get(r.id);if(!e)return [r];if(!e.letters)return [];
+  const original=r.original??e.region,{glyphs:_glyphs,confidence:_confidence,...rest}=original;
+  return [{...rest,text:e.text??original.text,original,layer:e.layer}];
+ });
+}
+
