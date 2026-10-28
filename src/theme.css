@@ -82,6 +82,8 @@ h1,h2,.brand {color:var(--ink)}
 .ruler span:after {background:var(--line)}
 .ruler:before {background:repeating-linear-gradient(90deg,transparent 0 9px,var(--line) 9px 10px)}
 .canvas-workspace {background-image:radial-gradient(#686b7426 .7px,transparent .7px);scrollbar-color:var(--subtle) transparent}
+/* Touch: pinch, pan and scrolling over the page are handled in touch-gestures.ts. */
+.canvas-workspace {touch-action:none;overscroll-behavior:contain}
 .artboard {box-shadow:0 9px 35px #25272d1f,0 0 0 1px #25272d14}
 .artboard-label,.artboard-label>span:last-child,.artboard-below {color:var(--muted)}
 .canvas-footer,.statusbar {background:var(--surface);border-color:var(--line);color:var(--muted)}
