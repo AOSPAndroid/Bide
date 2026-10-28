@@ -1,6 +1,6 @@
 export type OcrGrouping='smart'|'words'|'lines';
 type Box={x0:number;y0:number;x1:number;y1:number};
-type Word={text:string;bbox:Box;confidence?:number;chars?:{ch:string;x0:number;x1:number;p?:number}[]};
+type Word={text:string;bbox:Box;confidence?:number;chars?:{ch:string;x0:number;x1:number;p?:number;c?:number}[]};
 export type OcrGroup=Word&{words:Word[]};
 // Specks, borders and icons come back as low-confidence punctuation-only "words".
 const noise=(w:Word)=>(w.confidence??100)<25&&!/[\p{L}\p{N}]/u.test(w.text);
@@ -48,6 +48,16 @@ export function segmentOcrLine(line:Line,mode:OcrGrouping='smart'):OcrGroup[]{
   last=word;
  }
  return (rtl?runs.reverse():runs).map(words=>group(words,rtl));
+}
+// A coloured badge next to text ("Livret A" then "NOUVEAU" on a light blue
+// pill) is read as one phrase with it: a group is split between two words
+// whose backgrounds (sampled around each) differ by `min` or more in some
+// channel when either word sits on a badge (a patch of flat colour).
+export function splitAtBackgrounds(part:OcrGroup,backgrounds:readonly {rgb:readonly number[];badge:boolean}[],min=16):OcrGroup[]{
+ if(part.words.length<2||backgrounds.length!==part.words.length)return [part];
+ const out:Word[][]=[[part.words[0]]];
+ for(let i=1;i<part.words.length;i++){const a=backgrounds[i-1],b=backgrounds[i];if((a.badge||b.badge)&&Math.max(...[0,1,2].map(c=>Math.abs(a.rgb[c]-b.rgb[c])))>=min)out.push([]);out.at(-1)!.push(part.words[i]);}
+ return out.length===1?[part]:out.map(words=>group(words));
 }
 // Lines from a second (sparse-text) pass that the first pass did not cover.
 export function missingLines<T extends {bbox:Box}>(primary:{bbox:Box}[],extra:T[]):T[]{

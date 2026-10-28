@@ -1,5 +1,6 @@
 // Pure geometry and bookkeeping for detected text regions (no DOM, no fabric).
 import type {TextRegion} from './text-regions';
+import {UNREAD} from './glyph-edit';
 type Bounds={left:number;top:number;width:number;height:number};
 
 export function recognitionKey(r:TextRegion){return `${r.kind}:${Math.round(r.left)}:${Math.round(r.top)}:${r.text}`;}
@@ -103,11 +104,12 @@ export function attachNumberParts(texts:string[],bold:(boolean|undefined)[]){
 }
 
 // Code-point indexes (in region.text) of letters the recognizer was unsure of.
-// Glyphs follow the non-space characters of the text in order.
+// Glyphs follow the non-space characters of the text in order (placeholder
+// cells, glyph-edit.ts UNREAD, have no character).
 export const DOUBT=0.6;
-export function doubtfulLetters(region:{text:string;glyphs?:{p?:number}[]},threshold=DOUBT){
- const out:number[]=[];if(!region.glyphs)return out;let g=0;
- Array.from(region.text).forEach((ch,i)=>{if(/\s/.test(ch))return;const p=region.glyphs![g++]?.p;if(p!==undefined&&p<threshold)out.push(i);});
+export function doubtfulLetters(region:{text:string;glyphs?:{ch?:string;p?:number}[]},threshold=DOUBT){
+ const out:number[]=[];if(!region.glyphs)return out;const glyphs=region.glyphs.filter(g=>g.ch!==UNREAD);let g=0;
+ Array.from(region.text).forEach((ch,i)=>{if(/\s/.test(ch))return;const p=glyphs[g++]?.p;if(p!==undefined&&p<threshold)out.push(i);});
  return out;
 }
 // The fields after an edit, without rescanning the page: an edited field shows

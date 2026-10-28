@@ -1,8 +1,13 @@
 // Editing image text with its own letters: character cells measured on the
 // original line, and a plan that rebuilds edited text from those cells (or
 // matching letters elsewhere on the page) instead of a substitute font.
-// `p`: the recognizer's confidence in this letter (0-1), when known.
-export type Glyph={ch:string;x0:number;x1:number;p?:number};
+// `p`: the recognizer's confidence in this letter (0-1), when known; `c`:
+// where it placed the letter, until the scan is typeset (ocr-typography.ts).
+export type Glyph={ch:string;x0:number;x1:number;p?:number;c?:number};
+// A placeholder cell: ink the reading did not cover (a symbol the recognizer
+// lacks, such as ★). It adds no character to the text; its cell sits in the
+// line before the next character, so a letter edit can keep its pixels.
+export const UNREAD='\uFFFC';
 export type Cell=Glyph&{space?:boolean};
 // Borrowed letters carry their line's band and baseline (page units) and the page they come from.
 export type LibraryGlyph=Glyph&{y0:number;y1:number;source:string;baseline?:number;page?:string};
@@ -81,12 +86,16 @@ export function settleMarks(glyphs:Glyph[],upper:ArrayLike<number>,lower:ArrayLi
 // glyph boxes of its non-space characters (in order). Within a word, gaps or
 // overlaps between boxes are split at their midpoint; a space spans the gap
 // between the words around it. Returns undefined if glyphs and text disagree.
+// A placeholder glyph (UNREAD) is a cell of its own before the next
+// character: the cells spell the text with UNREAD where they lie.
 export function lineCells(text:string,glyphs:Glyph[]):Cell[]|undefined{
  const chars=Array.from(text),cells:Cell[]=[];let g=0;
+ const unread=()=>{while(glyphs[g]?.ch===UNREAD)cells.push({...glyphs[g++]});};
  for(const ch of chars){
   if(/\s/.test(ch)){cells.push({ch,x0:NaN,x1:NaN,space:true});continue;}
-  const glyph=glyphs[g++];if(!glyph||glyph.ch!==ch)return undefined;cells.push({...glyph});
+  unread();const glyph=glyphs[g++];if(!glyph||glyph.ch!==ch)return undefined;cells.push({...glyph});
  }
+ unread();
  if(g!==glyphs.length)return undefined;
  for(let i=0;i+1<cells.length;i++){const a=cells[i],b=cells[i+1];if(!a.space&&!b.space&&a.x1!==b.x0){const m=(a.x1+b.x0)/2;a.x1=m;b.x0=m;}}
  for(let i=0;i<cells.length;i++){const c=cells[i];if(!c.space)continue;const prev=cells.slice(0,i).reverse().find(x=>!x.space),next=cells.slice(i+1).find(x=>!x.space);if(!prev||!next)return undefined;c.x0=prev.x1;c.x1=next.x0;}
@@ -101,6 +110,20 @@ function align(text:string[],next:string[]){
  const keep=new Array<number>(m).fill(-1);let i=0,j=0;
  while(i<n&&j<m){if(text[i]===next[j]){keep[j]=i;i++;j++;}else if(dp[i+1][j]>=dp[i][j+1])i++;else j++;}
  return keep;
+}
+
+// `next`, an edit of the line's text, with the line's placeholder cells
+// (lineCells) in place: each stays before the character it preceded, or
+// after the one before that, while the edit keeps that character; an edit
+// of both takes it away.
+export function withUnread(text:string,cells:Cell[],next:string){
+ const read=Array.from(text),b=Array.from(next),at=new Array<number>(read.length).fill(-1);align(read,b).forEach((k,j)=>{if(k>=0)at[k]=j;});
+ const before=new Array<number>(b.length).fill(0),after=new Array<number>(b.length).fill(0);let i=0;
+ for(const c of cells){
+  if(c.ch!==UNREAD){i++;continue;}
+  if(i<read.length&&at[i]>=0)before[at[i]]++;else if(i>0&&at[i-1]>=0)after[at[i-1]]++;
+ }
+ return b.map((ch,j)=>UNREAD.repeat(before[j])+ch+UNREAD.repeat(after[j])).join('');
 }
 
 // Plan for rendering `next` in place of `text`: everything before the first

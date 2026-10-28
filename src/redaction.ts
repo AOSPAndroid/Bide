@@ -3,9 +3,10 @@
 // match. Pure functions; applying redactions is in redact-canvas.ts and the
 // PDF engine.
 import {frameOf,turnedBounds} from './ocr-regions';
+import {UNREAD} from './glyph-edit';
 export type Rect={left:number;top:number;width:number;height:number};
 export type Match={start:number;end:number;text:string};
-type RegionLike={text:string;left:number;top:number;width:number;height:number;glyphs?:{x0:number;x1:number}[];angle?:number};
+type RegionLike={text:string;left:number;top:number;width:number;height:number;glyphs?:{ch?:string;x0:number;x1:number}[];angle?:number};
 
 const digits=(s:string)=>s.replace(/\D/g,'');
 // Luhn checksum (payment cards).
@@ -45,11 +46,12 @@ export function findRedactions(text:string,{query='',presets=[]}:{query?:string;
 export function ocrMatchRect(region:RegionLike,match:Match,pad=1.5):Rect{
  const chars=Array.from(region.text),letters=chars.filter(c=>!/\s/.test(c)).length;
  let box:Rect={left:region.left,top:region.top,width:region.width,height:region.height};
- if(region.glyphs&&region.glyphs.length===letters){
+ const glyphs=region.glyphs?.filter(g=>g.ch!==UNREAD);
+ if(glyphs&&glyphs.length===letters){
   // Code-unit offsets to letter (non-space) indexes.
   let unit=0,letter=0,first=-1,last=-1;
   for(const c of chars){if(!/\s/.test(c)){if(unit>=match.start&&unit<match.end){if(first<0)first=letter;last=letter;}letter++;}unit+=c.length;}
-  if(first>=0){const x0=region.glyphs[first].x0,x1=region.glyphs[last].x1;if(x1>x0)box={left:x0,top:region.top,width:x1-x0,height:region.height};}
+  if(first>=0){const x0=glyphs[first].x0,x1=glyphs[last].x1;if(x1>x0)box={left:x0,top:region.top,width:x1-x0,height:region.height};}
  }
  return turnedBounds(frameOf(region),{left:box.left-pad,top:box.top-pad,width:box.width+pad*2,height:box.height+pad*2});
 }
