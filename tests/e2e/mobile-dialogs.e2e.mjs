@@ -208,6 +208,8 @@ test('#31 dialog controls are finger-sized and explain themselves without toolti
   await page.locator('input[type=file][accept*=".psd"]').setInputFiles(image);
   await page.locator('button[aria-label^="Edit detected text: Our rnodern"]').waitFor({state:'attached',timeout:240000});
   await page.waitForTimeout(4500); // the import toast has gone
+  // On phones the OCR bar's actions sit behind More.
+  if(await page.locator('.ocr-more').isVisible())await tap(page,page.locator('.ocr-more'));
   await tap(page,page.getByRole('button',{name:'Proofread'}));
   const chips=page.locator('.proofread-line .doubt button');await chips.first().waitFor({timeout:60000});
   const b=await chips.evaluateAll(bs=>bs.map(b=>b.getBoundingClientRect().toJSON()));
