@@ -27,6 +27,8 @@ export function pagePreview(source:string,index:number,scale:number){const key=`
 
 export const detectPdfText=(source:string,index:number)=>rpc<{regions:import('../text-regions').TextRegion[];skipped:number;ocrLayer?:boolean}>('detectText',{source,index});
 export const removePdfText=(source:string,index:number,regionId:string)=>rpc<{id:string;data:string}>('removeText',{source,index,regionId});
+// The line rewritten in its own font, or why not (the caller then uses a text box).
+export const replacePdfText=(source:string,index:number,regionId:string,text:string)=>rpc<{id:string;data:string}|{fallback:string}>('replaceText',{source,index,regionId,text});
 type PageRect=import('./pdf-core').PageRect;
 export const findPdfText=(source:string,index:number,needles:string[])=>rpc<PageRect[][]>('findText',{source,index,needles});
 export const redactPdf=(source:string,index:number,rects:PageRect[])=>rpc<{id:string;data:string}>('redact',{source,index,rects});
