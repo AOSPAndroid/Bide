@@ -1,7 +1,7 @@
 // The editor canvas's pointer and object events: drawing shapes, selections,
 // crop, pen, gradient, bucket, mask painting, pan and zoom. Registered once
 // when the canvas is created; everything that changes is read through refs.
-import {Canvas,Rect,Ellipse,Line,ActiveSelection} from 'fabric';
+import {Canvas,Rect,Ellipse,Line,ActiveSelection,type FabricObject,type Transform} from 'fabric';
 import type {RefObject,Dispatch,SetStateAction} from 'react';
 import {snapToGuides} from './Rulers';
 import {withHandles,nearPoint,type Anchor} from './pen-path';
@@ -15,6 +15,8 @@ import {makeEraserStroke} from './brushes';
 import {createRetouchController} from './retouch-controller';
 import type {XY} from './retouch-pixels';
 import type {Obj,Tool} from './editor-types';
+import type {TouchHooks} from './touch-gestures';
+import {revealEditedText} from './text-reveal';
 
 export type SelectionRegion={id:string;points:SelectionPoint[];mask?:Mask;outline?:string};
 export type CanvasEventDeps={
@@ -81,10 +83,16 @@ export function attachCanvasEvents(c:Canvas,d:CanvasEventDeps){
   let zoomDrag:{x:number;y:number;initial:number;out:boolean;dragged:boolean}|null=null;
   // Screen position of a mouse or touch event (Fabric hands either to the tools).
   const client=(ev:Event)=>{const t=(ev as TouchEvent).touches?.[0]??(ev as TouchEvent).changedTouches?.[0];return t?{clientX:t.clientX,clientY:t.clientY,button:0,altKey:false}:ev as MouseEvent;};
-  let selectionDrag:{id:string;points:SelectionPoint[];op:MaskOp;base:SelectionRegion|null;baseOutline?:string}|null=null;
-  let gradientDrag:{start:SelectionPoint;line:Line}|null=null,maskStroke:ReturnType<typeof createMaskBrush>|null=null,cropStart:SelectionPoint|null=null;
+  let selectionDrag:{id:string;points:SelectionPoint[];op:MaskOp;base:SelectionRegion|null;baseOutline?:string;prior:SelectionRegion|null}|null=null;
+  let gradientDrag:{start:SelectionPoint;line:Line}|null=null,maskStroke:ReturnType<typeof createMaskBrush>|null=null,cropStart:SelectionPoint|null=null,cropBefore:typeof cropRef.current=null;
   let origin = { x: 0, y: 0 }, shape: Obj | null = null;
   let pan: { x: number; y: number; left: number; top: number } | null = null;
+  // Touch: a tap on an already selected text box edits it where tapped, even on
+  // one of its handles (on a small box their touch areas cover most of it).
+  let tapText:Textbox|null=null,touchBefore:FabricObject|undefined;
+  const touch=(ev:Event)=>ev.type.startsWith('touch');
+  c.on('mouse:down:before',e=>{const a=touchBefore=c.getActiveObject();tapText=toolRef.current==='select'&&touch(e.e)&&a instanceof Textbox&&a.editable&&!a.isEditing?a:null;});
+  c.on('mouse:up',e=>{const t=tapText,tr=e.transform;tapText=null;if(!t||e.target!==t||!tr?.corner||tr.corner==='mtr'||tr.actionPerformed||!t.containsPoint(e.scenePoint))return;t.enterEditing(e.e);t.setCursorByClick(e.e);});
   c.on('mouse:dblclick',()=>{if(toolRef.current==='pen'&&penRef.current&&penRef.current.anchors.length>2)finishPenRef.current(false);});
   c.on('contextmenu', e=>{
     if(loading.current)return;const skip=c.skipTargetFind;c.skipTargetFind=false;
@@ -103,7 +111,7 @@ export function attachCanvasEvents(c:Canvas,d:CanvasEventDeps){
       if(st){st.anchors.push(pt);st.dragging=true;}else penRef.current={anchors:[pt],dragging:true};
       setPenPreview({anchors:[...penRef.current!.anchors],cursor:pt});return;
     }
-    if(t==='crop'){const p=pageRef.current,pt={x:Math.max(0,Math.min(p.width,e.scenePoint.x)),y:Math.max(0,Math.min(p.height,e.scenePoint.y))};cropStart=pt;setCrop({rect:{left:pt.x,top:pt.y,width:0,height:0},angle:cropRef.current?.angle??0});return;}
+    if(t==='crop'){const p=pageRef.current,pt={x:Math.max(0,Math.min(p.width,e.scenePoint.x)),y:Math.max(0,Math.min(p.height,e.scenePoint.y))};cropStart=pt;cropBefore=cropRef.current;setCrop({rect:{left:pt.x,top:pt.y,width:0,height:0},angle:cropRef.current?.angle??0});return;}
     if(t==='gradient'){const pt=e.scenePoint,line=new Line([pt.x,pt.y,pt.x,pt.y],{stroke:'#25272d',strokeWidth:1.5/zoomRef.current,strokeDashArray:[5/zoomRef.current,4/zoomRef.current],selectable:false,evented:false,excludeFromExport:true});gradientDrag={start:{x:pt.x,y:pt.y},line};c.add(line);return;}
     if(t==='bucket'){
       const p=pageRef.current,b=paintRef.current.bucket,target=retouchTarget.current&&c.getObjects().includes(retouchTarget.current)?retouchTarget.current:undefined;
@@ -130,7 +138,7 @@ export function attachCanvasEvents(c:Canvas,d:CanvasEventDeps){
         catch(error){notify(error instanceof Error?error.message:String(error));}
         return;
       }
-      selectionDrag={id:target.id!,points:[pt],op,base,baseOutline:base?base.outline??outlineOf(base.points):undefined};if(!base)setRegion(null);return;
+      selectionDrag={id:target.id!,points:[pt],op,base,baseOutline:base?base.outline??outlineOf(base.points):undefined,prior:regionRef.current};if(!base)setRegion(null);return;
     }
     if (t === 'hand') { const event = client(e.e); pan = { x: event.clientX, y: event.clientY, left: workspace.current!.scrollLeft, top: workspace.current!.scrollTop }; return; }
     if (['select','brush','highlight','eraser'].includes(t)) return;
@@ -163,7 +171,7 @@ export function attachCanvasEvents(c:Canvas,d:CanvasEventDeps){
     else { const vals = { left: Math.min(origin.x, pt.x), top: Math.min(origin.y, pt.y) }; if (shape instanceof Ellipse) shape.set({ ...vals, rx: Math.abs(dx)/2, ry: Math.abs(dy)/2 }); else shape.set({ ...vals, width: Math.abs(dx), height: Math.abs(dy) }); }
     c.requestRenderAll();
   });
-  c.on('mouse:up', () => {
+  c.on('mouse:up', e => {
     if(zoomDrag){const drag=zoomDrag;zoomDrag=null;if(toolRef.current==='zoom'&&!drag.dragged)changeZoom(drag.initial*(drag.out?1/1.25:1.25),{x:drag.x,y:drag.y});return;}
     if(retouch.current?.up())return;
     if(maskStroke){maskStroke=null;saveCanvasRef.current();return;}
@@ -188,7 +196,38 @@ export function attachCanvasEvents(c:Canvas,d:CanvasEventDeps){
       else if (!(shape instanceof Line)) shape.set({ width: 160, height: 100 });
       else shape.set({ x2: shape.x1 + 160 });
     }
-    shape.setCoords(); c.setActiveObject(shape); c.requestRenderAll(); shape = null; setTool('select'); saveCanvasRef.current(); syncSelection();
+    shape.setCoords(); c.setActiveObject(shape);
+    // On a phone the new text box is ready to type over (the keyboard opens with it).
+    if (shape instanceof Textbox && touch(e.e)) { shape.enterEditing(); shape.selectAll(); }
+    c.requestRenderAll(); shape = null; setTool('select'); saveCanvasRef.current(); syncSelection();
   });
-  return ()=>clearTimeout(textTimer);
+  // A pinch took over a touch the canvas had already started: undo what it did, without a history step.
+  const cancel=()=>{
+    const f=c as unknown as {_currentTransform:Transform|null;_isCurrentlyDrawing:boolean;_groupSelector:unknown};
+    const t=f._currentTransform;if(t){t.target.set(t.original);t.target.setCoords();t.target.isMoving=false;f._currentTransform=null;}
+    if(f._isCurrentlyDrawing){f._isCurrentlyDrawing=false;c.clearContext(c.contextTop);}
+    f._groupSelector=null;tapText=null;zoomDrag=null;pan=null;retouch.current?.cancel();
+    if(shape){c.remove(shape);shape=null;}
+    if(gradientDrag){c.remove(gradientDrag.line);gradientDrag=null;}
+    if(selectionDrag){setRegion(selectionDrag.prior);selectionDrag=null;}
+    if(cropStart){cropStart=null;setCrop(cropBefore);}
+    const pen=penRef.current;if(pen?.dragging){pen.dragging=false;pen.anchors.pop();if(pen.anchors.length)setPenPreview({anchors:[...pen.anchors]});else{penRef.current=null;setPenPreview(null);}}
+    // Selection as before the touch; a text box must not start editing when the fingers lift.
+    if(c.getActiveObject()!==touchBefore){if(touchBefore&&c.getObjects().includes(touchBefore))c.setActiveObject(touchBefore);else c.discardActiveObject();}
+    const a=c.getActiveObject();if(a instanceof Textbox&&!a.isEditing)(a as unknown as {selected:boolean}).selected=false;
+    c.requestRenderAll();syncSelection();
+  };
+  const targetAt=(e:Event)=>{const skip=c.skipTargetFind;c.skipTargetFind=false;try{return c.findTarget(e as MouseEvent).target;}finally{c.skipTargetFind=skip;}};
+  const touchHooks:TouchHooks={cancel,
+    // Tools that act at once where the finger lands wait until it lifts (Move and the mask brush: until it moves), so a slow pinch never triggers them.
+    wait:()=>['bucket','wand','object'].includes(toolRef.current)?'lift':['select','mask'].includes(toolRef.current),
+    // Move tool: one finger scrolls unless it lands on the selected, unlocked layer (tap a layer first to move it).
+    dragPans:e=>{if(toolRef.current!=='select'||loading.current)return false;const t=targetAt(e);return !t||!!t.lockMovementX||!c.getActiveObjects().concat(c.getActiveObject()??[]).includes(t);},
+    // Long press = right-click: the layer menu.
+    longPress:e=>{
+      if(toolRef.current!=='select'||loading.current)return false;const a=c.getActiveObject(),t=targetAt(e),p=e.touches[0];
+      if(!t||!p||(a instanceof Textbox&&a.isEditing))return false;openLayerMenu(t as Obj,p.clientX,p.clientY);return true;
+    }};
+  const detachReveal=revealEditedText(c,{zoomRef,workspace,changeZoom});
+  return Object.assign(()=>{clearTimeout(textTimer);detachReveal();},{touch:touchHooks});
 }

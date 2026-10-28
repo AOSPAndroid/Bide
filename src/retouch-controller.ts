@@ -3,7 +3,8 @@ import {pageRaster,rasterLayer} from './retouch-canvas';
 import {stampPixels,strokePoints,type XY} from './retouch-pixels';
 type Settings={tool:string;pageId:string;width:number;height:number;pdf:boolean;size:number;softness:number;opacity:number;target:FabricObject|null};
 export function createRetouchController(c:Canvas,get:()=>Settings,finish:()=>void,notify:(s:string)=>void,uid:()=>string) {
-  let sample:XY|null=null,samplePage='';
+  // Touch has no Alt key: arm() makes the next tap pick the source instead.
+  let sample:XY|null=null,samplePage='',armed=false;const watchers=new Set<()=>void>(),changed=()=>watchers.forEach(f=>f());
   let job:{mode:'clone'|'heal'|'erase';pageId:string;source:ImageData;backdrop:ImageData;pixels:ImageData;surface:HTMLCanvasElement;preview:FabricImage;target:FabricObject|null;index:number;start:XY;last:XY;sample:XY;size:number;softness:number;opacity:number;visible:boolean}|null=null;
   const paint=(point:XY)=>{if(!job)return;const j=job;for(const p of strokePoints(j.last,point,j.size))stampPixels(j.pixels,j.source,j.backdrop,p,{x:j.sample.x+p.x-j.start.x,y:j.sample.y+p.y-j.start.y},j.size,j.softness,j.opacity,j.mode);j.last=point;j.surface.getContext('2d')!.putImageData(j.pixels,0,0);j.preview.dirty=true;c.requestRenderAll();};
   const cancel=()=>{if(!job)return;const j=job;job=null;c.remove(j.preview);if(j.target)j.target.visible=j.visible;c.requestRenderAll();};
@@ -11,8 +12,8 @@ export function createRetouchController(c:Canvas,get:()=>Settings,finish:()=>voi
     down(point:XY,alt:boolean) {
       const s=get();if(!['clone','heal','eraser'].includes(s.tool))return false;
       if(s.pdf&&s.tool!=='eraser'){notify('Open an image or design page to retouch. Export PDF pages as PNG first.');return true;}
-      if(alt&&s.tool!=='eraser'){sample={...point};samplePage=s.pageId;notify('Source sampled. Drag to paint; Alt-click to sample again.');return true;}
-      if(s.tool!=='eraser'&&(!sample||samplePage!==s.pageId)){notify('Alt-click the image to choose a source first.');return true;}
+      if((alt||armed)&&s.tool!=='eraser'){const tapped=!alt;armed=false;sample={...point};samplePage=s.pageId;changed();notify(tapped?'Source set. Now drag over the spot to fix.':'Source sampled. Drag to paint; Alt-click to sample again.');return true;}
+      if(s.tool!=='eraser'&&(!sample||samplePage!==s.pageId)){notify(globalThis.matchMedia?.('(pointer:coarse)').matches?'Tap Set source, then tap the spot to copy from.':'Alt-click the image to choose a source first.');return true;}
       if(s.tool==='eraser'&&(!s.target||s.target.lockMovementX||!c.getObjects().includes(s.target))){notify('Select an unlocked patch or image layer, then choose Eraser.');return true;}
       try {
         cancel();const background=pageRaster(c,s.width,s.height),backdrop=background.getContext('2d')!.getImageData(0,0,background.width,background.height);
@@ -29,5 +30,8 @@ export function createRetouchController(c:Canvas,get:()=>Settings,finish:()=>voi
       const name=j.target?(j.target as FabricObject&{name?:string}).name||'Erased layer':j.mode==='heal'?'Healing patch':'Clone patch';
       const result=rasterLayer(j.surface,name,uid());if(j.target)c.remove(j.target);if(result){if(j.target)result.set({globalCompositeOperation:j.target.globalCompositeOperation});c.insertAt(j.index,result);c.setActiveObject(result);}c.requestRenderAll();finish();return true;
     },cancel,
+    arm(on=true){if(armed!==on){armed=on;changed();}},
+    source:()=>({armed,point:sample,pageId:samplePage}),
+    watch(f:()=>void){watchers.add(f);return()=>{watchers.delete(f);};},
   };
 }

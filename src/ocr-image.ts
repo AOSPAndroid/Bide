@@ -87,6 +87,25 @@ export function edgeWidth(img:Pixels,box:Box,background:readonly number[]):numbe
  return outline>=10?partial/outline:undefined;
 }
 
+// A text box grown over its letters' faint ink: descender tips, accents and
+// edges that blur softened below the recognizer's trim. A row (then a column)
+// at the box's edge counts while one of its pixels differs from the
+// background by `share` of the box's strongest contrast (24 at least). Rows
+// may skip one fainter row (the dot of an i, an accent); the box grows by at
+// most half its height up and down and a quarter of it sideways.
+export function growToInk(img:Pixels,box:Box,background:readonly number[],share=.3):Box{
+ const {data,width,height}=img,contrast=(x:number,y:number)=>{const i=(y*width+x)*4;return Math.max(Math.abs(data[i]-background[0]),Math.abs(data[i+1]-background[1]),Math.abs(data[i+2]-background[2]));};
+ let x0=Math.max(0,Math.floor(box.x0)),x1=Math.min(width,Math.ceil(box.x1)),y0=Math.max(0,Math.floor(box.y0)),y1=Math.min(height,Math.ceil(box.y1)),peak=0;
+ const row=(y:number)=>{let m=0;if(y>=0&&y<height)for(let x=x0;x<x1;x++)m=Math.max(m,contrast(x,y));return m;},column=(x:number)=>{let m=0;if(x>=0&&x<width)for(let y=y0;y<y1;y++)m=Math.max(m,contrast(x,y));return m;};
+ for(let y=y0;y<y1;y++)peak=Math.max(peak,row(y));
+ const t=Math.max(24,peak*share),tall=Math.ceil((y1-y0)/2),wide=Math.ceil((y1-y0)/4);
+ for(let n=0;n<tall;){if(row(y0-1)>=t){y0--;n++;}else if(n+1<tall&&row(y0-2)>=t){y0-=2;n+=2;}else break;}
+ for(let n=0;n<tall;){if(row(y1)>=t){y1++;n++;}else if(n+1<tall&&row(y1+1)>=t){y1+=2;n+=2;}else break;}
+ for(let n=0;n<wide&&column(x0-1)>=t;n++)x0--;
+ for(let n=0;n<wide&&column(x1)>=t;n++)x1++;
+ return {x0,y0,x1,y1};
+}
+
 // Total ink of a box, in fully-inked pixel equivalents: contrast with the
 // background summed over the box grown by `pad` px. Blur moves ink around but
 // keeps this total, unlike peak darkness or stroke coverage.

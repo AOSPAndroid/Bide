@@ -62,3 +62,12 @@ test('a line split by the detector is joined; table cells and the next line are 
  const lines=[{x0:0,y0:10,x1:200,y1:30},{x0:0,y0:32,x1:200,y1:52}];
  assert.equal(mergeLineBoxes(lines).length,2,'lines above each other stay apart');
 });
+test('a text box grows over its letters\' faint ink, not over the gap to the next line',async()=>{
+ const {growToInk}=await import('../tmp/ocr-image.mjs');
+ // Letters on rows 10-19 (contrast 200), a faint descender on rows 20-21 (80), blank rows 22-24, the next line from 25; a faint left edge at x 4.
+ const img=image(40,40,[255,255,255],(x,y)=>y>=10&&y<20&&x>=5&&x<30?[55,55,55]:y>=20&&y<22&&x===8?[175,175,175]:y>=25&&x>=5&&x<30?[55,55,55]:x===4&&y>=10&&y<20?[180,180,180]:undefined);
+ assert.deepEqual(growToInk(img,{x0:5,y0:10,x1:30,y1:20},[255,255,255]),{x0:4,y0:10,x1:30,y1:22});
+ // A dot one blank row above the letters is reached; a row of noise under 24 is not ink.
+ const dot=image(40,40,[255,255,255],(x,y)=>y>=10&&y<20&&x>=5&&x<30?[55,55,55]:y===8&&x===9?[60,60,60]:y===20?[240,240,240]:undefined);
+ assert.deepEqual(growToInk(dot,{x0:5,y0:10,x1:30,y1:20},[255,255,255]),{x0:5,y0:8,x1:30,y1:20});
+});

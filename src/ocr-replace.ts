@@ -13,15 +13,16 @@ export type OcrEdit={region:TextRegion;text?:string};
 // result to the page's serialized objects (clearing the background under
 // font-rendered lines first), so the caller can commit it as one undo step.
 export async function planOcrReplacement(c:Canvas,page:Page,items:OcrEdit[],{settings,pageRegions,others,letters,autoFont}:{settings:OcrSettings;pageRegions:TextRegion[];others:TextRegion[];letters:boolean;autoFont:boolean;otherPages?:LetterSource[]}){
- const patches:FabricObject[]=[],fonts:OcrEdit[]=[];
+ const patches:FabricObject[]=[],fonts:OcrEdit[]=[],edits:{region:TextRegion;text?:string;layer:string;letters:boolean}[]=[];
  for(const item of items){
   if(letters){
-   if(item.text===item.region.text)continue;
+   // Back to the text as read: the field shows the original again (no layer).
+   if(item.text===item.region.text){edits.push({region:item.region,text:item.text,layer:'',letters:true});continue;}
    // Neighbouring lines/pages may use another face or weight. Preserve this
    // line's own pixels instead of borrowing unverified lettering.
    const patch=item.text!==undefined?await glyphEditPatch(c,page,item.region,item.text):undefined;
    if(!patch)throw new Error('Cannot preserve the original lettering for this edit. Nothing was changed. Choose New font explicitly to allow a replacement font.');
-   patches.push(patch);
+   patches.push(patch);edits.push({region:item.region,text:item.text,layer:(patch as FabricObject&{id:string}).id,letters:true});
   }else fonts.push(item);
  }
  const transparent=fonts.length>0&&settings.background==='transparent';
@@ -33,8 +34,8 @@ export async function planOcrReplacement(c:Canvas,page:Page,items:OcrEdit[],{set
  for(const item of fonts){const {text}=single
   ?await matchedDetectedTextbox(item.region,c,page,pageRegions,{ocrFont:settings.font,ocrStyle:settings.style,matchBlur:settings.matchBlur,autoFont,appearanceRegions:others})
   :await detectedTextbox(item.region,{ocrFont:settings.font,ocrStyle:settings.style,pageInk,matchBlur:false});
-  if(item.text!==undefined&&item.text!==item.region.text){text.set({text:item.text});text.initDimensions();}texts.push(text);}
- return {letters:patches.length,fonts:texts.length,transparent,
+  if(item.text!==undefined&&item.text!==item.region.text){text.set({text:item.text});text.initDimensions();}texts.push(text);edits.push({region:item.region,text:item.text,layer:(text as Textbox&{id:string}).id,letters:false});}
+ return {letters:patches.length,fonts:texts.length,transparent,edits,
   async apply(objects:unknown[],onProgress?:(fraction:number)=>void){
    if(fonts.length)await coverOcrText(c,page,fonts.map(f=>f.region),objects,{mode:settings.background,color:settings.color,padding:settings.padding,others,onProgress});
    objects.push(...patches.map(p=>p.toObject()),...texts.map(t=>t.toObject()));

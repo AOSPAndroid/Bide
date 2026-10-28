@@ -2,9 +2,10 @@
 // data, matched in detected text, and the page rectangles that cover each
 // match. Pure functions; applying redactions is in redact-canvas.ts and the
 // PDF engine.
+import {frameOf,turnedBounds} from './ocr-regions';
 export type Rect={left:number;top:number;width:number;height:number};
 export type Match={start:number;end:number;text:string};
-type RegionLike={text:string;left:number;top:number;width:number;height:number;glyphs?:{x0:number;x1:number}[]};
+type RegionLike={text:string;left:number;top:number;width:number;height:number;glyphs?:{x0:number;x1:number}[];angle?:number};
 
 const digits=(s:string)=>s.replace(/\D/g,'');
 // Luhn checksum (payment cards).
@@ -39,7 +40,8 @@ export function findRedactions(text:string,{query='',presets=[]}:{query?:string;
 
 // The page rectangle covering `match` in an OCR region: from its letters'
 // positions when every letter has one, otherwise the whole region (covering
-// too much is safe, too little is not). `pad` grows it on every side.
+// too much is safe, too little is not). `pad` grows it on every side. On a
+// tilted line it is the page bounds of that box turned with the line.
 export function ocrMatchRect(region:RegionLike,match:Match,pad=1.5):Rect{
  const chars=Array.from(region.text),letters=chars.filter(c=>!/\s/.test(c)).length;
  let box:Rect={left:region.left,top:region.top,width:region.width,height:region.height};
@@ -49,7 +51,7 @@ export function ocrMatchRect(region:RegionLike,match:Match,pad=1.5):Rect{
   for(const c of chars){if(!/\s/.test(c)){if(unit>=match.start&&unit<match.end){if(first<0)first=letter;last=letter;}letter++;}unit+=c.length;}
   if(first>=0){const x0=region.glyphs[first].x0,x1=region.glyphs[last].x1;if(x1>x0)box={left:x0,top:region.top,width:x1-x0,height:region.height};}
  }
- return {left:box.left-pad,top:box.top-pad,width:box.width+pad*2,height:box.height+pad*2};
+ return turnedBounds(frameOf(region),{left:box.left-pad,top:box.top-pad,width:box.width+pad*2,height:box.height+pad*2});
 }
 
 export const overlaps=(a:Rect,b:Rect)=>a.left<b.left+b.width&&b.left<a.left+a.width&&a.top<b.top+b.height&&b.top<a.top+a.height;

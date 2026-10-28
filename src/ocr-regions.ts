@@ -6,7 +6,34 @@ export function recognitionKey(r:TextRegion){return `${r.kind}:${Math.round(r.le
 
 // OCR runs on a reduced raster; map its pixel boxes back to page units.
 export function scaleRegions(regions:TextRegion[],sx:number,sy:number):TextRegion[]{
- return regions.map(r=>({...r,left:r.left*sx,top:r.top*sy,width:r.width*sx,height:r.height*sy,size:r.size*sy,baseline:r.baseline*sy,...r.blur===undefined?{}:{blur:r.blur*(sx+sy)/2},...r.glyphs?{glyphs:r.glyphs.map(g=>({...g,x0:g.x0*sx,x1:g.x1*sx}))}:{}}));
+ return regions.map(r=>({...r,left:r.left*sx,top:r.top*sy,width:r.width*sx,height:r.height*sy,size:r.size*sy,baseline:r.baseline*sy,...r.blur===undefined?{}:{blur:r.blur*(sx+sy)/2},...r.glyphs?{glyphs:r.glyphs.map(g=>({...g,x0:g.x0*sx,x1:g.x1*sx}))}:{},...r.angle===undefined||sx===sy?{}:{angle:Math.atan2(Math.sin(r.angle*Math.PI/180)*sy,Math.cos(r.angle*Math.PI/180)*sx)*180/Math.PI}}));
+}
+
+// A tilted line (TextRegion.angle) is a level frame turned about its box's
+// centre; a level line's frame has angle 0.
+export type Frame={angle:number;cx:number;cy:number};
+export const frameOf=(r:Bounds&{angle?:number}):Frame=>({angle:r.angle??0,cx:r.left+r.width/2,cy:r.top+r.height/2});
+// A point of the frame's level coordinates on the page (`back`: from the page into the frame).
+export function turn(f:Frame,x:number,y:number,back=false){
+ const a=(back?-f.angle:f.angle)*Math.PI/180,cos=Math.cos(a),sin=Math.sin(a),dx=x-f.cx,dy=y-f.cy;
+ return {x:f.cx+dx*cos-dy*sin,y:f.cy+dx*sin+dy*cos};
+}
+// Page corners (clockwise from top left) and page bounds of a box given in the frame.
+export const turnedQuad=(f:Frame,b:Bounds)=>[[b.left,b.top],[b.left+b.width,b.top],[b.left+b.width,b.top+b.height],[b.left,b.top+b.height]].map(([x,y])=>turn(f,x,y));
+export function turnedBounds(f:Frame,b:Bounds):Bounds{
+ if(!f.angle)return b;
+ const q=turnedQuad(f,b),xs=q.map(p=>p.x),ys=q.map(p=>p.y),left=Math.min(...xs),top=Math.min(...ys);
+ return {left,top,width:Math.max(...xs)-left,height:Math.max(...ys)-top};
+}
+// Another region in the frame's level coordinates. A tilted page is read on
+// one levelled copy, so its lines differ from each other only by a shift;
+// a line tilted otherwise has no place in the frame (undefined), unless
+// within `tolerance` degrees (lines of a sheet photographed at an angle):
+// placed by its centre, close enough to find neighbours or stop a patch.
+export function inFrame(f:Frame,r:TextRegion,tolerance=.01):TextRegion|undefined{
+ const angle=r.angle??0;if(Math.abs(angle-f.angle)>tolerance)return undefined;if(!angle&&!f.angle)return r;
+ const cx=r.left+r.width/2,cy=r.top+r.height/2,c=turn(f,cx,cy,true),dx=c.x-cx,dy=c.y-cy;
+ return dx||dy?{...r,left:r.left+dx,top:r.top+dy,baseline:r.baseline+dy,...r.glyphs?{glyphs:r.glyphs.map(g=>({...g,x0:g.x0+dx,x1:g.x1+dx}))}:{}}:r;
 }
 
 // Hide regions that already became editable text: same key, or an OCR text
@@ -40,7 +67,8 @@ export function ocrPatchBounds(region:Bounds,padding:number,page:{width:number;h
 }
 
 // Below this Tesseract confidence a region is flagged for proofreading.
-export const isUncertain=(r:{kind:string;confidence?:number})=>r.kind==='ocr'&&r.confidence!==undefined&&r.confidence<70;
+// A field to check: its scan gave a reason (ocr-checks.ts), or, for fields read before that, a low confidence.
+export const isUncertain=(r:{kind:string;confidence?:number;doubt?:string})=>r.kind==='ocr'&&(r.doubt!==undefined||r.confidence!==undefined&&r.confidence<70);
 
 export function ocrScanStatus(count:number,languages:string,converted:boolean,uncertain=0){
  return count?`${count} OCR regions${uncertain?` · ${uncertain} to check`:''} · ${languages} · choose a matching font`:converted?'Original text converted. Double-click the text layer to edit.':'No text detected. Use Text to add your own.';
@@ -82,3 +110,16 @@ export function doubtfulLetters(region:{text:string;glyphs?:{p?:number}[]},thres
  Array.from(region.text).forEach((ch,i)=>{if(/\s/.test(ch))return;const p=region.glyphs![g++]?.p;if(p!==undefined&&p<threshold)out.push(i);});
  return out;
 }
+// The fields after an edit, without rescanning the page: an edited field shows
+// its new text, keeps its place and remembers the region as first read; a field
+// turned into a text layer leaves the overlay (the layer itself is editable).
+export function regionsAfterEdit(regions:TextRegion[],edits:{region:TextRegion;text?:string;layer:string;letters:boolean}[]):TextRegion[]{
+ const byId=new Map(edits.map(e=>[e.region.id,e]));
+ return regions.flatMap(r=>{
+  const e=byId.get(r.id);if(!e)return [r];if(!e.letters)return [];
+  const original=r.original??e.region,{glyphs:_glyphs,confidence:_confidence,doubt:_doubt,...rest}=original;
+  if((e.text??original.text)===original.text)return [original];
+  return [{...rest,text:e.text??original.text,original,layer:e.layer}];
+ });
+}
+

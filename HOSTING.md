@@ -115,6 +115,6 @@ The demo bundles PDF/image tools. It excludes the Office runtime: soffice.wasm a
 
 **Try OCR** in the demo banner adds a generated English/French example page to the current project, preserving existing pages. Click a detected line to edit it with its original letters. Model downloads show byte progress, followed by verification and preparation; a stalled download times out with a retry/Standard OCR explanation.
 
-On narrow phones the demo starts on the PDF tools home. Tap Workspaces to switch sections; landscape or desktop gives more room for detailed editing. Supported browsers can also use the optional WebMCP get_workspace/open_workspace navigation tools.
+On phones, upright or on their side, every edition starts on the PDF tools home. PHOTO, PDF and DOCS at the top switch sections; a tablet or desktop gives more room for detailed editing. Phones and tablets can add bide to their home screen (it opens in the browser). Supported browsers can also use the optional WebMCP get_workspace/open_workspace navigation tools.
 
 To end local or LAN hosting, run **Stop bide.bat** in the same installation folder. It stops only servers registered by this version from that folder, including HTTPS/custom-port servers. It does not close browser tabs or stop unrelated Node applications. Older running versions must be closed separately.

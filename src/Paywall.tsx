@@ -102,7 +102,8 @@ const decode=async(token:string)=>{try{return JSON.parse(atob(token.split('.')[0
 
 function AccountChip({licence,subscribe,manage,signOut,remove}:{licence:Licence;subscribe:()=>void;manage:()=>void;signOut:()=>void;remove:()=>void}){
  const days=trialDaysLeft(licence);
- return <details className="account-chip"><summary aria-label="Account">{licence.status==='trial'?`Trial · ${days} day${days===1?'':'s'} left`:'bide'}</summary><div>
+ // On phones and touch screens the open menu draws a transparent backdrop (mobile-shell.css): a tap on it only closes the menu.
+ return <details className="account-chip" onClick={e=>{if(e.target===e.currentTarget)e.currentTarget.open=false;}}><summary aria-label="Account">{licence.status==='trial'?`Trial · ${days} day${days===1?'':'s'} left`:'bide'}</summary><div>
   <span className="muted">{licence.email}</span>
   {!APP_STORE&&(licence.status==='trial'?<button onClick={subscribe}>Subscribe · {PRICE}</button>:<button onClick={manage}>Manage subscription</button>)}
   <button className="secondary" onClick={signOut}>Sign out</button>

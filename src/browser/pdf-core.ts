@@ -16,7 +16,9 @@ async function svgToPdf(...args:Parameters<typeof import('./svg-pdf').svgToPdf>)
 import type { FormField, PdfFormField } from '../forms';
 import { pdfBox, isChecked } from '../forms';
 export type OcrLine = { text: string; left: number; top: number; width: number; height: number };
-export type PageSpec = { width: number; height: number; source?: string; index: number; svg: string; fonts?:Record<string,string>; ocr?: OcrLine[]; forms?: FormField[] };
+// `edits`: OCR edits drawn over the page (page units, top-left origin); `text` is
+// the new text of an edit made with the page's own letters.
+export type PageSpec = { width: number; height: number; source?: string; index: number; svg: string; fonts?:Record<string,string>; ocr?: OcrLine[]; forms?: FormField[]; edits?: (Omit<OcrLine,'text'>&{text?:string;original?:Omit<OcrLine,'text'>})[] };
 
 // Windows-1252 codes for the characters it maps outside Latin-1.
 const cp1252: Record<number, number> = {0x20ac:0x80,0x201a:0x82,0x0192:0x83,0x201e:0x84,0x2026:0x85,0x2020:0x86,0x2021:0x87,0x02c6:0x88,0x2030:0x89,0x0160:0x8a,0x2039:0x8b,0x0152:0x8c,0x017d:0x8e,0x2018:0x91,0x2019:0x92,0x201c:0x93,0x201d:0x94,0x2022:0x95,0x2013:0x96,0x2014:0x97,0x02dc:0x98,0x2122:0x99,0x0161:0x9a,0x203a:0x9b,0x0153:0x9c,0x017e:0x9e,0x0178:0x9f};
@@ -267,7 +269,7 @@ export async function compose(spec: ExportSpec) {
 
    const xobjects:Record<string,mupdf.PDFObject>={},commands:string[]=[],links:{bounds:mupdf.Rect;uri:string}[]=[];
 
-   const fields:FormField[]=[...(entry.forms??[])];
+   const fields:FormField[]=[...(entry.forms??[])];let edited=false;
    const add=(data:Uint8Array,index:number,name:string)=>{
 
     const source=open(data) as mupdf.PDFDocument;
@@ -279,6 +281,7 @@ export async function compose(spec: ExportSpec) {
      if(spec.keepForms&&name==='Source'){const b=source.loadPage(index).getBounds(),sx=entry.width/(b[2]-b[0]),sy=entry.height/(b[3]-b[1]);
       for(const f of readFields(source,index))fields.push({...f,left:f.left*sx,top:f.top*sy,width:f.width*sx,height:f.height*sy});}
      source.bake(true,!spec.keepForms);
+     if(name==='Source'&&entry.edits?.length)edited=hideEditedText(source,index,entry);
 
      const embedded=embedPage(result,source,index,entry.width,entry.height);
 
@@ -297,11 +300,13 @@ export async function compose(spec: ExportSpec) {
    const rotation=(((spec.rotation||0)%360+360)%360) as mupdf.Rotate;
 
    const resources:Record<string,unknown>={XObject:xobjects};
-   if(entry.ocr?.length){
+   // The new text of edits made over a scanner's text layer replaces the old words in it.
+   const ocr=[...entry.ocr??[],...edited?(entry.edits??[]).filter((e):e is typeof e&{text:string}=>!!e.text).map(e=>({...e,...e.original})):[]];
+   if(ocr.length){
     ocrFont??={font:new mupdf.Font('Helvetica'),ref:result.addSimpleFont(new mupdf.Font('Helvetica'),'Latin')};resources.Font={OCR:ocrFont.ref};
     // MuPDF's built-in CJK font also covers Cyrillic, Greek and Hangul; it is subset below.
-    if(needsUnicodeFont(entry.ocr)){if(!ocrUnicode){const font=new mupdf.Font('zh-Hans');ocrUnicode={font,ref:result.addFont(font)};}(resources.Font as Record<string,unknown>).OCRU=ocrUnicode.ref;}
-    commands.push(...ocrTextCommands(entry.ocr,entry.height,ocrFont.font,'OCR',ocrUnicode&&needsUnicodeFont(entry.ocr)?{font:ocrUnicode.font,name:'OCRU'}:undefined));
+    if(needsUnicodeFont(ocr)){if(!ocrUnicode){const font=new mupdf.Font('zh-Hans');ocrUnicode={font,ref:result.addFont(font)};}(resources.Font as Record<string,unknown>).OCRU=ocrUnicode.ref;}
+    commands.push(...ocrTextCommands(ocr,entry.height,ocrFont.font,'OCR',ocrUnicode&&needsUnicodeFont(ocr)?{font:ocrUnicode.font,name:'OCRU'}:undefined));
    }
    const pageObj=result.addPage([0,0,entry.width,entry.height],rotation,resources as never,commands.join('\n'));
 
@@ -491,6 +496,22 @@ function editablePdfText(page:mupdf.PDFPage,bounds:mupdf.Rect){
  }finally{filter.destroy();writer.destroy();visible.destroy();}
 }
 // Count paintable text separately from scanner OCR and clipping-only text.
+// A scanner's invisible OCR text under an edit still said the old value, so
+// search and copy gave it back: on pages whose text is all invisible, the text
+// under each edit is removed (text only: the scan and drawings stay).
+function hideEditedText(source:mupdf.PDFDocument,index:number,entry:PageSpec){
+ const page=source.loadPage(index) as mupdf.PDFPage;
+ try{
+  const kinds=textKinds(page);if(kinds.visible||!kinds.invisible)return false;
+  const b=page.getBounds(),sx=(b[2]-b[0])/entry.width,sy=(b[3]-b[1])/entry.height;
+  // A letters patch often starts at the first changed digit. Remove the full
+  // original hidden field, otherwise its untouched prefix would survive and
+  // be duplicated when the complete replacement string is appended.
+  for(const edit of entry.edits!){const e=edit.original??edit;page.createAnnotation('Redact').setRect([b[0]+e.left*sx,b[1]+e.top*sy,b[0]+(e.left+e.width)*sx,b[1]+(e.top+e.height)*sy]);}
+  page.applyRedactions(false,mupdf.PDFPage.REDACT_IMAGE_NONE,mupdf.PDFPage.REDACT_LINE_ART_NONE,mupdf.PDFPage.REDACT_TEXT_REMOVE);
+  return true;
+ }finally{page.destroy();}
+}
 function textKinds(page:mupdf.Page){
  const n={visible:0,invisible:0},opacity=[1];
  const paint=(_text:unknown,_ctm:unknown,_space:unknown,_color:unknown,alpha:number)=>{n[alpha*opacity[opacity.length-1]>0?'visible':'invisible']++;};

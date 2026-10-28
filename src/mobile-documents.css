@@ -1,0 +1,87 @@
+/* Phones and touch screens: documents. Rules here only apply at phone sizes or to coarse pointers. */
+
+/* Below 980px the totals, checks and actions column comes after every card:
+   a bar keeps the total, the checks and Issue at the bottom of the screen. */
+@media (min-width:981px){.invoice-summary-bar{display:none}}
+@media (max-width:980px){
+ /* Sticky sits inside the scroller's padding, so the bar needs none below it; focused fields stay clear of it. */
+ .documents-workspace.editing{padding-bottom:0;scroll-padding-bottom:84px}
+ .invoice-summary-bar{position:sticky;bottom:0;z-index:5;display:flex;align-items:center;gap:10px;margin:0 -32px;padding:10px 32px calc(10px + env(safe-area-inset-bottom));background:var(--surface);border-top:1px solid var(--line);box-shadow:0 -6px 18px #25272d14}
+ .invoice-summary-total{flex:1;min-width:0;display:flex;flex-direction:column;font-size:12px;color:var(--muted)}
+ .invoice-summary-total b{font-size:17px;font-weight:650;color:var(--ink);white-space:nowrap}
+ .invoice-summary-ok{display:flex;align-items:center;gap:6px;font-size:14px;color:var(--success)}
+ .invoice-summary-bar button{min-height:44px;padding:0 14px;font-size:14px;border-radius:8px}
+ .invoice-summary-bar .secondary svg{color:#c0392b}
+ /* Paywall builds: the account chip moves above the bar. */
+ body:has(.documents-workspace.editing) .account-chip{bottom:calc(84px + env(safe-area-inset-bottom))}
+ /* Invoice lines: remove button beside the description, line total on the right. */
+ .invoice-line{grid-template-columns:repeat(3,minmax(0,1fr)) 44px;grid-template-areas:"desc desc desc del" "qty unit price price" "vat rate total total"}
+ .invoice-line.adjustment{grid-template-columns:repeat(3,minmax(0,1fr)) 44px;grid-template-areas:"desc desc desc del" "qty unit price price" ". . total total"}
+ .invoice-line>.invoice-field:first-child{grid-column:auto;grid-area:desc}
+ .invoice-line>:nth-child(2){grid-area:qty}
+ .invoice-line>:nth-child(3){grid-area:unit}
+ .invoice-line>:nth-child(4){grid-area:price}
+ .invoice-line>:nth-child(5){grid-area:vat}
+ .invoice-line>:nth-child(6){grid-area:rate}
+ .invoice-line>.invoice-line-total{grid-area:total}
+ .invoice-line>.icon-button{grid-area:del;width:44px;height:44px;justify-self:end;align-self:end}
+ /* Read-only lines have no remove button: the description takes the whole row. */
+ .invoice-line:not(:has(>.icon-button))>.invoice-field:first-child{grid-column:1/-1}
+ /* Long one-line values wrap (InvoiceEditor renders them as textareas that refuse new lines). */
+ .invoice-field textarea.one-line{field-sizing:content;min-height:0;line-height:1.35;resize:none;overflow:hidden;overflow-wrap:anywhere}
+}
+@media (max-width:600px){
+ .invoice-summary-bar{margin:0 -16px;padding-left:16px;padding-right:16px}
+ .invoice-card{padding:16px 14px}
+ .invoice-line,.invoice-line.adjustment{grid-template-columns:minmax(0,1fr) minmax(0,1fr) 44px}
+ /* Quantity × unit price on one row, with room for the price's label. */
+ .invoice-line{grid-template-areas:"desc desc del" "qty price price" "unit vat vat" "rate total total"}
+ .invoice-line.adjustment{grid-template-areas:"desc desc del" "qty unit unit" "price total total"}
+ /* Fields that need the room get the whole row: VAT number (and From SIREN), e-invoicing address, payment method. */
+ .invoice-field:has([data-field$=".vatId"]),.invoice-field:has([data-field$=".electronicAddress"]),.invoice-field:has([data-field="payment.code"]){grid-column:1/-1}
+}
+
+/* Touch: readable text like the Documents home, controls at least 44px,
+   and 16px field text because iOS zooms into any smaller field it focuses. */
+@media (pointer:coarse),(max-width:600px){
+ .invoice-field{font-size:13px;gap:6px}
+ .invoice-field.check{font-size:14px}
+ .invoice-number>i{font-size:13px;color:var(--muted)}
+ .invoice-totals>div,.invoice-checks li button,.invoice-ok,.invoice-actions .fine-print,.invoice-line-total{font-size:14px}
+ .invoice-totals>.grand{font-size:17px}
+ .invoice-source,.invoice-table,.client-list li{font-size:13px}
+ .invoice-status,.invoice-table th{font-size:12px}
+ .invoice-field input:not([type=checkbox]),.invoice-field select{font-size:16px;min-height:44px}
+ .invoice-field textarea{font-size:16px}
+ .invoice-field textarea.one-line{min-height:44px;padding:10px 9px}
+ .invoice-field.check{min-height:44px}
+ .invoice-field.check input{width:22px;height:22px;flex:none;margin:0}
+ .documents-workspace .invoice-card .secondary.small,.documents-workspace .invoice-topline .secondary{min-height:44px;padding:0 14px;font-size:14px}
+ .documents-workspace .invoice-line .icon-button,.documents-workspace .client-list .icon-button{width:44px;height:44px}
+ .documents-workspace .invoice-inline{min-height:44px;padding:0 12px;font-size:13px}
+ .documents-workspace .invoice-checks ul{gap:6px}
+ .documents-workspace .invoice-checks li button{min-height:44px;padding:10px}
+ .documents-workspace .invoice-actions .primary,.documents-workspace .invoice-actions .secondary{min-height:48px;font-size:15px}
+ /* Delete stays apart from Duplicate and Save, so a slightly-off tap does not hit it. */
+ .documents-workspace .invoice-actions .danger{margin-top:14px}
+ .invoice-table td{height:44px}
+ .client-list li{padding:2px 4px 2px 14px}
+}
+
+/* Phone landscape: the workspace scrolls by itself and does not need the canvas editor's 570px floor,
+   which put the summary bar below the screen. The bar is slimmer there. */
+@media (max-height:500px) and (pointer:coarse){
+ .app.workspace-documents{min-height:0}
+ .invoice-summary-bar{padding-top:6px;padding-bottom:calc(6px + env(safe-area-inset-bottom))}
+ .invoice-summary-bar button{min-height:40px}
+ .invoice-summary-total{flex-direction:row;align-items:baseline;gap:8px}
+}
+
+/* Phones, portrait and landscape. */
+@media (max-width:600px),(max-height:500px) and (pointer:coarse){
+ /* The toast fits the screen, sits low and lets taps through (except on its Undo button). */
+ .toast{left:12px;right:12px;width:fit-content;max-width:none;margin-inline:auto;transform:none;bottom:calc(72px + env(safe-area-inset-bottom));padding:10px 14px;font-size:13px;line-height:1.45;pointer-events:none}
+ .toast button{pointer-events:auto;min-height:40px;min-width:64px;font-size:14px}
+ /* Reading an invoice shows wherever the list is scrolled. */
+ .invoice-reading{position:fixed;left:12px;right:12px;bottom:calc(24px + env(safe-area-inset-bottom));z-index:150;width:fit-content;max-width:none;margin:0 auto;padding:12px 16px;font-size:14px;color:var(--ink);background:var(--surface);border:1px solid var(--accent-border);border-radius:10px;box-shadow:0 8px 35px #25272d20}
+}

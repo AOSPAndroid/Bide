@@ -142,7 +142,7 @@ export function editorCommands(d:EditorCommandsDeps){
     { label:'Freehand highlight', hint:'H', icon:Highlighter, run:()=>setTool('highlight') },
     { label:'New document', hint:'Ctrl N', icon:FilePlus2, run:()=>setModal('new') }, { label:'Open PDF, image or Office file', hint:'Ctrl O', icon:FolderOpen, run:()=>openFiles() },
     { label:'Open editable project', hint:'.bide', icon:FolderOpen, run:()=>projectInput.current?.click() }, { label:'Save editable project', hint:'Ctrl S', icon:Save, run:saveProject },
-    { label:'Export PDF', hint:'Ctrl Shift E', icon:Download, run:()=>exportDialog() }, { label:'Add text box', hint:'T', icon:Type, run:addText },
+    { label:'Export PDF', hint:'Ctrl Shift E', icon:Download, run:()=>exportDialog('pdf') }, { label:'Add text box', hint:'T', icon:Type, run:addText },
     { label:'Place image', hint:'', icon:ImagePlus, run:()=>imageInput.current?.click() }, { label:'Add signature', hint:'', icon:PenLine, run:()=>setModal('signature') },
     { label:'Merge documents', hint:'', icon:Merge, run:()=>openFiles(true) }, { label:'Split PDF into pages', hint:'', icon:Scissors, run:()=>exportDialog('split') },
     { label:'Compress PDF', hint:'', icon:Scaling, run:()=>exportDialog('pdf','balanced') }, { label:'Convert Office or images to PDF', hint:'', icon:FileText, run:()=>openFiles() },
@@ -157,7 +157,7 @@ export function editorCommands(d:EditorCommandsDeps){
     { label:'Add watermarks', hint:'', icon:Type, run:()=>setModal('watermark') },
     { label:'Add page numbers', hint:'', icon:FileText, run:()=>setModal('numbers') },
     { label:'Crop current page', hint:'', icon:Scissors, run:()=>setModal('crop') },
-    { label:'Protect PDF with password', hint:'', icon:LockKeyhole, run:()=>{exportDialog();setProtect(true);} },
+    { label:'Protect PDF with password', hint:'', icon:LockKeyhole, run:()=>{exportDialog('pdf');setProtect(true);} },
     { label:'Unlock password PDF', hint:'', icon:UnlockKeyhole, run:()=>openFiles() },
     { label:'Export current design as PSD', hint:'', icon:Layers, run:()=>exportDialog('psd') },
     {label:'Unlock Original PDF as image layer',hint:'Marquee · Lasso · rasterize',icon:UnlockKeyhole,disabled:!page.source?'This page is already editable':undefined,run:()=>void unlockOriginalPdf()},
@@ -187,7 +187,7 @@ export function editorCommands(d:EditorCommandsDeps){
   const clearSelection=()=>{setRegion(null);canvas.current?.discardActiveObject();canvas.current?.requestRenderAll();syncSelection();setTool('select');};
   const copyLayers=copyToClipboard;
   const pasteLayers=()=>void pasteFromClipboard();
-  const focusSetting=(label:string)=>{setMobilePanel('properties');requestAnimationFrame(()=>{const input=document.querySelector<HTMLElement>(`[aria-label="${label}"]`);/* Settings tucked into a closed menu open first. */for(let d=input?.closest('details');d;d=d.parentElement?.closest('details')??null)d.open=true;input?.scrollIntoView({block:'nearest'});input?.focus();});};
+  const focusSetting=(label:string)=>{/* OCR settings sit in their own dropdown, not in the Properties drawer. */if(!document.querySelector(`.ocr-settings [aria-label="${label}"]`))setMobilePanel('properties');requestAnimationFrame(()=>{const input=document.querySelector<HTMLElement>(`[aria-label="${label}"]`);/* Settings tucked into a closed menu open first. */for(let d=input?.closest('details');d;d=d.parentElement?.closest('details')??null)d.open=true;input?.scrollIntoView({block:'nearest'});input?.focus();});};
   const moreActions:PaletteAction[] = [
     {label:'Pen tool',hint:'P',icon:PenTool,keywords:'path bezier curve vector shape draw',run:()=>setTool('pen')},
     {label:'Edit path points',hint:'',icon:PenTool,keywords:'node anchor handle bezier',disabled:selected instanceof Path?requireLayer:'Select a path or pen shape first',run:()=>{setTool('select');togglePathEdit();}},

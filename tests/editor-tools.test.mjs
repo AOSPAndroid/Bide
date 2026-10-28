@@ -31,6 +31,9 @@ test('tiny workspace and extreme wheel input cannot create zero or unbounded can
   assert.equal(clampZoom(100),8);
   assert.equal(clampZoom(NaN),1);
   assert.ok(fitZoom(595,842,1000,900)>0.1);
+  // Phones pass their measured margins: A4 in a 350 px wide workspace fills it instead of 39%.
+  assert.equal(fitZoom(595,842,1088,781),fitZoom(595,842,1088,781,{x:120,y:100}),'desktop margins by default');
+  assert.ok(fitZoom(595,842,350,595,{x:28,y:56})>0.53&&fitZoom(595,842,350,595)<0.4);
 });
 
 test('brush styles, bounds and eraser compositing survive editable project restoration', async () => {

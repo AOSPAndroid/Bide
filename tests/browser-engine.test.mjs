@@ -321,3 +321,23 @@ test('sanitized project sources omit discarded pages, old form values and unused
  assert.equal((await PDFDocument.load(bytes)).getForm().getTextField('Kept').getText(),'Public value');
  await assert.rejects(()=>sanitizePdf(source.id,[2]),/valid PDF pages/);
 });
+
+test('scanner text replacement removes the whole old field, including an unchanged prefix',async()=>{
+ const doc=new mupdf.PDFDocument(),font=new mupdf.Font('Helvetica'),face=doc.addSimpleFont(font);
+ const object=doc.addPage([0,0,420,180],0,{Font:{F:face}},'1 1 1 rg 0 0 420 180 re f 0.2 0.4 0.6 rg 250 40 100 80 re f BT /F 18 Tf 3 Tr 30 100 Td (1 947,80 EUR) Tj ET BT /F 14 Tf 3 Tr 30 45 Td (Reference 88) Tj ET');
+ doc.insertPage(-1,object);const buffer=doc.saveToBuffer(''),data=buffer.asUint8Array().slice();buffer.destroy();object.destroy();face.destroy();font.destroy();doc.destroy();
+ const input=await importBytes(data,'invented-scanner-layer.pdf');
+ // The visible original-letter patch covers only the suffix that changed.
+ // Its OCR repair must use the separately recorded full original field.
+ const original={left:30,top:62,width:130,height:25};
+ for(const replacement of ['1 974,80 EUR','']){
+ const result=await exportDocument({pages:[{width:420,height:180,source:input.id,index:0,svg:'<svg xmlns="http://www.w3.org/2000/svg" width="420" height="180"></svg>',edits:[{left:55,top:62,width:79,height:25,text:replacement,original}]}],title:'Scanner replacement',format:'pdf',compression:'lossless',range:'',dpi:72});
+ const output=mupdf.Document.openDocument(result.bytes,'pdf'),page=output.loadPage(0),structured=page.toStructuredText('');
+ try{
+  const lines=structured.asText().split(/\r?\n/).map(t=>t.trim()).filter(Boolean);
+  assert.deepEqual(lines.sort(),[...(replacement?[replacement]:[]),'Reference 88'].sort(),'replacement or deletion leaves no old amount prefix behind');
+  const before=mupdf.Document.openDocument(data,'pdf'),beforePage=before.loadPage(0),a=beforePage.toPixmap(mupdf.Matrix.identity,mupdf.ColorSpace.DeviceRGB,false,true),b=page.toPixmap(mupdf.Matrix.identity,mupdf.ColorSpace.DeviceRGB,false,true);
+  try{assert.deepEqual(a.getPixels(),b.getPixels(),'repairing invisible text never changes the scan or its drawings');}finally{a.destroy();b.destroy();beforePage.destroy();before.destroy();}
+ }finally{structured.destroy();page.destroy();output.destroy();}
+ }
+});

@@ -1,6 +1,6 @@
 import {inkDensity} from '../ocr-weight';
 import {segmentOcrLine,missingLines,type OcrGrouping} from '../ocr-segmentation';
-import {sampleBackground,estimateTextColor,toHex,edgeWidth,blurFromEdgeWidth,inkMass,prepareOcrPixels,estimateLineHeight} from '../ocr-image';
+import {sampleBackground,estimateTextColor,toHex,edgeWidth,blurFromEdgeWidth,inkMass,prepareOcrPixels,estimateLineHeight,growToInk} from '../ocr-image';
 import {prepareOcrImage} from './ocr-prepare';
 import {createWorker,PSM,type Worker as OcrEngine,type LoggerMessage} from 'tesseract.js';
 import type {TextRegion} from '../text-regions';
@@ -8,6 +8,8 @@ import type {OcrScript} from '../ai-image';
 import {inkMap,estimateSkew} from '../deskew';
 import {findSheet,sheetSize} from '../page-quad';
 import {unwarpPixels,mapSquare,type XY} from '../perspective';
+import {settleMarks} from '../glyph-edit';
+import {frameOf,turn} from '../ocr-regions';
 
 export type OcrProgress=(fraction:number,label:string)=>void;
 export type OcrReader='tesseract'|'paddle';
@@ -37,20 +39,37 @@ async function prepare(image:HTMLCanvasElement,signal?:AbortSignal):Promise<{inp
 
 // A tilted page is read straightened: the AI recognizer cuts each line out
 // as a level rectangle, so even 1.2° of tilt made it miss three words in
-// four. Regions are mapped back onto the original image; on a clearly tilted
-// page their letter cells are dropped (letter editing needs level text).
+// four. Each region keeps its level box and letter cells, moved to where its
+// centre lies on the original, and the tilt as its angle: turned by it, the
+// box covers the line's ink (a level box missed 9-14% of it) and letters can
+// be edited on a copy levelled the same way (detected-text.ts). The levelled
+// copy is softer than the photo: boxes first grow over their letters' faint
+// rows and columns (on an invented invoice photo they covered 89% of the
+// ink, 98% after), and commas and full stops get back the columns a
+// neighbouring letter's cell took from them.
 export async function recognizeImage(image:HTMLCanvasElement,options:OcrOptions={}):Promise<TextRegion[]>{
  options.signal?.throwIfAborted();
  const sheet=options.flatten===false||options.deskew===false?undefined:pageSheet(image);
  if(sheet)return readSheet(image,sheet,options);
  const tilt=options.deskew===false?undefined:pageTilt(image);
  if(!tilt)return recognizeLevel(image,options);
- const {canvas,toOriginal}=levelled(image,tilt);
+ const {canvas,toOriginal}=levelled(image,tilt),pixels=canvas.getContext('2d',{willReadFrequently:true})!.getImageData(0,0,canvas.width,canvas.height);
  return (await recognizeLevel(canvas,options)).map(r=>{
-  const c=toOriginal(r.left+r.width/2,r.top+r.height/2),dx=c.x-(r.left+r.width/2),dy=c.y-(r.top+r.height/2);
-  const {glyphs,...rest}=r;
-  return {...rest,left:r.left+dx,top:r.top+dy,baseline:r.baseline+dy,...(glyphs&&Math.abs(tilt)<=1?{glyphs:glyphs.map(g=>({...g,x0:g.x0+dx,x1:g.x1+dx}))}:{})};
+  const bg=[1,3,5].map(i=>parseInt((r.background||'#ffffff').slice(i,i+2),16)),b=growToInk(pixels,{x0:r.left,y0:r.top,x1:r.left+r.width,y1:r.top+r.height},bg),width=b.x1-b.x0,height=b.y1-b.y0;
+  const c=toOriginal(b.x0+width/2,b.y0+height/2),dx=c.x-(b.x0+width/2),dy=c.y-(b.y0+height/2),glyphs=r.glyphs&&markCells(pixels,r,bg);
+  return {...r,left:b.x0+dx,top:b.y0+dy,width,height,baseline:r.baseline+dy,angle:tilt,...(glyphs?{glyphs:glyphs.map(g=>({...g,x0:g.x0+dx,x1:g.x1+dx}))}:{})};
  }).filter(r=>r.left+r.width>0&&r.top+r.height>0&&r.left<image.width&&r.top<image.height);
+}
+// Letter cells with commas and full stops settled (glyph-edit.ts): ink per
+// column of the region's box, above and below 60% of its height.
+function markCells(img:ImageData,r:TextRegion,bg:number[]){
+ if(!r.glyphs!.some(g=>g.ch===','||g.ch==='.'))return r.glyphs;
+ const {data,width}=img,x0=Math.max(0,Math.floor(r.left)),x1=Math.min(width,Math.ceil(r.left+r.width)),y0=Math.max(0,Math.floor(r.top)),y1=Math.min(img.height,Math.ceil(r.top+r.height)),split=Math.round(y0+(y1-y0)*.6);
+ const contrast=(x:number,y:number)=>{const i=(y*width+x)*4;return Math.max(Math.abs(data[i]-bg[0]),Math.abs(data[i+1]-bg[1]),Math.abs(data[i+2]-bg[2]));};
+ let peak=0;for(let y=y0;y<y1;y++)for(let x=x0;x<x1;x++)peak=Math.max(peak,contrast(x,y));
+ const t=Math.max(40,peak*.45),upper=new Float32Array(x1-x0),lower=new Float32Array(x1-x0);
+ for(let y=y0;y<y1;y++)for(let x=x0;x<x1;x++)if(contrast(x,y)>t)(y<split?upper:lower)[x-x0]++;
+ return settleMarks(r.glyphs!,upper,lower,x0);
 }
 // A sheet photographed at an angle on a darker surface (page-quad.ts), found
 // on a copy at most 600 px across; corners in the image's pixels.
@@ -61,20 +80,30 @@ export function pageSheet(image:HTMLCanvasElement){
  return findSheet(g.getImageData(0,0,w,h).data,w,h)?.map(p=>({x:p.x/k,y:p.y/k}));
 }
 // Perspective bends each line differently, so a photographed sheet is read
-// flattened to a rectangle, then every region's box is carried back onto the
-// photo through the same mapping (letter cells are dropped: they would lean).
+// flattened to a rectangle, then every region is carried back onto the photo
+// through the same mapping. Along one line perspective is close to a turn:
+// a region becomes the level box, turned along its mapped line, that holds
+// its mapped box, with its letter cells mapped along the line, so its letters
+// can be edited like a tilted page's. On a level flattened sheet boxes grow
+// over faint ink and marks settle first, as on a levelled copy.
 async function readSheet(image:HTMLCanvasElement,corners:XY[],options:OcrOptions){
  let {width,height}=sheetSize(corners);const k=Math.min(1,4000/Math.max(width,height));width=Math.max(1,Math.round(width*k));height=Math.max(1,Math.round(height*k));
  const src=image.getContext('2d',{willReadFrequently:true})!.getImageData(0,0,image.width,image.height);
- const flat=Object.assign(document.createElement('canvas'),{width,height});
- flat.getContext('2d')!.putImageData(new ImageData(unwarpPixels(src,corners,width,height),width,height),0,0);
+ const flat=Object.assign(document.createElement('canvas'),{width,height}),pixels=new ImageData(unwarpPixels(src,corners,width,height),width,height);
+ flat.getContext('2d',{willReadFrequently:true})!.putImageData(pixels,0,0);
  const at=(x:number,y:number)=>mapSquare(corners,x/width,y/height);
  return (await recognizeImage(flat,{...options,flatten:false})).map(r=>{
-  const box=[at(r.left,r.top),at(r.left+r.width,r.top),at(r.left+r.width,r.top+r.height),at(r.left,r.top+r.height)];
-  const left=Math.min(...box.map(p=>p.x)),top=Math.min(...box.map(p=>p.y)),right=Math.max(...box.map(p=>p.x)),bottom=Math.max(...box.map(p=>p.y));
-  const across=Math.hypot(box[1].x-box[0].x,box[1].y-box[0].y)/Math.max(1,r.width),down=Math.hypot(box[3].x-box[0].x,box[3].y-box[0].y)/Math.max(1,r.height);
-  const {glyphs:_,...rest}=r;
-  return {...rest,left,top,width:right-left,height:bottom-top,size:r.size*down,baseline:at(r.left+r.width/2,r.baseline).y,
+  const bg=[1,3,5].map(i=>parseInt((r.background||'#ffffff').slice(i,i+2),16)),b=r.angle?{x0:r.left,y0:r.top,x1:r.left+r.width,y1:r.top+r.height}:growToInk(pixels,{x0:r.left,y0:r.top,x1:r.left+r.width,y1:r.top+r.height},bg),cells=r.glyphs&&!r.angle?markCells(pixels,r,bg):r.glyphs;
+  // Flattened (possibly tilted) frame -> photo -> the line's turned frame.
+  const f=frameOf(r),onPhoto=(x:number,y:number)=>{const p=turn(f,x,y);return at(p.x,p.y);},middle=(b.y0+b.y1)/2,start=onPhoto(b.x0,middle),end=onPhoto(b.x1,middle),centre=onPhoto((b.x0+b.x1)/2,middle);
+  const line={angle:Math.atan2(end.y-start.y,end.x-start.x)*180/Math.PI,cx:centre.x,cy:centre.y},local=(x:number,y:number)=>{const p=onPhoto(x,y);return turn(line,p.x,p.y,true);};
+  const q=[local(b.x0,b.y0),local(b.x1,b.y0),local(b.x1,b.y1),local(b.x0,b.y1)],x0=Math.min(...q.map(p=>p.x)),x1=Math.max(...q.map(p=>p.x)),y0=Math.min(...q.map(p=>p.y)),y1=Math.max(...q.map(p=>p.y));
+  // The box's own centre is its turning point.
+  const mid=turn(line,(x0+x1)/2,(y0+y1)/2),dx=mid.x-(x0+x1)/2,dy=mid.y-(y0+y1)/2;
+  const across=Math.hypot(end.x-start.x,end.y-start.y)/Math.max(1,b.x1-b.x0),down=(y1-y0)/Math.max(1,b.y1-b.y0);
+  const {glyphs:_,angle:_angle,...rest}=r;
+  return {...rest,left:x0+dx,top:y0+dy,width:x1-x0,height:y1-y0,angle:line.angle,size:r.size*down,baseline:local((b.x0+b.x1)/2,r.baseline).y+dy,
+   ...(cells?{glyphs:cells.map(g=>({...g,x0:local(g.x0,middle).x+dx,x1:local(g.x1,middle).x+dx}))}:{}),
    ...(r.words?{words:r.words.map(w=>w.width===undefined?w:{...w,width:w.width*across})}:{}),
    ...(r.line?{line:{...r.line,words:r.line.words.map(w=>w.width===undefined?w:{...w,width:w.width*across})}}:{})};
  });
@@ -85,7 +114,11 @@ export function pageTilt(image:HTMLCanvasElement){
  const small=Object.assign(document.createElement('canvas'),{width:w,height:h}),g=small.getContext('2d',{willReadFrequently:true})!;
  g.fillStyle='#fff';g.fillRect(0,0,w,h);g.drawImage(image,0,0,w,h);
  const result=estimateSkew(inkMap(g.getImageData(0,0,w,h).data,w,h),w,h);
- return result&&result.confidence>=1.3&&Math.abs(result.angle)>=.5?result.angle:undefined;
+ // Below 0.5° a page is straightened only when its lines drift by 6 px or more
+ // across its width: at 0.4° a long scanned line drifts half its height and is misread.
+ if(!result||result.confidence<1.3)return undefined;
+ const angle=Math.abs(result.angle);
+ return angle>=.5||angle>=.2&&image.width*Math.tan(angle*Math.PI/180)>=6?result.angle:undefined;
 }
 // The image turned back by `tilt` on a canvas large enough for its corners,
 // filled with the page's own background colour.

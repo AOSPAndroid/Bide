@@ -20,3 +20,8 @@ test('older saved projects recover bold and italic fallback from the original fo
  assert.deepEqual(pdfFallbackStyle({pdfOriginalFont:'ABCDEF+Arial-BoldItalic'}),{fontWeight:'bold',fontStyle:'italic'});
  assert.deepEqual(pdfFallbackStyle({pdfOriginalFont:'Helvetica'}),{fontWeight:'normal',fontStyle:'normal'});
 });
+test('PDF fonts that cannot draw new text fall back to a metric-compatible bundled face',async()=>{
+ const {fallbackFont}=await import('../tmp/text-regions.mjs');
+ const cases={'Helvetica':'Liberation Sans','BCDEFG+Helvetica-Bold':'Liberation Sans','ArialMT':'Liberation Sans','Arial,Bold':'Liberation Sans','Times-Roman':'Liberation Serif','TimesNewRomanPS-BoldMT':'Liberation Serif','ABCDEF+Calibri':'Carlito','Cambria-Italic':'Caladea','Courier':'Cousine','Georgia':'PT Serif','MicrosoftSansSerif':'Liberation Sans','DejaVuSans':'Liberation Sans','OpenSans-Regular':'Liberation Sans','Roboto-Bold':'Liberation Sans','Inter-Medium':'Liberation Sans','PTSans-Bold':'PT Sans','Lato-Black':'Lato','Poppins-Medium':'Poppins','Quicksand':'Lato'};
+ for(const [font,face] of Object.entries(cases))assert.equal(fallbackFont(font),face,font);
+});
