@@ -203,7 +203,7 @@ export default function App() {
   const [commandIndex, setCommandIndex] = useState(0);
   const [menu, setMenu] = useState<string | null>(null);
   const [busy, setBusy] = useState('');
-  const [toast, setToast] = useState('');
+  const [toast, setToast] = useState<{text:string;action?:{label:string;run:()=>void}}|null>(null);
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
   const openedByUser = useRef(false);
@@ -241,7 +241,8 @@ export default function App() {
   const projectInput = useRef<HTMLInputElement>(null);
   const importMode = useRef<'open' | 'append'>('open');
   const saveCanvasRef = useRef<() => void>(() => {});
-  const notify = (s: string) => { setToast(s); setTimeout(() => setToast(''), 4200); };
+  // A toast with an action (Undo) stays a little longer; a new toast restarts the timer.
+  const toastTimer = useRef(0), notify = (text: string, action?: {label:string;run:()=>void}) => { clearTimeout(toastTimer.current); setToast({text,action}); toastTimer.current = window.setTimeout(() => setToast(null), action ? 6000 : 4200); };
   const fail = (e: unknown) => setError(e instanceof Error ? e.message : String(e));
 
   function commit(next: Project, reload = false, label?: string) {
@@ -1157,7 +1158,7 @@ export default function App() {
     </div>
     {view==='pdf'&&pdfHome&&<PdfWorkspace tools={pdfTools} name={project.name} pages={project.pages.length} intent={entryTool} website={HOSTED_BUILD} onOpen={()=>openFiles()} onEdit={()=>{setEntryTool(undefined);setPdfHome(false);}} onRun={tool=>{setMeasurementTool(tool.title==='Merge documents'?'merge':tool.title==='Compress PDF'?'compress':tool.title==='Split & extract'?'split':'other');setEntryTool(undefined);setPdfHome(false);tool.run();}}/>}
     {view==='documents'&&<Documents notify={notify} ocrEngine={aiReady?ocr.engine:'tesseract'} onFillForm={()=>{selectWorkspace('pdf');setPdfHome(false);openFiles();}}/>}
-    {toast&&<div className="toast" role="status"><Check size={16}/>{toast}</div>}
+    {toast&&<div className="toast" role="status"><Check size={16}/>{toast.text}{toast.action&&<button className="secondary" onClick={()=>{toast.action!.run();setToast(null);}}>{toast.action.label}</button>}</div>}
     {error&&<ModalShell title="Something needs your attention" close={()=>setError('')}><p className="error-message">{error}</p><div className="dialog-actions"><button className="primary" onClick={()=>setError('')}>Got it</button></div></ModalShell>}
     {importNotice&&<ModalShell title="PSD import details" close={()=>setImportNotice('')}><p className="notice">{importNotice}</p><div className="dialog-actions"><button className="primary" onClick={()=>setImportNotice('')}>Continue editing</button></div></ModalShell>}
     {passwordPrompt&&<ModalShell title="Unlock PDF" close={()=>passwordPrompt.resolve(null)}><PasswordForm key={String(passwordPrompt.incorrect)} name={passwordPrompt.name} incorrect={passwordPrompt.incorrect} onSubmit={passwordPrompt.resolve}/></ModalShell>}
