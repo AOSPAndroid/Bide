@@ -46,6 +46,20 @@ export function coverageFit(source:Coverage,candidate:Coverage,dx=0,dy=0){
  const error=Math.max(0,sourcePower-2*gain*cross+gain*gain*power);
  return {score:Math.max(0,1-error/sourcePower),gain};
 }
+// Ink strength from the stroke cores alone, whatever the alignment: a
+// slightly different letter shape lowers the least-squares gain, which would
+// lighten the colour. Compares the darkest pixels of each, as many as half
+// the rendered stroke core.
+export function coreGain(source:Coverage,candidate:Coverage){
+ const top=(data:Float32Array,count:number)=>{
+  const bins=new Uint32Array(256);for(const v of data)if(v>0)bins[Math.min(255,Math.round(v*255))]++;
+  let left=count,sum=0;for(let b=255;b>=0&&left>0;b--){const n=Math.min(left,bins[b]);sum+=n*b;left-=n;}
+  return count>left?sum/(count-left)/255:0;
+ };
+ let core=0;for(const v of candidate.data)if(v>=.75)core++;
+ const count=Math.max(1,core>>1),ink=top(candidate.data,count);
+ return ink>0?Math.min(1,top(source.data,count)/ink):0;
+}
 export function matchedInkColor(color:string,background:string,gain:number){
  if(!/^#[0-9a-f]{6}$/i.test(color)||!/^#[0-9a-f]{6}$/i.test(background)||!Number.isFinite(gain))return color;
  const rgb=(hex:string)=>[1,3,5].map(i=>parseInt(hex.slice(i,i+2),16)),ink=rgb(color),bg=rgb(background);
