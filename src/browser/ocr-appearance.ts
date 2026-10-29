@@ -126,7 +126,14 @@ export async function matchOcrAppearance(raster:HTMLCanvasElement,region:TextReg
   if(!best||score>best.score)best=result;
  }
  // Low confidence or mismatched OCR should retain the existing estimate.
- return best&&best.score>=.55?best:undefined;
+ if(!best||best.score<.55)return undefined;
+ // Neighbours can guide the font and placement, but their ink can differ
+ // from the selected line. Measure its own cores at the final fitted tuple.
+ if(selected&&paintSelected){
+  const text=await makeText(region,best.family);applyOcrAppearance(text,region,best);
+  text.set({fill:'#000000',objectCaching:false});best.gain=coreGain(selected.source,paintSelected(text));
+ }
+ return best;
 }
 
 // Softness alone, for a text already fitted in place: rendered over the

@@ -44,6 +44,30 @@ document.querySelector('#run')!.addEventListener('click',async()=>{
    if(!manual||manual.family!==family||manual.softness!==0)throw Error('Manual font/crisp override was ignored');
    results.push({family,weight,sourceSoftness:softness,sourceEdges,replacementEdges,fit:fitted,manual});document.body.append(canvas);
   }
+  // A neighbour can guide typography without lending its ink colour to the
+  // selected amount. Cover both contrast directions and light-on-dark text.
+  for(const [background,labelColor,color] of [
+   ['#ffffff','#4d4d4d','#4d4d4d'],
+   ['#ffffff','#000000','#4d4d4d'],
+   ['#ffffff','#4d4d4d','#000000'],
+   ['#202020','#fafafa','#b2b2b2'],
+   ['#ffffff','#000000','#2355aa'],
+  ] as const){
+   await ensureFont('Liberation Sans');
+   const canvas=document.createElement('canvas');canvas.width=900;canvas.height=95;
+   const ctx=canvas.getContext('2d')!;ctx.fillStyle=background;ctx.fillRect(0,0,canvas.width,canvas.height);ctx.font='normal 28px "Liberation Sans"';
+   const regions=[['label','Annual charge before tax',20.25,labelColor],['amount','17 950,24 €',550.25,color]].map(([id,text,x,fill])=>{
+    ctx.fillStyle=String(fill);ctx.fillText(String(text),Number(x),54.25);const m=ctx.measureText(String(text));
+    return {id:String(id),text:String(text),left:Number(x)-m.actualBoundingBoxLeft,top:54.25-m.actualBoundingBoxAscent,width:m.actualBoundingBoxLeft+m.actualBoundingBoxRight,height:m.actualBoundingBoxAscent+m.actualBoundingBoxDescent,size:28,baseline:54.25,fontName:'Image',bold:false,italic:false,color:String(fill),background,kind:'ocr',confidence:99} as TextRegion;
+   });
+   const selected=regions[1],makeText=async(r:TextRegion,font:string)=>(await detectedTextbox(r,{ocrFont:font,ocrStyle:'regular'})).text;
+   const fit=await matchOcrAppearance(canvas,selected,regions,'Liberation Sans',{autoFont:false,matchBlur:false,makeText});
+   if(!fit||fit.family!=='Liberation Sans'||fit.softness!==0)throw Error(`Mixed-ink typography changed: ${JSON.stringify({background,labelColor,color,fit})}`);
+   const text=await makeText(selected,fit.family);applyOcrAppearance(text,selected,fit);
+   const fill=String(text.fill),channels=[1,3,5];
+   if(!/^#[0-9a-f]{6}$/i.test(fill)||channels.some(i=>Math.abs(parseInt(fill.slice(i,i+2),16)-parseInt(color.slice(i,i+2),16))>2))throw Error(`Selected amount borrowed its neighbour's ink: ${JSON.stringify({background,labelColor,color,fill,fit})}`);
+   results.push({case:'Selected ink colour beside a neighbour',background,labelColor,sourceColor:color,replacementColor:fill,fit});
+  }
   // A small clear name beside a softer label must keep its own edge clarity.
   await ensureFont('Inter');const canvas=document.createElement('canvas');canvas.width=280;canvas.height=50;
   const ctx=canvas.getContext('2d')!;ctx.fillStyle='#fafafa';ctx.fillRect(0,0,280,50);ctx.font='normal 12px "Inter"';ctx.fillStyle='#202020';
