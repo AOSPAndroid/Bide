@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {contrastCoverage,coverageEdgeWidth,coverageFit,matchedInkColor} from '../tmp/ocr-appearance.mjs';
+import {contrastCoverage,coreGain,coverageEdgeWidth,coverageFit,matchedInkColor} from '../tmp/ocr-appearance.mjs';
 const coverage=(fill)=>{const width=28,height=16,data=new Float32Array(width*height);for(let y=0;y<height;y++)for(let x=0;x<width;x++)data[y*width+x]=fill(x,y);return {width,height,data};};
 const glyphs=(x,y)=>y>=4&&y<12&&((x>=5&&x<7)||(x>=11&&x<14)||(y<6&&x>=5&&x<14))?1:0;
 const soft=coverage((x,y)=>{let sum=0;for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++)sum+=glyphs(x+dx,y+dy)*(dx===0?2:1)*(dy===0?2:1);return sum/16;});
@@ -42,4 +42,13 @@ test('coverage handles coloured dark-mode letters, transparency and background n
  assert.equal(matchedInkColor('#444444','#ffffff',.8),'#333333');
  assert.equal(matchedInkColor('#d0d0d0','#202020',.8),'#ececec');
  assert.equal(matchedInkColor('invalid','#ffffff',.8),'invalid');
+});
+test('ink strength comes from the stroke cores, not from how well the shapes overlap',()=>{
+ // The same grey letters, a pixel off and with one stroke a little wider: the
+ // least-squares gain shrinks with the mismatch, the core ratio does not.
+ const crisp=coverage(glyphs),grey=coverage((x,y)=>(glyphs(x-1,y)||(y>=4&&y<12&&x===14))*.7);
+ assert.ok(coverageFit(grey,crisp).gain<.5);
+ assert.ok(Math.abs(coreGain(grey,crisp)-.7)<.01);
+ assert.ok(Math.abs(coreGain({...soft,data:soft.data.map(v=>v*.6)},soft)-.6)<.01);
+ assert.equal(coreGain(crisp,crisp),1);assert.equal(coreGain(crisp,coverage(()=>0)),0);
 });

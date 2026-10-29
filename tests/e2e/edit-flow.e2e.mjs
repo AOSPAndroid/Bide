@@ -6,6 +6,7 @@
 // the edit rather than the old digits under it.
 import {test} from 'node:test';import assert from 'node:assert/strict';
 import {createServer} from 'vite';import {chromium} from 'playwright-core';
+import {mkdtemp,writeFile} from 'node:fs/promises';import {join} from 'node:path';import {tmpdir} from 'node:os';
 
 const fields=page=>page.locator('button[aria-label^="Edit detected text"]').evaluateAll(b=>b.map(x=>x.getAttribute('aria-label').slice('Edit detected text: '.length)));
 async function editField(page,from,to){
@@ -212,6 +213,39 @@ test('an edit needing a letter the line lacks says which, and a font can then be
   assert.equal(await page.getByLabel('New text').inputValue(),next,'the next refused edit also retains current input');
   assert.deepEqual(await canvasState(),beforeLater,'a per-line font choice cannot silently replace another field or alter the earlier edit');
   assert.equal(await mode.inputValue(),'letters');
+  assert.deepEqual(errors,[]);
+ }finally{await browser.close();await server.close();}
+});
+
+
+test('a line set in a font takes the grey of the original ink, not a lighter one',{timeout:600000},async()=>{
+ const server=await createServer({logLevel:'error',server:{port:0,host:'127.0.0.1'}});await server.listen();
+ const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||undefined});
+ try{
+  // An invented page in grey ink, rendered at 200 dpi as a scanner would.
+  const shot=await browser.newPage({viewport:{width:420,height:260},deviceScaleFactor:200/72});
+  await shot.setContent(`<body style="margin:0;background:#fff;font-family:Arial,Helvetica,sans-serif;color:#4d4d4d"><div style="padding:30px 40px;font-size:10px;line-height:2.4">
+   <div style="display:flex;justify-content:space-between"><span>Annual charge before tax</span><span>17 950,24 €</span></div>
+   <div style="display:flex;justify-content:space-between"><span>Service fee</span><span>447,75 €</span></div>
+   <div style="display:flex;justify-content:space-between;font-weight:bold;font-size:13px;color:#222"><span>Total</span><span>18 404,49 €</span></div></div>`);
+  const dir=await mkdtemp(join(tmpdir(),'grey-ink-')),file=join(dir,'grey-page.png');await writeFile(file,await shot.screenshot());await shot.close();
+  const page=await browser.newPage({viewport:{width:1400,height:900}}),errors=[];page.on('pageerror',e=>errors.push(e.message));
+  await page.goto(server.resolvedUrls.local[0]+'app/');await page.locator('input[type=file][accept*=".psd"]').setInputFiles(file);
+  const field=page.locator('button[aria-label^="Edit detected text: 17 950,24"]').first();await field.waitFor({timeout:240000});
+  // The line has no 6, so the edit needs a font, chosen explicitly.
+  await field.click();await page.getByLabel('New text').fill('17 654,24 €');await page.getByRole('button',{name:'Apply',exact:true}).click();
+  await page.getByRole('button',{name:'Use a font for this edit'}).click();
+  await page.getByText('This line is now text in the OCR font',{exact:false}).waitFor({timeout:60000});
+  // Autosave may be delayed under the full suite: await the resolved saved
+  // layer rather than assuming a fixed delay has elapsed.
+  const savedBy=Date.now()+30000;let fills=[];
+  while(!fills.length&&Date.now()<savedBy){
+   fills=await page.evaluate(async()=>{const {restoreLocal}=await import('/src/model.ts');return (await restoreLocal())?.pages[0].canvas.objects.filter(o=>o.type?.toLowerCase()==='textbox').map(o=>o.fill)??[];});
+   if(!fills.length)await page.waitForTimeout(200);
+  }
+  assert.equal(fills.length,1);
+  const level=parseInt(fills[0].slice(1,3),16);
+  assert.ok(Math.abs(level-0x4d)<=2,`the font text is #4d4d4d like the original ink (got ${fills[0]})`);
   assert.deepEqual(errors,[]);
  }finally{await browser.close();await server.close();}
 });

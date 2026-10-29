@@ -1,4 +1,4 @@
-import {alphaCoverage,contrastCoverage,coverageFit,matchedInkColor,coverageEdgeWidth,type Coverage} from '../ocr-appearance';
+import {alphaCoverage,contrastCoverage,coreGain,coverageFit,matchedInkColor,coverageEdgeWidth,type Coverage} from '../ocr-appearance';
 import {rankOcrFonts,type FontSample} from '../ocr-font';
 import type {TextRegion} from '../text-regions';
 import type {Textbox} from '../text-appearance';
@@ -110,7 +110,11 @@ export async function matchOcrAppearance(raster:HTMLCanvasElement,region:TextReg
     // letting the placement settle a little for each.
     const placed=fit as Fit|undefined,step=softnessValues.indexOf(initial.softness);
     if(placed)for(const direction of [-1,1])for(let i=step+direction;i>=0&&i<softnessValues.length;i+=direction){const before=(fit as Fit|undefined)?.score??-Infinity;for(const dx of [-.25,0,.25])for(const dy of [-.25,0,.25])place(softnessValues[i],placed.dx+dx,placed.dy+dy);if(((fit as Fit|undefined)?.score??-Infinity)<=before)break;}
-    if(fit){fits.push(fit);onFit?.(fit);}
+    if(fit){
+     // Colour from the stroke cores at the chosen placement, not the fit's gain.
+     const f=fit as Fit;text.set({fontSize:size*f.ratio,left:sample.region.left+f.dx,top:sample.region.top+ascent-size*f.ratio*.93+f.dy});text.textSoftness=f.softness;text.initDimensions();
+     f.gain=coreGain(sample.source,paint());fits.push(f);onFit?.(f);
+    }
    }
   }
   if(!fits.length)continue;
