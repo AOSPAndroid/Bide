@@ -22,7 +22,7 @@ const ligatures=['ff','fi','fl','ffi','ffl','st','st'];
 const at=(o:mupdf.PDFObject,...path:string[])=>o.isNull()?o:o.get(...path);
 
 type Glyphinfo={u:string;gid:number;w:number;adv:number;ink?:boolean};
-type Font={num:number;name:string;kind:'type0'|'simple'|'type3';size:1|2;embedded:boolean;win:boolean;tu?:Map<number,string>;info:Map<number,Glyphinfo>;used:Map<number,number>;kerns:Map<string,Kern[]>};
+type Font={num:number;name:string;kind:'type0'|'simple'|'type3';size:1|2;embedded:boolean;win:boolean;mono?:boolean;tu?:Map<number,string>;info:Map<number,Glyphinfo>;used:Map<number,number>;kerns:Map<string,Kern[]>};
 type Src={obj:mupdf.PDFObject;text:string;num:number;uses:number;form:boolean};
 type Show={src:number;start:number;end:number;op:string;args:Val[];font:Font|null;size:number;tc:number;tw:number;th:number;ts:number;tr:number;ctm:M;
  pen0:number;pen1:number;k:number;sx:number;flat:boolean;glyphs:Glyph[];trailing:Kern[]};
@@ -106,18 +106,21 @@ function interpret(page:mupdf.PDFPage){
 // of the size) and, with `ink`, whether the glyph paints anything.
 function probe(pdoc:mupdf.PDFDocument,f:Font,codes:number[],ink:boolean){
  const todo=[...new Set(codes)].filter(c=>!f.info.has(c)||ink&&f.info.get(c)!.ink===undefined);if(!todo.length)return;
+ let mono=true;
  const hex=(c:number)=>c.toString(16).padStart(f.size*2,'0'),seen:{gid:number;u:string;e:number;adv:number;ink?:boolean}[]=[];
  const ref=pdoc.newIndirect(f.num),obj=pdoc.addPage([0,0,10,10],0,{Font:{P:ref}},'BT /P 1000 Tf '+todo.map(c=>`1 0 0 1 0 0 Tm <${hex(c)}${hex(c)}> Tj`).join(' ')+' ET');
  pdoc.insertPage(-1,obj);const page=pdoc.loadPage(pdoc.countPages()-1);
  const device=new mupdf.Device({fillText(text,ctm){text.walk({showGlyph(font,trm,gid,u){
   // Further characters of a ligature come as glyph -1.
   if(gid<0){if(seen.length)seen[seen.length-1].u+=String.fromCodePoint(u);return;}
+  mono=mono&&font.isMono();
   const item:{gid:number;u:string;e:number;adv:number;ink?:boolean}={gid,u:u>0?String.fromCodePoint(u):'',e:trm[4],adv:gid>0&&f.embedded?font.advanceGlyph(gid,0)*1000:NaN};
   if(ink&&seen.length%2===0&&gid>0){const t=new mupdf.Text();try{t.showGlyph(font,trm,gid,u);const b=t.getBounds(null as never,ctm);item.ink=b[2]-b[0]>.5&&b[3]-b[1]>.5;}finally{t.destroy();}}
   seen.push(item);}});}});
  try{page.runPageContents(device,mupdf.Matrix.identity);device.close();}
  finally{device.destroy();page.destroy();pdoc.deletePage(pdoc.countPages()-1);obj.destroy();}
  if(seen.length!==todo.length*2)throw new Unsafe('This PDF font could not be read.');
+ f.mono=mono&&(f.mono??true);
  todo.forEach((c,i)=>{const a=seen[2*i],b=seen[2*i+1];f.info.set(c,{u:a.u,gid:a.gid,w:Math.round((b.e-a.e)*1000)/1000,adv:a.adv,ink:a.ink??f.info.get(c)?.ink});});
 }
 
@@ -257,10 +260,11 @@ export function rewriteText(doc:mupdf.PDFDocument,pdoc:mupdf.PDFDocument,index:n
   // not silently acquire zero kerning. Numbers/punctuation keep the PDF's own
   // advances, Tc/Tw and observed adjustments; absent producer layout tables
   // still prevent a universal claim of regenerated-document equivalence.
-  // A monospaced font keeps every character on one pitch: when no pair in
-  // this font on the page is adjusted, an unseen pair is not adjusted either.
+  // A genuinely monospaced font can keep its unadjusted pitch. Equal widths
+  // of only the letters seen here are not proof (Helvetica A and V match).
+  // Require the rendered font's own mono flag as well, not a PDF name or Flags.
   const widths=[...f.used.keys(),...codes].map(c=>f.info.get(c)?.w).filter((w):w is number=>!!w);
-  const pitched=widths.length>1&&widths.every(w=>Math.abs(w-widths[0])<=1)&&[...f.kerns.values()].every(k=>!k.reduce((n,x)=>n+x.v,0));
+  const pitched=f.mono===true&&widths.length>1&&widths.every(w=>Math.abs(w-widths[0])<=1)&&[...f.kerns.values()].every(k=>!k.reduce((n,x)=>n+x.v,0));
   const kern=(a:number|undefined,b:number|undefined)=>{
    if(a===undefined||b===undefined)return;
    const known=f.kerns.get(a+','+b),left=f.info.get(a)?.u??'',right=f.info.get(b)?.u??'';
