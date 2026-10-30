@@ -15,8 +15,12 @@ export function fallbackFont(name:string){
  const n=name.replace(/^[A-Z]{6}\+/,'');
  const bundled=[['PT Sans',/pt ?sans/i],['PT Serif',/pt ?serif/i],['Poppins',/poppins/i],['Lato',/lato/i]] as const;
  const same=bundled.find(([,pattern])=>pattern.test(n))?.[0];if(same)return same;
- return /courier|mono|consolas/i.test(n)?'Cousine':/helvetica|arial|arimo|nimbus ?sans|liberation ?sans/i.test(n)?'Liberation Sans':/times|tinos|nimbus ?rom|liberation ?serif/i.test(n)?'Liberation Serif':/calibri|carlito/i.test(n)?'Carlito':/cambria|caladea/i.test(n)?'Caladea':/sans|roboto|^inter\b|inter-/i.test(n)?'Liberation Sans':/serif|georgia|garamond/i.test(n)?'PT Serif':'Lato';
+ return /courier|nimbus ?mono|freemono/i.test(n)?(/bold|black|heavy/i.test(n)?'Courier Prime':'Cutive Mono'):/mono|consolas/i.test(n)?'Cousine':/helvetica|arial|arimo|nimbus ?sans|liberation ?sans/i.test(n)?'Liberation Sans':/times|tinos|nimbus ?rom|liberation ?serif/i.test(n)?'Liberation Serif':/calibri|carlito/i.test(n)?'Carlito':/cambria|caladea/i.test(n)?'Caladea':/sans|roboto|^inter\b|inter-/i.test(n)?'Liberation Sans':/serif|georgia|garamond/i.test(n)?'PT Serif':'Lato';
 }
+
+// Courier is thin; Cutive Mono matches its weight (Courier Prime, its bold)
+// but sets 0.6055 em per character: tighten it onto Courier's 0.6 em pitch.
+export const fallbackCharSpacing=(family:string)=>family==='Cutive Mono'?-5.47:0;
 
 // Use the original face's style when an embedded subset cannot render new text.
 // The embedded face itself stays normal to avoid synthesizing bold twice.

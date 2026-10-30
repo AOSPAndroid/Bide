@@ -79,3 +79,13 @@ test('scaling keeps a tilted line\'s angle, and follows uneven scales',()=>{
  const [s]=scaleRegions([{...region('Hi',100,50,40,20),angle:45}],1,2);assert.ok(Math.abs(s.angle-Math.atan(2)*180/Math.PI)<1e-9);
  assert.equal('angle' in scaleRegions([region('Hi',1,1)],.5,.25)[0],false,'a level line stays without an angle');
 });
+test('a field target grows evenly around a small line, so the middle of each line is its own',async()=>{
+ const {fieldBox}=await import('../tmp/ocr-regions.mjs');
+ // Lines 16 pt apart, 12 pt tall, seen at 35%: 4.2 px tall, under the 10 px minimum.
+ const lines=[0,1,2].map(i=>({left:70,top:160+i*16,width:180,height:12})),boxes=lines.map(l=>fieldBox(l,.35));
+ boxes.forEach((b,i)=>{assert.equal(b.height,10);assert.ok(Math.abs(b.top+b.height/2-(lines[i].top+6)*.35)<1e-9,'centred on its line');});
+ // The next line's target (drawn on top) does not reach this line's middle.
+ for(let i=0;i<2;i++)assert.ok(boxes[i+1].top>(lines[i].top+6)*.35);
+ assert.deepEqual(fieldBox({left:10,top:20,width:100,height:30},2),{left:20,top:40,width:200,height:60,transform:undefined});
+ assert.equal(fieldBox({left:0,top:0,width:2,height:2,angle:-2.5},1).transform,'rotate(-2.5deg)');
+});

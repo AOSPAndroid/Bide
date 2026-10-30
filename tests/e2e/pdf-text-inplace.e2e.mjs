@@ -55,6 +55,23 @@ async function printed({total='1 284,50'}={}){
  }finally{await page.close();}
 }
 
+// A parcel slip with a typewriter address block: standard Courier (not
+// embedded) from pdf-lib, or a Courier-family subset embedded by pdfkit.
+const slipLines=(city='69003 LYON')=>['MARTINE LEFEVRE','8 ALLEE DES TILLEULS',city,'REF 004127-88  COLIS 2/3'];
+async function slip({city}={}){
+ const pdf=await PDFDocument.create(),mono=await pdf.embedFont(StandardFonts.Courier),bold=await pdf.embedFont(StandardFonts.HelveticaBold);
+ const p=pdf.addPage([595,842]);p.drawText('Transports Vallee du Lot',{x:60,y:782,size:16,font:bold});
+ slipLines(city).forEach((l,i)=>p.drawText(l,{x:70,y:672-i*16,size:12,font:mono,color:rgb(.08,.08,.1)}));
+ return Buffer.from(await pdf.save());
+}
+function subsetSlip(){
+ return new Promise(resolve=>{
+  const doc=new PDFKit({size:'A4',margin:50,info:{Title:'Slip (invented)',CreationDate:new Date(Date.UTC(2026,9,14))}}),chunks=[];doc.on('data',c=>chunks.push(c));doc.on('end',()=>resolve(Buffer.concat(chunks)));
+  doc.registerFont('M','src/browser/fonts/extra/CourierPrime-Regular.ttf');doc.font('M').fontSize(12).fillColor('#141418');
+  slipLines().forEach((l,i)=>doc.text(l,70,160+i*16,{lineBreak:false}));doc.end();
+ });
+}
+
 // --- Rendering and comparison --------------------------------------------
 const render=(bytes,i=0)=>{const d=mupdf.Document.openDocument(bytes,'application/pdf'),p=d.loadPage(i),x=p.toPixmap(mupdf.Matrix.scale(2,2),mupdf.ColorSpace.DeviceRGB,false,true);try{return {w:x.getWidth(),h:x.getHeight(),px:x.getPixels().slice()};}finally{x.destroy();p.destroy();d.destroy();}};
 const find=(bytes,needle,i=0)=>{const d=mupdf.Document.openDocument(bytes,'application/pdf'),p=d.loadPage(i);try{return p.search(needle).flat().map(q=>({left:Math.min(q[0],q[4]),right:Math.max(q[2],q[6]),top:Math.min(q[1],q[3]),bottom:Math.max(q[5],q[7])}));}finally{p.destroy();d.destroy();}};
@@ -175,9 +192,9 @@ test('d) a character the subset lacks keeps the PDF and typed input until New fo
   await field(page,'EUR 785.65').waitFor({timeout:120000});const before=await state(page);
   await field(page,'EUR 785.65').click();const typed=(await page.getByLabel('New text').inputValue()).replace('EUR 785.65','EUR 785.65 Ω');
   await page.getByLabel('New text').fill(typed);await page.getByRole('button',{name:'Apply',exact:true}).click();
-  await page.getByRole('dialog',{name:'Something needs your attention'}).getByText(/Ω/).waitFor();
+  await page.locator('.lettering-refusal').getByText(/Ω/).waitFor();assert.equal(await page.getByRole('dialog',{name:'Something needs your attention'}).count(),0,'said in the edit dialog, not a separate box');
   assert.deepEqual(await state(page),before,'the unsupported default edit changes neither PDF source nor canvas');
-  await page.getByRole('button',{name:'Got it',exact:true}).click();assert.equal(await page.getByLabel('New text').inputValue(),typed,'the refused dialog keeps the typed value');
+  assert.equal(await page.getByLabel('New text').inputValue(),typed,'the refused dialog keeps the typed value');
   // Compare the retained native source as well as its state, then opt in
   // directly from the still-open dialog without discarding the typed value.
   const kept=await state(page),r=compare(Buffer.from(kept.sources[kept.source],'base64'),original,union(find(original,'EUR 785.65')));report('d-refused',r);
@@ -202,6 +219,42 @@ test('e) a right-aligned amount that gets wider keeps its right edge',{timeout:3
   assert.ok(now&&Math.abs(now.right-was.right)<.05,`right edge ${now?.right} (was ${was.right})`);
   assert.ok(now.left<was.left-4,'the start moved left by the new digit');
   assert.equal(r.pixels,0,`the download is the regenerated statement (${JSON.stringify(r)})`);
+  assert.deepEqual(errors,[]);
+ }finally{await page.close();}
+});
+
+test('g) in a monospaced font, letters never paired before are written in place on the font\'s own pitch',{timeout:300000},async()=>{
+ // "CE", "ED", "DE", "EX" appear nowhere on the page; Courier has one pitch and no kerning.
+ const original=await slip(),reference=await slip({city:'69003 LYON CEDEX'});
+ const {page,errors}=await open('slip.pdf',original);
+ try{
+  await edit(page,'69003 LYON','69003 LYON CEDEX');
+  const edited=await download(page),r=compare(edited,reference,union([...find(original,'69003 LYON'),...find(reference,'69003 LYON CEDEX')]));report('g',r);
+  assert.deepEqual(fonts(edited),fonts(original),'still the standard Courier');
+  assert.equal(r.pixels,0,`the download is the regenerated slip (${JSON.stringify(r)})`);
+  assert.deepEqual(errors,[]);
+ }finally{await page.close();}
+});
+
+test('h) a Courier line whose subset lacks a letter: said in the dialog; New font keeps it on one line in a Courier-weight face',{timeout:300000},async()=>{
+ const original=await subsetSlip(),{page,errors}=await open('slip.pdf',original);
+ try{
+  await field(page,'69003 LYON').waitFor({timeout:120000});await field(page,'69003 LYON').click();
+  await page.getByLabel('New text').fill('69003 LYON CEDEX');await page.getByRole('button',{name:'Apply',exact:true}).click();
+  // The subset has no X.
+  await page.locator('.lettering-refusal').getByText(/no “X”/).waitFor({timeout:60000});
+  assert.equal(await page.getByRole('dialog',{name:'Something needs your attention'}).count(),0);
+  await page.getByRole('button',{name:'New font text box',exact:true}).click();
+  await page.waitForFunction(()=>document.activeElement?.tagName==='TEXTAREA',null,{timeout:60000});await page.keyboard.press('Escape');
+  const layer=(await state(page)).canvas.objects.find(o=>o.type?.toLowerCase()==='textbox');
+  assert.equal(layer.text,'69003 LYON CEDEX');
+  assert.equal(layer.fontFamily,'Cutive Mono','regular Courier gets a face of its stroke weight');
+  assert.equal(layer.charSpacing,-5.47,"set on Courier's 0.6 em pitch");
+  // One line: a longer value widens the box instead of wrapping onto the line below.
+  const [was]=find(original,'69003 LYON'),pitch=.6*12;
+  assert.ok(layer.height<layer.fontSize*1.5,`one line (height ${layer.height}, size ${layer.fontSize})`);
+  assert.ok(layer.width>=16*pitch-1,`the box holds all 16 characters (${layer.width})`);
+  assert.ok(Math.abs(layer.left-was.left)<1.5,`starts where the line did (${layer.left} vs ${was.left})`);
   assert.deepEqual(errors,[]);
  }finally{await page.close();}
 });

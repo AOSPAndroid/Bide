@@ -257,9 +257,14 @@ export function rewriteText(doc:mupdf.PDFDocument,pdoc:mupdf.PDFDocument,index:n
   // not silently acquire zero kerning. Numbers/punctuation keep the PDF's own
   // advances, Tc/Tw and observed adjustments; absent producer layout tables
   // still prevent a universal claim of regenerated-document equivalence.
+  // A monospaced font keeps every character on one pitch: when no pair in
+  // this font on the page is adjusted, an unseen pair is not adjusted either.
+  const widths=[...f.used.keys(),...codes].map(c=>f.info.get(c)?.w).filter((w):w is number=>!!w);
+  const pitched=widths.length>1&&widths.every(w=>Math.abs(w-widths[0])<=1)&&[...f.kerns.values()].every(k=>!k.reduce((n,x)=>n+x.v,0));
   const kern=(a:number|undefined,b:number|undefined)=>{
    if(a===undefined||b===undefined)return;
    const known=f.kerns.get(a+','+b),left=f.info.get(a)?.u??'',right=f.info.get(b)?.u??'';
+   if(known===undefined&&pitched)return [];
    if(known===undefined&&/^\p{L}+$/u.test(left)&&/^\p{L}+$/u.test(right))throw new Unsafe(`This PDF does not establish the original spacing for “${left}${right}”.`);
    return known;
   };
