@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-10-30 — Hosted web reliability
+
+- Recover from an interrupted AI runtime download with Rescan, without reloading the page or losing the document. Failed runtimes are discarded; stale worker events cannot affect the replacement.
+- Keep scanned-PDF edits sharp for larger text by cutting original letters at the PDF render density, within the existing page-size and memory limits. Image editing still uses the image's original pixels.
+
 ## 2026-10-30 — PDF lettering and editing
 
 - Extend safe Courier/typewriter text in its original PDF font, including new letter pairs when the font's monospacing and spacing checks permit it.
