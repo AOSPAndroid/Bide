@@ -69,6 +69,14 @@ export function ocrPatchBounds(region:Bounds,padding:number,page:{width:number;h
 
 // Below this Tesseract confidence a region is flagged for proofreading.
 // A field to check: its scan gave a reason (ocr-checks.ts), or, for fields read before that, a low confidence.
+// A field's tap target on the page, in screen pixels: at least 8 x 10 px,
+// grown evenly around the text, so a small line's target stays centred on it
+// and the middle of each line stays its own (zoomed out, it spilled downward
+// onto the next line).
+export function fieldBox(r:{left:number;top:number;width:number;height:number;angle?:number},zoom:number){
+ const width=Math.max(8,r.width*zoom),height=Math.max(10,r.height*zoom);
+ return {left:r.left*zoom-(width-r.width*zoom)/2,top:r.top*zoom-(height-r.height*zoom)/2,width,height,transform:r.angle?`rotate(${r.angle}deg)`:undefined};
+}
 export const isUncertain=(r:{kind:string;confidence?:number;doubt?:string})=>r.kind==='ocr'&&(r.doubt!==undefined||r.confidence!==undefined&&r.confidence<70);
 
 export function ocrScanStatus(count:number,languages:string,converted:boolean,uncertain=0){

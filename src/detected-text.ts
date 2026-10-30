@@ -12,8 +12,10 @@ import {repairTextBackground} from './text-replacement';
 import {estimateOcrBold,glyphInk,wordInk,classifyWordWeights} from './ocr-weight';
 import {darkenToInk,prepareOcrPixels,estimateLineHeight} from './ocr-image';
 import {ensureFont,ensureEmbeddedFont,ensureDocumentFonts} from './fonts';
+import {bundledFonts} from './font-catalog';
+import {weightFamilies} from './font-weights';
 import {rasterSearchWords} from './searchable-text';
-import {fallbackFont,fitOcrText,type TextRegion} from './text-regions';
+import {fallbackFont,fallbackCharSpacing,fitOcrText,type TextRegion} from './text-regions';
 import {lineCells,planGlyphEdit,missingLetters,withUnread,ownInk,lineMetrics,UNREAD,type LibraryGlyph} from './glyph-edit';
 import {markDoubts} from './ocr-checks';
 import {mixedWeights,attachNumberParts,recognitionKey,scaleRegions,unconvertedRegions,ocrPatchBounds,ocrScanStatus,isUncertain,frameOf,turn,turnedBounds,inFrame,type Frame} from './ocr-regions';
@@ -137,11 +139,18 @@ async function suggestFont(raster:HTMLCanvasElement,regions:TextRegion[]){
  const {suggestOcrFont}=await import('./ocr-font');return (await suggestOcrFont(samples))?.family;
 }
 
+// A field's new value stays on its line: a longer value widens the box
+// instead of wrapping (by letter) onto the line below.
+export function fitOneLine(text:Textbox){
+ if(text.text.includes('\n'))return;
+ const width=text.width;text.set({width:1e4});text.initDimensions();
+ text.set({width:Math.max(width,Math.ceil(text.calcTextWidth())+2)});text.initDimensions();
+}
 // Editable text positioned so its first baseline matches the detected text.
 // matchBlur gives OCR text the measured softness of the original letters.
 // A tilted line's text is turned with it, unless `level` (for fitting in its frame).
 export async function detectedTextbox(region:TextRegion,{ocrFont,ocrStyle,matchBlur=false,pageInk,level=false}:{ocrFont:string;ocrStyle:string;matchBlur?:boolean;pageInk?:PageInk;level?:boolean}){
- let family=region.kind==='ocr'?ocrFont:fallbackFont(region.fontName),embedded=false;
+ let family=region.kind==='ocr'?ocrFont:fallbackFont(region.fontName,bundledFonts.map(f=>f.family)),embedded=false;
  if(region.fontData&&region.fontId){try{await ensureEmbeddedFont(region.fontId,region.fontData);family=region.fontId;embedded=true;}catch{}}
  await ensureFont(family);
  const italic=region.kind==='ocr'?ocrStyle.includes('italic'):region.italic,words=region.words;
@@ -161,8 +170,8 @@ export async function detectedTextbox(region:TextRegion,{ocrFont,ocrStyle,matchB
   if(words.every(w=>!measurable(w.text)||(w.inkMass!==undefined&&w.width))){const result=classifyWordWeights(words.map(inkOf),vote(words),sameInk(region,pageInk));weights=mixedWeights(words,result.bold);inkLevel=result.ink;}
   else weights=mixedWeights(words,words.map(w=>w.inkDensity===undefined||!measurable(w.text)?undefined:estimateOcrBold(w.text,family,region.height,w.inkDensity,region.blur)));
  }
- const bold=weights?weights.base:ownBold??(region.kind==='ocr'?(auto?estimateOcrBold(region.text,family,region.height,region.inkDensity,region.blur):ocrStyle.includes('bold')):region.bold);
- let size=region.size,ocrAscent=region.height,charSpacing=0,boxWidth=Math.max(region.width+4,20);
+ const bold=weights?weights.base:ownBold??(region.kind==='ocr'?(auto?estimateOcrBold(region.text,family,region.height,region.inkDensity,region.blur):ocrStyle.includes('bold')):region.bold&&!weightFamilies.has(family));
+ let size=region.size,ocrAscent=region.height,charSpacing=region.kind==='pdf'&&!embedded?fallbackCharSpacing(family):0,boxWidth=Math.max(region.width+4,20);
  if(region.kind==='ocr'){
   const ctx=document.createElement('canvas').getContext('2d')!,font=(b:boolean)=>`${italic?'italic ':''}${b?'bold ':''}100px "${family}"`;ctx.font=font(bold);const metrics=ctx.measureText(region.text);
   // Ink width (not advance), to compare with the original's inked extent.
@@ -174,9 +183,15 @@ export async function detectedTextbox(region:TextRegion,{ocrFont,ocrStyle,matchB
  }
  const text=Object.assign(new Textbox(region.text,{left:region.left,top:region.top,width:boxWidth,fontSize:size,charSpacing,fontFamily:family,fontWeight:embedded?'normal':bold?'bold':'normal',fontStyle:embedded?'normal':italic?'italic':'normal',fill:region.kind==='ocr'?darkenToInk(region.color,region.background,inkLevel):region.color,lineHeight:1,splitByGrapheme:true,objectCaching:false}),{id:uid(),name:region.text.slice(0,40),pdfOriginalFont:region.fontName,pdfFontData:embedded?region.fontData:undefined,pdfFontFallback:fallbackFont(region.fontName),pdfFontBold:bold,pdfFontItalic:italic,recognizedKey:recognitionKey(region),...(region.kind==='ocr'?{ocrOriginalBounds:originalFieldBounds(region)}:{})});
  for(const r of weights?.ranges??[])text.setSelectionStyles({fontWeight:r.bold?'bold':'normal'},r.start,r.end);
+ fitOneLine(text);
  if(matchBlur&&region.kind==='ocr'&&(region.blur??0)>=.3)Object.assign(text,{textSoftness:clampTextSoftness(region.blur!)});
  // Fabric's top includes its ascender allowance; anchor the first baseline.
- text.top=region.kind==='pdf'?region.baseline-region.size*.93:region.top+ocrAscent-size*.93;
+ // A PDF line goes exactly on its pen position and baseline: Fabric draws the
+ // first baseline 1.13 × (1 − 0.222) em below the text's top, and the text sits
+ // half a stroke width inside the box that left/top place (0.93 em left a
+ // 26 pt line 0.7 pt high and 0.5 pt right).
+ if(region.kind==='pdf'){const inset=text.strokeWidth/2;text.left=region.left-inset;text.top=region.baseline-text.fontSize*text._fontSizeMult*(1-text._fontSizeFraction)-inset;}
+ else text.top=region.top+ocrAscent-size*.93;
  if(!level)turnLayer(text,region);
  return {text,embedded};
 }

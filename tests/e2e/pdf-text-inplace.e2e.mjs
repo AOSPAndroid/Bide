@@ -9,7 +9,7 @@
 import {test,before,after} from 'node:test';import assert from 'node:assert/strict';
 import {createServer} from 'vite';import {chromium} from 'playwright-core';
 import {readFile} from 'node:fs/promises';import {createHash} from 'node:crypto';
-import * as mupdf from 'mupdf';import {PDFDocument,StandardFonts,rgb} from 'pdf-lib';import PDFKit from 'pdfkit';
+import * as mupdf from 'mupdf';import {PDFDocument,StandardFonts,rgb} from 'pdf-lib';import fontkit from '@pdf-lib/fontkit';import PDFKit from 'pdfkit';
 
 let server,browser;
 before(async()=>{server=await createServer({logLevel:'error',server:{port:0,host:'127.0.0.1'}});await server.listen();browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||undefined});});
@@ -53,6 +53,36 @@ async function printed({total='1 284,50'}={}){
    <p><b>Total dû : ${total} €</b></p></body></html>`);
   await page.evaluate(()=>document.fonts.ready);return Buffer.from(await page.pdf({format:'A4'}));
  }finally{await page.close();}
+}
+
+// A parcel slip with a typewriter address block: standard Courier (not
+// embedded) from pdf-lib, or a Courier-family subset embedded by pdfkit.
+const slipLines=(city='69003 LYON')=>['MARTINE LEFEVRE','8 ALLEE DES TILLEULS',city,'REF 004127-88  COLIS 2/3'];
+async function slip({city}={}){
+ const pdf=await PDFDocument.create(),mono=await pdf.embedFont(StandardFonts.Courier),bold=await pdf.embedFont(StandardFonts.HelveticaBold);
+ const p=pdf.addPage([595,842]);p.drawText('Transports Vallee du Lot',{x:60,y:782,size:16,font:bold});
+ slipLines(city).forEach((l,i)=>p.drawText(l,{x:70,y:672-i*16,size:12,font:mono,color:rgb(.08,.08,.1)}));
+ return Buffer.from(await pdf.save());
+}
+// A Courier-family face Bide does not bundle (a subset named CourierStd).
+async function subsetSlip(){
+ const pdf=await PDFDocument.create();pdf.registerFontkit(fontkit);
+ const mono=await pdf.embedFont(await readFile('src/browser/fonts/extra/CourierPrime-Regular.ttf'),{subset:true,customName:'CourierStd'}),p=pdf.addPage([595,842]);
+ slipLines().forEach((l,i)=>p.drawText(l,{x:70,y:672-i*16,size:12,font:mono,color:rgb(.08,.08,.1)}));
+ return Buffer.from(await pdf.save());
+}
+
+// A card receipt: the merchant in Roboto Light (its subset holds only that
+// word's letters), details in Roboto Regular, a Roboto Bold heading.
+function receipt({merchant='Lumina Air'}={}){
+ return new Promise(resolve=>{
+  const doc=new PDFKit({size:'A4',margin:50,info:{Title:'Receipt (invented)',CreationDate:new Date(Date.UTC(2026,9,14))}}),chunks=[];doc.on('data',c=>chunks.push(c));doc.on('end',()=>resolve(Buffer.concat(chunks)));
+  doc.registerFont('L','src/browser/fonts/weights/Roboto-Light.ttf');doc.registerFont('R','src/browser/fonts/library/roboto-Regular.ttf');doc.registerFont('B','src/browser/fonts/library/roboto-Bold.ttf');
+  doc.font('B').fontSize(20).fillColor('#111').text('Description',60,80,{lineBreak:false});doc.moveTo(55,112).lineTo(540,112).lineWidth(1.5).stroke('#111');
+  doc.font('L').fontSize(26).text(merchant,60,128,{lineBreak:false});
+  doc.font('R').fontSize(14).fillColor('#222');['To: Lumina Air Ltd, 4 Harbour Road','Card: 5300 **** 1188'].forEach((t,i)=>doc.text(t,60,170+i*20,{lineBreak:false}));
+  doc.end();
+ });
 }
 
 // --- Rendering and comparison --------------------------------------------
@@ -175,9 +205,9 @@ test('d) a character the subset lacks keeps the PDF and typed input until New fo
   await field(page,'EUR 785.65').waitFor({timeout:120000});const before=await state(page);
   await field(page,'EUR 785.65').click();const typed=(await page.getByLabel('New text').inputValue()).replace('EUR 785.65','EUR 785.65 Ω');
   await page.getByLabel('New text').fill(typed);await page.getByRole('button',{name:'Apply',exact:true}).click();
-  await page.getByRole('dialog',{name:'Something needs your attention'}).getByText(/Ω/).waitFor();
+  await page.locator('.lettering-refusal').getByText(/Ω/).waitFor();assert.equal(await page.getByRole('dialog',{name:'Something needs your attention'}).count(),0,'said in the edit dialog, not a separate box');
   assert.deepEqual(await state(page),before,'the unsupported default edit changes neither PDF source nor canvas');
-  await page.getByRole('button',{name:'Got it',exact:true}).click();assert.equal(await page.getByLabel('New text').inputValue(),typed,'the refused dialog keeps the typed value');
+  assert.equal(await page.getByLabel('New text').inputValue(),typed,'the refused dialog keeps the typed value');
   // Compare the retained native source as well as its state, then opt in
   // directly from the still-open dialog without discarding the typed value.
   const kept=await state(page),r=compare(Buffer.from(kept.sources[kept.source],'base64'),original,union(find(original,'EUR 785.65')));report('d-refused',r);
@@ -202,6 +232,60 @@ test('e) a right-aligned amount that gets wider keeps its right edge',{timeout:3
   assert.ok(now&&Math.abs(now.right-was.right)<.05,`right edge ${now?.right} (was ${was.right})`);
   assert.ok(now.left<was.left-4,'the start moved left by the new digit');
   assert.equal(r.pixels,0,`the download is the regenerated statement (${JSON.stringify(r)})`);
+  assert.deepEqual(errors,[]);
+ }finally{await page.close();}
+});
+
+test('g) in a monospaced font, letters never paired before are written in place on the font\'s own pitch',{timeout:300000},async()=>{
+ // "CE", "ED", "DE", "EX" appear nowhere on the page; Courier has one pitch and no kerning.
+ const original=await slip(),reference=await slip({city:'69003 LYON CEDEX'});
+ const {page,errors}=await open('slip.pdf',original);
+ try{
+  await edit(page,'69003 LYON','69003 LYON CEDEX');
+  const edited=await download(page),r=compare(edited,reference,union([...find(original,'69003 LYON'),...find(reference,'69003 LYON CEDEX')]));report('g',r);
+  assert.deepEqual(fonts(edited),fonts(original),'still the standard Courier');
+  assert.equal(r.pixels,0,`the download is the regenerated slip (${JSON.stringify(r)})`);
+  assert.deepEqual(errors,[]);
+ }finally{await page.close();}
+});
+
+test('h) a Courier line whose subset lacks a letter: said in the dialog; New font keeps it on one line in a Courier-weight face',{timeout:300000},async()=>{
+ const original=await subsetSlip(),{page,errors}=await open('slip.pdf',original);
+ try{
+  await field(page,'69003 LYON').waitFor({timeout:120000});await field(page,'69003 LYON').click();
+  await page.getByLabel('New text').fill('69003 LYON CEDEX');await page.getByRole('button',{name:'Apply',exact:true}).click();
+  // The subset has no X.
+  await page.locator('.lettering-refusal').getByText(/no “X”/).waitFor({timeout:60000});
+  assert.equal(await page.getByRole('dialog',{name:'Something needs your attention'}).count(),0);
+  await page.getByRole('button',{name:'New font text box',exact:true}).click();
+  await page.waitForFunction(()=>document.activeElement?.tagName==='TEXTAREA',null,{timeout:60000});await page.keyboard.press('Escape');
+  const layer=(await state(page)).canvas.objects.find(o=>o.type?.toLowerCase()==='textbox');
+  assert.equal(layer.text,'69003 LYON CEDEX');
+  assert.equal(layer.fontFamily,'Cutive Mono','regular Courier gets a face of its stroke weight');
+  assert.equal(layer.charSpacing,-5.47,"set on Courier's 0.6 em pitch");
+  // One line: a longer value widens the box instead of wrapping onto the line below.
+  const [was]=find(original,'69003 LYON'),pitch=.6*12;
+  assert.ok(layer.height<layer.fontSize*1.5,`one line (height ${layer.height}, size ${layer.fontSize})`);
+  assert.ok(layer.width>=16*pitch-1,`the box holds all 16 characters (${layer.width})`);
+  assert.ok(Math.abs(layer.left-was.left)<1.5,`starts where the line did (${layer.left} vs ${was.left})`);
+  assert.deepEqual(errors,[]);
+ }finally{await page.close();}
+});
+
+test('i) a light Roboto line set with New font uses Roboto Light on the original baseline: identical to the regenerated receipt',{timeout:300000},async()=>{
+ const original=await receipt(),reference=await receipt({merchant:'Borealis Air'}),{page,errors}=await open('receipt.pdf',original);
+ try{
+  await field(page,'Lumina Air').waitFor({timeout:120000});
+  const target=page.locator('button[aria-label="Edit detected text: Lumina Air"]');await target.click();
+  await page.getByLabel('New text').fill('Borealis Air');await page.getByRole('button',{name:'Apply',exact:true}).click();
+  // The light subset holds only L, u, m, i, n, a, A and r.
+  await page.locator('.lettering-refusal').getByText(/no “B”/).waitFor({timeout:60000});
+  await page.getByRole('button',{name:'New font text box',exact:true}).click();
+  await page.waitForFunction(()=>document.activeElement?.tagName==='TEXTAREA',null,{timeout:60000});await page.keyboard.press('Escape');
+  const layer=(await state(page)).canvas.objects.find(o=>o.type?.toLowerCase()==='textbox');
+  assert.equal(layer.fontFamily,'Roboto Light','its own family and weight (it was Liberation Sans Regular)');assert.equal(layer.fontWeight,'normal');
+  const edited=await download(page),r=compare(edited,reference,union([...find(original,'Lumina Air'),...find(reference,'Borealis Air')]));report('i',r);
+  assert.ok(r.pixels<=20&&r.mean<.1,`the download matches the regenerated receipt (${JSON.stringify(r)})`);
   assert.deepEqual(errors,[]);
  }finally{await page.close();}
 });

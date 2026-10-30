@@ -85,9 +85,9 @@ test('native PDF text edits in place by default; unavailable new glyphs require 
   // Refusal leaves the source intact and keeps exactly what was typed.
   await field.click();const typed='Closing balance 3 421,85 EUR Ω';await page.getByLabel('New text').fill(typed);
   await page.getByRole('button',{name:'Apply',exact:true}).click();
-  await page.getByRole('dialog',{name:'Something needs your attention'}).getByText(/Ω/).waitFor();
+  await page.locator('.lettering-refusal').getByText(/Ω/).waitFor();assert.equal(await page.getByRole('dialog',{name:'Something needs your attention'}).count(),0,'said in the edit dialog, not a separate box');
   assert.deepEqual(await state(),inPlace,'the unsupported in-place edit leaves the native PDF and layers untouched');
-  await page.getByRole('button',{name:'Got it',exact:true}).click();assert.equal(await page.getByLabel('New text').inputValue(),typed);
+  assert.equal(await page.getByLabel('New text').inputValue(),typed);
   await page.getByRole('dialog',{name:'Edit PDF text'}).getByRole('button',{name:'Cancel',exact:true}).click();
   // Native-only pages expose the same explicit New font choice as scans.
   await page.locator('.ocr-settings').evaluate(e=>e.setAttribute('open',''));

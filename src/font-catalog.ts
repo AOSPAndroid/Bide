@@ -1,5 +1,6 @@
 import {corporateFonts} from './corporate-fonts';
 import {extendedFonts} from './font-library';
+import {weightFonts} from './font-weights';
 import addedLiberationSansRegular from './browser/fonts/LiberationSans-Regular.ttf';
 import addedLiberationSansBold from './browser/fonts/LiberationSans-Bold.ttf';
 import addedLiberationSansItalic from './browser/fonts/LiberationSans-Italic.ttf';
@@ -50,8 +51,14 @@ import font26 from './browser/fonts/extra/BebasNeue-Regular.ttf';
 import font27 from './browser/fonts/extra/AbrilFatface-Regular.ttf';
 import font28 from './browser/fonts/extra/GreatVibes-Regular.ttf';
 import font29 from './browser/fonts/extra/Sacramento-Regular.ttf';
+import font30 from './browser/fonts/extra/CourierPrime-Regular.ttf';
+import font31 from './browser/fonts/extra/CourierPrime-Bold.ttf';
+import font32 from './browser/fonts/extra/CourierPrime-Italic.ttf';
+import font33 from './browser/fonts/extra/CourierPrime-BoldItalic.ttf';
+import font34 from './browser/fonts/extra/CutiveMono-Regular.ttf';
 export const bundledFonts=[
 ...extendedFonts,
+...weightFonts,
 {family:"Liberation Sans",category:"sans",faces:[{style:"Regular",url:addedLiberationSansRegular},{style:"Bold",url:addedLiberationSansBold},{style:"Italic",url:addedLiberationSansItalic},{style:"BoldItalic",url:addedLiberationSansBoldItalic}]},
 {family:"Liberation Serif",category:"serif",faces:[{style:"Regular",url:addedLiberationSerifRegular},{style:"Bold",url:addedLiberationSerifBold},{style:"Italic",url:addedLiberationSerifItalic},{style:"BoldItalic",url:addedLiberationSerifBoldItalic}]},
 {family:"Liberation Mono",category:"mono",faces:[{style:"Regular",url:addedLiberationMonoRegular},{style:"Bold",url:addedLiberationMonoBold},{style:"Italic",url:addedLiberationMonoItalic},{style:"BoldItalic",url:addedLiberationMonoBoldItalic}]},
@@ -63,6 +70,8 @@ export const bundledFonts=[
 {family:"PT Serif",category:"serif",faces:[{style:"Regular",url:font12},{style:"Bold",url:font13},{style:"Italic",url:font14},{style:"BoldItalic",url:font15}]},
 {family:"Crimson Text",category:"serif",faces:[{style:"Regular",url:font16},{style:"Bold",url:font17},{style:"Italic",url:font18},{style:"BoldItalic",url:font19}]},
 {family:"Cousine",category:"mono",faces:[{style:"Regular",url:font20},{style:"Bold",url:font21},{style:"Italic",url:font22},{style:"BoldItalic",url:font23}]},
+{family:"Courier Prime",category:"mono",faces:[{style:"Regular",url:font30},{style:"Bold",url:font31},{style:"Italic",url:font32},{style:"BoldItalic",url:font33}]},
+{family:"Cutive Mono",category:"mono",faces:[{style:"Regular",url:font34}]},
 {family:"Pacifico",category:"script",faces:[{style:"Regular",url:font24}]},
 {family:"Lobster",category:"display",faces:[{style:"Regular",url:font25}]},
 {family:"Bebas Neue",category:"display",faces:[{style:"Regular",url:font26}]},
