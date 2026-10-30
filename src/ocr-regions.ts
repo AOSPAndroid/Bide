@@ -77,6 +77,15 @@ export function fieldBox(r:{left:number;top:number;width:number;height:number;an
  const width=Math.max(8,r.width*zoom),height=Math.max(10,r.height*zoom);
  return {left:r.left*zoom-(width-r.width*zoom)/2,top:r.top*zoom-(height-r.height*zoom)/2,width,height,transform:r.angle?`rotate(${r.angle}deg)`:undefined};
 }
+// Native touch adjustment can dispatch a click to a neighbouring enlarged
+// button. Resolve the user's point against the unexpanded text geometry.
+export function closestTextRegion<T extends Bounds&{angle?:number}>(regions:readonly T[],x:number,y:number,fallback:T):T{
+ if(!Number.isFinite(x)||!Number.isFinite(y))return fallback;
+ const score=(r:T)=>{const p=turn(frameOf(r),x,y,true),dx=Math.max(r.left-p.x,0,p.x-r.left-r.width),dy=Math.max(r.top-p.y,0,p.y-r.top-r.height);return {distance:dx*dx+dy*dy,centre:(p.x-r.left-r.width/2)**2+(p.y-r.top-r.height/2)**2};};
+ let best=fallback,at=score(best);
+ for(const r of regions){const next=score(r);if(next.distance<at.distance-1e-9||Math.abs(next.distance-at.distance)<=1e-9&&next.centre<at.centre-1e-9){best=r;at=next;}}
+ return best;
+}
 export const isUncertain=(r:{kind:string;confidence?:number;doubt?:string})=>r.kind==='ocr'&&(r.doubt!==undefined||r.confidence!==undefined&&r.confidence<70);
 
 export function ocrScanStatus(count:number,languages:string,converted:boolean,uncertain=0){
