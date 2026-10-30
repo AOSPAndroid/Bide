@@ -3,6 +3,7 @@
 // by family (canvas text, PDF export) uses them unchanged. A PDF line in such
 // a weight falls back to its own family and weight (see fallbackFont). SIL OFL;
 // converted from @fontsource WOFF (Latin and Latin Extended), see THIRD_PARTY.md.
+// Source Sans 3 derivatives use the distinct Bide Sans 3 names (reserved name).
 import w0 from './browser/fonts/weights/Roboto-Light.ttf';
 import w1 from './browser/fonts/weights/Roboto-Medium.ttf';
 import w2 from './browser/fonts/weights/Roboto-SemiBold.ttf';
@@ -40,9 +41,9 @@ export const weightFonts=[
 {family:"Poppins Light",category:"sans",faces:[{style:"Regular",url:w12}]},
 {family:"Poppins Medium",category:"sans",faces:[{style:"Regular",url:w13}]},
 {family:"Poppins SemiBold",category:"sans",faces:[{style:"Regular",url:w14}]},
-{family:"Source Sans 3 Light",category:"sans",faces:[{style:"Regular",url:w15}]},
-{family:"Source Sans 3 Medium",category:"sans",faces:[{style:"Regular",url:w16}]},
-{family:"Source Sans 3 SemiBold",category:"sans",faces:[{style:"Regular",url:w17}]},
+{family:"Bide Sans 3 Light",category:"sans",faces:[{style:"Regular",url:w15}]},
+{family:"Bide Sans 3 Medium",category:"sans",faces:[{style:"Regular",url:w16}]},
+{family:"Bide Sans 3 SemiBold",category:"sans",faces:[{style:"Regular",url:w17}]},
 {family:"Noto Sans Light",category:"sans",faces:[{style:"Regular",url:w18}]},
 {family:"Noto Sans Medium",category:"sans",faces:[{style:"Regular",url:w19}]},
 {family:"Noto Sans SemiBold",category:"sans",faces:[{style:"Regular",url:w20}]}
