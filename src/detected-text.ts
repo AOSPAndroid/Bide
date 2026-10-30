@@ -21,6 +21,7 @@ import {markDoubts} from './ocr-checks';
 import {mixedWeights,attachNumberParts,recognitionKey,scaleRegions,unconvertedRegions,ocrPatchBounds,ocrScanStatus,isUncertain,frameOf,turn,turnedBounds,inFrame,type Frame} from './ocr-regions';
 import type {OcrGrouping} from './ocr-segmentation';
 import {uid,type Page} from './model';
+import {letterRasterScale} from './render-budget';
 import {bundledOcrLanguages,languageLabel} from './ocr-languages';
 import {scriptLabels,type OcrScript} from './ai-image';
 
@@ -331,11 +332,9 @@ function scaledCanvas(source:HTMLCanvasElement,scale:number){
  const out=document.createElement('canvas');out.width=Math.ceil(source.width*scale);out.height=Math.ceil(source.height*scale);
  const g=out.getContext('2d')!;g.imageSmoothingQuality='high';g.drawImage(source,0,0,out.width,out.height);return out;
 }
-// Pixels per page unit for cutting letters: a PDF page's units are points
-// (72 dpi), and letters cut at that scale came out as a blurry bitmap over a
-// page drawn sharp at screen resolution. PDF lines are cut from a render where
-// they are about 32 px tall (a whole multiple, so letters stay on pixels).
-export const letterScale=(region:TextRegion,p:Page)=>p.source?Math.max(1,Math.min(4,Math.round(32/Math.max(1,region.height)),Math.floor(Math.sqrt(16e6/(p.width*p.height))))):1;
+// PDF units are points (72 dpi). Preserve the finest bounded raster for all
+// letter sizes: large text otherwise became a 72 dpi patch over a sharp scan.
+export const letterScale=(_region:TextRegion,p:Page)=>letterRasterScale(p.width,p.height,!!p.source);
 const scaledRegion=(r:TextRegion,k:number):TextRegion=>k===1?r:{...r,left:r.left*k,top:r.top*k,width:r.width*k,height:r.height*k,glyphs:r.glyphs?.map(g=>({...g,x0:g.x0*k,x1:g.x1*k}))};
 
 // Glyphs of `regions` whose x-height matches (within 12%), each with its line's
@@ -382,9 +381,12 @@ export async function glyphEditPatch(c:Canvas,p:Page,lineRegion:TextRegion,next:
  }
  if(!plan)return undefined;
  const pieces=plan.pieces.map(q=>({...q,x0:Math.round(q.x0),x1:Math.round(q.x1)})),startX=Math.max(0,Math.round(plan.startX)),width=pieces.reduce((s,q)=>s+q.x1-q.x0,0);
- const top=Math.max(0,Math.floor(region.top)-k),bottom=Math.min(H,Math.ceil(region.top+region.height)+k),endX=Math.min(W,Math.ceil(Math.max(plan.oldEnd,startX+width))+k);
+ // The 300 dpi source scale is fractional in PDF points. Raster bounds and
+ // array indices must still be integers; divide by k only for page placement.
+ const pad=Math.ceil(k),sidePad=Math.ceil(2*k),rowPad=Math.ceil(8*k);
+ const top=Math.max(0,Math.floor(region.top)-pad),bottom=Math.min(H,Math.ceil(region.top+region.height)+pad),endX=Math.min(W,Math.ceil(Math.max(plan.oldEnd,startX+width))+pad);
  // Analyse the whole line plus a margin of rows to see where blobs lead.
- const ax0=Math.max(0,Math.floor(Math.min(region.left,startX))-2*k),ax1=Math.min(W,Math.max(endX,Math.ceil(region.left+region.width)+2*k)),ay0=Math.max(0,top-8*k),ay1=Math.min(H,bottom+8*k);
+ const ax0=Math.max(0,Math.floor(Math.min(region.left,startX))-sidePad),ax1=Math.min(W,Math.max(endX,Math.ceil(region.left+region.width)+sidePad)),ay0=Math.max(0,top-rowPad),ay1=Math.min(H,bottom+rowPad);
  const ctx=raster.getContext('2d',{willReadFrequently:true})!,area=ctx.getImageData(ax0,ay0,ax1-ax0,ay1-ay0),bg=hexRgb(region.background||'#ffffff');
  const own=ownInk(area.data,area.width,area.height,bg,top-ay0,bottom-ay0);
  // Borrowed letters may reach below the line box (descenders): the patch grows to fit them.
