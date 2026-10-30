@@ -24,7 +24,7 @@ import {useEffect,useLayoutEffect,useRef,useState,type Dispatch,type SetStateAct
 import {Canvas,Rect,Ellipse,FabricImage,FabricObject,PencilBrush,Path,Group,ActiveSelection,filters,controlsUtils,util,Point} from 'fabric';
 import {History as HistoryIcon,ArrowDown,ArrowUp,ArrowUpRight,Bold,Check,ChevronDown,Command,Copy,Download,Eye,EyeOff,FileImage,FileText,FolderOpen,GripVertical,ImagePlus,Italic,Layers,LockKeyhole,Maximize,Merge,Minus,MoreHorizontal,PanelLeftClose,PenLine,Plus,Redo2,Save,Scaling,Scissors,Search,Settings2,ShieldCheck,SlidersHorizontal,Sparkles,Square,Trash2,Type,Underline,Undo2,UnlockKeyhole,X} from 'lucide-react';
 import {autosave,blankPage,demoProject,download,restoreLocal,safeName,uid,type Page,type Project} from './model';
-import Signature,{placeInk} from './Signature';
+import Signature,{placeInk,type Ink} from './Signature';
 import {saveExport,zipFormats,zipFormatLabel} from './export-save';
 import {engineHealth,restoreSources,importDocument,exportInBrowser,removePdfText,pagePreview,fontSupportsText,findPdfText,redactPdf,pdfFormFields,fillPdfField,sanitizePdf} from './browser/engine';
 import {replacePdfText} from './browser/engine';
@@ -98,6 +98,9 @@ export default function App() {
   const [ready, setReady] = useState(false);
   const [epoch, setEpoch] = useState(0);
   const loading = useRef(false);
+  // A signature waits for the selected page's actual canvas load, not its DOM.
+  const canvasLoad = useRef<Promise<boolean>>(Promise.resolve(false));
+  const signaturePlacement = useRef<{target:Canvas;pageId:string;load:Promise<boolean>}|null>(null);
   const [tool, setTool] = useState<Tool>('select');
   const toolRef = useRef(tool); toolRef.current = tool;
   const [zoom, setZoom] = useState(0.72);
@@ -204,6 +207,8 @@ export default function App() {
   const [highlightOpacity, setHighlightOpacity] = useState(38);
   const [layers, setLayers] = useState<Obj[]>([]);
   const [modal, setModal] = useState<Modal>(null);
+  const [placingSignature,setPlacingSignature] = useState(false);
+  useEffect(()=>{if(modal!=='signature'){signaturePlacement.current=null;setPlacingSignature(false);}},[modal]);
   const [palette, setPalette] = useState(false);
   const [query, setQuery] = useState('');
   const [commandIndex, setCommandIndex] = useState(0);
@@ -352,8 +357,8 @@ export default function App() {
     retouch.current?.cancel();retouchTarget.current=null;setRegion(null);selectionTarget.current=null;
     const controller = new AbortController();
     c.discardActiveObject(); setSelected(null);
-    ensureDocumentFonts(page.canvas).then(()=>{if(cancelled)return;return c.loadFromJSON(page.canvas, undefined, { signal: controller.signal });}).then(() => {
-      if (cancelled) return;
+    canvasLoad.current=ensureDocumentFonts(page.canvas).then(()=>{if(cancelled)return;return c.loadFromJSON(page.canvas, undefined, { signal: controller.signal });}).then(() => {
+      if (cancelled) return false;
       c.backgroundColor = page.source ? '' : page.color;
       c.getObjects().forEach(o => { if (!(o as Obj).id) Object.assign(o, { id: uid() }); });
       c.requestRenderAll(); loading.current = false; syncSelection();setTextScanRevision(v=>v+1);
@@ -367,7 +372,8 @@ export default function App() {
         projectRef.current = next;
         return next;
       });
-    }).catch(e => { if (!cancelled) { loading.current = false; fail(e); } });
+      return true;
+    }).catch(e => { if (!cancelled) { loading.current = false; fail(e); } return false; });
     return () => { cancelled = true; controller.abort(); };
   }, [ready, pageId, epoch]);
 
@@ -748,6 +754,28 @@ export default function App() {
       image.set(at ? {left:at.left,top:at.top} : { left: (page.width-image.getScaledWidth())/2, top: (page.height-image.getScaledHeight())/2 });
       addObject(image, typeof file === 'string' ? name : file.name);
     } catch { fail(new Error('This image could not be opened. Try PNG, JPEG, or WebP.')); }
+  }
+  async function placeSignature(value:string,drawn:boolean,inkColor:string,ink?:Ink) {
+    const target=canvas.current;if(!target||signaturePlacement.current)return;
+    const request={target,pageId:pageIdRef.current,load:canvasLoad.current};
+    signaturePlacement.current=request;setPlacingSignature(true);
+    try {
+      const image=drawn?await FabricImage.fromURL(value):undefined;
+      const loaded=await request.load;
+      if(signaturePlacement.current!==request)return;
+      const targetPage=projectRef.current.pages.find(p=>p.id===request.pageId);
+      if(!loaded||canvasLoad.current!==request.load||canvas.current!==target||pageIdRef.current!==request.pageId||!targetPage){
+        notify('The page changed or could not finish opening. Your signature is still here.');return;
+      }
+      if(image){
+        const at=ink&&placeInk(ink,targetPage.width,targetPage.height);
+        image.scale(at?at.width/image.width:Math.min((targetPage.width-100)/image.width,(targetPage.height-120)/image.height,1));
+        image.set(at?{left:at.left,top:at.top}:{left:(targetPage.width-image.getScaledWidth())/2,top:(targetPage.height-image.getScaledHeight())/2});
+        addObject(image,'Signature');
+      }else addObject(new Textbox(value,{left:70,top:targetPage.height-170,width:380,fontFamily:'cursive',fontStyle:'italic',fontSize:44,fill:inkColor}),'Signature');
+      setModal(null);
+    }catch(error){if(signaturePlacement.current===request)fail(error);}
+    finally{if(signaturePlacement.current===request){signaturePlacement.current=null;setPlacingSignature(false);}}
   }
   function removeSelected() {
     const c = canvas.current; if (!c) return;
@@ -1204,7 +1232,7 @@ export default function App() {
     {draggingFile&&<div className="drop-overlay" onDragLeave={()=>setDraggingFile(false)}><FolderOpen size={40}/><h2>Drop files into your workspace</h2><p>{HOSTED_BUILD?'PDFs, images, text, or a .bide project':'PDFs, images, Office documents, or a .bide project'}</p></div>}
     {(modal==='watermark'||modal==='numbers')&&<ModalShell title={modal==='watermark'?'Add watermarks':'Add page numbers'} close={()=>setModal(null)}><StampForm kind={modal} onApply={applyStamp}/></ModalShell>}
     {modal==='crop'&&<ModalShell title="Crop page" close={()=>setModal(null)}><CropForm width={page.width} height={page.height} onApply={crop=>runExport({format:'pdf',range:String(project.pages.findIndex(p=>p.id===pageId)+1),crop,reimport:true})}/></ModalShell>}
-    {modal==='signature'&&<ModalShell title="Your signature, your way" close={()=>setModal(null)}><Signature onAdd={(value,drawn,inkColor,ink)=>{if(drawn)void addImage(value,'Signature',ink&&placeInk(ink,page.width,page.height));else addObject(new Textbox(value,{left:70,top:page.height-170,width:380,fontFamily:'cursive',fontStyle:'italic',fontSize:44,fill:inkColor}),'Signature');setModal(null);}}/></ModalShell>}
+    {modal==='signature'&&<ModalShell title="Your signature, your way" close={()=>{signaturePlacement.current=null;setPlacingSignature(false);setModal(null);}}><Signature placing={placingSignature} onAdd={(value,drawn,inkColor,ink)=>void placeSignature(value,drawn,inkColor,ink)}/></ModalShell>}
     {modal==='new'&&<ModalShell title="Start with a blank canvas" close={()=>setModal(null)}><p className="muted">Create a document, a design, or something in between. Your previous workspace remains available with Undo.</p><label className="stacked-label">Document name<input value={newName} onChange={e=>setNewName(e.target.value)}/></label><div className="preset-grid">{[{name:'A4 document',w:595,h:842,detail:'210 × 297 mm'},{name:'US Letter',w:612,h:792,detail:'8.5 × 11 in'},{name:'Square canvas',w:1080,h:1080,detail:'1080 × 1080'},{name:'Presentation',w:1280,h:720,detail:'16:9 landscape'}].map(p=><button className={newWidth===p.w&&newHeight===p.h?'active':''} key={p.name} onClick={()=>{setNewWidth(p.w);setNewHeight(p.h);}}><FileText size={22}/><strong>{p.name}</strong><span>{p.detail}</span></button>)}</div><div className="field-grid"><Field label="Width" value={newWidth} min={50} max={5000} onChange={setNewWidth}/><Field label="Height" value={newHeight} min={50} max={5000} onChange={setNewHeight}/></div><p className="fine-print">PDF dimensions use points (72 points = 1 inch).</p><div className="dialog-actions"><button className="secondary" onClick={()=>setModal(null)}>Cancel</button><button className="primary" onClick={()=>{const p=blankPage(newWidth,newHeight);p.name='Page 1';commit({version:1,name:newName||'Untitled',pages:[p],sources:{}},true);setPageId(p.id);setModal(null);}}>Create document<ArrowUpRight size={15}/></button></div></ModalShell>}
     {textEdit&&<EditTextDialog region={textEdit} pending={!!busy} close={()=>{if(!busy)setTextEdit(null);}} apply={text=>editRegionText(textEdit,text)} asTextbox={textEdit.kind==='pdf'?text=>{void editDetectedText(textEdit,{text,allowNewFont:true});}:undefined} refusal={textEditRefusal} useFont={textEdit.kind==='ocr'?text=>void editRegionInFont(textEdit,text):undefined}/>}
     {colorRange&&<ColorRangeDialog initial={color} preview={previewColorRange} apply={()=>{setColorRange(null);setTool(t=>['marquee','lasso','wand','object'].includes(t)?t:'wand');}} close={()=>{setRegion(colorRange.before);setColorRange(null);}}/>}

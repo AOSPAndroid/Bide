@@ -19,7 +19,7 @@ function draw(ctx: CanvasRenderingContext2D, { color, points }: Stroke, from = 0
   ctx.stroke();
 }
 
-export default function Signature({ onAdd }: { onAdd: (value: string, drawn: boolean, color: string, ink?: Ink) => void }) {
+export default function Signature({ onAdd,placing=false }: { placing?:boolean;onAdd: (value: string, drawn: boolean, color: string, ink?: Ink) => void }) {
   const ref = useRef<HTMLCanvasElement>(null);
   // Strokes are kept in CSS pixels: the bitmap follows the pad's displayed size
   // (times the pixel ratio), so x and y scale alike on every screen.
@@ -52,21 +52,22 @@ export default function Signature({ onAdd }: { onAdd: (value: string, drawn: boo
   }
   return <>
     <p className="muted">Add a handwritten mark to your document. This is a visual signature.</p>
-    <div className="segmented"><button className={mode === 'draw' ? 'active' : ''} onClick={() => setMode('draw')}><PenLine size={15}/>Draw signature</button><button className={mode === 'type' ? 'active' : ''} onClick={() => setMode('type')}><Type size={15}/>Type signature</button></div>
+    <div className="segmented"><button disabled={placing} className={mode === 'draw' ? 'active' : ''} onClick={() => setMode('draw')}><PenLine size={15}/>Draw signature</button><button disabled={placing} className={mode === 'type' ? 'active' : ''} onClick={() => setMode('type')}><Type size={15}/>Type signature</button></div>
     {mode === 'draw' ? <div className="signature-pad"><canvas ref={ref} width={920} height={340} aria-label="Draw your signature" onPointerDown={e => {
+      if(placing)return;
       // One finger or pen draws; a second touch or a resting palm is ignored.
       if (e.pointerType === 'pen') pen.current = true;
       if (active.current !== null || (pen.current && e.pointerType === 'touch')) return;
       active.current = e.pointerId; e.currentTarget.setPointerCapture(e.pointerId); setInk(true);
       const stroke = { color, points: [point(e)] }; strokes.current.push(stroke); draw(context(), stroke);
     }} onPointerMove={e => {
-      if (e.pointerId !== active.current) return;
+      if (placing || e.pointerId !== active.current) return;
       const stroke = strokes.current.at(-1)!, from = stroke.points.length;
       const events = e.nativeEvent.getCoalescedEvents?.();
       for (const ev of events?.length ? events : [e.nativeEvent]) stroke.points.push(point(ev));
       draw(context(), stroke, from);
     }} onPointerUp={end} onPointerCancel={end} onLostPointerCapture={end}/><span>Sign here</span></div>
-    : <input className="signature-type" value={name} onChange={e => setName(e.target.value)} placeholder="Your name" autoFocus/>}
-    <div className="dialog-actions"><input type="color" title="Signature ink" aria-label="Signature ink" value={color} onChange={e => setColor(e.target.value)}/>{mode === 'draw' && <button className="secondary" onClick={() => { strokes.current = []; const c = ref.current; c?.getContext('2d')?.clearRect(0, 0, c.width, c.height); setInk(false); }}><Eraser size={14}/>Clear</button>}<button className="primary" disabled={mode === 'draw' ? !ink : !name.trim()} onClick={() => { if (mode === 'type') return onAdd(name, false, color); const [url, box] = exportInk(); onAdd(url, true, color, box); }}>Place signature</button></div>
+    : <input disabled={placing} className="signature-type" value={name} onChange={e => setName(e.target.value)} placeholder="Your name" autoFocus/>}
+    <div className="dialog-actions"><input disabled={placing} type="color" title="Signature ink" aria-label="Signature ink" value={color} onChange={e => setColor(e.target.value)}/>{mode === 'draw' && <button disabled={placing} className="secondary" onClick={() => { strokes.current = []; const c = ref.current; c?.getContext('2d')?.clearRect(0, 0, c.width, c.height); setInk(false); }}><Eraser size={14}/>Clear</button>}<button className="primary" disabled={placing || (mode === 'draw' ? !ink : !name.trim())} onClick={() => { if (mode === 'type') return onAdd(name, false, color); const [url, box] = exportInk(); onAdd(url, true, color, box); }}>{placing?'Placing signature…':'Place signature'}</button></div>
   </>;
 }

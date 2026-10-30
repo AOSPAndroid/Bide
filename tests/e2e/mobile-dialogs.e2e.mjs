@@ -306,3 +306,62 @@ test('desktop keeps its dialogs; the signature pad bitmap follows its box',{time
  await mouseDrag(hx,hy);const [nx]=await center(handle);assert.ok(Math.abs(nx-hx-40)<3,`the handle follows the mouse (${Math.round(nx-hx)}px)`);
  assert.deepEqual(errors,[]);await context.close();
 });
+
+
+// Hold the actual FontFace binary loads, after the app has booted, so the
+// project DOM is present while its selected page's canvas is still opening.
+async function slowSignatureProject(page){
+ let release;const gate=new Promise(resolve=>{release=resolve;}),held=[];
+ await page.route('**/*',async route=>{const request=route.request();if(request.resourceType()==='font'&&/\/src\/browser\/fonts\/library\/inter-[^/]+\.ttf(?:\?|$)/i.test(request.url())){held.push(request.url());await gate;}await route.continue();});
+ const fixture=await page.evaluate(async()=>{const {demoProject}=await import('/src/model.ts');const p=demoProject();p.name='Invented slow-font signature';for(const o of p.pages[0].canvas.objects)if(o.fontFamily)o.fontFamily='Inter';p.pages[0].canvas.objects[0].name='Slow-font fixture';return p;});
+ await page.locator('input[type=file][accept=".bide,.folio"]').setInputFiles({name:'invented-slow-font.bide',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(fixture))});
+ const deadline=Date.now()+10000;while(!held.length&&Date.now()<deadline)await page.waitForTimeout(50);assert.ok(held.length,'an actual FontFace load is held');
+ return {fixture,release,heldAt:Date.now()};
+}
+const stableSignatureObject=o=>Object.fromEntries(['id','name','type','text','left','top','width','fill','fontFamily','fontSize','fontWeight','charSpacing','radius','rx','ry'].map(key=>[key,o[key]]));
+async function signatureObjects(page,wanted,currentObject){
+ const deadline=Date.now()+30000;let objects=[];while(Date.now()<deadline){objects=await savedObjects(page);if(objects.filter(o=>o.name==='Signature').length===wanted&&(!currentObject||objects.some(o=>o.id===currentObject)))return objects;await page.waitForTimeout(200);}assert.equal(objects.filter(o=>o.name==='Signature').length,wanted,'signature count persisted');if(currentObject)assert.ok(objects.some(o=>o.id===currentObject),'the current project persisted');return objects;
+}
+
+test('a drawn signature waits for the page font, keeps its ink, places once, and survives Undo and reload',{timeout:300000},async()=>{
+ const {context,page,errors,cdp}=await open(iphone);let pending;
+ try{
+  pending=await slowSignatureProject(page);await pdfTool(page,'Sign a document');const pad=await box(page,'.signature-pad canvas');
+  await touches(cdp,circle(pad.left+pad.width/2,pad.top+pad.height/2,50));const drawn=await inkOf(page);assert.ok(Math.abs(drawn.w/drawn.h-1)<.1);
+  await page.waitForTimeout(Math.max(0,6000-(Date.now()-pending.heldAt)));
+  await page.getByRole('button',{name:'Place signature',exact:true}).tap();
+  const waiting=page.getByRole('button',{name:'Placing signature…',exact:true});await waiting.waitFor();assert.ok(await waiting.isDisabled());assert.deepEqual(await inkOf(page),drawn,'the drawn input stays intact while the page opens');
+  // A second touch cannot create a second queued image.
+  const [x,y]=await center(waiting);await page.touchscreen.tap(x,y);
+  pending.release();await page.locator('.signature-pad').waitFor({state:'detached',timeout:30000});
+  let objects=await signatureObjects(page,1),signature=objects.find(o=>o.name==='Signature');
+  const expected=pending.fixture.pages[0].canvas.objects.map(stableSignatureObject),originals=list=>list.filter(o=>o.name!=='Signature').map(stableSignatureObject);
+  assert.deepEqual(originals(objects),expected,'all original objects survive the queued placement');
+  const placed=await inkOf(page,signature.src);assert.ok(Math.abs(placed.w/placed.h-1)<.1,'the placed circle is still round');assert.ok(Math.abs(signature.width*signature.scaleX/(signature.height*signature.scaleY)-1)<.2);
+  await page.keyboard.press('Escape');await page.keyboard.press('Control+z');objects=await signatureObjects(page,0);assert.deepEqual(originals(objects),expected,'Undo removes only the signature');
+  await page.keyboard.press('Control+Shift+z');objects=await signatureObjects(page,1);assert.deepEqual(originals(objects),expected,'Redo retains every original object');
+  await page.reload();if(!await page.locator('.artboard').isVisible())await page.locator('.workspace-nav').getByRole('button',{name:'Photo editor',exact:true}).click();await page.locator('.layer-row .layer-name').filter({hasText:'Signature'}).waitFor({state:'attached',timeout:30000});
+  objects=await signatureObjects(page,1);assert.deepEqual(originals(objects),expected,'reload restores the page and its single signature');assert.equal(objects.find(o=>o.name==='Signature').src,signature.src,'the actual signature pixels survived');assert.deepEqual(errors,[]);
+ }finally{pending?.release();await page.unrouteAll({behavior:'wait'});await context.close();}
+});
+
+test('queued signatures cancel on a different page, and typed signatures wait without losing the name',{timeout:300000},async()=>{
+ for(const mode of ['cancel','type']){
+  const {context,page,errors,cdp}=await open(iphone);let pending;
+  try{
+   pending=await slowSignatureProject(page);await pdfTool(page,'Sign a document');
+   if(mode==='type'){await tap(page,page.getByRole('button',{name:'Type signature',exact:true}));await page.getByPlaceholder('Your name').fill('Queued Writer');}
+   else{const pad=await box(page,'.signature-pad canvas');await touches(cdp,circle(pad.left+pad.width/2,pad.top+pad.height/2,50));}
+   await page.getByRole('button',{name:'Place signature',exact:true}).tap();await page.getByRole('button',{name:'Placing signature…',exact:true}).waitFor();
+   if(mode==='cancel'){
+    await closeDialog(page);
+    const other=await page.evaluate(async()=>{const {demoProject}=await import('/src/model.ts');const p=demoProject();p.name='Other invented page';p.pages[0].canvas.objects[0].name='Other-page fixture';return p;});
+    await page.locator('input[type=file][accept=".bide,.folio"]').setInputFiles({name:'other-page.bide',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(other))});await page.locator('.layer-row .layer-name').filter({hasText:'Other-page fixture'}).waitFor({state:'attached',timeout:30000});
+    pending.release();await page.unrouteAll({behavior:'wait'});await page.waitForTimeout(1500);const objects=await signatureObjects(page,0,other.pages[0].canvas.objects[0].id);assert.deepEqual(objects.map(stableSignatureObject),other.pages[0].canvas.objects.map(stableSignatureObject),'the cancelled image never reaches another page');
+   }else{
+    assert.equal(await page.getByPlaceholder('Your name').inputValue(),'Queued Writer');assert.ok(await page.getByPlaceholder('Your name').isDisabled());pending.release();await page.getByPlaceholder('Your name').waitFor({state:'detached',timeout:30000});const objects=await signatureObjects(page,1),signature=objects.find(o=>o.name==='Signature');assert.equal(signature.text,'Queued Writer');assert.deepEqual(objects.filter(o=>o.name!=='Signature').map(stableSignatureObject),pending.fixture.pages[0].canvas.objects.map(stableSignatureObject));
+   }
+   assert.deepEqual(errors,[]);
+  }finally{pending?.release();await page.unrouteAll({behavior:'wait'});await context.close();}
+ }
+});
