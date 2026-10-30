@@ -9,7 +9,7 @@
 import {test,before,after} from 'node:test';import assert from 'node:assert/strict';
 import {createServer} from 'vite';import {chromium} from 'playwright-core';
 import {readFile} from 'node:fs/promises';import {createHash} from 'node:crypto';
-import * as mupdf from 'mupdf';import {PDFDocument,StandardFonts,rgb} from 'pdf-lib';import PDFKit from 'pdfkit';
+import * as mupdf from 'mupdf';import {PDFDocument,StandardFonts,rgb} from 'pdf-lib';import fontkit from '@pdf-lib/fontkit';import PDFKit from 'pdfkit';
 
 let server,browser;
 before(async()=>{server=await createServer({logLevel:'error',server:{port:0,host:'127.0.0.1'}});await server.listen();browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||undefined});});
@@ -64,12 +64,12 @@ async function slip({city}={}){
  slipLines(city).forEach((l,i)=>p.drawText(l,{x:70,y:672-i*16,size:12,font:mono,color:rgb(.08,.08,.1)}));
  return Buffer.from(await pdf.save());
 }
-function subsetSlip(){
- return new Promise(resolve=>{
-  const doc=new PDFKit({size:'A4',margin:50,info:{Title:'Slip (invented)',CreationDate:new Date(Date.UTC(2026,9,14))}}),chunks=[];doc.on('data',c=>chunks.push(c));doc.on('end',()=>resolve(Buffer.concat(chunks)));
-  doc.registerFont('M','src/browser/fonts/extra/CourierPrime-Regular.ttf');doc.font('M').fontSize(12).fillColor('#141418');
-  slipLines().forEach((l,i)=>doc.text(l,70,160+i*16,{lineBreak:false}));doc.end();
- });
+// A Courier-family face Bide does not bundle (a subset named CourierStd).
+async function subsetSlip(){
+ const pdf=await PDFDocument.create();pdf.registerFontkit(fontkit);
+ const mono=await pdf.embedFont(await readFile('src/browser/fonts/extra/CourierPrime-Regular.ttf'),{subset:true,customName:'CourierStd'}),p=pdf.addPage([595,842]);
+ slipLines().forEach((l,i)=>p.drawText(l,{x:70,y:672-i*16,size:12,font:mono,color:rgb(.08,.08,.1)}));
+ return Buffer.from(await pdf.save());
 }
 
 // A card receipt: the merchant in Roboto Light (its subset holds only that
