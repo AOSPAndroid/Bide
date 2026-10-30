@@ -289,3 +289,35 @@ test('i) a light Roboto line set with New font uses Roboto Light on the original
   assert.deepEqual(errors,[]);
  }finally{await page.close();}
 });
+
+
+test('j) equal-width letters in a proportional font do not establish unseen pair spacing, even with fixed-pitch PDF metadata',{timeout:300000},async()=>{
+ // Helvetica and Liberation Sans have equal A/V advances, but their producer
+ // kerns AV. The page only establishes AA; a separate V makes it available.
+ // Cutive Mono also has equal advances but can shape fi as one glyph, so its
+ // unproven pitch must refuse too (f and i occur separately elsewhere).
+ for(const [font,forged,typed] of [['Helvetica',false,'AV'],['src/browser/fonts/LiberationSans-Regular.ttf',false,'AV'],['src/browser/fonts/LiberationSans-Regular.ttf',true,'AV'],['src/browser/fonts/extra/CutiveMono-Regular.ttf',false,'fi']]){
+  let original=await new Promise(resolve=>{
+   const doc=new PDFKit({size:[300,230],margin:30}),chunks=[];doc.on('data',c=>chunks.push(c));doc.on('end',()=>resolve(Buffer.concat(chunks)));
+   doc.font(font).fontSize(32).text('AA',40,60,{lineBreak:false});
+   if(typed==='fi')doc.text('f',40,130,{lineBreak:false}).text('i',40,180,{lineBreak:false});else doc.text('V',40,130,{lineBreak:false});doc.end();
+  });
+  if(forged){
+   const doc=mupdf.Document.openDocument(original,'application/pdf');
+   try{doc.findPage(0).getInheritable('Resources').get('Font').forEach(f=>{
+    f.put('BaseFont',doc.newName('Courier'));let descriptor=f.get('FontDescriptor');if(descriptor.isNull())descriptor=f.get('DescendantFonts',0,'FontDescriptor');
+    if(!descriptor.isNull())descriptor.put('Flags',descriptor.get('Flags').asNumber()|1);
+   });const bytes=doc.saveToBuffer('');try{original=Buffer.from(bytes.asUint8Array());}finally{bytes.destroy();}}finally{doc.destroy();}
+  }
+  const {page,errors}=await open('proportional.pdf',original);
+  try{
+   await field(page,'AA').waitFor({timeout:120000});const before=await state(page);
+   await field(page,'AA').click();await page.getByLabel('New text').fill(typed);await page.getByRole('button',{name:'Apply',exact:true}).click();
+   await page.locator('.lettering-refusal').getByText(new RegExp('original spacing.*'+typed)).waitFor({timeout:60000});
+   assert.equal(await page.getByLabel('New text').inputValue(),typed,'unsupported pair keeps the current input');
+   assert.deepEqual(await state(page),before,'a proportional-font spacing refusal changes neither PDF source nor canvas');
+   const kept=await state(page),r=compare(Buffer.from(kept.sources[kept.source],'base64'),original,union(find(original,'AA')));report('j'+(forged?'-forged':''),r);
+   assert.equal(r.pixels,0,'the original PDF remains pixel-identical');assert.deepEqual(errors,[]);
+  }finally{await page.close();}
+ }
+});
