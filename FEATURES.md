@@ -5,6 +5,10 @@
 
 ## Unreleased — Open, edit, download
 
+- Digital PDFs, New font text box: a line in a family Bide bundles is set in that family and weight. A light Roboto merchant line on an invented card receipt used to become Liberation Sans Regular (Arial shapes, twice the ink). It is now Roboto Light, and the download is identical to the regenerated receipt (0 differing pixels at 144 dpi, `tests/e2e/pdf-text-inplace.e2e.mjs` i).
+  - Any of the 82 bundled families is matched by the PDF font's name ("OpenSans-SemiBoldItalic", "RobotoMono-Regular"); Helvetica, Times, Calibri, Cambria and Courier keep their metric-compatible faces.
+  - New Light, Medium and SemiBold faces of Roboto, Inter, Open Sans, Montserrat, Poppins, Source Sans 3 and Noto Sans (SIL OFL), loaded only when used. Thin and ExtraLight use Light.
+  - The text box sits exactly on the line's pen position and baseline: it was 0.05 em too high and half a point to the right.
 - Typewriter-style PDF text (Courier and its clones), tried on invented parcel slips from pdf-lib (standard Courier), pdfkit and Chromium (embedded subsets):
   - Letters never paired before on the page are written in place when the font is monospaced and no pair on the page is adjusted ("69003 LYON" → "69003 LYON CEDEX" in standard Courier: identical to the regenerated slip). It used to refuse: "This PDF does not establish the original spacing for “CE”".
   - When the PDF's subset lacks a letter and New font text box is chosen, regular Courier is set in Cutive Mono, a typewriter face of the same stroke weight, tightened onto Courier's 0.6 em pitch; bold Courier in Courier Prime Bold. It used to be Cousine, a sans monospace about twice as heavy.

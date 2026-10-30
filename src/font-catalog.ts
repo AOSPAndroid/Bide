@@ -1,5 +1,6 @@
 import {corporateFonts} from './corporate-fonts';
 import {extendedFonts} from './font-library';
+import {weightFonts} from './font-weights';
 import addedLiberationSansRegular from './browser/fonts/LiberationSans-Regular.ttf';
 import addedLiberationSansBold from './browser/fonts/LiberationSans-Bold.ttf';
 import addedLiberationSansItalic from './browser/fonts/LiberationSans-Italic.ttf';
@@ -57,6 +58,7 @@ import font33 from './browser/fonts/extra/CourierPrime-BoldItalic.ttf';
 import font34 from './browser/fonts/extra/CutiveMono-Regular.ttf';
 export const bundledFonts=[
 ...extendedFonts,
+...weightFonts,
 {family:"Liberation Sans",category:"sans",faces:[{style:"Regular",url:addedLiberationSansRegular},{style:"Bold",url:addedLiberationSansBold},{style:"Italic",url:addedLiberationSansItalic},{style:"BoldItalic",url:addedLiberationSansBoldItalic}]},
 {family:"Liberation Serif",category:"serif",faces:[{style:"Regular",url:addedLiberationSerifRegular},{style:"Bold",url:addedLiberationSerifBold},{style:"Italic",url:addedLiberationSerifItalic},{style:"BoldItalic",url:addedLiberationSerifBoldItalic}]},
 {family:"Liberation Mono",category:"mono",faces:[{style:"Regular",url:addedLiberationMonoRegular},{style:"Bold",url:addedLiberationMonoBold},{style:"Italic",url:addedLiberationMonoItalic},{style:"BoldItalic",url:addedLiberationMonoBoldItalic}]},

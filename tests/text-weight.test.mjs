@@ -25,3 +25,12 @@ test('PDF fonts that cannot draw new text fall back to a metric-compatible bundl
  const cases={'Helvetica':'Liberation Sans','BCDEFG+Helvetica-Bold':'Liberation Sans','ArialMT':'Liberation Sans','Arial,Bold':'Liberation Sans','Times-Roman':'Liberation Serif','TimesNewRomanPS-BoldMT':'Liberation Serif','ABCDEF+Calibri':'Carlito','Cambria-Italic':'Caladea','Courier':'Cutive Mono','CourierNewPSMT':'Cutive Mono','Courier-Bold':'Courier Prime','ABCDEF+NimbusMonoPS-Regular':'Cutive Mono','LiberationMono':'Cousine','Consolas':'Cousine','Georgia':'PT Serif','MicrosoftSansSerif':'Liberation Sans','DejaVuSans':'Liberation Sans','OpenSans-Regular':'Liberation Sans','Roboto-Bold':'Liberation Sans','Inter-Medium':'Liberation Sans','PTSans-Bold':'PT Sans','Lato-Black':'Lato','Poppins-Medium':'Poppins','Quicksand':'Lato'};
  for(const [font,face] of Object.entries(cases))assert.equal(fallbackFont(font),face,font);
 });
+test('a PDF font named after a bundled family falls back to that family, in its weight when bundled',async()=>{
+ const {fallbackFont}=await import('../tmp/text-regions.mjs');
+ const families=['Roboto','Roboto Light','Roboto Medium','Roboto SemiBold','Roboto Mono','Open Sans','Open Sans SemiBold','Inter','Inter Medium','Lato','Shadows Into Light','Liberation Sans','Cousine'];
+ const cases={'ABCDEF+Roboto-Light':'Roboto Light','Roboto-LightItalic':'Roboto Light','Roboto-Thin':'Roboto Light','Roboto-ExtraLight':'Roboto Light','Roboto-Medium':'Roboto Medium','Roboto-SemiBold':'Roboto SemiBold','Roboto-Regular':'Roboto','Roboto-Bold':'Roboto','Roboto-Black':'Roboto','RobotoLight':'Roboto Light',
+  'RobotoMono-Regular':'Roboto Mono','OpenSans-SemiBoldItalic':'Open Sans SemiBold','OpenSans-Light':'Open Sans','Open Sans,Bold':'Open Sans','Inter-Medium':'Inter Medium','Inter-Light':'Inter','Lato-Light':'Lato','ShadowsIntoLight':'Shadows Into Light','LiberationSans-Bold':'Liberation Sans',
+  // Not a bundled family followed by style words: the metric-compatible rules still apply.
+  'RobotoCondensed-Regular':'Liberation Sans','Helvetica-Light':'Liberation Sans','Courier':'Cutive Mono','ArialMT':'Liberation Sans'};
+ for(const [font,face] of Object.entries(cases))assert.equal(fallbackFont(font,families),face,font);
+});

@@ -11,8 +11,16 @@ export type TextRegion={id:string;text:string;script?:string;left:number;top:num
 // metric-compatible one where it exists, so the line keeps its width and look
 // (Liberation Sans for Helvetica and Arial, Liberation Serif for Times, Carlito
 // for Calibri, Caladea for Cambria). A Helvetica line set in Lato differed 4x more.
-export function fallbackFont(name:string){
+// `families`: the bundled families. A PDF font named after one of them, with
+// nothing but style words after it, falls back to that very family, in its
+// weight when that is bundled: "Roboto-Light" → Roboto Light, "OpenSans-
+// SemiBoldItalic" → Open Sans SemiBold, "Inter-Bold" → Inter. (A light Roboto
+// line used to become Liberation Sans Regular: other shapes, twice the ink.)
+export function fallbackFont(name:string,families:readonly string[]=[]){
  const n=name.replace(/^[A-Z]{6}\+/,'');
+ const key=(s:string)=>s.toLowerCase().replace(/[^a-z0-9]/g,''),k=key(n);
+ const own=families.map(f=>({f,rest:k.startsWith(key(f))?k.slice(key(f).length):null})).filter((m):m is {f:string;rest:string}=>m.rest!==null&&/^(thin|hairline|extralight|ultralight|light|regular|book|normal|roman|medium|semibold|demibold|demi|bold|extrabold|ultrabold|black|heavy|italic|oblique|mt|ps)*$/.test(m.rest)).sort((a,b)=>a.rest.length-b.rest.length)[0];
+ if(own){const weight=/semibold|demi/.test(own.rest)?'SemiBold':/medium/.test(own.rest)?'Medium':/thin|hairline|light/.test(own.rest)?'Light':'';return weight&&families.includes(`${own.f} ${weight}`)?`${own.f} ${weight}`:own.f;}
  const bundled=[['PT Sans',/pt ?sans/i],['PT Serif',/pt ?serif/i],['Poppins',/poppins/i],['Lato',/lato/i]] as const;
  const same=bundled.find(([,pattern])=>pattern.test(n))?.[0];if(same)return same;
  return /courier|nimbus ?mono|freemono/i.test(n)?(/bold|black|heavy/i.test(n)?'Courier Prime':'Cutive Mono'):/mono|consolas/i.test(n)?'Cousine':/helvetica|arial|arimo|nimbus ?sans|liberation ?sans/i.test(n)?'Liberation Sans':/times|tinos|nimbus ?rom|liberation ?serif/i.test(n)?'Liberation Serif':/calibri|carlito/i.test(n)?'Carlito':/cambria|caladea/i.test(n)?'Caladea':/sans|roboto|^inter\b|inter-/i.test(n)?'Liberation Sans':/serif|georgia|garamond/i.test(n)?'PT Serif':'Lato';

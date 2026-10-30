@@ -72,6 +72,19 @@ function subsetSlip(){
  });
 }
 
+// A card receipt: the merchant in Roboto Light (its subset holds only that
+// word's letters), details in Roboto Regular, a Roboto Bold heading.
+function receipt({merchant='Lumina Air'}={}){
+ return new Promise(resolve=>{
+  const doc=new PDFKit({size:'A4',margin:50,info:{Title:'Receipt (invented)',CreationDate:new Date(Date.UTC(2026,9,14))}}),chunks=[];doc.on('data',c=>chunks.push(c));doc.on('end',()=>resolve(Buffer.concat(chunks)));
+  doc.registerFont('L','src/browser/fonts/weights/Roboto-Light.ttf');doc.registerFont('R','src/browser/fonts/library/roboto-Regular.ttf');doc.registerFont('B','src/browser/fonts/library/roboto-Bold.ttf');
+  doc.font('B').fontSize(20).fillColor('#111').text('Description',60,80,{lineBreak:false});doc.moveTo(55,112).lineTo(540,112).lineWidth(1.5).stroke('#111');
+  doc.font('L').fontSize(26).text(merchant,60,128,{lineBreak:false});
+  doc.font('R').fontSize(14).fillColor('#222');['To: Lumina Air Ltd, 4 Harbour Road','Card: 5300 **** 1188'].forEach((t,i)=>doc.text(t,60,170+i*20,{lineBreak:false}));
+  doc.end();
+ });
+}
+
 // --- Rendering and comparison --------------------------------------------
 const render=(bytes,i=0)=>{const d=mupdf.Document.openDocument(bytes,'application/pdf'),p=d.loadPage(i),x=p.toPixmap(mupdf.Matrix.scale(2,2),mupdf.ColorSpace.DeviceRGB,false,true);try{return {w:x.getWidth(),h:x.getHeight(),px:x.getPixels().slice()};}finally{x.destroy();p.destroy();d.destroy();}};
 const find=(bytes,needle,i=0)=>{const d=mupdf.Document.openDocument(bytes,'application/pdf'),p=d.loadPage(i);try{return p.search(needle).flat().map(q=>({left:Math.min(q[0],q[4]),right:Math.max(q[2],q[6]),top:Math.min(q[1],q[3]),bottom:Math.max(q[5],q[7])}));}finally{p.destroy();d.destroy();}};
@@ -255,6 +268,24 @@ test('h) a Courier line whose subset lacks a letter: said in the dialog; New fon
   assert.ok(layer.height<layer.fontSize*1.5,`one line (height ${layer.height}, size ${layer.fontSize})`);
   assert.ok(layer.width>=16*pitch-1,`the box holds all 16 characters (${layer.width})`);
   assert.ok(Math.abs(layer.left-was.left)<1.5,`starts where the line did (${layer.left} vs ${was.left})`);
+  assert.deepEqual(errors,[]);
+ }finally{await page.close();}
+});
+
+test('i) a light Roboto line set with New font uses Roboto Light on the original baseline: identical to the regenerated receipt',{timeout:300000},async()=>{
+ const original=await receipt(),reference=await receipt({merchant:'Borealis Air'}),{page,errors}=await open('receipt.pdf',original);
+ try{
+  await field(page,'Lumina Air').waitFor({timeout:120000});
+  const target=page.locator('button[aria-label="Edit detected text: Lumina Air"]');await target.click();
+  await page.getByLabel('New text').fill('Borealis Air');await page.getByRole('button',{name:'Apply',exact:true}).click();
+  // The light subset holds only L, u, m, i, n, a, A and r.
+  await page.locator('.lettering-refusal').getByText(/no “B”/).waitFor({timeout:60000});
+  await page.getByRole('button',{name:'New font text box',exact:true}).click();
+  await page.waitForFunction(()=>document.activeElement?.tagName==='TEXTAREA',null,{timeout:60000});await page.keyboard.press('Escape');
+  const layer=(await state(page)).canvas.objects.find(o=>o.type?.toLowerCase()==='textbox');
+  assert.equal(layer.fontFamily,'Roboto Light','its own family and weight (it was Liberation Sans Regular)');assert.equal(layer.fontWeight,'normal');
+  const edited=await download(page),r=compare(edited,reference,union([...find(original,'Lumina Air'),...find(reference,'Borealis Air')]));report('i',r);
+  assert.ok(r.pixels<=20&&r.mean<.1,`the download matches the regenerated receipt (${JSON.stringify(r)})`);
   assert.deepEqual(errors,[]);
  }finally{await page.close();}
 });
