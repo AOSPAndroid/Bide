@@ -1,6 +1,36 @@
 import {corporateFonts,corporateFallback} from './corporate-fonts';
 import {bundledFonts} from './font-catalog';
 const loaded=new Map<string,Promise<void>>();
+const bundledBytes=new Map<string,Promise<string>>();
+type FontStyle={fontFamily?:string;fontWeight?:string|number;fontStyle?:string};
+type PdfFontText=FontStyle&{text:string;pdfOriginalFont?:string;recognizedKey?:string;styles?:Record<string,Record<string,FontStyle>>;graphemeSplit?:(value:string)=>string[]};
+export const isPdfDerivedText=(value:{pdfOriginalFont?:unknown;recognizedKey?:unknown})=>!(typeof value.recognizedKey==='string'&&value.recognizedKey.startsWith('ocr:'))&&(typeof value.recognizedKey==='string'&&value.recognizedKey.startsWith('pdf:')||typeof value.pdfOriginalFont==='string'&&!!value.pdfOriginalFont);
+
+// A bundled PDF replacement must draw its text itself. Browser font fallback
+// can show a missing character that the PDF exporter would replace by .notdef.
+// Check the same face/style the exporter selects, including per-grapheme styles.
+export async function bundledPdfFontError(text:PdfFontText,pdfDerived=isPdfDerivedText(text)):Promise<string|undefined>{
+ if(!pdfDerived)return undefined;
+ const runs=new Map<string,{family:string;url:string;text:string}>();
+ for(const [lineIndex,line] of text.text.split(/\r?\n/).entries()){
+  const chars=text.graphemeSplit?text.graphemeSplit(line):Array.from(line);
+  for(const [index,char] of chars.entries()){
+   const own=text.styles?.[lineIndex]?.[index],style={fontFamily:own?.fontFamily??text.fontFamily,fontWeight:own?.fontWeight??text.fontWeight,fontStyle:own?.fontStyle??text.fontStyle},family=style.fontFamily?.split(',')[0].trim().replace(/^['"]|['"]$/g,''),item=bundledFonts.find(font=>font.family===family);
+   if(!item)continue;
+   const bold=/^(?:bold|bolder|[6-9]00)$/.test(String(style.fontWeight).toLowerCase()),italic=/^(?:italic|oblique)$/.test(style.fontStyle?.toLowerCase()??''),wanted=bold&&italic?'BoldItalic':bold?'Bold':italic?'Italic':'Regular';
+   const face=item.faces.find(face=>face.style===wanted)??item.faces.find(face=>face.style==='Regular');if(!face)continue;
+   const run=runs.get(face.url);if(run)run.text+=char;else runs.set(face.url,{family:item.family,url:face.url,text:char});
+  }
+ }
+ for(const run of runs.values()){
+  if(!bundledBytes.has(run.url))bundledBytes.set(run.url,(async()=>{
+   const response=await fetch(run.url);if(!response.ok)throw new Error(`The bundled ${run.family} font could not be loaded.`);
+   const bytes=new Uint8Array(await response.arrayBuffer());let binary='';for(let i=0;i<bytes.length;i+=8192)binary+=String.fromCharCode(...bytes.subarray(i,i+8192));return btoa(binary);
+  })().catch(error=>{bundledBytes.delete(run.url);throw error;}));
+  const {fontSupportsText}=await import('./browser/engine');
+  if(!await fontSupportsText(await bundledBytes.get(run.url)!,run.text))return `The selected ${run.family} font cannot draw some typed characters. Your text and font were kept. Remove those characters or choose a font that includes them before exporting.`;
+ }
+}
 export function ensureFont(family:string):Promise<void> {
   const item=bundledFonts.find(font=>font.family===family);if(!item){if(!corporateFonts.includes(family))return Promise.resolve();if(!loaded.has(family))loaded.set(family,new FontFace(family,`local("${family}")`).load().then(()=>{}).catch(()=>{loaded.delete(family);throw new Error(`${family} is not installed on this PC. Choose bundled ${corporateFallback(family)} or another installed font.`);}));return loaded.get(family)!;}
   if(!loaded.has(family))loaded.set(family,Promise.all(item.faces.map(async face=>{

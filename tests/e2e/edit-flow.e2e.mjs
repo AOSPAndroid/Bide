@@ -249,3 +249,52 @@ test('a line set in a font takes the grey of the original ink, not a lighter one
   assert.deepEqual(errors,[]);
  }finally{await browser.close();await server.close();}
 });
+
+test('a PDF bundled replacement refuses missing glyphs before changing the source; later styled and grouped text cannot lose glyphs on export',{timeout:600000},async()=>{
+ const {default:PDFKit}=await import('pdfkit');
+ const bytes=await new Promise(resolve=>{const doc=new PDFKit({size:'A4'}),chunks=[];doc.on('data',c=>chunks.push(c));doc.on('end',()=>resolve(Buffer.concat(chunks)));doc.registerFont('L','src/browser/fonts/weights/Roboto-Light.ttf');doc.font('L').fontSize(26).text('Lumina Air',60,128,{lineBreak:false});doc.end();});
+ const server=await createServer({logLevel:'error',server:{port:0,host:'127.0.0.1'}});await server.listen();
+ const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||undefined});
+ try{
+  const page=await browser.newPage({viewport:{width:1400,height:900},acceptDownloads:true}),errors=[],downloads=[];page.on('pageerror',e=>errors.push(e.message));page.on('download',d=>downloads.push(d));
+  const project=()=>page.evaluate(async()=>{const {restoreLocal}=await import('/src/model.ts');return restoreLocal();});
+  const saved=async predicate=>{const until=Date.now()+30000;let p;while(Date.now()<until){p=await project();if(p&&predicate(p))return p;await page.waitForTimeout(200);}assert.fail('the expected project state was not saved');};
+  await page.goto(server.resolvedUrls.local[0]+'app/');await page.locator('input[type=file][accept*=".psd"]').setInputFiles({name:'invented-light-receipt.pdf',mimeType:'application/pdf',buffer:bytes});
+  const field=page.locator('button[aria-label="Edit detected text: Lumina Air"]');await field.waitFor({timeout:120000});
+  const original=await saved(p=>!!p.pages[0].source),before={source:original.pages[0].source,sources:original.sources,canvas:original.pages[0].canvas};
+  const state=async()=>{const p=await project();return {source:p.pages[0].source,sources:p.sources,canvas:p.pages[0].canvas};};
+  await field.click();await page.getByLabel('New text').fill('Omega Ω');await page.getByRole('button',{name:'Apply',exact:true}).click();await page.locator('.lettering-refusal').waitFor();
+  assert.deepEqual(await state(),before,'default refusal leaves the PDF and layers intact');
+  await page.getByRole('button',{name:'New font text box',exact:true}).click();
+  await page.locator('.lettering-refusal').getByText(/selected Roboto Light font cannot draw/).waitFor({timeout:60000});
+  assert.equal(await page.getByLabel('New text').inputValue(),'Omega Ω');assert.deepEqual(await state(),before,'even explicit replacement keeps the original intact when its selected face lacks a glyph');
+  assert.equal(await page.getByLabel('Edit image text with').inputValue(),'letters');
+  await page.getByLabel('New text').fill('Borealis Air');await page.getByRole('button',{name:'New font text box',exact:true}).click();
+  await page.waitForFunction(()=>document.activeElement?.tagName==='TEXTAREA',null,{timeout:60000});await page.keyboard.press('Escape');
+  const valid=await saved(p=>p.pages[0].canvas.objects.some(o=>o.type?.toLowerCase()==='textbox'&&o.text==='Borealis Air')),validLayer=valid.pages[0].canvas.objects.find(o=>o.type?.toLowerCase()==='textbox');
+  assert.equal(validLayer.fontFamily,'Roboto Light');assert.equal(validLayer.fontWeight,'normal');
+  // Later edits keep exactly the typed text and the chosen weight; no fallback.
+  await page.getByLabel('Text content',{exact:true}).fill('Borealis Ω Air');
+  await page.getByRole('dialog',{name:'Something needs your attention'}).getByText(/selected Roboto Light font cannot draw/).waitFor();await page.getByRole('button',{name:'Got it',exact:true}).click();
+  const changed=await saved(p=>p.pages[0].canvas.objects.some(o=>o.text==='Borealis Ω Air')),changedLayer=changed.pages[0].canvas.objects.find(o=>o.type?.toLowerCase()==='textbox');
+  assert.equal(changedLayer.fontFamily,'Roboto Light');assert.equal(changed.pages[0].source,valid.pages[0].source);
+  await page.locator('.document-actions .primary').click();await page.locator('.modal .dialog-actions .primary').click();
+  await page.getByRole('dialog',{name:'Something needs your attention'}).getByText(/selected Roboto Light font cannot draw/).waitFor();
+  assert.equal(downloads.length,0);assert.deepEqual(await project(),changed,'blocked export keeps text, chosen font and document unchanged');
+  await page.getByRole('button',{name:'Got it',exact:true}).click();await page.getByRole('dialog',{name:'Export document'}).getByRole('button',{name:'Close dialog',exact:true}).click();
+  // Logical style indices follow graphemes and explicit newlines even when a
+  // narrow text box wraps. Test both a capable styled glyph and the converse.
+  const styled=await page.evaluate(async()=>{
+   const {restoreLocal}=await import('/src/model.ts'),{exportPayload}=await import('/src/project-io.ts');const current=await restoreLocal(),template=current.pages[0].canvas.objects.find(o=>o.type?.toLowerCase()==='textbox');
+   const check=async({base,styled,pdfOnGroup})=>{
+    const p=structuredClone(current),layer=structuredClone(template);layer.text='e\u0301Ω\nAΩ';layer.width=10;layer.fontFamily=base;layer.styles={0:{1:{fontFamily:styled,fontWeight:600,fontStyle:'italic'}},1:{1:{fontFamily:styled}}};
+    const outer={type:'Group',objects:[{type:'Group',objects:[layer]}]};if(pdfOnGroup){outer.pdfOriginalFont=layer.pdfOriginalFont;outer.recognizedKey=layer.recognizedKey;delete layer.pdfOriginalFont;delete layer.recognizedKey;}
+    p.pages[0].canvas.objects=[outer];const before=JSON.stringify(p);try{await exportPayload(p);return {blocked:false,unchanged:JSON.stringify(p)===before};}catch(e){return {blocked:true,message:e.message,unchanged:JSON.stringify(p)===before};}
+   };
+   return {capable:await check({base:'Roboto Light',styled:'Liberation Sans'}),missing:await check({base:'Liberation Sans',styled:'Roboto Light'}),groupOrigin:await check({base:'Liberation Sans',styled:'Roboto Light',pdfOnGroup:true})};
+  });
+  assert.equal(styled.capable.blocked,false,'a capable font explicitly styled on the Greek glyph is allowed');
+  for(const key of ['missing','groupOrigin']){assert.equal(styled[key].blocked,true,key);assert.match(styled[key].message,/Roboto Light font cannot draw/);assert.equal(styled[key].unchanged,true);}
+  assert.deepEqual(errors,[]);
+ }finally{await browser.close();await server.close();}
+});

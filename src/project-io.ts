@@ -3,12 +3,12 @@
 import {FabricImage,StaticCanvas,Group,type FabricObject} from 'fabric';
 import {blankPage,uid,type Page,type Project} from './model';
 import {Textbox} from './text-appearance';
-import {ensureDocumentFonts,documentEmbeddedFonts} from './fonts';
+import {ensureDocumentFonts,documentEmbeddedFonts,bundledPdfFontError,isPdfDerivedText} from './fonts';
 import {fontSupportsText} from './browser/engine';
 import {hasBlending} from './browser/layer-utils';
 import {needsRasterExport,rasterExportBounds} from './layer-style-render';
 
-type PdfText={pdfFontData?:string;pdfFontFallback?:string;pdfFontBold?:boolean;pdfFontItalic?:boolean;pdfOriginalFont?:string};
+type PdfText={pdfFontData?:string;pdfFontFallback?:string;pdfFontBold?:boolean;pdfFontItalic?:boolean;pdfOriginalFont?:string;recognizedKey?:string};
 
 export function readDataUrl(file:Blob){
  return new Promise<string>((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result as string);reader.onerror=()=>reject(reader.error??new Error('Could not read the file.'));reader.readAsDataURL(file);});
@@ -49,7 +49,7 @@ export async function exportPayload(current:Project,ocr?:Map<string,{text:string
    await c.loadFromJSON(p.canvas);
    // OCR edits over a PDF page: letters edits carry their new text; text layers made from OCR text are real text already.
    const edits=p.source?c.getObjects().flatMap(o=>{const t=o as FabricObject&{editedText?:string;recognizedKey?:string;ocrOriginalBounds?:{left:number;top:number;width:number;height:number}};if(typeof t.editedText!=='string'&&!(o instanceof Textbox&&t.recognizedKey?.startsWith('ocr:')))return [];const b=o.getBoundingRect();return [{text:t.editedText,left:b.left,top:b.top,width:b.width,height:b.height,original:t.ocrOriginalBounds}];}):[];
-   const validateFonts=async(objects:FabricObject[])=>{for(const object of objects){const o=object as Textbox&PdfText;if(o instanceof Textbox&&o.pdfFontData&&o.fontFamily.startsWith('PDFfont-')&&!await fontSupportsText(o.pdfFontData,o.text))throw new Error('The embedded PDF font cannot draw some text. Remove unsupported characters or choose Font family explicitly before exporting. The font was not changed.');if(object instanceof Group)await validateFonts(object.getObjects());}};
+   const validateFonts=async(objects:FabricObject[],inheritedPdf=false)=>{for(const object of objects){const o=object as Textbox&PdfText,pdfDerived=inheritedPdf||isPdfDerivedText(o);if(o instanceof Textbox){if(o.pdfFontData&&o.fontFamily.startsWith('PDFfont-')&&!await fontSupportsText(o.pdfFontData,o.text))throw new Error('The embedded PDF font cannot draw some text. Remove unsupported characters or choose Font family explicitly before exporting. The font was not changed.');const reason=await bundledPdfFontError(o,pdfDerived);if(reason)throw new Error(reason);}if(object instanceof Group)await validateFonts(object.getObjects(),pdfDerived);}};
    await validateFonts(c.getObjects());
    // Layer styles and painted masks have no SVG form here: those layers go in as pixels.
    const objects=c.getObjects(),flattenBlends=hasBlending(objects);

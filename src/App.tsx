@@ -47,7 +47,7 @@ import {type Workspace} from './WorkspaceDock';
 import PdfWorkspace,{type PdfTool} from './PdfWorkspace';
 import {PUBLIC_DEMO,SAAS_BUILD,HOSTED_BUILD,DOWNLOAD_URL} from './build-flags';
 import {bundledFonts,systemFonts} from './font-catalog';
-import {ensureFont,ensureDocumentFonts} from './fonts';
+import {ensureFont,ensureDocumentFonts,bundledPdfFontError} from './fonts';
 import {type SelectionPoint} from './selection-mask';
 import {makeBrush,brushWidth,brushNames,type BrushKind} from './brushes';
 import PageMenu from './PageMenu';
@@ -410,10 +410,13 @@ export default function App() {
     }catch(e){fail(e);}finally{setBusy('');}
   }
   async function validateTextFont(o:Obj){
-    const data=o.pdfFontData;if(!(o instanceof Textbox)||!data||!o.fontFamily.startsWith('PDFfont-'))return;
-    const text=o.text,family=o.fontFamily;if(await fontSupportsText(data,text))return;
-    if(!canvas.current?.getObjects().includes(o)||o.text!==text||o.fontFamily!==family||(o as Obj).pdfFontData!==data)return;
-    fail(new Error('The embedded PDF font does not contain some typed characters. Your text and font were kept. Remove those characters or choose Font family explicitly before downloading.'));
+    if(!(o instanceof Textbox))return;const data=(o as Obj).pdfFontData,text=o.text,family=o.fontFamily,weight=o.fontWeight,style=o.fontStyle,styles=JSON.stringify(o.styles);
+    let reason:string|undefined;
+    try{reason=data&&family.startsWith('PDFfont-')&&!await fontSupportsText(data,text)?'The embedded PDF font does not contain some typed characters. Your text and font were kept. Remove those characters or choose Font family explicitly before downloading.':await bundledPdfFontError(o);}catch(error){reason=error instanceof Error?error.message:'The selected font could not be checked. Your text and font were kept.';}
+    if(!reason)return;
+    const contains=(objects:FabricObject[]):boolean=>objects.some(object=>object===o||object instanceof Group&&contains(object.getObjects()));
+    if(!canvas.current||!contains(canvas.current.getObjects())||o.text!==text||o.fontFamily!==family||o.fontWeight!==weight||o.fontStyle!==style||(o as Obj).pdfFontData!==data||JSON.stringify(o.styles)!==styles)return;
+    fail(new Error(reason));
   }
   // Native PDF edits first use their original text operators. A text layer is
   // an explicit alternative; substituting its font still needs New font mode.
@@ -427,6 +430,7 @@ export default function App() {
       const editableRegion=native&&!canDraw?{...shown,fontData:undefined,fontId:undefined}:shown;
       const {text,embedded}=await matchedDetectedTextbox(editableRegion,canvas.current!,originalPage,pageOcrRegions.current.get(originalPage.id)??textRegions,{ocrFont:ocr.font,ocrStyle:ocr.style,matchBlur:ocr.matchBlur,autoFont:!ocrFontChosen.current,appearanceRegions:textRegions});
       if(native&&!embedded&&!allowNewFont)throw new Error(exactFontError);
+      if(native){const refusal=await bundledPdfFontError(text,true);if(refusal){setTextEditRefusal(refusal);return;}}
       let nextSource=originalPage.source,nextData:string|undefined;
       if(region.kind==='pdf'&&originalPage.source){const result=await removePdfText(originalPage.source,originalPage.index,region.id);nextSource=result.id;nextData=result.data;}
       if(pageIdRef.current!==originalPage.id)return;const current=capture();const objects=[...((current.pages.find(p=>p.id===originalPage.id)!.canvas.objects||[]) as unknown[])].filter(o=>!region.layer||(o as {id?:string}).id!==region.layer);
@@ -722,7 +726,7 @@ export default function App() {
     if(isAdjustment(o)&&(values.layerStyle||(values.globalCompositeOperation!==undefined&&values.globalCompositeOperation!=='source-over'))){notify('Adjustment layers use Normal blend mode and their own settings.');return;}
     if(o instanceof Textbox&&o.isEditing)o.exitEditing();
     if (o.lockMovementX && !Object.keys(values).every(key => key === 'name')) { notify('Unlock this layer before editing it.'); return; }
-    o.set(values); o.setCoords(); c.requestRenderAll(); refresh(v => v+1); if (save) saveCanvas();if(values.text!==undefined)void validateTextFont(o);
+    o.set(values); o.setCoords(); c.requestRenderAll(); refresh(v => v+1); if (save) saveCanvas();if(values.text!==undefined||values.fontFamily!==undefined||values.fontWeight!==undefined||values.fontStyle!==undefined)void validateTextFont(o);
   }
   function addObject(o: Obj, name: string) {
     const c = canvas.current; if (!c) return;
