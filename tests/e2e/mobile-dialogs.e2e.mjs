@@ -364,4 +364,30 @@ test('queued signatures cancel on a different page, and typed signatures wait wi
    assert.deepEqual(errors,[]);
   }finally{pending?.release();await page.unrouteAll({behavior:'wait'});await context.close();}
  }
+ // A touch must be an in-bounds primary tap, not a drag, cancellation or pinch.
+ {
+  const {context,page,errors,cdp}=await open(iphone);
+  try{
+   await pdfTool(page,'Sign a document');const pad=await box(page,'.signature-pad canvas');await touches(cdp,circle(pad.left+pad.width/2,pad.top+pad.height/2,50));
+   const button=page.getByRole('button',{name:'Place signature',exact:true}),[x,y]=await center(button);
+   await touches(cdp,drag(x,y,0,80));assert.ok(await page.locator('.signature-pad').isVisible(),'dragging off the action does not place');
+   await touches(cdp,[['touchStart',[[x,y]]],['touchCancel',[]]]);assert.ok(await page.locator('.signature-pad').isVisible(),'a cancelled pointer does not place');
+   const heading=await box(page,'.modal h2');await touches(cdp,[['touchStart',[[x,y]]],['touchStart',[[x,y],[heading.left+10,heading.top+10]]],['touchEnd',[]]]);
+   assert.ok(await page.locator('.signature-pad').isVisible(),'a second finger cancels the action');assert.equal((await savedObjects(page)).filter(o=>o.name==='Signature').length,0);
+   // Reproduce browsers omitting the compatibility click after a drawn stroke:
+   // the real pointer tap still places exactly once without that event.
+   await page.evaluate(()=>document.addEventListener('click',e=>{const b=e.target.closest?.('button');if(b&&/Plac(?:e|ing) signature/.test(b.textContent)){e.preventDefault();e.stopImmediatePropagation();}},true));
+   await button.tap();await page.locator('.signature-pad').waitFor({state:'detached',timeout:30000});assert.equal((await signatureObjects(page,1)).filter(o=>o.name==='Signature').length,1);assert.deepEqual(errors,[]);
+  }finally{await context.close();}
+ }
+ // Native mouse and keyboard activation retain their normal click semantics.
+ for(const input of ['mouse','keyboard']){
+  const {context,page,errors}=await open(desktop);
+  try{
+   await pdfTool(page,'Sign a document');await page.getByRole('button',{name:'Type signature',exact:true}).click();await page.getByPlaceholder('Your name').fill(input+' writer');const button=page.getByRole('button',{name:'Place signature',exact:true});
+   if(input==='mouse')await button.click();else{await button.focus();await page.keyboard.press('Enter');}
+   await page.getByPlaceholder('Your name').waitFor({state:'detached',timeout:30000});const objects=await signatureObjects(page,1);assert.equal(objects.find(o=>o.name==='Signature').text,input+' writer');assert.deepEqual(errors,[]);
+  }finally{await context.close();}
+ }
+
 });

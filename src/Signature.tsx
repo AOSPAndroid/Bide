@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useEffect,useLayoutEffect, useRef, useState,type PointerEvent } from 'react';
 import { Eraser, PenLine, Type } from 'lucide-react';
 
 type Stroke = { color: string; points: { x: number; y: number }[] };
@@ -28,6 +28,32 @@ export default function Signature({ onAdd,placing=false }: { placing?:boolean;on
   const [mode, setMode] = useState<'draw' | 'type'>('draw');
   const [name, setName] = useState('');
   const [color, setColor] = useState('#172d4a');
+  const placeButton=useRef<HTMLButtonElement>(null);
+  const placingTouch=useRef<{id:number;x:number;y:number;moved:boolean}|null>(null),touchClick=useRef(false);
+  const submit=()=>{if(placing||(mode==='draw'?!ink:!name.trim()))return;if(mode==='type'){onAdd(name,false,color);return;}const [url,box]=exportInk();onAdd(url,true,color,box);};
+  useEffect(()=>{
+    const button=placeButton.current;if(!button)return;
+    // The touch is handled by pointerup; suppress its later compatibility
+    // click before the modal can disappear and expose the page behind it.
+    const nativeClick=(e:TouchEvent)=>{if(e.cancelable)e.preventDefault();};
+    const extraFinger=(e:TouchEvent)=>{if(e.touches.length>1)placingTouch.current=null;};
+    button.addEventListener('touchstart',nativeClick,{passive:false});document.addEventListener('touchstart',extraFinger,{passive:true});
+    return()=>{button.removeEventListener('touchstart',nativeClick);document.removeEventListener('touchstart',extraFinger);};
+  },[]);
+
+  // A fast tap after drawing can have pointer events but no compatibility
+  // click. Treat the primary touch itself as the button's activation.
+  const beginPlace=(e:PointerEvent<HTMLButtonElement>)=>{
+    placingTouch.current=null;touchClick.current=e.pointerType==='touch';
+    if(e.pointerType!=='touch'||!e.isPrimary||placing)return;
+    placingTouch.current={id:e.pointerId,x:e.clientX,y:e.clientY,moved:false};e.currentTarget.setPointerCapture(e.pointerId);
+  };
+  const movePlace=(e:PointerEvent<HTMLButtonElement>)=>{const p=placingTouch.current;if(p?.id===e.pointerId&&Math.hypot(e.clientX-p.x,e.clientY-p.y)>12)p.moved=true;};
+  const endPlace=(e:PointerEvent<HTMLButtonElement>)=>{
+    const p=placingTouch.current;placingTouch.current=null;if(!p||p.id!==e.pointerId||p.moved||placing)return;
+    const r=e.currentTarget.getBoundingClientRect();if(e.clientX>=r.left&&e.clientX<=r.right&&e.clientY>=r.top&&e.clientY<=r.bottom)submit();
+  };
+
   const scale = () => Math.max(2, window.devicePixelRatio || 1);
   const context = () => { const c = ref.current!, ctx = c.getContext('2d')!, s = c.width / (c.clientWidth || 1); ctx.setTransform(s, 0, 0, s, 0, 0); return ctx; };
   useLayoutEffect(() => {
@@ -68,6 +94,6 @@ export default function Signature({ onAdd,placing=false }: { placing?:boolean;on
       draw(context(), stroke, from);
     }} onPointerUp={end} onPointerCancel={end} onLostPointerCapture={end}/><span>Sign here</span></div>
     : <input disabled={placing} className="signature-type" value={name} onChange={e => setName(e.target.value)} placeholder="Your name" autoFocus/>}
-    <div className="dialog-actions"><input disabled={placing} type="color" title="Signature ink" aria-label="Signature ink" value={color} onChange={e => setColor(e.target.value)}/>{mode === 'draw' && <button disabled={placing} className="secondary" onClick={() => { strokes.current = []; const c = ref.current; c?.getContext('2d')?.clearRect(0, 0, c.width, c.height); setInk(false); }}><Eraser size={14}/>Clear</button>}<button className="primary" disabled={placing || (mode === 'draw' ? !ink : !name.trim())} onClick={() => { if (mode === 'type') return onAdd(name, false, color); const [url, box] = exportInk(); onAdd(url, true, color, box); }}>{placing?'Placing signature…':'Place signature'}</button></div>
+    <div className="dialog-actions"><input disabled={placing} type="color" title="Signature ink" aria-label="Signature ink" value={color} onChange={e => setColor(e.target.value)}/>{mode === 'draw' && <button disabled={placing} className="secondary" onClick={() => { strokes.current = []; const c = ref.current; c?.getContext('2d')?.clearRect(0, 0, c.width, c.height); setInk(false); }}><Eraser size={14}/>Clear</button>}<button ref={placeButton} className="primary" disabled={placing || (mode === 'draw' ? !ink : !name.trim())} onPointerDown={beginPlace} onPointerMove={movePlace} onPointerUp={endPlace} onPointerCancel={()=>{placingTouch.current=null;}} onLostPointerCapture={()=>{placingTouch.current=null;}} onClick={e=>{if(touchClick.current&&e.detail!==0){touchClick.current=false;return;}touchClick.current=false;submit();}}>{placing?'Placing signature…':'Place signature'}</button></div>
   </>;
 }
