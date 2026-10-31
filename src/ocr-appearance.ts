@@ -57,7 +57,7 @@ export function coreGain(source:Coverage,candidate:Coverage){
   return count>left?sum/(count-left)/255:0;
  };
  let core=0;for(const v of candidate.data)if(v>=.75)core++;
- const count=Math.max(1,core>>1),ink=top(candidate.data,count);
+ const count=Math.max(1,core>>2),ink=top(candidate.data,count);
  return ink>0?Math.min(1,top(source.data,count)/ink):0;
 }
 export function matchedInkColor(color:string,background:string,gain:number){

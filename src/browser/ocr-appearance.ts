@@ -151,6 +151,16 @@ export function matchOcrSoftness(raster:HTMLCanvasElement,region:TextRegion,regi
  return best;
 }
 
+// Ink strength, measured like the softness on a finer raster with the text as
+// fitted: at a PDF page's own scale (72 dpi) thin strokes never reach their
+// ink, and the fill came out far lighter (#1d1d1f set as #606061).
+export function matchOcrInk(raster:HTMLCanvasElement,region:TextRegion,regions:TextRegion[],text:Textbox,scale:number){
+ const up=(r:TextRegion)=>({...r,left:r.left*scale,top:r.top*scale,width:r.width*scale,height:r.height*scale});
+ const selected=samplePixels(raster,up(region),regions.map(up));if(!selected)return undefined;
+ const fill=text.fill;text.set({fill:'#000000'});
+ try{const gain=coreGain(selected.source,coverageRenderer(selected,scale)(text));return gain>0?gain:undefined;}finally{text.set({fill});}
+}
+
 export function applyOcrAppearance(text:Textbox,region:TextRegion,fit:Fit){
  const size=text.fontSize,ascent=text.top-region.top+size*.93;
  text.set({fontSize:size*fit.ratio,left:region.left+fit.dx,top:region.top+ascent-size*fit.ratio*.93+fit.dy,

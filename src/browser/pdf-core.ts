@@ -195,6 +195,21 @@ export async function restore(data: Record<string,string>) {
 
 }
 
+// A scanned page's own resolution, in pixels per page unit: the largest image
+// covering at least half the page, drawn upright. Letters cut from a render at
+// exactly this scale are the scan's own pixels (a render at another scale
+// resamples them, and reused letters came out lighter, 29 → 38 on near-black).
+export function scanScale(source:string,index:number):number|undefined{
+ const data=sources.get(source);if(!data)throw new Error('Reopen the project to restore its PDF pages.');
+ const doc=open(data),page=doc.loadPage(index),b=page.getBounds(),area=(b[2]-b[0])*(b[3]-b[1]);let best:{cover:number;scale:number}|undefined;
+ const device=new mupdf.Device({fillImage(image,ctm){
+  if(Math.abs(ctm[1])>1e-3||Math.abs(ctm[2])>1e-3||ctm[0]<=0)return;
+  const w=Math.abs(ctm[0]),h=Math.abs(ctm[3]),cover=w*h/area;if(cover<.5)return;
+  const scale=Math.min(image.getWidth()/w,image.getHeight()/h);if(!best||cover>best.cover)best={cover,scale};
+ }});
+ try{page.run(device,mupdf.Matrix.identity);device.close();return best&&best.scale>=1&&best.scale<=8?best.scale:undefined;}finally{device.destroy();page.destroy();doc.destroy();}
+}
+
 export function render(source:string,index:number,scale:number) {
 
   const data=sources.get(source); if(!data)throw new Error('Reopen the project to restore its PDF pages.');

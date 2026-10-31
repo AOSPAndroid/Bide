@@ -6,13 +6,14 @@ import {maskToCanvas} from './selection-canvas';
 import {Textbox,clampTextSoftness,rasterizedText} from './text-appearance';
 import {needsRasterExport} from './layer-style-render';
 import {hasBlending} from './browser/layer-utils';
-import {detectPdfText,pagePreview} from './browser/engine';
+import {detectPdfText,pagePreview,pdfScanScale} from './browser/engine';
 import {pageRaster,rasterLayer} from './retouch-canvas';
 import {repairTextBackground} from './text-replacement';
 import {estimateOcrBold,glyphInk,wordInk,classifyWordWeights} from './ocr-weight';
 import {darkenToInk,prepareOcrPixels,estimateLineHeight} from './ocr-image';
 import {ensureFont,ensureEmbeddedFont,ensureDocumentFonts} from './fonts';
 import {bundledFonts} from './font-catalog';
+import {matchedInkColor} from './ocr-appearance';
 import {weightFamilies} from './font-weights';
 import {rasterSearchWords} from './searchable-text';
 import {fallbackFont,fallbackCharSpacing,fitOcrText,type TextRegion} from './text-regions';
@@ -201,7 +202,7 @@ export async function matchedDetectedTextbox(region:TextRegion,c:Canvas,p:Page,r
  const all=regions.length?regions:[region],inkCache=new Map<string,Promise<PageInk|undefined>>();
  const ink=(family:string)=>{if(!inkCache.has(family))inkCache.set(family,options.ocrStyle==='auto'?pageInkLevel(all,family):Promise.resolve(undefined));return inkCache.get(family)!;};
  const makeText=async(r:TextRegion,family:string)=>(await detectedTextbox(r,{...options,ocrFont:family,matchBlur:false,pageInk:await ink(family),level:true})).text;
- const {matchOcrAppearance,applyOcrAppearance,matchOcrSoftness}=await import('./browser/ocr-appearance');
+ const {matchOcrAppearance,applyOcrAppearance,matchOcrSoftness,matchOcrInk}=await import('./browser/ocr-appearance');
  // A PDF page's units are points (72 dpi): small scanned letters look soft at
  // that scale however crisp the scan, and replacement text got a blur the
  // page does not have. Font, size and position are fitted at page scale; the
@@ -212,7 +213,11 @@ export async function matchedDetectedTextbox(region:TextRegion,c:Canvas,p:Page,r
  if(!fit)return detectedTextbox(region,{...options,pageInk:await ink(options.ocrFont)});
  const text=await makeText(region,fit.family);applyOcrAppearance(text,region,fit);
  const k=pdf?Math.max(1,Math.min(4,32/Math.max(1,region.height),Math.sqrt(16e6/(p.width*p.height)))):1;
- if(pdf&&options.matchBlur){const fine=levelRaster(await previewCanvas(p.source!,p.index,k,Math.ceil(p.width*k),Math.ceil(p.height*k)),f,k,fill);text.textSoftness=matchOcrSoftness(fine,region,regionsAll,text,k);text.initDimensions();}
+ if(pdf){
+  const fine=levelRaster(await previewCanvas(p.source!,p.index,k,Math.ceil(p.width*k),Math.ceil(p.height*k)),f,k,fill);
+  if(options.matchBlur){text.textSoftness=matchOcrSoftness(fine,region,regionsAll,text,k);text.initDimensions();}
+  const gain=matchOcrInk(fine,region,regionsAll,text,k);if(gain!==undefined)text.set({fill:matchedInkColor(region.color,region.background||'#ffffff',gain)});
+ }
  return {text:turnLayer(text,region),embedded:false};
 }
 
@@ -362,7 +367,7 @@ export function letterEditBlocker(region:TextRegion,next:string){
 export async function glyphEditPatch(c:Canvas,p:Page,lineRegion:TextRegion,next:string,pageRegions:TextRegion[]=[],sources:LetterSource[]=[]){
  if(lineRegion.kind!=='ocr'||!lineRegion.glyphs)return undefined;
  // Everything below works in raster pixels, `k` per page unit.
- const k=letterScale(lineRegion,p),f=frameOf(lineRegion),fill=lineRegion.background||'#ffffff',region=scaledRegion(lineRegion,k),page=pageRegions.flatMap(r=>r===lineRegion?[region]:framed(f,[r]).map(m=>scaledRegion(m,k)));
+ const k=(p.source?await pdfScanScale(p.source,p.index):undefined)??letterScale(lineRegion,p),f=frameOf(lineRegion),fill=lineRegion.background||'#ffffff',region=scaledRegion(lineRegion,k),page=pageRegions.flatMap(r=>r===lineRegion?[region]:framed(f,[r]).map(m=>scaledRegion(m,k)));
  // Another page's letters are cut in the frame of one of its lines.
  const otherPages=sources.map(o=>{const of=frameOf(o.regions.find(r=>r.glyphs)??lineRegion);return {...o,frame:of,regions:framed(of,o.regions).map(r=>scaledRegion(r,k))};});
  // Placeholder cells (ink the recognizer did not read) are planned as
@@ -382,9 +387,10 @@ export async function glyphEditPatch(c:Canvas,p:Page,lineRegion:TextRegion,next:
  }
  if(!plan)return undefined;
  const pieces=plan.pieces.map(q=>({...q,x0:Math.round(q.x0),x1:Math.round(q.x1)})),startX=Math.max(0,Math.round(plan.startX)),width=pieces.reduce((s,q)=>s+q.x1-q.x0,0);
- const top=Math.max(0,Math.floor(region.top)-k),bottom=Math.min(H,Math.ceil(region.top+region.height)+k),endX=Math.min(W,Math.ceil(Math.max(plan.oldEnd,startX+width))+k);
+ // Margins in whole pixels (a scan's own scale, `k`, need not be a whole number).
+ const m=Math.ceil(k),top=Math.max(0,Math.floor(region.top)-m),bottom=Math.min(H,Math.ceil(region.top+region.height)+m),endX=Math.min(W,Math.ceil(Math.max(plan.oldEnd,startX+width))+m);
  // Analyse the whole line plus a margin of rows to see where blobs lead.
- const ax0=Math.max(0,Math.floor(Math.min(region.left,startX))-2*k),ax1=Math.min(W,Math.max(endX,Math.ceil(region.left+region.width)+2*k)),ay0=Math.max(0,top-8*k),ay1=Math.min(H,bottom+8*k);
+ const ax0=Math.max(0,Math.floor(Math.min(region.left,startX))-2*m),ax1=Math.min(W,Math.max(endX,Math.ceil(region.left+region.width)+2*m)),ay0=Math.max(0,top-8*m),ay1=Math.min(H,bottom+8*m);
  const ctx=raster.getContext('2d',{willReadFrequently:true})!,area=ctx.getImageData(ax0,ay0,ax1-ax0,ay1-ay0),bg=hexRgb(region.background||'#ffffff');
  const own=ownInk(area.data,area.width,area.height,bg,top-ay0,bottom-ay0);
  // Borrowed letters may reach below the line box (descenders): the patch grows to fit them.

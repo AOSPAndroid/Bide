@@ -25,6 +25,8 @@ export async function exportInBrowser(spec:ExportSpec){const result=await rpc<{b
 const previews=new Map<string,Promise<string>>();
 export function pagePreview(source:string,index:number,scale:number){const key=`${source}/${index}/${scale}`;let p=previews.get(key);if(!p){p=rpc<Uint8Array<ArrayBuffer>>('render',{source,index,scale}).then(data=>URL.createObjectURL(new Blob([data],{type:'image/png'}))).catch(e=>{previews.delete(key);throw e;});previews.set(key,p);}return p;}
 
+// A scanned page's own pixels per page unit (see pdf-core scanScale).
+export const pdfScanScale=(source:string,index:number)=>rpc<number|undefined>('scanScale',{source,index});
 export const detectPdfText=(source:string,index:number)=>rpc<{regions:import('../text-regions').TextRegion[];skipped:number;ocrLayer?:boolean}>('detectText',{source,index});
 export const removePdfText=(source:string,index:number,regionId:string)=>rpc<{id:string;data:string}>('removeText',{source,index,regionId});
 // The line rewritten in its own font, or why not (the caller then uses a text box).

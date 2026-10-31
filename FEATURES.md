@@ -5,6 +5,10 @@
 
 ## Unreleased — Open, edit, download
 
+- Scanned PDFs keep the ink colour of edited text. On an invented receipt scanned at 200 dpi, in near-black #1d1d1f:
+  - A line set in a font came out #606061 (core ink 29 → 96 on a 0–255 scale); now #1e1e20 (29 → 30). Its ink was measured on the page at 72 dpi, where thin strokes never reach their colour. It is now measured where the softness is, on a finer render.
+  - Letters reused from the line came out lighter (29 → 38): they were cut from a render at another scale than the scan's, so they were resampled twice. They are now cut at the scan's own resolution (29 → 29).
+  - Pictures and digital PDFs already kept the colour, and still do; grey #444444 and a 300 dpi scan are within 2 levels too (`tests/e2e/edit-flow.e2e.mjs`).
 - Digital PDFs, New font text box: a line in a family Bide bundles is set in that family and weight. A light Roboto merchant line on an invented card receipt used to become Liberation Sans Regular (Arial shapes, twice the ink). It is now Roboto Light, and the download is identical to the regenerated receipt (0 differing pixels at 144 dpi, `tests/e2e/pdf-text-inplace.e2e.mjs` i).
   - Any of the 82 bundled families is matched by the PDF font's name ("OpenSans-SemiBoldItalic", "RobotoMono-Regular"); Helvetica, Times, Calibri, Cambria and Courier keep their metric-compatible faces.
   - New Light, Medium and SemiBold faces of Roboto, Inter, Open Sans, Montserrat, Poppins, Source Sans 3 and Noto Sans (SIL OFL), loaded only when used. Thin and ExtraLight use Light.

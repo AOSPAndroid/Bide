@@ -6,7 +6,8 @@
 // the edit rather than the old digits under it.
 import {test} from 'node:test';import assert from 'node:assert/strict';
 import {createServer} from 'vite';import {chromium} from 'playwright-core';
-import {mkdtemp,writeFile} from 'node:fs/promises';import {join} from 'node:path';import {tmpdir} from 'node:os';
+import {mkdtemp,writeFile,readFile} from 'node:fs/promises';import {join} from 'node:path';import {tmpdir} from 'node:os';
+import * as mupdf from 'mupdf';import {PDFDocument} from 'pdf-lib';
 
 const fields=page=>page.locator('button[aria-label^="Edit detected text"]').evaluateAll(b=>b.map(x=>x.getAttribute('aria-label').slice('Edit detected text: '.length)));
 async function editField(page,from,to){
@@ -220,6 +221,41 @@ test('a line set in a font takes the grey of the original ink, not a lighter one
   assert.equal(fills.length,1);
   const level=parseInt(fills[0].slice(1,3),16);
   assert.ok(Math.abs(level-0x4d)<=2,`the font text is #4d4d4d like the original ink (got ${fills[0]})`);
+  assert.deepEqual(errors,[]);
+ }finally{await browser.close();await server.close();}
+});
+
+test('a scanned PDF keeps its ink: letters reused at the scan\'s own pixels, a font in the measured colour',{timeout:600000},async()=>{
+ const server=await createServer({logLevel:'error',server:{port:0,host:'127.0.0.1'}});await server.listen();
+ const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||undefined});
+ try{
+  // An invented bakery receipt in near-black ink, scanned at 200 dpi (2.78 px
+  // per point, not a whole number) and put in a PDF without a text layer.
+  const ink='#1d1d1f',shot=await browser.newPage({viewport:{width:400,height:260},deviceScaleFactor:200/72});
+  await shot.setContent(`<body style="margin:0;background:#fff;font-family:Arial,Helvetica,sans-serif;color:${ink}"><div style="padding:36px 44px;font-size:10px;line-height:2.3;width:300px">
+   <div style="font-size:13px;font-weight:bold">Boulangerie du Canal - commande 2207</div>
+   ${[['Pain de campagne','4,20 €'],['Croissants (x12)','13,80 €'],['Tarte aux pommes','9,40 €'],['Total','27,40 €']].map(([a,b])=>`<div style="display:flex;justify-content:space-between"><span>${a}</span><span>${b}</span></div>`).join('')}</div></body>`);
+  const png=await shot.screenshot();await shot.close();
+  const pdf=await PDFDocument.create(),img=await pdf.embedPng(png),pg=pdf.addPage([img.width*72/200,img.height*72/200]);pg.drawImage(img,{x:0,y:0,width:pg.getWidth(),height:pg.getHeight()});
+  const page=await browser.newPage({viewport:{width:1400,height:900},acceptDownloads:true}),errors=[];page.on('pageerror',e=>errors.push(e.message));
+  await page.goto(server.resolvedUrls.local[0]+'app/');await page.locator('input[type=file][accept*=".psd"]').setInputFiles({name:'receipt-scan.pdf',mimeType:'application/pdf',buffer:Buffer.from(await pdf.save())});
+  const field=t=>page.locator(`button[aria-label^="Edit detected text"][aria-label*="${t}"]`).first();await field('13,80').waitFor({timeout:240000});
+  const box=t=>field(t).evaluate(b=>{const z=document.querySelector('.artboard').getBoundingClientRect().width/parseFloat(document.querySelector('.artboard-label span:last-child').textContent);return {x0:parseFloat(b.style.left)/z,y0:parseFloat(b.style.top)/z,x1:(parseFloat(b.style.left)+parseFloat(b.style.width))/z,y1:(parseFloat(b.style.top)+parseFloat(b.style.height))/z};});
+  const letters=await box('13,80'),font=await box('9,40');
+  // The line's own letters can write 31,80; 6,40 needs a font, chosen explicitly.
+  await field('13,80').click();await page.getByLabel('New text').fill('31,80 €');await page.getByRole('button',{name:'Apply',exact:true}).click();
+  await page.getByText("Edited with the image's own letters",{exact:false}).last().waitFor({timeout:60000});
+  await field('9,40').click();await page.getByLabel('New text').fill('6,40 €');await page.getByRole('button',{name:'Apply',exact:true}).click();
+  await page.getByRole('button',{name:'Use a font for this edit'}).click();await page.getByText('This line is now text in the OCR font',{exact:false}).waitFor({timeout:60000});
+  await page.keyboard.press('Escape');await page.mouse.click(5,450);await page.waitForTimeout(800);
+  await page.locator('.document-actions .primary').click();
+  const [d]=await Promise.all([page.waitForEvent('download',{timeout:120000}),page.locator('.modal .dialog-actions .primary').click()]);
+  // Darkest 8% of the ink in each line, on renders at the scan's resolution.
+  const core=(bytes,b)=>{const doc=mupdf.Document.openDocument(bytes,'application/pdf'),p=doc.loadPage(0),k=200/72,x=p.toPixmap(mupdf.Matrix.scale(k,k),mupdf.ColorSpace.DeviceRGB,false,true),w=x.getWidth(),px=x.getPixels(),l=[];
+   for(let y=Math.floor((b.y0-2)*k);y<Math.ceil((b.y1+2)*k);y++)for(let xx=Math.floor((b.x0-2)*k);xx<Math.ceil((b.x1+2)*k);xx++){const i=(y*w+xx)*3,v=.299*px[i]+.587*px[i+1]+.114*px[i+2];if(v<200)l.push(v);}
+   x.destroy();p.destroy();doc.destroy();l.sort((a,c)=>a-c);const c=l.slice(0,Math.max(1,Math.ceil(l.length*.08)));return c.reduce((s,v)=>s+v,0)/c.length;};
+  const before=Buffer.from(await pdf.save()),after=await readFile(await d.path());
+  for(const [name,b] of [['own letters',letters],['font',font]]){const was=core(before,b),now=core(after,b);assert.ok(Math.abs(now-was)<=3,`${name}: core ink ${was.toFixed(0)} → ${now.toFixed(0)} (it came out 38 and 96)`);}
   assert.deepEqual(errors,[]);
  }finally{await browser.close();await server.close();}
 });
