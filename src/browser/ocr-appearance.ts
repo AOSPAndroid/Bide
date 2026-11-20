@@ -135,9 +135,25 @@ export async function matchOcrAppearance(raster:HTMLCanvasElement,region:TextReg
  // from the selected line. Measure its own cores at the final fitted tuple.
  if(selected&&paintSelected){
   const text=await makeText(region,best.family);applyOcrAppearance(text,region,best);
-  text.set({fill:'#000000',objectCaching:false});best.gain=coreGain(selected.source,paintSelected(text));
+  text.set({fill:'#000000',objectCaching:false});
+  // Neighbours set the font, size and softness, but each word's box sits a
+  // pixel or two differently: the placement comes from the selected letters.
+  const own=ownPlacement(selected.source,paintSelected,text);best.dx+=own.dx;best.dy+=own.dy;
+  best.gain=coreGain(selected.source,paintSelected(text));
  }
  return best;
+}
+
+// The text moved over its own letters, whole pixels then quarters, within
+// two pixels; it stays unless a place fits them better. Leaves it there.
+function ownPlacement(source:Coverage,paint:(text:Textbox)=>Coverage,text:Textbox){
+ const left=text.left,top=text.top,at=(dx:number,dy:number)=>{text.set({left:left+dx,top:top+dy});text.initDimensions();return coverageFit(source,paint(text)).score;};
+ let best={dx:0,dy:0,score:at(0,0)};const alpha=paint(text);
+ for(let dx=-2;dx<=2;dx++)for(let dy=-2;dy<=2;dy++){const score=coverageFit(source,alpha,dx,dy).score;if(score>best.score+.002)best={dx,dy,score};}
+ const whole={...best};
+ for(const dx of [-.5,-.25,0,.25,.5])for(const dy of [-.5,-.25,0,.25,.5]){if(!dx&&!dy)continue;const score=at(whole.dx+dx,whole.dy+dy);if(score>best.score)best={dx:whole.dx+dx,dy:whole.dy+dy,score};}
+ text.set({left:left+best.dx,top:top+best.dy});text.initDimensions();
+ return {dx:best.dx,dy:best.dy};
 }
 
 // Lines sampled on a finer raster (a scanned PDF page at the scan's scale) are larger in pixels.
