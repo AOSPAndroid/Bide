@@ -22,3 +22,6 @@ dist-saas/
 dist-app/
 .env.*.local
 .dev.vars
+
+# Temporary checkouts of background coding agents
+.claude/worktrees/
