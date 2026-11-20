@@ -163,7 +163,10 @@ async function recognizeLevel(image:HTMLCanvasElement,{signal,grouping='smart',l
    const lineHeight=estimateLineHeight(probe),k=lineHeight&&lineHeight<22?Math.max(1,Math.min(lineHeight<=5?3:1.5,28/lineHeight,Math.sqrt(12e6/(image.width*image.height)))):1;
    let input=image;
    if(k>1.05){input=Object.assign(document.createElement('canvas'),{width:Math.round(image.width*k),height:Math.round(image.height*k)});const g=input.getContext('2d',{willReadFrequently:true})!;g.imageSmoothingQuality='high';g.drawImage(image,0,0,input.width,input.height);}
-   lines=(await paddleOcr(input,(f,label)=>onProgress?.(f,label||'Recognizing text (AI)'),signal,{script,accurate})).filter(l=>l.confidence>=35);
+   // The server detector (High accuracy) finds lines at the page's own size:
+   // on a scanned letter enlarged 1.5x it took the paper's grain for text
+   // (837,000 pixels flagged instead of 22,000) and merged nine lines into four.
+   lines=(await paddleOcr(input,(f,label)=>onProgress?.(f,label||'Recognizing text (AI)'),signal,{script,accurate,detectScale:accurate?1/k:1})).filter(l=>l.confidence>=35);
    sx=image.width/input.width;sy=image.height/input.height;
   }else{
   onProgress?.(0,'Preparing image');

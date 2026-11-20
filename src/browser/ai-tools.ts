@@ -82,10 +82,12 @@ function sharpen(px:Uint8ClampedArray,w:number,h:number){
  const o=px.slice();
  for(let y=1;y<h-1;y++)for(let x=1;x<w-1;x++)for(let c=0;c<3;c++){const i=(y*w+x)*4+c;px[i]=5*o[i]-o[i-4]-o[i+4]-o[i-w*4]-o[i+w*4];}
 }
-export async function paddleOcr(source:HTMLCanvasElement,onProgress?:Progress,signal?:AbortSignal,{script='auto',accurate=false}:{script?:OcrScript|'auto';accurate?:boolean}={}):Promise<AiOcrLine[]>{
+// `detectScale`: the most detector pixels per source pixel (below 1 for a
+// source enlarged for recognition, to find its lines at the original size).
+export async function paddleOcr(source:HTMLCanvasElement,onProgress?:Progress,signal?:AbortSignal,{script='auto',accurate=false,detectScale=1}:{script?:OcrScript|'auto';accurate?:boolean;detectScale?:number}={}):Promise<AiOcrLine[]>{
  const loading=(p:ModelProgress)=>onProgress?.(0,p.stage==='download'?`Downloading OCR model · ${(p.loaded/1e6).toFixed(1)} / ${(p.total/1e6).toFixed(1)} MB`:p.stage==='verify'?'Checking OCR model':'Preparing OCR model');
  const {width,height}=source,src=context(source).getImageData(0,0,width,height);
- const scale=Math.min(1,1600/Math.max(width,height)),dw=Math.max(32,Math.round(width*scale/32)*32),dh=Math.max(32,Math.round(height*scale/32)*32);
+ const scale=Math.min(1,detectScale,1600/Math.max(width,height)),dw=Math.max(32,Math.round(width*scale/32)*32),dh=Math.max(32,Math.round(height*scale/32)*32);
  const detInput={data:resizeBilinear(src.data,width,height,dw,dh)};
  const prob=(await runModel(accurate?'ppocr-det-server':'ppocr-det',{x:{data:toPlanar(detInput.data,dw,dh,{mean:[.485,.456,.406],std:[.229,.224,.225],bgr:true}),dims:[1,3,dh,dw]}},signal,loading));
  const boxes=mergeLineBoxes(dbBoxes(Object.values(prob)[0].data,dw,dh)),lines:AiOcrLine[]=[];onProgress?.(.1);
