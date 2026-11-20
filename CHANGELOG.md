@@ -2,7 +2,7 @@
 
 ## 2026-11-20 — Edits that match the page; AI on the graphics card
 
-Measured on 16 invented documents (an invoice, a letter, a parcel slip, a meter table, a booking screen) scanned clean, soft, tilted, at low resolution, as phone shots and as scanned PDFs, 215 edits typed and compared with the document regenerated with the new text (`npm run bench:edit`). In the default flow (the page's own letters, a font when they cannot make the edit): 146 → 195 edits with no visible difference, 56 → 16 visible, fields that could not be read 13 → 4.
+Measured on 16 invented documents (an invoice, a letter, a parcel slip, a meter table, a booking screen) scanned clean, soft, tilted, at low resolution, as phone shots and as scanned PDFs, 215 edits typed and compared with the document regenerated with the new text (`npm run bench:edit`). In the default flow (the page's own letters, a font when they cannot make the edit): 146 → 196 edits with no visible difference, 56 → 15 visible, fields that could not be read 13 → 4.
 
 - **The page's own letters** (166 of the 215 edits, 98% of them without a visible difference, against 92 and 81%):
   - A letter the line lacks is borrowed only from a line proven to be in the same lettering by its own pixels: the letters the two lines share must have the same shape and the same amount of ink. Bold, italic, another face or a size 8% larger do not pass. A table cell sharing no letter with the one that has the needed letter is linked through a third line ("4,8" → "5,8" takes its 5 from "1 205", verified through "1 482").

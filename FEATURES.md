@@ -4,7 +4,7 @@
 - Text set in a font over a scanned PDF is fitted at the scan's resolution, exported as pixels on the scan's grid, and placed on the edited line's own letters.
 - AI OCR puts back word spaces dropped on soft scans, corrects decimal commas read as full stops on small soft digits, and settles 0/O between capitals and digits from the page's own letters. High accuracy finds lines at the page's own size (it read nothing on enlarged scans).
 - AI models use the graphics card where WebGPU offers one (text detection, sharpening, background removal, page flattening); they never did on the hosted site. Text recognition, High accuracy detection, AI fill and object selection stay on the CPU.
-- Measured with `npm run bench:edit` (16 invented documents, 215 edits compared with the regenerated document): 195 edits with no visible difference in the default flow, from 146. Details in CHANGELOG.md.
+- Measured with `npm run bench:edit` (16 invented documents, 215 edits compared with the regenerated document): 196 edits with no visible difference in the default flow, from 146. Details in CHANGELOG.md.
 
 ## Hosted update — preserve scanned lettering
 
