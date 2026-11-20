@@ -1,7 +1,7 @@
 // Runs the bundled ONNX models off the main thread. WebGPU (graphics card) is
 // used when the browser offers it, otherwise multithreaded WebAssembly on the
 // CPU; a model that fails on WebGPU is reloaded on the CPU.
-import * as ort from 'onnxruntime-web/webgpu';
+import * as ort from 'onnxruntime-web';
 import {modelBytes,type ModelProgress} from './ai-models';
 type Feeds=Record<string,{data:Float32Array|BigInt64Array;dims:number[]}>;
 type Loaded={session:ort.InferenceSession;backend:'webgpu'|'wasm'};
