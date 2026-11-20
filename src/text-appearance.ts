@@ -15,7 +15,10 @@ export class Textbox extends FabricTextbox {
  private softRaster(requestedScale:number){
   const softness=clampTextSoftness(this.textSoftness??0);
   const pad=Math.ceil(softness*4+this.strokeWidth+this.fontSize*.3),width=this.width+pad*2,height=this.height+pad*2;
-  const scale=Math.min(Math.max(1,requestedScale),300/72,8192/Math.max(width,height),Math.sqrt(16000000/(width*height)));
+  // At least four times finer than the page: the canvas blur steps in whole
+  // pixels (at 1x nothing under 0.8 px, then a 3 px box), so a soft line
+  // drawn at a picture's own size came out sharp or too soft and pale.
+  const scale=Math.min(Math.max(4,requestedScale),300/72,8192/Math.max(width,height),Math.sqrt(16000000/(width*height)));
   const bitmap=util.createCanvasElement();bitmap.width=Math.ceil(width*scale);bitmap.height=Math.ceil(height*scale);
   const context=bitmap.getContext('2d')!;context.scale(scale,scale);context.translate(width/2,height/2);
   context.filter=`blur(${softness*scale}px)`;super._render(context);
@@ -24,8 +27,8 @@ export class Textbox extends FabricTextbox {
  _render(ctx:CanvasRenderingContext2D){
   if(!clampTextSoftness(this.textSoftness??0)){super._render(ctx);return;}
   const matrix=ctx.getTransform(),scale=Math.sqrt(Math.abs(matrix.a*matrix.d-matrix.b*matrix.c));
-  const raster=this.softRaster(scale);
-  ctx.drawImage(raster.bitmap,raster.x,raster.y,raster.width,raster.height);
+  const raster=this.softRaster(scale),quality=ctx.imageSmoothingQuality;
+  ctx.imageSmoothingQuality='high';ctx.drawImage(raster.bitmap,raster.x,raster.y,raster.width,raster.height);ctx.imageSmoothingQuality=quality;
  }
  _toSVG():string[]{
   if(!rasterizedText(this))return super._toSVG();
