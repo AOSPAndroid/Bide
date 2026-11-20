@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-11-20 — Shared on the office network
+
+- Text detection works for colleagues opening a shared bide at its network address. On plain HTTP the browser offers no `crypto.subtle`, and checking the AI models failed with "Text detection unavailable" for everyone except the hosting PC; the check now hashes in JavaScript there.
+- The sharing server marks every file with its version (ETag, Last-Modified), so a return visit revalidates instead of downloading, and sends scripts, fonts and WebAssembly compressed (the ONNX runtime from 24 MB to under 6 MB, MuPDF from 10 MB to under 5 MB).
+- A colleague's browser keeps the AI models it has used in its own storage, verified on every load: they are too large for a browser's HTTP cache, so each visit downloaded them again. One colleague, one scanned page: first visit 70 MB → 38 MB, later visits 54 MB → almost nothing, scan after a reload 8.6 s → 5.5 s (the hosting PC's speed).
+- HOSTING.md explains the per-colleague Chrome/Edge setting that gives an HTTP address the capabilities of `localhost` (Office conversion, AI threads, GPU, reliable downloads) when HTTPS is not available.
+
 ## 2026-10-30 — Hosted web reliability
 
 - Recover from an interrupted AI runtime download with Rescan, without reloading the page or losing the document. Failed runtimes are discarded; stale worker events cannot affect the replacement.
