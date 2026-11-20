@@ -18,16 +18,17 @@ export class LetteringError extends Error{
 // result to the page's serialized objects (clearing the background under
 // font-rendered lines first), so the caller can commit it as one undo step.
 export async function planOcrReplacement(c:Canvas,page:Page,items:OcrEdit[],{settings,pageRegions,others,letters,autoFont}:{settings:OcrSettings;pageRegions:TextRegion[];others:TextRegion[];letters:boolean;autoFont:boolean;otherPages?:LetterSource[]}){
- const patches:FabricObject[]=[],fonts:OcrEdit[]=[],edits:{region:TextRegion;text?:string;layer:string;letters:boolean}[]=[];
+ const patches:FabricObject[]=[],fonts:OcrEdit[]=[],edits:{region:TextRegion;text?:string;layer:string;letters:boolean}[]=[];let borrowed=0;
  for(const item of items){
   if(letters){
    // Back to the text as read: the field shows the original again (no layer).
    if(item.text===item.region.text){edits.push({region:item.region,text:item.text,layer:'',letters:true});continue;}
-   // Neighbouring lines/pages may use another face or weight. Preserve this
-   // line's own pixels instead of borrowing unverified lettering.
-   const patch=item.text!==undefined?await glyphEditPatch(c,page,item.region,item.text):undefined;
+   // Neighbouring lines may use another face or weight: a letter this line
+   // lacks is taken only from a line of the page verified to be in the same
+   // lettering (letter-match.ts), never from unverified lettering.
+   const patch=item.text!==undefined?await glyphEditPatch(c,page,item.region,item.text,pageRegions):undefined;
    if(!patch)throw new LetteringError(letterEditBlocker(item.region,item.text??item.region.text));
-   patches.push(patch);edits.push({region:item.region,text:item.text,layer:(patch as FabricObject&{id:string}).id,letters:true});
+   patches.push(patch);if((patch as FabricObject&{borrowed?:boolean}).borrowed)borrowed++;edits.push({region:item.region,text:item.text,layer:(patch as FabricObject&{id:string}).id,letters:true});
   }else fonts.push(item);
  }
  const transparent=fonts.length>0&&settings.background==='transparent';
@@ -40,7 +41,7 @@ export async function planOcrReplacement(c:Canvas,page:Page,items:OcrEdit[],{set
   ?await matchedDetectedTextbox(item.region,c,page,pageRegions,{ocrFont:settings.font,ocrStyle:settings.style,matchBlur:settings.matchBlur,autoFont,appearanceRegions:others})
   :await detectedTextbox(item.region,{ocrFont:settings.font,ocrStyle:settings.style,pageInk,matchBlur:false});
   if(item.text!==undefined&&item.text!==item.region.text){text.set({text:item.text});fitOneLine(text);}texts.push(text);edits.push({region:item.region,text:item.text,layer:(text as Textbox&{id:string}).id,letters:false});}
- return {letters:patches.length,fonts:texts.length,transparent,edits,
+ return {letters:patches.length,fonts:texts.length,borrowed,transparent,edits,
   async apply(objects:unknown[],onProgress?:(fraction:number)=>void){
    if(fonts.length)await coverOcrText(c,page,fonts.map(f=>f.region),objects,{mode:settings.background,color:settings.color,padding:settings.padding,others,onProgress});
    objects.push(...patches.map(p=>p.toObject()),...texts.map(t=>t.toObject()));
@@ -48,4 +49,5 @@ export async function planOcrReplacement(c:Canvas,page:Page,items:OcrEdit[],{set
 }
 
 // Toast after a letters-first edit.
-export const lettersNote=(letters:number,_fonts:number)=>letters?'Edited with the image\'s own letters. Undo restores the original.':'No text was changed.';
+// `borrowed`: edits that took a letter from another line of the page.
+export const lettersNote=(letters:number,_fonts:number,borrowed=0)=>letters?`Edited with the image's own letters${borrowed?' (a missing one came from another line in the same lettering)':''}. Undo restores the original.`:'No text was changed.';

@@ -18,6 +18,7 @@ import {weightFamilies} from './font-weights';
 import {rasterSearchWords} from './searchable-text';
 import {fallbackFont,fallbackCharSpacing,fitOcrText,type TextRegion} from './text-regions';
 import {lineCells,planGlyphEdit,missingLetters,withUnread,ownInk,lineMetrics,UNREAD,type LibraryGlyph} from './glyph-edit';
+import {letterCover,sameLettering,overBackground,telling,type Cover} from './letter-match';
 import {markDoubts} from './ocr-checks';
 import {mixedWeights,attachNumberParts,recognitionKey,scaleRegions,unconvertedRegions,ocrPatchBounds,ocrScanStatus,isUncertain,frameOf,turn,turnedBounds,inFrame,type Frame} from './ocr-regions';
 import type {OcrGrouping} from './ocr-segmentation';
@@ -351,6 +352,78 @@ function letterLibrary(raster:HTMLCanvasElement,regions:TextRegion[],xHeight:num
  });
 }
 
+// The middle of each letter's ink across (its centroid over the line's rows)
+// and where that ink starts and ends, to put one letter where another stood.
+// Undefined for spaces and empty cells.
+function inkMiddles(ctx:CanvasRenderingContext2D,r:{top:number;height:number},paper:number[],cells:{x0:number;x1:number;space?:boolean}[]){
+ const inked=cells.filter(c=>!c.space);if(!inked.length)return cells.map(()=>undefined);
+ const x0=Math.max(0,Math.floor(Math.min(...inked.map(c=>c.x0)))),x1=Math.min(ctx.canvas.width,Math.ceil(Math.max(...inked.map(c=>c.x1)))),y0=Math.max(0,Math.floor(r.top)),h=Math.max(1,Math.min(ctx.canvas.height-y0,Math.ceil(r.height))),w=x1-x0;
+ if(w<1)return cells.map(()=>undefined);
+ const d=ctx.getImageData(x0,y0,w,h).data,col=new Float32Array(w);
+ for(let y=0;y<h;y++)for(let x=0;x<w;x++){const i=(y*w+x)*4;if(Math.max(Math.abs(d[i]-paper[0]),Math.abs(d[i+1]-paper[1]),Math.abs(d[i+2]-paper[2]))>60)col[x]++;}
+ return cells.map(c=>{if(c.space)return undefined;let m=0,sum=0,i0=Infinity,i1=-Infinity;for(let x=Math.max(x0,Math.floor(c.x0));x<Math.min(x1,Math.ceil(c.x1));x++){const v=col[x-x0];if(!v)continue;m+=v;sum+=v*(x+.5);i0=Math.min(i0,x);i1=Math.max(i1,x+1);}return m?{m:sum/m,i0,i1}:undefined;});
+}
+// A line is right-aligned when its right edge lines up with other lines of
+// its column (amounts in a table) more than its left edge does; a tie goes
+// right for amounts. Boxes are trimmed to ink, hence the tolerance.
+function rightAligned(region:TextRegion,others:TextRegion[]){
+ const tol=Math.max(2,region.height*.08),right=region.left+region.width,column=others.filter(o=>Math.min(o.top+o.height,region.top+region.height)-Math.max(o.top,region.top)<.5*Math.min(o.height,region.height));
+ const rights=column.filter(o=>Math.abs(o.left+o.width-right)<tol).length,lefts=column.filter(o=>Math.abs(o.left-region.left)<tol).length;
+ const digits=region.text.replace(/\D/g,'').length,letters=region.text.replace(/[^\p{L}]/gu,'').length;
+ return rights>lefts||rights>0&&rights===lefts&&digits>letters;
+}
+// The paper under a line: the median colour of its box's pixels near the
+// detected background (a banded table row is not the page's white).
+function paperOf(ctx:CanvasRenderingContext2D,r:{left:number;top:number;width:number;height:number;background?:string}){
+ const guess=hexRgb(r.background||'#ffffff'),x=Math.max(0,Math.floor(r.left)-1),y=Math.max(0,Math.floor(r.top)-1),w=Math.max(1,Math.min(ctx.canvas.width-x,Math.ceil(r.width)+2)),h=Math.max(1,Math.min(ctx.canvas.height-y,Math.ceil(r.height)+2));
+ const d=ctx.getImageData(x,y,w,h).data,near:number[][]=[[],[],[]];
+ for(let i=0;i<d.length;i+=4)if(Math.max(Math.abs(d[i]-guess[0]),Math.abs(d[i+1]-guess[1]),Math.abs(d[i+2]-guess[2]))<48)for(let n=0;n<3;n++)near[n].push(d[i+n]);
+ return near[0].length<8?guess:near.map(v=>v.sort((p,q)=>p-q)[v.length>>1]);
+}
+// The colour of a line's ink: the mean of its strongest tenth of pixels.
+function inkOf(ctx:CanvasRenderingContext2D,r:{left:number;top:number;width:number;height:number},paper:number[]){
+ const x=Math.max(0,Math.floor(r.left)),y=Math.max(0,Math.floor(r.top)),w=Math.max(1,Math.min(ctx.canvas.width-x,Math.ceil(r.width))),h=Math.max(1,Math.min(ctx.canvas.height-y,Math.ceil(r.height)));
+ const d=ctx.getImageData(x,y,w,h).data,px:{v:number;i:number}[]=[];
+ for(let i=0;i<d.length;i+=4){const v=Math.max(Math.abs(d[i]-paper[0]),Math.abs(d[i+1]-paper[1]),Math.abs(d[i+2]-paper[2]));if(v>40)px.push({v,i});}
+ if(px.length<8)return undefined;px.sort((a,b)=>b.v-a.v);const n=Math.max(1,Math.ceil(px.length*.1)),sum=[0,0,0];
+ for(let k=0;k<n;k++)for(let c=0;c<3;c++)sum[c]+=d[px[k].i+c];
+ return sum.map(v=>v/n);
+}
+// Letters the edited line lacks, from other lines of the page verified to be
+// in its lettering (letter-match.ts): the characters the two lines share are
+// alike in shape and ink. Nearest lines first; a line under an earlier edit
+// (`blocked`) no longer shows what was read there. Each letter comes with its
+// line's baseline as the shared letters place it against this line's.
+function verifiedLibrary(raster:HTMLCanvasElement,regions:TextRegion[],region:TextRegion,cells:{ch:string;x0:number;x1:number;space?:boolean}[],baseline:number,needed:string[],blocked:{left:number;top:number;width:number;height:number}[],page?:string):LibraryGlyph[]{
+ const wanted=needed.filter(ch=>/\S/.test(ch));if(!wanted.length)return [];
+ const ctx=raster.getContext('2d',{willReadFrequently:true})!,bg=paperOf(ctx,region),up=Math.ceil(baseline-region.top)+1,down=Math.ceil(region.top+region.height-baseline)+1;
+ // The line's ink contrast: its strongest pixels (the 95th percentile of the inked ones).
+ const box=ctx.getImageData(Math.max(0,Math.floor(region.left)),Math.max(0,Math.floor(region.top)),Math.max(1,Math.ceil(region.width)),Math.max(1,Math.ceil(region.height))).data,inked:number[]=[];
+ for(let i=0;i<box.length;i+=4){const v=Math.max(Math.abs(box[i]-bg[0]),Math.abs(box[i+1]-bg[1]),Math.abs(box[i+2]-bg[2]));if(v>40)inked.push(v);}
+ if(inked.length<8)return [];inked.sort((a,b)=>a-b);const contrast=inked[Math.floor((inked.length-1)*.95)];
+ const cover=(g:{x0:number;x1:number},base:number,paper:number[]):Cover|undefined=>{const x=Math.floor(g.x0),w=Math.ceil(g.x1)-x,y=Math.round(base)-up;if(w<1||x<0||y<0||x+w>raster.width||y+up+down>raster.height)return undefined;return letterCover(ctx.getImageData(x,y,w,up+down).data,w,up+down,paper,contrast);};
+ // Up to two instances of each telling character.
+ const covers=(list:{ch:string;x0:number;x1:number;space?:boolean}[],base:number,paper:number[],only?:Set<string>)=>{const m=new Map<string,Cover[]>();for(const g of list){if(g.space||!telling(g.ch)||only&&!only.has(g.ch)||(m.get(g.ch)?.length??0)>=2)continue;const c=cover(g,base,paper);if(c)m.set(g.ch,[...m.get(g.ch)??[],c]);}return m;};
+ const mine=covers(cells,baseline,bg),ink=inkOf(ctx,region,bg);if(!mine.size||!ink)return [];
+ const centre=(r:{left:number;top:number;width:number;height:number})=>[r.left+r.width/2,r.top+r.height/2],[cx,cy]=centre(region);
+ const candidates=regions.filter(r=>r.id!==region.id&&r.kind==='ocr'&&r.glyphs&&wanted.some(ch=>r.text.includes(ch))&&[...mine.keys()].some(ch=>r.text.includes(ch))&&!blocked.some(b=>b.left<r.left+r.width&&b.left+b.width>r.left&&b.top<r.top+r.height&&b.top+b.height>r.top))
+  .sort((a,b)=>Math.abs(centre(a)[1]-cy)+Math.abs(centre(a)[0]-cx)*.25-Math.abs(centre(b)[1]-cy)-Math.abs(centre(b)[0]-cx)*.25).slice(0,16);
+ const out:LibraryGlyph[]=[],left=new Set(wanted);
+ for(const r of candidates){
+  if(!left.size)break;if(!wanted.some(ch=>left.has(ch)&&r.text.includes(ch)))continue;
+  const {rows,y0}=rowInk(raster,r),m=lineMetrics(rows),own=lineCells(r.text,r.glyphs!);if(!m||!own)continue;
+  const base=y0+m.baseline,paper=paperOf(ctx,r),theirs=inkOf(ctx,r,paper);
+  // The same ink colour (black digits must not stand in a grey or green line).
+  if(!theirs||theirs.some((v,n)=>Math.abs(v-ink[n])>30))continue;
+  const verdict=sameLettering(mine,covers(own,base,paper,new Set(mine.keys())));
+  if(!verdict.ok)continue;
+  const middles=inkMiddles(ctx,r,paper,own);
+  own.forEach((g,i)=>{if(g.space||g.ch===UNREAD||!left.has(g.ch))return;out.push({...g,y0:r.top,y1:r.top+r.height,source:r.id,baseline:base+verdict.dy,page,...middles[i]});});
+  for(const ch of wanted)if(r.text.includes(ch))left.delete(ch);
+ }
+ return out;
+}
+
 // A tilted line is edited in its level frame, on the page turned back about
 // its centre as OCR read it (lines tilted the same way only shift into that
 // frame); the patch is turned back onto the line, so it changes only pixels
@@ -360,7 +433,7 @@ export function letterEditBlocker(region:TextRegion,next:string){
  if(region.kind!=='ocr'||!region.glyphs)return 'this line was read without the positions of its letters, so they cannot be reused.';
  const cells=lineCells(region.text,region.glyphs);if(!cells)return "the recognized text does not line up with this line's letters.";
  const missing=missingLetters(cells.map(c=>c.ch).join(''),cells,withUnread(region.text,cells,next)).map(c=>c===' '?'a space':`“${c}”`);
- if(missing.length)return `${missing.length===1?'':'the characters '}${missing.join(', ')} ${missing.length===1?'does':'do'} not appear in this line, and only its own letters are reused.`;
+ if(missing.length)return `${missing.length===1?'':'the characters '}${missing.join(', ')} ${missing.length===1?'does':'do'} not appear in this line, nor in another line of the page verified to be in the same lettering.`;
  return 'this line could not be measured precisely enough to rebuild it.';
 }
 export async function glyphEditPatch(c:Canvas,p:Page,lineRegion:TextRegion,next:string,pageRegions:TextRegion[]=[],sources:LetterSource[]=[]){
@@ -368,7 +441,7 @@ export async function glyphEditPatch(c:Canvas,p:Page,lineRegion:TextRegion,next:
  // Everything below works in raster pixels, `k` per page unit.
  // A scanned PDF is cut at the scan's own resolution when the render budget
  // reaches it (letters are then the scan's pixels, not a resampling of them).
- const budget=letterScale(lineRegion,p),native=p.source?await pdfScanScale(p.source,p.index):undefined,k=native!==undefined&&native<=budget?native:budget,f=frameOf(lineRegion),fill=lineRegion.background||'#ffffff',region=scaledRegion(lineRegion,k),page=pageRegions.flatMap(r=>r===lineRegion?[region]:framed(f,[r]).map(m=>scaledRegion(m,k)));
+ const budget=letterScale(lineRegion,p),native=p.source?await pdfScanScale(p.source,p.index):undefined,k=native!==undefined&&native<=budget?native:budget,f=frameOf(lineRegion),fill=lineRegion.background||'#ffffff',region=scaledRegion(lineRegion,k),page=pageRegions.flatMap(r=>r.id===lineRegion.id?[]:framed(f,[r]).map(m=>scaledRegion(m,k)));
  // Another page's letters are cut in the frame of one of its lines.
  const otherPages=sources.map(o=>{const of=frameOf(o.regions.find(r=>r.glyphs)??lineRegion);return {...o,frame:of,regions:framed(of,o.regions).map(r=>scaledRegion(r,k))};});
  // Placeholder cells (ink the recognizer did not read) are planned as
@@ -377,24 +450,30 @@ export async function glyphEditPatch(c:Canvas,p:Page,lineRegion:TextRegion,next:
  const read=cells.map(c=>c.ch).join(''),wanted=withUnread(region.text,cells,next);
  const raster=levelRaster(k===1?await pageComposite(c,p):await previewCanvas(p.source!,p.index,k,Math.ceil(p.width*k),Math.ceil(p.height*k)),f,k,fill),W=raster.width,H=raster.height;
  const target=rowInk(raster,region),metrics=lineMetrics(target.rows);if(!metrics)return undefined;
+ const rctx=raster.getContext('2d',{willReadFrequently:true})!,middles=inkMiddles(rctx,region,paperOf(rctx,region),cells);cells.forEach((cell,i)=>Object.assign(cell,middles[i]));
+ const layout={right:rightAligned(region,page)};
  const baseline=target.y0+metrics.baseline,rasters=new Map<string,HTMLCanvasElement>([[p.id,raster]]);
- let plan=planGlyphEdit(read,cells,wanted,letterLibrary(raster,page,metrics.xHeight,region,p.id));
+ // Earlier edits drawn on a picture page changed what their lines show.
+ const blocked=p.source?[]:c.getObjects().filter(o=>typeof (o as Tagged&{editedText?:string}).editedText==='string'||o instanceof Textbox).map(o=>o.getBoundingRect());
+ const library=page.length?verifiedLibrary(raster,page,region,cells,baseline,missingLetters(read,cells,wanted),blocked,p.id):[];
+ let plan=planGlyphEdit(read,cells,wanted,library,layout);
  // A letter missing from this page: look for it on the other pages.
  for(const other of otherPages){
   if(plan||other.page.id===p.id)continue;
-  if(!planGlyphEdit(read,cells,wanted,other.regions.flatMap(r=>r.glyphs?lineCells(r.text,r.glyphs)?.filter(g=>!g.space&&g.ch!==UNREAD).map(g=>({...g,y0:0,y1:0,source:r.id}))??[]:[]))&&!plan)continue;
+  if(!planGlyphEdit(read,cells,wanted,other.regions.flatMap(r=>r.glyphs?lineCells(r.text,r.glyphs)?.filter(g=>!g.space&&g.ch!==UNREAD).map(g=>({...g,y0:0,y1:0,source:r.id}))??[]:[]),layout)&&!plan)continue;
   const source=levelRaster(await offscreenComposite(other.page,k),other.frame,k,fill);rasters.set(other.page.id,source);
-  plan=planGlyphEdit(read,cells,wanted,[...letterLibrary(raster,page,metrics.xHeight,region,p.id),...letterLibrary(source,other.regions,metrics.xHeight,region,other.page.id)]);
+  plan=planGlyphEdit(read,cells,wanted,[...library,...letterLibrary(source,other.regions,metrics.xHeight,region,other.page.id)],layout);
  }
  if(!plan)return undefined;
- const pieces=plan.pieces.map(q=>({...q,x0:Math.round(q.x0),x1:Math.round(q.x1)})),startX=Math.max(0,Math.round(plan.startX)),width=pieces.reduce((s,q)=>s+q.x1-q.x0,0);
+ // Whole pixels: a placed piece moves by a whole number of them from where it was cut.
+ const startX=Math.max(0,Math.round(plan.startX)),pieces=plan.pieces.map(q=>({...q,x0:Math.round(q.x0),x1:Math.round(q.x1),at:q.to===undefined?undefined:Math.round(q.x0)+Math.round(q.to-q.x0)-startX})),width=pieces.reduce((s,q)=>s+q.x1-q.x0,0);
  // The 300 dpi source scale is fractional in PDF points. Raster bounds and
  // array indices must still be integers; divide by k only for page placement.
  const pad=Math.ceil(k),sidePad=Math.ceil(2*k),rowPad=Math.ceil(8*k);
- const top=Math.max(0,Math.floor(region.top)-pad),bottom=Math.min(H,Math.ceil(region.top+region.height)+pad),endX=Math.min(W,Math.ceil(Math.max(plan.oldEnd,startX+width))+pad);
+ const top=Math.max(0,Math.floor(region.top)-pad),bottom=Math.min(H,Math.ceil(region.top+region.height)+pad),endX=Math.min(W,Math.ceil(Math.max(plan.oldEnd,plan.end,...pieces.map(q=>q.at===undefined?0:startX+q.at+q.x1-q.x0),pieces.some(q=>q.at===undefined)?startX+width:0))+pad);
  // Analyse the whole line plus a margin of rows to see where blobs lead.
  const ax0=Math.max(0,Math.floor(Math.min(region.left,startX))-sidePad),ax1=Math.min(W,Math.max(endX,Math.ceil(region.left+region.width)+sidePad)),ay0=Math.max(0,top-rowPad),ay1=Math.min(H,bottom+rowPad);
- const ctx=raster.getContext('2d',{willReadFrequently:true})!,area=ctx.getImageData(ax0,ay0,ax1-ax0,ay1-ay0),bg=hexRgb(region.background||'#ffffff');
+ const ctx=raster.getContext('2d',{willReadFrequently:true})!,area=ctx.getImageData(ax0,ay0,ax1-ax0,ay1-ay0),bg=paperOf(ctx,region);
  const own=ownInk(area.data,area.width,area.height,bg,top-ay0,bottom-ay0);
  // Borrowed letters may reach below the line box (descenders): the patch grows to fit them.
  const reach=Math.max(0,...pieces.filter(q=>q.source!==undefined).map(q=>Math.ceil((q.y1??0)-(q.baseline??0))-(bottom-baseline)));
@@ -407,12 +486,15 @@ export async function glyphEditPatch(c:Canvas,p:Page,lineRegion:TextRegion,next:
  let x=0;
  for(const q of pieces){
   const w=q.x1-q.x0;if(w<=0)continue;
+  if(q.at!==undefined)x=q.at;
   if(q.source!==undefined){
    // Borrowed letter: copy its ink, moved so its baseline sits on this line's baseline.
    const from=rasters.get(q.page??p.id)??raster,dy=Math.round(baseline-(q.baseline??baseline)),sy=Math.max(0,top-dy),sh=Math.min(from.height,top-dy+patchH)-sy;
+   // Its paper may differ from this line's (banded table rows): the ink is kept, the paper exchanged.
+   const lender=page.find(r=>r.id===q.source),paper=lender?paperOf(from.getContext('2d',{willReadFrequently:true})!,lender):bg,strength=Math.max(40,...[0,1,2].map(n=>Math.abs(hexRgb(region.color||'#000000')[n]-paper[n])));
    if(sh>0){const src=from.getContext('2d',{willReadFrequently:true})!.getImageData(q.x0,sy,w,sh),offset=sy-(top-dy);
-    for(let y=0;y<sh;y++)for(let dx=0;dx<w&&x+dx<patchW;dx++){const i=(y*w+dx)*4,dist=Math.max(...[0,1,2].map(k=>Math.abs(src.data[i+k]-bg[k])));if(dist>12&&y+offset<patchH)out.data.set(src.data.subarray(i,i+4),((y+offset)*patchW+x+dx)*4);}}
-  }else if(!q.blank)for(let y=0;y<patchH&&y+top<ay1;y++)for(let dx=0;dx<w&&x+dx<patchW;dx++){
+    for(let y=0;y<sh;y++)for(let dx=Math.max(0,-x);dx<w&&x+dx<patchW;dx++){const i=(y*w+dx)*4,dist=Math.max(...[0,1,2].map(n=>Math.abs(src.data[i+n]-paper[n])));if(dist>12&&y+offset<patchH){const o=((y+offset)*patchW+x+dx)*4,cover=Math.min(1,dist/strength);for(let n=0;n<3;n++)out.data[o+n]=overBackground(src.data[i+n],cover,paper[n],bg[n]);out.data[o+3]=255;}}}
+  }else if(!q.blank)for(let y=0;y<patchH&&y+top<ay1;y++)for(let dx=Math.max(0,-x);dx<w&&x+dx<patchW;dx++){
    const ai=((y+top-ay0)*area.width+(q.x0+dx-ax0));if(own[ai])out.data.set(area.data.subarray(ai*4,ai*4+4),(y*patchW+x+dx)*4);
   }
   x+=w;
@@ -421,6 +503,6 @@ export async function glyphEditPatch(c:Canvas,p:Page,lineRegion:TextRegion,next:
  // twice they would only come back softer.
  if(f.angle)for(let y=0;y<patchH&&y+top<ay1;y++)for(let u=0;u<patchW;u++){const o=(y*patchW+u)*4,ai=((y+top-ay0)*area.width+(u+startX-ax0))*4;if(out.data[o]===area.data[ai]&&out.data[o+1]===area.data[ai+1]&&out.data[o+2]===area.data[ai+2]&&out.data[o+3]===area.data[ai+3])out.data[o+3]=0;}
  const patch=document.createElement('canvas');patch.width=patchW;patch.height=patchH;patch.getContext('2d')!.putImageData(out,0,0);
- return Object.assign(turnLayer(new FabricImage(patch,{left:startX/k,top:top/k,scaleX:1/k,scaleY:1/k}),lineRegion),{id:uid(),name:`Edited text: ${next.slice(0,40)}`,editedText:next,ocrOriginalBounds:originalFieldBounds(lineRegion)});
+ return Object.assign(turnLayer(new FabricImage(patch,{left:startX/k,top:top/k,scaleX:1/k,scaleY:1/k}),lineRegion),{id:uid(),name:`Edited text: ${next.slice(0,40)}`,editedText:next,ocrOriginalBounds:originalFieldBounds(lineRegion),borrowed:plan.pieces.some(q=>q.source!==undefined)});
 }
 const hexRgb=(hex:string)=>[1,3,5].map(i=>parseInt(hex.slice(i,i+2),16)||0);

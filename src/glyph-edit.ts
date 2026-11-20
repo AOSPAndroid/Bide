@@ -8,10 +8,22 @@ export type Glyph={ch:string;x0:number;x1:number;p?:number;c?:number};
 // lacks, such as ★). It adds no character to the text; its cell sits in the
 // line before the next character, so a letter edit can keep its pixels.
 export const UNREAD='\uFFFC';
-export type Cell=Glyph&{space?:boolean};
+// `m`: the middle of the letter's ink across (its centroid), and `i0`, `i1`
+// where that ink starts and ends, when measured.
+export type Cell=Glyph&{space?:boolean;m?:number;i0?:number;i1?:number};
 // Borrowed letters carry their line's band and baseline (page units) and the page they come from.
-export type LibraryGlyph=Glyph&{y0:number;y1:number;source:string;baseline?:number;page?:string};
-export type Piece={x0:number;x1:number;y0?:number;y1?:number;source?:string;blank?:boolean;baseline?:number;page?:string};
+export type LibraryGlyph=Glyph&{y0:number;y1:number;source:string;baseline?:number;page?:string;m?:number;i0?:number;i1?:number};
+// Where a new letter goes for its ink to stand where the old one's stood:
+// ink of about the same width is laid edge to edge (a 3 over a 6: their
+// centroids differ, their outlines do not); a narrower or wider letter (a 1
+// over an 8) by the centre of its ink.
+const over=(old:Cell,g:Cell|LibraryGlyph)=>{
+ if(old.i0!==undefined&&old.i1!==undefined&&g.i0!==undefined&&g.i1!==undefined){const a=old.i1-old.i0,b=g.i1-g.i0;if(Math.abs(a-b)<=Math.max(1,Math.max(a,b)*.15))return g.x0+(old.i0+old.i1)/2-(g.i0+g.i1)/2;}
+ return g.x0+old.m!-g.m!;
+};
+// A stretch of source columns drawn into the edited line. Pieces follow each
+// other from the plan's start, unless `to` says where a piece's first column goes.
+export type Piece={x0:number;x1:number;y0?:number;y1?:number;source?:string;blank?:boolean;baseline?:number;page?:string;to?:number};
 
 // Baseline and x-height of a text line from its ink per row (top to bottom).
 // Lowercase bodies hold most of the ink: rows above 40% of the busiest row form
@@ -40,7 +52,13 @@ export function segmentGlyphs(text:string,centers:number[],x0:number,x1:number,c
  // ("i") does not, even when the centres drift by a letter.
  const mass=runs.map(r=>{let m=0;for(let x=r.a;x<r.b;x++)m+=columns[x-offset]??0;return m;}),median=[...mass].sort((p,q)=>p-q)[mass.length>>1]||1;
  const skip=(from:number,to:number)=>{let s=0;for(let j=from;j<to;j++)s+=8*mass[j]/median;return s;};
- const dist=(i:number,j:number)=>{const c=centers[i],r=runs[j];return c<r.a?r.a-c:c>=r.b?c-r.b+1:0;};
+ // A comma, full stop, colon or apostrophe is a small run of its own, and
+ // the recognizer places it loosely (its centres come in steps of about half
+ // a letter): on a small run it may sit half a letter off for free, on a
+ // letter-sized run it costs as much. A comma read at the start of the next
+ // digit used to share that digit's run and leave its own ink to the digit before.
+ const widths=runs.map(r=>r.b-r.a).sort((p,q)=>p-q),slack=widths[widths.length>>1]/2,mark=chars.map(ch=>/^[.,:;'’‘`·]$/.test(ch)),small=mass.map(m=>m<median*.45);
+ const dist=(i:number,j:number)=>{const c=centers[i],r=runs[j],d=c<r.a?r.a-c:c>=r.b?c-r.b+1:0;return mark[i]?small[j]?Math.max(0,d-slack):d+slack:d;};
  const R=runs.length,N=centers.length,cost=Array.from({length:N},()=>new Float64Array(R).fill(Infinity)),from=Array.from({length:N},()=>new Int32Array(R).fill(-1));
  for(let j=0;j<R;j++)cost[0][j]=skip(0,j)+dist(0,j);
  for(let i=1;i<N;i++)for(let j=0;j<R;j++)for(let k=0;k<=j;k++){const v=cost[i-1][k]+(k===j?0:skip(k+1,j))+dist(i,j);if(v<cost[i][j]){cost[i][j]=v;from[i][j]=k;}}
@@ -136,28 +154,91 @@ export function withUnread(text:string,cells:Cell[],next:string){
  return b.map((ch,j)=>UNREAD.repeat(before[j])+ch).join('')+UNREAD.repeat(before[b.length]);
 }
 
+// The advance of a line set at one pitch (a typewriter face, or a run of
+// digits): the distance between the ink middles of neighbouring characters,
+// when every character sits on that grid. Needs five measured characters.
+// Returns the pitch and the grid's origin (the middle of character 0).
+export function fixedPitch(cells:Cell[]):{pitch:number;origin:number}|undefined{
+ const at=cells.flatMap((c,i)=>c.space||c.ch===UNREAD||c.m===undefined?[]:[{i,m:c.m}]);if(at.length<5)return undefined;
+ const middle=(v:number[])=>[...v].sort((x,y)=>x-y)[v.length>>1],steps:number[]=[];
+ for(let k=0;k+1<at.length;k++)steps.push((at[k+1].m-at[k].m)/(at[k+1].i-at[k].i));
+ const pitch=middle(steps);if(!(pitch>0))return undefined;
+ const origin=middle(at.map(x=>x.m-x.i*pitch));
+ return at.every(x=>Math.abs(x.m-origin-x.i*pitch)<=pitch*.14)?{pitch,origin}:undefined;
+}
+
 // Plan for rendering `next` in place of `text`: everything before the first
 // change stays untouched; from there the line is rebuilt from cells (kept
 // characters use their own pixels, new ones the nearest identical letter on the
 // line or, failing that, from `library`). Undefined when a letter is missing.
-export function planGlyphEdit(text:string,cells:Cell[],next:string,library:LibraryGlyph[]=[]):{startX:number;oldEnd:number;pieces:Piece[]}|undefined{
+// Where characters share one advance, a new one takes the place of the old:
+//  - a digit for a digit, or any character for another on a line set at one
+//    pitch, text of the same length: the new letter's ink is centred where the
+//    old one's was and nothing else moves (cells are cut between letters, so a
+//    1's cell is narrower than an 8's and chaining cells shifted the rest);
+//  - a line at one pitch whose length changes: every character from the change
+//    on sits on the line's grid.
+// Otherwise cells follow each other at their own widths. `right`: the line is
+// right-aligned, so a change of width moves its start, not its end.
+export function planGlyphEdit(text:string,cells:Cell[],next:string,library:LibraryGlyph[]=[],{right=false}:{right?:boolean}={}):{startX:number;oldEnd:number;end:number;pieces:Piece[]}|undefined{
  const a=Array.from(text),b=Array.from(next);if(a.join('')===b.join(''))return undefined;
- let p=0;while(p<a.length&&p<b.length&&a[p]===b[p])p++;
- const keep=align(a,b),spaces=cells.filter(c=>c.space).map(c=>c.x1-c.x0).sort((x,y)=>x-y),space=spaces.length?spaces[spaces.length>>1]:undefined;
- const pieces:Piece[]=[];
- for(let j=p;j<b.length;j++){
-  const k=keep[j];
-  if(k>=p){pieces.push({x0:cells[k].x0,x1:cells[k].x1});continue;}
-  const ch=b[j];
-  if(/\s/.test(ch)){if(space===undefined)return undefined;pieces.push({x0:0,x1:space,blank:true});continue;}
-  // Nearest identical letter on this line (by position), then the page library.
-  const own=cells.map((c,i)=>({c,i})).filter(({c})=>!c.space&&c.ch===ch).sort((x,y)=>Math.abs(x.i-Math.min(j,a.length-1))-Math.abs(y.i-Math.min(j,a.length-1)))[0];
-  if(own){pieces.push({x0:own.c.x0,x1:own.c.x1});continue;}
-  const borrowed=library.find(g=>g.ch===ch);if(!borrowed)return undefined;
-  pieces.push({x0:borrowed.x0,x1:borrowed.x1,y0:borrowed.y0,y1:borrowed.y1,source:borrowed.source,...borrowed.baseline===undefined?{}:{baseline:borrowed.baseline},...borrowed.page===undefined?{}:{page:borrowed.page}});
+ let first=0;while(first<a.length&&first<b.length&&a[first]===b[first])first++;
+ const oldEnd=cells[cells.length-1].x1,digit=(ch:string)=>/^\p{Nd}$/u.test(ch),grid=fixedPitch(cells);
+ const spaces=cells.filter(c=>c.space).map(c=>c.x1-c.x0).sort((x,y)=>x-y),space=spaces.length?spaces[spaces.length>>1]:undefined;
+ // The advance of the line's digits: between the ink middles of two that touch.
+ const steps=cells.flatMap((c,i)=>i&&digit(c.ch)&&digit(cells[i-1].ch)&&c.m!==undefined&&cells[i-1].m!==undefined?[c.m-cells[i-1].m!]:[]).sort((x,y)=>x-y),figures=steps.length?steps[steps.length>>1]:undefined;
+ // A new letter: the nearest identical one on this line (by position), then the page library.
+ const letter=(ch:string,j:number):(Cell|LibraryGlyph)|undefined=>cells.map((c,i)=>({c,i})).filter(({c})=>!c.space&&c.ch===ch).sort((x,y)=>Math.abs(x.i-Math.min(j,a.length-1))-Math.abs(y.i-Math.min(j,a.length-1)))[0]?.c??library.find(g=>g.ch===ch);
+ const piece=(g:Cell|LibraryGlyph):Piece=>'source' in g?{x0:g.x0,x1:g.x1,y0:g.y0,y1:g.y1,source:g.source,...g.baseline===undefined?{}:{baseline:g.baseline},...g.page===undefined?{}:{page:g.page}}:{x0:g.x0,x1:g.x1};
+ const placed=(pieces:Piece[],from:number)=>({startX:Math.min(from,...pieces.map(q=>q.to!)),oldEnd,end:Math.max(...pieces.map(q=>q.to!+q.x1-q.x0)),pieces});
+ // The same length, each changed character on the advance of the one it replaces.
+ if(a.length===b.length){
+  const changed=a.flatMap((ch,i)=>ch===b[i]?[]:[i]);
+  if(changed.every(i=>!cells[i].space&&!/\s/.test(b[i])&&cells[i].m!==undefined&&(grid||digit(a[i])&&digit(b[i])))){
+   const from=Math.max(0,changed[0]-1),pieces:Piece[]=[];
+   for(let i=from;i<cells.length;i++){
+    const c=cells[i];if(a[i]===b[i]){pieces.push(c.space?{x0:0,x1:c.x1-c.x0,blank:true,to:c.x0}:{x0:c.x0,x1:c.x1,to:c.x0});continue;}
+    const g=letter(b[i],i);if(!g)return undefined;
+    if(g.m===undefined){pieces.length=0;break;}
+    pieces.push({...piece(g),to:over(c,g)});
+   }
+   if(pieces.length)return placed(pieces,cells[from].x0);
+  }
  }
- const startX=p<cells.length?cells[p].x0:cells[cells.length-1].x1;
- return {startX,oldEnd:cells[cells.length-1].x1,pieces};
+ const plan=(p:number)=>{
+  const keep=align(a,b),pieces:Piece[]=[];
+  // One pitch: each character from the change on takes its place on the grid.
+  if(grid&&cells.every(c=>c.space||c.ch===UNREAD||c.m!==undefined)){
+   for(let j=p;j<b.length;j++){
+    const k=keep[j],middle=grid.origin+j*grid.pitch;
+    if(k>=p&&!cells[k].space){pieces.push({x0:cells[k].x0,x1:cells[k].x1,to:cells[k].x0+(j-k)*grid.pitch});continue;}
+    if(/\s/.test(b[j])){pieces.push({x0:0,x1:grid.pitch,blank:true,to:middle-grid.pitch/2});continue;}
+    const g=letter(b[j],j);if(!g)return undefined;
+    if(g.m===undefined){pieces.length=0;break;}
+    pieces.push({...piece(g),to:g.x0+middle-g.m});
+   }
+   if(pieces.length||p>=b.length)return pieces.length?placed(pieces,p<cells.length?cells[p].x0:oldEnd):{startX:p<cells.length?cells[p].x0:oldEnd,oldEnd,end:p<cells.length?cells[p].x0:oldEnd,pieces};
+  }
+  for(let j=p;j<b.length;j++){
+   const k=keep[j];
+   if(k>=p){pieces.push({x0:cells[k].x0,x1:cells[k].x1});continue;}
+   const ch=b[j];
+   if(/\s/.test(ch)){if(space===undefined)return undefined;pieces.push({x0:0,x1:space,blank:true});continue;}
+   const g=letter(ch,j);if(!g)return undefined;
+   // A new digit takes a digit's advance, its ink in the middle (its own cell is cut at the ink of its old neighbours).
+   const lead=figures!==undefined&&digit(ch)&&g.m!==undefined?figures/2-(g.m-g.x0):0,w=g.x1-g.x0;
+   if(lead>0)pieces.push({x0:0,x1:lead,blank:true});
+   pieces.push(piece(g));
+   if(figures!==undefined&&digit(ch)&&g.m!==undefined&&figures-lead-w>0)pieces.push({x0:0,x1:figures-Math.max(0,lead)-w,blank:true});
+  }
+  const startX=p<cells.length?cells[p].x0:oldEnd;
+  return {startX,oldEnd,end:startX+pieces.reduce((n,q)=>n+q.x1-q.x0,0),pieces};
+ };
+ const made=plan(first);if(!made||!right)return made;
+ // Right-aligned: the whole line is laid again, ending where it ended.
+ const delta=made.end-oldEnd;if(Math.abs(delta)<.5)return made;
+ const whole=plan(0);if(!whole)return undefined;
+ return {startX:whole.startX-delta,oldEnd,end:whole.end-delta,pieces:whole.pieces.map(q=>q.to===undefined?q:{...q,to:q.to-delta})};
 }
 
 // The characters of `next` an edit cannot take from the line itself (as
