@@ -89,3 +89,26 @@ test('a field target grows evenly around a small line, so the middle of each lin
  assert.deepEqual(fieldBox({left:10,top:20,width:100,height:30},2),{left:20,top:40,width:200,height:60,transform:undefined});
  assert.equal(fieldBox({left:0,top:0,width:2,height:2,angle:-2.5},1).transform,'rotate(-2.5deg)');
 });
+
+test('touch selection uses unexpanded row and column geometry, not the browser-adjusted target',async()=>{
+ const {closestTextRegion}=await import('../tmp/ocr-regions.mjs');
+ const rows=[0,1,2].map(i=>region('row'+i,70,160+i*16,115,15));
+ assert.equal(closestTextRegion(rows,127,183.5,rows[2]),rows[1],'a click delivered to the next row still selects the touched middle line');
+ const columns=[region('left',10,50,15,10),region('right',30,50,15,10)];
+ assert.equal(closestTextRegion(columns,17.5,55,columns[1]),columns[0]);assert.equal(closestTextRegion(columns,37.5,55,columns[0]),columns[1]);
+});
+test('closest text selection undoes each line rotation before measuring distance',async()=>{
+ const {closestTextRegion,frameOf,turn}=await import('../tmp/ocr-regions.mjs');
+ const tilted={...region('tilted',100,60,100,16),angle:45},p=turn(frameOf(tilted),105,62),other=region('neighbour',p.x+1,p.y+1,8,8);
+ assert.equal(closestTextRegion([other,tilted],p.x,p.y,other),tilted,'the actual rotated ink contains the point');
+ const outside={...region('outside',101,61,4,4)};
+ assert.equal(closestTextRegion([tilted,outside],103,63,tilted),outside,'a point in the unrotated rectangle but outside the turned line does not select it');
+ const negative={...region('negative',100,60,100,16),angle:-45},q=turn(frameOf(negative),195,74);
+ assert.equal(closestTextRegion([other,negative],q.x,q.y,other),negative,'negative angles use the same original geometry');
+});
+test('equal text geometry keeps the clicked field, and invalid coordinates do not redirect it',async()=>{
+ const {closestTextRegion}=await import('../tmp/ocr-regions.mjs');const first=region('first',10,10,40,10),second={...first,id:'second',text:'second'};
+ assert.equal(closestTextRegion([first,second],30,15,second),second);
+ const wider=region('wider',0,10,100,10);
+ assert.equal(closestTextRegion([first,wider],49,15,first),wider,'overlapping original rectangles choose the nearest centre');assert.equal(closestTextRegion([],30,15,second),second);assert.equal(closestTextRegion([first,second],NaN,15,second),second);
+});

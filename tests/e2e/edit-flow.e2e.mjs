@@ -182,6 +182,8 @@ test('an edit needing a letter the line lacks says which, and a font can then be
   const page=await browser.newPage({viewport:{width:1400,height:900}}),errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.goto(server.resolvedUrls.local[0]+'app/');await page.locator('input[type=file][accept*=".psd"]').setInputFiles('tests/fixtures/scanned-quote.pdf');
   const field=page.locator('button[aria-label^="Edit detected text: 289,70"]').first();await field.waitFor({timeout:240000});
+  const mode=page.getByLabel('Edit image text with');assert.equal(await mode.inputValue(),'letters','original letters is the default');
+  const canvasState=()=>page.evaluate(async()=>{const {restoreLocal}=await import('/src/model.ts');return (await restoreLocal()).pages[0].canvas;});
   await field.click();const input=page.getByLabel('New text');
   // "289,70 €" has no 5: its own letters cannot write "289,75 €".
   await input.fill('289,75 €');await page.getByRole('button',{name:'Apply',exact:true}).click();
@@ -189,11 +191,29 @@ test('an edit needing a letter the line lacks says which, and a font can then be
   assert.match(await refusal.innerText(),/“5” does not appear in this line/);
   assert.equal(await input.inputValue(),'289,75 €','the typed text is kept');
   assert.equal(await page.getByRole('dialog',{name:'Something needs your attention'}).count(),0,'no separate error box');
-  // The explicit choice sets this one line in the OCR font.
+  // The explicit choice uses the current input, including changes after the refusal.
+  const latest='289,57 €';await input.fill(latest);
   await page.getByRole('button',{name:'Use a font for this edit'}).click();
   await page.getByText('This line is now text in the OCR font',{exact:false}).waitFor({timeout:60000});
-  const layers=await page.evaluate(async()=>{const {restoreLocal}=await import('/src/model.ts');await new Promise(r=>setTimeout(r,1500));return (await restoreLocal()).pages[0].canvas.objects.filter(o=>o.type?.toLowerCase()==='textbox').map(o=>o.text);});
-  assert.deepEqual(layers,['289,75 €']);
+  // Read the resolved autosave state: waitForFunction treats an async predicate's
+  // Promise as truthy before the IndexedDB read has returned its condition.
+  const savedBy=Date.now()+30000;let persisted=false;
+  while(!persisted&&Date.now()<savedBy){
+   persisted=(await canvasState()).objects.some(o=>o.type?.toLowerCase()==='textbox'&&o.text===latest);
+   if(!persisted)await page.waitForTimeout(200);
+  }
+  assert.ok(persisted,'autosave contains the current explicitly permitted text');
+  const layers=(await canvasState()).objects.filter(o=>o.type?.toLowerCase()==='textbox').map(o=>o.text);
+  assert.deepEqual(layers,[latest]);
+  assert.equal(await mode.inputValue(),'letters','font consent applies only to this line and does not change the global mode');
+  // Another field still refuses a missing letter instead of inheriting that font consent.
+  const beforeLater=await canvasState(),next='1 947,85 €';
+  await page.locator('button[aria-label^="Edit detected text: 1 947,80"]').first().click({timeout:60000});
+  await page.getByLabel('New text').fill(next);await page.getByRole('button',{name:'Apply',exact:true}).click();
+  await refusal.waitFor({timeout:60000});assert.match(await refusal.innerText(),/“5” does not appear in this line/);
+  assert.equal(await page.getByLabel('New text').inputValue(),next,'the next refused edit also retains current input');
+  assert.deepEqual(await canvasState(),beforeLater,'a per-line font choice cannot silently replace another field or alter the earlier edit');
+  assert.equal(await mode.inputValue(),'letters');
   assert.deepEqual(errors,[]);
  }finally{await browser.close();await server.close();}
 });
@@ -217,7 +237,13 @@ test('a line set in a font takes the grey of the original ink, not a lighter one
   await field.click();await page.getByLabel('New text').fill('17 654,24 €');await page.getByRole('button',{name:'Apply',exact:true}).click();
   await page.getByRole('button',{name:'Use a font for this edit'}).click();
   await page.getByText('This line is now text in the OCR font',{exact:false}).waitFor({timeout:60000});
-  const fills=await page.evaluate(async()=>{const {restoreLocal}=await import('/src/model.ts');await new Promise(r=>setTimeout(r,1500));return (await restoreLocal()).pages[0].canvas.objects.filter(o=>o.type?.toLowerCase()==='textbox').map(o=>o.fill);});
+  // Autosave may be delayed under the full suite: await the resolved saved
+  // layer rather than assuming a fixed delay has elapsed.
+  const savedBy=Date.now()+30000;let fills=[];
+  while(!fills.length&&Date.now()<savedBy){
+   fills=await page.evaluate(async()=>{const {restoreLocal}=await import('/src/model.ts');return (await restoreLocal())?.pages[0].canvas.objects.filter(o=>o.type?.toLowerCase()==='textbox').map(o=>o.fill)??[];});
+   if(!fills.length)await page.waitForTimeout(200);
+  }
   assert.equal(fills.length,1);
   const level=parseInt(fills[0].slice(1,3),16);
   assert.ok(Math.abs(level-0x4d)<=2,`the font text is #4d4d4d like the original ink (got ${fills[0]})`);
@@ -256,6 +282,55 @@ test('a scanned PDF keeps its ink: letters reused at the scan\'s own pixels, a f
    x.destroy();p.destroy();doc.destroy();l.sort((a,c)=>a-c);const c=l.slice(0,Math.max(1,Math.ceil(l.length*.08)));return c.reduce((s,v)=>s+v,0)/c.length;};
   const before=Buffer.from(await pdf.save()),after=await readFile(await d.path());
   for(const [name,b] of [['own letters',letters],['font',font]]){const was=core(before,b),now=core(after,b);assert.ok(Math.abs(now-was)<=3,`${name}: core ink ${was.toFixed(0)} → ${now.toFixed(0)} (it came out 38 and 96)`);}
+  assert.deepEqual(errors,[]);
+ }finally{await browser.close();await server.close();}
+});
+
+test('a PDF bundled replacement refuses missing glyphs before changing the source; later styled and grouped text cannot lose glyphs on export',{timeout:600000},async()=>{
+ const {default:PDFKit}=await import('pdfkit');
+ const bytes=await new Promise(resolve=>{const doc=new PDFKit({size:'A4'}),chunks=[];doc.on('data',c=>chunks.push(c));doc.on('end',()=>resolve(Buffer.concat(chunks)));doc.registerFont('L','src/browser/fonts/weights/Roboto-Light.ttf');doc.font('L').fontSize(26).text('Lumina Air',60,128,{lineBreak:false});doc.end();});
+ const server=await createServer({logLevel:'error',server:{port:0,host:'127.0.0.1'}});await server.listen();
+ const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||undefined});
+ try{
+  const page=await browser.newPage({viewport:{width:1400,height:900},acceptDownloads:true}),errors=[],downloads=[];page.on('pageerror',e=>errors.push(e.message));page.on('download',d=>downloads.push(d));
+  const project=()=>page.evaluate(async()=>{const {restoreLocal}=await import('/src/model.ts');return restoreLocal();});
+  const saved=async predicate=>{const until=Date.now()+30000;let p;while(Date.now()<until){p=await project();if(p&&predicate(p))return p;await page.waitForTimeout(200);}assert.fail('the expected project state was not saved');};
+  await page.goto(server.resolvedUrls.local[0]+'app/');await page.locator('input[type=file][accept*=".psd"]').setInputFiles({name:'invented-light-receipt.pdf',mimeType:'application/pdf',buffer:bytes});
+  const field=page.locator('button[aria-label="Edit detected text: Lumina Air"]');await field.waitFor({timeout:120000});
+  const original=await saved(p=>!!p.pages[0].source),before={source:original.pages[0].source,sources:original.sources,canvas:original.pages[0].canvas};
+  const state=async()=>{const p=await project();return {source:p.pages[0].source,sources:p.sources,canvas:p.pages[0].canvas};};
+  await field.click();await page.getByLabel('New text').fill('Omega Ω');await page.getByRole('button',{name:'Apply',exact:true}).click();await page.locator('.lettering-refusal').waitFor();
+  assert.deepEqual(await state(),before,'default refusal leaves the PDF and layers intact');
+  await page.getByRole('button',{name:'New font text box',exact:true}).click();
+  await page.locator('.lettering-refusal').getByText(/selected Roboto Light font cannot draw/).waitFor({timeout:60000});
+  assert.equal(await page.getByLabel('New text').inputValue(),'Omega Ω');assert.deepEqual(await state(),before,'even explicit replacement keeps the original intact when its selected face lacks a glyph');
+  assert.equal(await page.getByLabel('Edit image text with').inputValue(),'letters');
+  await page.getByLabel('New text').fill('Borealis Air');await page.getByRole('button',{name:'New font text box',exact:true}).click();
+  await page.waitForFunction(()=>document.activeElement?.tagName==='TEXTAREA',null,{timeout:60000});await page.keyboard.press('Escape');
+  const valid=await saved(p=>p.pages[0].canvas.objects.some(o=>o.type?.toLowerCase()==='textbox'&&o.text==='Borealis Air')),validLayer=valid.pages[0].canvas.objects.find(o=>o.type?.toLowerCase()==='textbox');
+  assert.equal(validLayer.fontFamily,'Roboto Light');assert.equal(validLayer.fontWeight,'normal');
+  // Later edits keep exactly the typed text and the chosen weight; no fallback.
+  await page.getByLabel('Text content',{exact:true}).fill('Borealis Ω Air');
+  await page.getByRole('dialog',{name:'Something needs your attention'}).getByText(/selected Roboto Light font cannot draw/).waitFor();await page.getByRole('button',{name:'Got it',exact:true}).click();
+  const changed=await saved(p=>p.pages[0].canvas.objects.some(o=>o.text==='Borealis Ω Air')),changedLayer=changed.pages[0].canvas.objects.find(o=>o.type?.toLowerCase()==='textbox');
+  assert.equal(changedLayer.fontFamily,'Roboto Light');assert.equal(changed.pages[0].source,valid.pages[0].source);
+  await page.locator('.document-actions .primary').click();await page.locator('.modal .dialog-actions .primary').click();
+  await page.getByRole('dialog',{name:'Something needs your attention'}).getByText(/selected Roboto Light font cannot draw/).waitFor();
+  assert.equal(downloads.length,0);assert.deepEqual(await project(),changed,'blocked export keeps text, chosen font and document unchanged');
+  await page.getByRole('button',{name:'Got it',exact:true}).click();await page.getByRole('dialog',{name:'Export document'}).getByRole('button',{name:'Close dialog',exact:true}).click();
+  // Logical style indices follow graphemes and explicit newlines even when a
+  // narrow text box wraps. Test both a capable styled glyph and the converse.
+  const styled=await page.evaluate(async()=>{
+   const {restoreLocal}=await import('/src/model.ts'),{exportPayload}=await import('/src/project-io.ts');const current=await restoreLocal(),template=current.pages[0].canvas.objects.find(o=>o.type?.toLowerCase()==='textbox');
+   const check=async({base,styled,pdfOnGroup})=>{
+    const p=structuredClone(current),layer=structuredClone(template);layer.text='e\u0301Ω\nAΩ';layer.width=10;layer.fontFamily=base;layer.styles={0:{1:{fontFamily:styled,fontWeight:600,fontStyle:'italic'}},1:{1:{fontFamily:styled}}};
+    const outer={type:'Group',objects:[{type:'Group',objects:[layer]}]};if(pdfOnGroup){outer.pdfOriginalFont=layer.pdfOriginalFont;outer.recognizedKey=layer.recognizedKey;delete layer.pdfOriginalFont;delete layer.recognizedKey;}
+    p.pages[0].canvas.objects=[outer];const before=JSON.stringify(p);try{await exportPayload(p);return {blocked:false,unchanged:JSON.stringify(p)===before};}catch(e){return {blocked:true,message:e.message,unchanged:JSON.stringify(p)===before};}
+   };
+   return {capable:await check({base:'Roboto Light',styled:'Liberation Sans'}),missing:await check({base:'Liberation Sans',styled:'Roboto Light'}),groupOrigin:await check({base:'Liberation Sans',styled:'Roboto Light',pdfOnGroup:true})};
+  });
+  assert.equal(styled.capable.blocked,false,'a capable font explicitly styled on the Greek glyph is allowed');
+  for(const key of ['missing','groupOrigin']){assert.equal(styled[key].blocked,true,key);assert.match(styled[key].message,/Roboto Light font cannot draw/);assert.equal(styled[key].unchanged,true);}
   assert.deepEqual(errors,[]);
  }finally{await browser.close();await server.close();}
 });

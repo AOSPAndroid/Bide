@@ -15,3 +15,9 @@ export function pdfRasterScale(width:number,height:number,requested:number){
  const w=Math.max(1,width),h=Math.max(1,height);
  return Math.min(300/72,Math.max(.1,Number.isFinite(requested)?requested:1),8192/Math.max(w,h),Math.sqrt(16000000/(w*h)));
 }
+// Reused PDF letters need the finest bounded source raster even when the
+// letters themselves are large. A target character height downsampled large
+// scanned text to 72/144 dpi while its surrounding page stayed sharp.
+export function letterRasterScale(width:number,height:number,pdf:boolean){
+ return pdf?pdfRasterScale(width,height,300/72):1;
+}

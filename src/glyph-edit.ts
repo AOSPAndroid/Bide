@@ -112,18 +112,28 @@ function align(text:string[],next:string[]){
  return keep;
 }
 
-// `next`, an edit of the line's text, with the line's placeholder cells
-// (lineCells) in place: each stays before the character it preceded, or
-// after the one before that, while the edit keeps that character; an edit
-// of both takes it away.
+// `next`, an edit of the line's text, with its unread cells kept in order.
+// They are absent from the editable text, so replacing/deleting their
+// visible neighbours must not silently erase their ink. Kept letters anchor
+// them; inside a replaced span their boundary follows that span's new length.
+// Only an empty replacement removes the whole field, unread cells included.
 export function withUnread(text:string,cells:Cell[],next:string){
  const read=Array.from(text),b=Array.from(next),at=new Array<number>(read.length).fill(-1);align(read,b).forEach((k,j)=>{if(k>=0)at[k]=j;});
- const before=new Array<number>(b.length).fill(0),after=new Array<number>(b.length).fill(0);let i=0;
+ const before=new Array<number>(b.length+1).fill(0);let i=0;
  for(const c of cells){
   if(c.ch!==UNREAD){i++;continue;}
-  if(i<read.length&&at[i]>=0)before[at[i]]++;else if(i>0&&at[i-1]>=0)after[at[i-1]]++;
+  if(!b.length)continue;
+  let slot:number;
+  if(i===0)slot=0;else if(i===read.length)slot=b.length;
+  else if(at[i]>=0)slot=at[i];else if(at[i-1]>=0)slot=at[i-1]+1;
+  else{
+   let left=i-1,right=i;while(left>=0&&at[left]<0)left--;while(right<read.length&&at[right]<0)right++;
+   const start=left>=0?at[left]+1:0,end=right<read.length?at[right]:b.length;
+   slot=Math.round(start+(end-start)*(i-left-1)/Math.max(1,right-left-1));
+  }
+  before[slot]++;
  }
- return b.map((ch,j)=>UNREAD.repeat(before[j])+ch+UNREAD.repeat(after[j])).join('');
+ return b.map((ch,j)=>UNREAD.repeat(before[j])+ch).join('')+UNREAD.repeat(before[b.length]);
 }
 
 // Plan for rendering `next` in place of `text`: everything before the first

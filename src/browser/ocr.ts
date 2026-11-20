@@ -196,7 +196,10 @@ async function recognizeLevel(image:HTMLCanvasElement,{signal,grouping='smart',l
     regions.push({id:'ocr-'+regions.length,...line.script&&line.script!=='latin'?{script:line.script}:{},text:part.text,left:b.x0,top:b.y0,width:w,height:h,size:h/.75,baseline:b.y1,fontName:'Image text (font unknown)',bold:false,italic:false,color:ink?toHex(ink):light?'#151515':'#ffffff',kind:'ocr',confidence:part.confidence??line.confidence,background:toHex(rgb),inkDensity:inkDensity(ctx.getImageData(b.x0,b.y0,w,h).data,rgb),words,blur,line:lineContext,glyphs:part.words.length&&part.words.every(w=>w.chars?.length)?part.words.flatMap(w=>w.chars!.map(g=>({ch:g.ch,x0:g.x0*sx,x1:g.x1*sx,p:g.p,...g.c===undefined?{}:{c:g.c*sx}}))):undefined});
    }
   }
+  // Settle low punctuation on level pages too: a digit's cell must not
+  // borrow a comma's ink when that digit is reused in an original-letter edit.
+  const settled=regions.slice(0,2000).map(r=>r.glyphs?{...r,glyphs:markCells(original,r,[1,3,5].map(i=>parseInt((r.background||'#ffffff').slice(i,i+2),16)))}:r);
   // Typographic marks and unread symbols, from each cell's ink (ocr-typography.ts).
-  resolve(typesetRegions(regions.slice(0,2000),original));
+  resolve(typesetRegions(settled,original));
  }catch(e){reject(e);}finally{report=undefined;}});return result;
 }

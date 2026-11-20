@@ -34,3 +34,10 @@ test('a PDF font named after a bundled family falls back to that family, in its 
   'RobotoCondensed-Regular':'Liberation Sans','Helvetica-Light':'Liberation Sans','Courier':'Cutive Mono','ArialMT':'Liberation Sans'};
  for(const [font,face] of Object.entries(cases))assert.equal(fallbackFont(font,families),face,font);
 });
+
+test('reserved-name weight derivatives map both original and reopened PDF names to their distinct families',async()=>{
+ const {fallbackFont}=await import('../tmp/text-regions.mjs');
+ const families=['Source Sans 3','Bide Sans 3 Light','Bide Sans 3 Medium','Bide Sans 3 SemiBold'];
+ const cases={'ABCDEF+SourceSans3-Light':'Bide Sans 3 Light','SourceSans3-ExtraLightItalic':'Bide Sans 3 Light','SourceSans3-Medium':'Bide Sans 3 Medium','SourceSans3-SemiBoldItalic':'Bide Sans 3 SemiBold','SourceSans3-Regular':'Source Sans 3','ABCDEF+bide-sans3-Light':'Bide Sans 3 Light','bide-sans3-Medium':'Bide Sans 3 Medium','bide-sans3-SemiBold':'Bide Sans 3 SemiBold'};
+ for(const [font,face] of Object.entries(cases))assert.equal(fallbackFont(font,families),face,font);
+});

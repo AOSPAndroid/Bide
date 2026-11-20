@@ -83,7 +83,8 @@ test('ink no cell covers becomes a dash or a placeholder cell that a letter edit
  const cells=lineCells(star.text,star.glyphs);assert.equal(cells.map(c=>c.ch).join(''),`E · ${UNREAD}4`);
  // An edit after it keeps it in place; so does one of the digit beside it.
  assert.equal(withUnread(star.text,cells,'E · 44'),`E · ${UNREAD}44`);assert.equal(withUnread(star.text,cells,'E · 5'),`E · ${UNREAD}5`);
- assert.equal(withUnread(star.text,cells,'E ·'),'E ·','deleting what is on both sides takes it away');
+ assert.equal(withUnread(star.text,cells,'E ·'),'E ·'+UNREAD,'a partial text deletion does not silently erase unread ink');
+ assert.equal(withUnread(star.text,cells,''),'','an intentional whole-field deletion also removes unread ink');
  const plan=planGlyphEdit(cells.map(c=>c.ch).join(''),cells,withUnread(star.text,cells,'4 · 4'));
  assert.ok(plan.pieces.some(p=>p.x0===cells[4].x0&&p.x1===cells[4].x1),'the edit redraws the ★ from its own cell');
  // One before a word, in its first letter's cell: the letter keeps its own run.
@@ -102,4 +103,19 @@ test('words follow the new text, and a line shared by fields stays in step',()=>
  assert.deepEqual(r.line.words.slice(r.line.start,r.line.start+r.line.count).map(w=>w.text),['ab','–','cd']);
  assert.deepEqual(s.line.words.slice(s.line.start,s.line.start+s.line.count).map(w=>w.text),['ef'],'the next field of the line moves along');
  assert.equal(s.line.words,r.line.words);
+});
+
+test('unread symbols survive substitutions of adjacent characters, including both neighbours',()=>{
+ const leading=[{ch:UNREAD,x0:0,x1:10},{ch:'4',x0:10,x1:20},{ch:'5',x0:30,x1:40},{ch:'8',x0:40,x1:50}];
+ const trailing=[{ch:'5',x0:0,x1:10},{ch:'8',x0:10,x1:20},{ch:'4',x0:30,x1:40},{ch:UNREAD,x0:40,x1:50}];
+ const middle=[{ch:'A',x0:0,x1:10},{ch:UNREAD,x0:10,x1:20},{ch:'B',x0:20,x1:30},{ch:'C',x0:40,x1:50},{ch:'D',x0:50,x1:60}];
+ for(const [text,glyphs,next,wanted] of [['4 58',leading,'5 58',UNREAD+'5 58'],['58 4',trailing,'58 5','58 5'+UNREAD],['AB CD',middle,'CD CD','C'+UNREAD+'D CD']]){
+  const cells=lineCells(text,glyphs),read=cells.map(c=>c.ch).join('');
+  assert.equal(withUnread(text,cells,next),wanted,'the unread mark remains at the same end of the line');
+  const plan=planGlyphEdit(read,cells,wanted),symbol=cells.find(c=>c.ch===UNREAD);
+  if(plan.startX>symbol.x0)assert.ok(plan.startX>=symbol.x1,'an untouched leading symbol stays outside the patch');
+  else assert.ok(plan.pieces.some(p=>p.x0===symbol.x0&&p.x1===symbol.x1),'the patch copies the original symbol cell');
+  assert.equal(withUnread(text,cells,''),'','deleting the whole field also removes its unread marks');
+  assert.deepEqual(planGlyphEdit(read,cells,'').pieces,[]);
+ }
 });
