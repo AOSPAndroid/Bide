@@ -205,20 +205,27 @@ export async function matchedDetectedTextbox(region:TextRegion,c:Canvas,p:Page,r
  const ink=(family:string)=>{if(!inkCache.has(family))inkCache.set(family,options.ocrStyle==='auto'?pageInkLevel(all,family):Promise.resolve(undefined));return inkCache.get(family)!;};
  const makeText=async(r:TextRegion,family:string)=>(await detectedTextbox(r,{...options,ocrFont:family,matchBlur:false,pageInk:await ink(family),level:true})).text;
  const {matchOcrAppearance,applyOcrAppearance,matchOcrSoftness,matchOcrInk}=await import('./browser/ocr-appearance');
- // A PDF page's units are points (72 dpi): small scanned letters look soft at
- // that scale however crisp the scan, and replacement text got a blur the
- // page does not have. Font, size and position are fitted at page scale; the
- // softness of a PDF page is measured on a render with ~32 px letters.
+ // A PDF page's units are points (72 dpi): scanned letters are a few pixels
+ // at that scale, where the font ranking, size, place and softness all came
+ // out coarse (a bold Arial total set in Inter, text a third of a point off,
+ // a blur the scan does not have). A scanned page is fitted on a render at the
+ // scan's own resolution when the render budget reaches it, else with about
+ // 32 px letters; the fit is brought back to page units.
  // A tilted line is fitted level, on the page turned back about its centre.
  const pdf=!!p.source,f=frameOf(region),fill=region.background||'#ffffff',regionsAll=framed(f,options.appearanceRegions??all,true);
- const raster=levelRaster(await pageComposite(c,p),f,1,fill),fit=await matchOcrAppearance(raster,region,regionsAll,options.ocrFont,{autoFont:options.autoFont,matchBlur:options.matchBlur&&!pdf,makeText});
- if(!fit)return detectedTextbox(region,{...options,pageInk:await ink(options.ocrFont)});
- const text=await makeText(region,fit.family);applyOcrAppearance(text,region,fit);
- const k=pdf?Math.max(1,Math.min(4,32/Math.max(1,region.height),Math.sqrt(16e6/(p.width*p.height)))):1;
+ const native=pdf?await pdfScanScale(p.source!,p.index):undefined,k=pdf?native!==undefined&&native<=letterRasterScale(p.width,p.height,true)?native:Math.max(1,Math.min(4,32/Math.max(1,region.height),Math.sqrt(16e6/(p.width*p.height)))):1;
+ const raster=levelRaster(pdf?await previewCanvas(p.source!,p.index,k,Math.ceil(p.width*k),Math.ceil(p.height*k)):await pageComposite(c,p),f,k,fill);
+ const fine=(list:TextRegion[])=>k===1?list:scaleRegions(list,k,k),fitted=await matchOcrAppearance(raster,fine([region])[0],fine(regionsAll),options.ocrFont,{autoFont:options.autoFont,matchBlur:options.matchBlur,makeText});
+ if(!fitted)return detectedTextbox(region,{...options,pageInk:await ink(options.ocrFont)});
+ const text=await makeText(region,fitted.family);applyOcrAppearance(text,region,{...fitted,dx:fitted.dx/k,dy:fitted.dy/k,softness:fitted.softness/k});
  if(pdf){
-  const fine=levelRaster(await previewCanvas(p.source!,p.index,k,Math.ceil(p.width*k),Math.ceil(p.height*k)),f,k,fill);
-  if(options.matchBlur){text.textSoftness=matchOcrSoftness(fine,region,regionsAll,text,k);text.initDimensions();}
-  const gain=matchOcrInk(fine,region,regionsAll,text,k);if(gain!==undefined)text.set({fill:matchedInkColor(region.color,region.background||'#ffffff',gain)});
+  // The shape fit settles on a crisper softness than a soft scan has, and ink
+  // measured against it came out pale (grey #555 lines set 18% too light):
+  // softness by edge width, then the line's own ink at that softness.
+  if(options.matchBlur){text.textSoftness=matchOcrSoftness(raster,region,regionsAll,text,k);text.initDimensions();}
+  const gain=matchOcrInk(raster,region,regionsAll,text,k);if(gain!==undefined)text.set({fill:matchedInkColor(region.color,region.background||'#ffffff',gain)});
+  // Exported as it was fitted: pixels at this scale, not vector text over the scan.
+  text.rasterScale=k;
  }
  return {text:turnLayer(text,region),embedded:false};
 }
@@ -475,13 +482,27 @@ export async function glyphEditPatch(c:Canvas,p:Page,lineRegion:TextRegion,next:
  const ax0=Math.max(0,Math.floor(Math.min(region.left,startX))-sidePad),ax1=Math.min(W,Math.max(endX,Math.ceil(region.left+region.width)+sidePad)),ay0=Math.max(0,top-rowPad),ay1=Math.min(H,bottom+rowPad);
  const ctx=raster.getContext('2d',{willReadFrequently:true})!,area=ctx.getImageData(ax0,ay0,ax1-ax0,ay1-ay0),bg=paperOf(ctx,region);
  const own=ownInk(area.data,area.width,area.height,bg,top-ay0,bottom-ay0);
+ // Soft letters fade below the ink threshold over a pixel or two. That fringe
+ // (pixels within two of this line's ink, not ink themselves) goes with its
+ // letter: left behind it outlines the old letters, left out it sharpens the
+ // new ones. Where letters leave, the paper is the scan's own, noise included:
+ // pixels of this line's band away from any ink, not one flat colour (a
+ // smooth patch shows on a noisy scan once zoomed in).
+ const aw=area.width,ah=area.height,away=(i:number)=>Math.max(Math.abs(area.data[i*4]-bg[0]),Math.abs(area.data[i*4+1]-bg[1]),Math.abs(area.data[i*4+2]-bg[2]));
+ const fringe=new Uint8Array(aw*ah),nearInk=new Uint8Array(aw*ah);
+ for(let y=0;y<ah;y++)for(let x=0;x<aw;x++){
+  const i=y*aw+x;if(away(i)<=16)continue;
+  for(let dy=-3;dy<=3;dy++)for(let dx=-3;dx<=3;dx++){const nx=x+dx,ny=y+dy;if(nx<0||ny<0||nx>=aw||ny>=ah)continue;const j=ny*aw+nx;nearInk[j]=1;if(own[i]&&Math.abs(dx)<=2&&Math.abs(dy)<=2&&away(j)<=16)fringe[j]=1;}
+ }
+ const grain:number[]=[];for(let y=Math.max(0,top-ay0);y<Math.min(ah,bottom-ay0);y++)for(let x=0;x<aw;x++){const i=y*aw+x;if(!nearInk[i]&&away(i)<=8)grain.push(i);}
+ const paperAt=(x:number,y:number,o:number)=>{if(grain.length<64){out.data.set(bg,o);}else{const i=grain[((Math.imul(x,73856093)^Math.imul(y,19349663))>>>0)%grain.length]*4;out.data[o]=area.data[i];out.data[o+1]=area.data[i+1];out.data[o+2]=area.data[i+2];}out.data[o+3]=255;};
  // Borrowed letters may reach below the line box (descenders): the patch grows to fit them.
  const reach=Math.max(0,...pieces.filter(q=>q.source!==undefined).map(q=>Math.ceil((q.y1??0)-(q.baseline??0))-(bottom-baseline)));
  const patchW=Math.max(1,endX-startX),patchH=Math.min(H,bottom+reach)-top,out=new ImageData(patchW,patchH);
  for(let y=0;y<patchH;y++)for(let x=0;x<patchW;x++){
   const o=(y*patchW+x)*4;if(y+top>=ay1)continue;
   const ai=((y+top-ay0)*area.width+(x+startX-ax0));
-  if(own[ai]){out.data.set(bg,o);out.data[o+3]=255;}else{out.data.set(area.data.subarray(ai*4,ai*4+4),o);}
+  if(own[ai]||fringe[ai])paperAt(x+startX,y+top,o);else out.data.set(area.data.subarray(ai*4,ai*4+4),o);
  }
  let x=0;
  for(const q of pieces){
@@ -493,9 +514,9 @@ export async function glyphEditPatch(c:Canvas,p:Page,lineRegion:TextRegion,next:
    // Its paper may differ from this line's (banded table rows): the ink is kept, the paper exchanged.
    const lender=page.find(r=>r.id===q.source),paper=lender?paperOf(from.getContext('2d',{willReadFrequently:true})!,lender):bg,strength=Math.max(40,...[0,1,2].map(n=>Math.abs(hexRgb(region.color||'#000000')[n]-paper[n])));
    if(sh>0){const src=from.getContext('2d',{willReadFrequently:true})!.getImageData(q.x0,sy,w,sh),offset=sy-(top-dy);
-    for(let y=0;y<sh;y++)for(let dx=Math.max(0,-x);dx<w&&x+dx<patchW;dx++){const i=(y*w+dx)*4,dist=Math.max(...[0,1,2].map(n=>Math.abs(src.data[i+n]-paper[n])));if(dist>12&&y+offset<patchH){const o=((y+offset)*patchW+x+dx)*4,cover=Math.min(1,dist/strength);for(let n=0;n<3;n++)out.data[o+n]=overBackground(src.data[i+n],cover,paper[n],bg[n]);out.data[o+3]=255;}}}
+    for(let y=0;y<sh;y++)for(let dx=Math.max(0,-x);dx<w&&x+dx<patchW;dx++){const i=(y*w+dx)*4,dist=Math.max(...[0,1,2].map(n=>Math.abs(src.data[i+n]-paper[n])));if(dist>6&&y+offset<patchH){const o=((y+offset)*patchW+x+dx)*4,cover=Math.min(1,dist/strength);for(let n=0;n<3;n++)out.data[o+n]=overBackground(src.data[i+n],cover,paper[n],bg[n]);out.data[o+3]=255;}}}
   }else if(!q.blank)for(let y=0;y<patchH&&y+top<ay1;y++)for(let dx=Math.max(0,-x);dx<w&&x+dx<patchW;dx++){
-   const ai=((y+top-ay0)*area.width+(q.x0+dx-ax0));if(own[ai])out.data.set(area.data.subarray(ai*4,ai*4+4),(y*patchW+x+dx)*4);
+   const ai=((y+top-ay0)*area.width+(q.x0+dx-ax0));if(own[ai]||fringe[ai])out.data.set(area.data.subarray(ai*4,ai*4+4),(y*patchW+x+dx)*4);
   }
   x+=w;
  }

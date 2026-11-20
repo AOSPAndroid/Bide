@@ -4,17 +4,18 @@ import type {TextRegion} from '../text-regions';
 import type {Textbox} from '../text-appearance';
 
 type Sample={region:TextRegion;left:number;top:number;source:Coverage;font:FontSample};
+const FAMILY_MARGIN=.04;
 type Fit={family:string;score:number;softness:number;ratio:number;dx:number;dy:number;gain:number};
 const median=(values:number[])=>[...values].sort((a,b)=>a-b)[values.length>>1];
 
-function samplePixels(raster:HTMLCanvasElement,r:TextRegion,regions:TextRegion[]):Sample|undefined{
+function samplePixels(raster:HTMLCanvasElement,r:TextRegion,regions:TextRegion[],maxArea=120000):Sample|undefined{
  let left=Math.max(0,Math.floor(r.left)-2),top=Math.max(0,Math.floor(r.top)-2),right=Math.min(raster.width,Math.ceil(r.left+r.width)+2),bottom=Math.min(raster.height,Math.ceil(r.top+r.height)+2);
  // Do not score unrelated letters in the padding around a word.
  for(const other of regions){if(other.id===r.id)continue;
   if(other.top<bottom&&other.top+other.height>top){if(other.left>=r.left+r.width)right=Math.min(right,Math.floor(other.left));if(other.left+other.width<=r.left)left=Math.max(left,Math.ceil(other.left+other.width));}
   if(other.left<right&&other.left+other.width>left){if(other.top>=r.top+r.height)bottom=Math.min(bottom,Math.floor(other.top));if(other.top+other.height<=r.top)top=Math.max(top,Math.ceil(other.top+other.height));}
  }
- const width=right-left,height=bottom-top;if(width<3||height<3||width*height>50000)return undefined;
+ const width=right-left,height=bottom-top;if(width<3||height<3||width*height>maxArea)return undefined;
  const pixels=raster.getContext('2d',{willReadFrequently:true})!.getImageData(left,top,width,height),background=[1,3,5].map(i=>parseInt((r.background||'#ffffff').slice(i,i+2),16));
  return {region:r,left,top,source:contrastCoverage(pixels.data,width,height,background),font:{text:r.text,pixels,background}};
 }
@@ -25,7 +26,7 @@ function localSamples(raster:HTMLCanvasElement,region:TextRegion,regions:TextReg
  const near=regions.filter(r=>r.kind==='ocr'&&r.id!==region.id&&(r.confidence??0)>=85&&r.text.replace(/[^\p{L}\p{N}]/gu,'').length>=4&&r.height>=6&&r.height/region.height>=.7&&r.height/region.height<=1.4&&Math.abs((r.top+r.height/2)-(region.top+region.height/2))<region.height*.6)
   .sort((a,b)=>Math.abs(a.left-region.left)-Math.abs(b.left-region.left)).slice(0,3);
  return (near.length?near:[region]).flatMap(r=>{
-  if((r.confidence??0)<75||r.text.length<4||r.width>800)return [];
+  if((r.confidence??0)<75||r.text.length<4||r.width>2000)return [];
   const sample=samplePixels(raster,r,regions);return sample?[sample]:[];
  });
 }
@@ -123,7 +124,10 @@ export async function matchOcrAppearance(raster:HTMLCanvasElement,region:TextReg
   // Combining separate medians can create a placement we never evaluated.
   // Keep an actual fitted tuple when that combination would soften the edges.
   const result=allows(aggregate.ratio,aggregate.softness,aggregate.dx,aggregate.dy)?aggregate:{...fits.reduce((a,b)=>a.score>b.score?a:b),score};
-  if(!best||score>best.score)best=result;
+  // The page's font stays unless another fits these letters clearly better
+  // (faces of one kind score within a few hundredths of each other, and a
+  // near tie on one soft line used to turn Arial into Roboto or Open Sans).
+  if(!best||score>best.score+(best.family===family?FAMILY_MARGIN:0))best=result;
  }
  // Low confidence or mismatched OCR should retain the existing estimate.
  if(!best||best.score<.55)return undefined;
@@ -136,12 +140,41 @@ export async function matchOcrAppearance(raster:HTMLCanvasElement,region:TextReg
  return best;
 }
 
+// Lines sampled on a finer raster (a scanned PDF page at the scan's scale) are larger in pixels.
+const FINE_AREA=400000;
+// Size and place alone, for a text already fitted at the page's own scale
+// (72 dpi for a PDF, where a letter is a few pixels and the fit lands within
+// a third of a point): refined on a finer raster, `scale` pixels per page
+// unit, one dimension at a time around the fitted values. The baseline stays
+// where the size change leaves it.
+export function matchOcrPlacement(raster:HTMLCanvasElement,region:TextRegion,regions:TextRegion[],text:Textbox,scale:number){
+ const up=(r:TextRegion)=>({...r,left:r.left*scale,top:r.top*scale,width:r.width*scale,height:r.height*scale});
+ const selected=samplePixels(raster,up(region),regions.map(up),FINE_AREA);if(!selected)return;
+ const paint=coverageRenderer(selected,scale),base={left:text.left,top:text.top,size:text.fontSize,fill:text.fill},step=1/scale;
+ let best={dx:0,dy:0,ratio:1},score=-Infinity;
+ const place=(dx:number,dy:number,ratio:number)=>{text.set({fontSize:base.size*ratio,left:base.left+dx,top:base.top+base.size*.93*(1-ratio)+dy});text.initDimensions();};
+ const tried=(dx:number,dy:number,ratio:number)=>{place(dx,dy,ratio);const s=coverageFit(selected.source,paint(text)).score-Math.abs(1-ratio)*.02;if(s>score){score=s;best={dx,dy,ratio};}};
+ text.set({fill:'#000000'});
+ try{
+  tried(0,0,1);
+  // Twice round: up and down, across, then the size (quarter-pixel steps of the fine raster).
+  for(let pass=0;pass<2;pass++){
+   const at={...best};
+   for(let n=-4;n<=4;n++)if(n)tried(at.dx,at.dy+n*step/2*(pass?.5:1),at.ratio);
+   const row={...best};
+   for(let n=-4;n<=4;n++)if(n)tried(row.dx+n*step/2*(pass?.5:1),row.dy,row.ratio);
+   const sized={...best};
+   for(const r of pass?[-.005,.005]:[-.03,-.02,-.01,.01,.02,.03])tried(sized.dx,sized.dy,sized.ratio+r);
+  }
+ }finally{place(best.dx,best.dy,best.ratio);text.set({fill:base.fill});}
+}
+
 // Softness alone, for a text already fitted in place: rendered over the
 // selected letters of a finer raster (`scale` raster pixels per page unit),
 // with the blur whose edge width matches the original's. Returns page units.
 export function matchOcrSoftness(raster:HTMLCanvasElement,region:TextRegion,regions:TextRegion[],text:Textbox,scale:number){
  const up=(r:TextRegion)=>({...r,left:r.left*scale,top:r.top*scale,width:r.width*scale,height:r.height*scale});
- const selected=samplePixels(raster,up(region),regions.map(up));if(!selected)return 0;
+ const selected=samplePixels(raster,up(region),regions.map(up),FINE_AREA);if(!selected)return 0;
  const target=coverageEdgeWidth(selected.source);if(target===undefined)return 0;
  // Scale the render, keeping the text and its softness in page units. Scaling
  // the blur value itself hits Textbox's 2 pt limit before the fine raster fits.
@@ -163,7 +196,7 @@ export function matchOcrSoftness(raster:HTMLCanvasElement,region:TextRegion,regi
 // ink, and the fill came out far lighter (#1d1d1f set as #606061).
 export function matchOcrInk(raster:HTMLCanvasElement,region:TextRegion,regions:TextRegion[],text:Textbox,scale:number){
  const up=(r:TextRegion)=>({...r,left:r.left*scale,top:r.top*scale,width:r.width*scale,height:r.height*scale});
- const selected=samplePixels(raster,up(region),regions.map(up));if(!selected)return undefined;
+ const selected=samplePixels(raster,up(region),regions.map(up),FINE_AREA);if(!selected)return undefined;
  const fill=text.fill;text.set({fill:'#000000'});
  try{const gain=coreGain(selected.source,coverageRenderer(selected,scale)(text));return gain>0?gain:undefined;}finally{text.set({fill});}
 }

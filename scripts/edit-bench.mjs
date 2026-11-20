@@ -17,7 +17,8 @@ const pick=(name)=>process.env[name]?.split(',').map(s=>s.trim()).filter(Boolean
 const onlyCases=pick('BENCH_CASES'),modes=pick('BENCH_MODES')??['letters','font'],kinds=pick('BENCH_KINDS'),out=process.env.BENCH_OUT??'tmp/edit-bench';
 const chosen=cases.filter(([t,v])=>!onlyCases||onlyCases.includes(`${t}/${v}`)||onlyCases.includes(t));
 await rm(out,{recursive:true,force:true});await mkdir(out,{recursive:true});
-const server=await createServer({logLevel:'error',server:{port:0,host:'127.0.0.1'}});await server.listen();
+// No file watching: a source file saved during a run must not reload the page under it.
+const server=await createServer({logLevel:'error',server:{port:0,host:'127.0.0.1',hmr:false,watch:null}});await server.listen();
 const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||undefined});
 const median=a=>a.length?[...a].sort((x,y)=>x-y)[a.length>>1]:NaN,fix=(v,n=2)=>Number.isFinite(v)?+v.toFixed(n):v;
 const records=[],ocr=[],cells=[];
@@ -96,10 +97,10 @@ try{
      [O,E,R].forEach((img,i)=>g.drawImage(img.canvas,a.x,a.y,a.w,a.h,0,i*(a.h+4)*2,a.w*2,a.h*2));
      return {...s,crop:c.toDataURL('image/png').split(',')[1]};
     },[edited,type,reference.pixels,original.pixels,box,v.dpi]);
-    Object.assign(m,{shift:score.shift,mismatch:fix(score.mismatch),mass:fix(score.mass),core:fix(score.core,0),sharp:fix(score.sharp),outside:score.outside});m.problems=verdict(m,v.dpi);
+    Object.assign(m,{shift:score.shift,mismatch:fix(score.mismatch),mass:fix(score.mass),core:fix(score.core,0),sharp:fix(score.sharp),grain:fix(score.grain),outside:score.outside});m.problems=verdict(m,v.dpi);
     if(m.problems.length||process.env.BENCH_CROPS==='all')await writeFile(crop,Buffer.from(score.crop,'base64'));
    }
-   const show=m=>!m?'':m.outcome==='refused'?`refused (${m.reason.slice(0,60)})`:m.outcome==='error'?`ERROR ${m.reason}`:`${m.problems.length?m.problems.join('+').toUpperCase():'ok'} [shift ${m.shift} mismatch ${m.mismatch} mass ${m.mass} core ${m.core} sharp ${m.sharp}${m.outside?` outside ${m.outside}`:''}${m.info?` · ${m.info.font} ${m.info.weight} soft ${fix(m.info.soft??0)}`:''}]`;
+   const show=m=>!m?'':m.outcome==='refused'?`refused (${m.reason.slice(0,60)})`:m.outcome==='error'?`ERROR ${m.reason}`:`${m.problems.length?m.problems.join('+').toUpperCase():'ok'} [shift ${m.shift} mismatch ${m.mismatch} mass ${m.mass} core ${m.core} sharp ${m.sharp}${m.grain!==1?` grain ${m.grain}`:''}${m.outside?` outside ${m.outside}`:''}${m.info?` · ${m.info.font} ${m.info.weight} soft ${fix(m.info.soft??0)}`:''}]`;
    console.log(`  ${fid} "${field.text}" → "${to}" (${kind})${state.status==='exact'?'':` {${state.status}}`}\n     letters: ${show(rec.letters)}${rec.font?`\n     font:    ${show(rec.font)}`:''}`);
   }
   await app.evaluate(async id=>(await import('/tests/edit-bench/bench.ts')).close(id),id);

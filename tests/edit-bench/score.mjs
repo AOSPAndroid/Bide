@@ -45,6 +45,9 @@ function ink(img,x0,y0,w,h){
  return {v:l,bg};
 }
 const top=(v,share)=>{const s=Array.from(v).filter(x=>x>40).sort((a,b)=>b-a);if(!s.length)return 0;const n=Math.max(1,Math.ceil(s.length*share));let t=0;for(let i=0;i<n;i++)t+=s[i];return t/n;};
+// Roughness of the paper around the letters (pixels with little ink): a patch
+// of flat colour on a noisy scan shows when zoomed in.
+const grain=(img,x0,y0,w,h,v)=>{let n=0,sum=0,sq=0;for(let y=0;y<h;y++)for(let x=0;x<w;x++){if(v[y*w+x]>10)continue;const xx=x+x0,yy=y+y0;if(xx<0||yy<0||xx>=img.w||yy>=img.h)continue;const l=lum(img.data,(yy*img.w+xx)*4);n++;sum+=l;sq+=l*l;}return n>20?Math.sqrt(Math.max(0,sq/n-(sum/n)**2)):0;};
 const edges=(v,w,h)=>{let e=0,m=0;for(let y=1;y<h;y++)for(let x=1;x<w;x++){const i=y*w+x;e+=Math.abs(v[i]-v[i-1])+Math.abs(v[i]-v[i-w]);m+=v[i];}return m?e/m:0;};
 
 // An edited field against the same field in the regenerated document.
@@ -54,6 +57,7 @@ const edges=(v,w,h)=>{let e=0,m=0;for(let y=1;y<h;y++)for(let x=1;x<w;x++){const
 //   mass      ink of the edit / ink of the reference
 //   core      darkest ink of the edit − of the reference (levels; − = lighter)
 //   sharp     edge sharpness of the edit / of the reference
+//   grain     paper noise around the edit's letters / around the reference's (1 on clean paper)
 export function fieldScore(edited,reference,box,dpi){
  const k=dpi/200,mx=Math.round(26*k),my=Math.round(7*k),x0=Math.round(box.x)-mx,y0=Math.round(box.y)-my,w=Math.round(box.w)+2*mx,h=Math.round(box.h)+2*my;
  const E=ink(edited,x0,y0,w,h),R=ink(reference,x0,y0,w,h),sx=Math.round(24*k),sy=Math.round(5*k);
@@ -63,7 +67,9 @@ export function fieldScore(edited,reference,box,dpi){
  for(let dy=-sy;dy<=sy;dy++)for(let dx=-sx;dx<=sx;dx++){const c=cost(dx,dy,best.cost);if(c<best.cost||c===best.cost&&Math.abs(dx)+Math.abs(dy)<Math.abs(best.dx)+Math.abs(best.dy))best={dx,dy,cost:c};}
  let union=0,sumE=0,sumR=0;
  for(let y=0;y<h;y++)for(let x=0;x<w;x++){const xx=x+best.dx,yy=y+best.dy,e=xx<0||yy<0||xx>=w||yy>=h?0:E.v[yy*w+xx],r=R.v[y*w+x];union+=Math.max(e,r);sumE+=E.v[y*w+x];sumR+=r;}
- return {shift:[best.dx,best.dy],mismatch:union?best.cost/union:0,mass:sumR?sumE/sumR:0,core:top(E.v,.08)-top(R.v,.08),sharp:(edges(R.v,w,h)?edges(E.v,w,h)/edges(R.v,w,h):1),area:{x:x0,y:y0,w,h}};
+ // Only the field itself: its margins are untouched paper in both.
+ const fx=Math.round(box.x),fy=Math.round(box.y),fw=Math.round(box.w),fh=Math.round(box.h),FE=ink(edited,fx,fy,fw,fh),FR=ink(reference,fx,fy,fw,fh),gr=grain(reference,fx,fy,fw,fh,FR.v);
+ return {shift:[best.dx,best.dy],mismatch:union?best.cost/union:0,mass:sumR?sumE/sumR:0,core:top(E.v,.08)-top(R.v,.08),sharp:(edges(R.v,w,h)?edges(E.v,w,h)/edges(R.v,w,h):1),grain:gr<1?1:grain(edited,fx,fy,fw,fh,FE.v)/gr,area:{x:x0,y:y0,w,h}};
 }
 // Pixels changed away from the field: the edit against the document as opened.
 export function collateral(edited,original,area){
@@ -80,6 +86,7 @@ export function verdict(m,dpi){
  if(m.mass<.9||m.mass>1.1)problems.push(m.mass<1?'thin':'heavy');
  if(Math.abs(m.core)>16)problems.push(m.core<0?'pale':'dark');
  if(m.sharp<.8||m.sharp>1.3)problems.push(m.sharp<1?'soft':'crisp');
+ if(m.grain!==undefined&&(m.grain<.6||m.grain>1.6))problems.push(m.grain<1?'flat':'rough');
  if(m.outside>60*k*k)problems.push('spill');
  return problems;
 }

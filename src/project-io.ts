@@ -2,7 +2,7 @@
 // the page renderings sent to the export engine.
 import {FabricImage,StaticCanvas,Group,type FabricObject} from 'fabric';
 import {blankPage,uid,type Page,type Project} from './model';
-import {Textbox} from './text-appearance';
+import {Textbox,rasterizedText} from './text-appearance';
 import {ensureDocumentFonts,documentEmbeddedFonts,bundledPdfFontError,isPdfDerivedText} from './fonts';
 import {fontSupportsText} from './browser/engine';
 import {hasBlending} from './browser/layer-utils';
@@ -47,17 +47,19 @@ export async function exportPayload(current:Project,ocr?:Map<string,{text:string
   try {
    await ensureDocumentFonts(p.canvas);
    await c.loadFromJSON(p.canvas);
-   // OCR edits over a PDF page: letters edits carry their new text; text layers made from OCR text are real text already.
-   const edits=p.source?c.getObjects().flatMap(o=>{const t=o as FabricObject&{editedText?:string;recognizedKey?:string;ocrOriginalBounds?:{left:number;top:number;width:number;height:number}};if(typeof t.editedText!=='string'&&!(o instanceof Textbox&&t.recognizedKey?.startsWith('ocr:')))return [];const b=o.getBoundingRect();return [{text:t.editedText,left:b.left,top:b.top,width:b.width,height:b.height,original:t.ocrOriginalBounds}];}):[];
+   // OCR edits over a PDF page: letters edits carry their new text, and so do text layers exported as pixels; other text layers made from OCR text are real text already.
+   const edits=p.source?c.getObjects().flatMap(o=>{const t=o as FabricObject&{editedText?:string;recognizedKey?:string;ocrOriginalBounds?:{left:number;top:number;width:number;height:number}};if(typeof t.editedText!=='string'&&!(o instanceof Textbox&&t.recognizedKey?.startsWith('ocr:')))return [];const b=o.getBoundingRect();return [{text:t.editedText??(o instanceof Textbox&&rasterizedText(o)?o.text:undefined),left:b.left,top:b.top,width:b.width,height:b.height,original:t.ocrOriginalBounds}];}):[];
    const validateFonts=async(objects:FabricObject[],inheritedPdf=false)=>{for(const object of objects){const o=object as Textbox&PdfText,pdfDerived=inheritedPdf||isPdfDerivedText(o);if(o instanceof Textbox){if(o.pdfFontData&&o.fontFamily.startsWith('PDFfont-')&&!await fontSupportsText(o.pdfFontData,o.text))throw new Error('The embedded PDF font cannot draw some text. Remove unsupported characters or choose Font family explicitly before exporting. The font was not changed.');const reason=await bundledPdfFontError(o,pdfDerived);if(reason)throw new Error(reason);}if(object instanceof Group)await validateFonts(object.getObjects(),pdfDerived);}};
    await validateFonts(c.getObjects());
    // Layer styles and painted masks have no SVG form here: those layers go in as pixels.
    const objects=c.getObjects(),flattenBlends=hasBlending(objects);
    for(let i=0;i<objects.length;i++){
-    const o=objects[i];if(!needsRasterExport(o))continue;
+    const o=objects[i],scan=p.source&&o instanceof Textbox?o.rasterScale:undefined;if(!scan&&!needsRasterExport(o))continue;
     const b=rasterExportBounds(o);
-    const left=Math.floor(b.left),top=Math.floor(b.top),width=Math.ceil(b.width)+1,height=Math.ceil(b.height)+1;
-    const k=Math.max(1,Math.min(3,Math.sqrt(16000000/Math.max(1,width*height))));
+    let left=Math.floor(b.left),top=Math.floor(b.top),width=Math.ceil(b.width)+1,height=Math.ceil(b.height)+1,k=Math.max(1,Math.min(3,Math.sqrt(16000000/Math.max(1,width*height))));
+    // Text fitted over a scan goes in as pixels on the scan's own grid (Textbox.rasterScale):
+    // drawn as in the editor, and a viewer at the scan's resolution has nothing to resample.
+    if(scan){const t=o as Textbox,pad=t.fontSize*.3+(t.textSoftness??0)*4;k=scan;left=Math.floor((b.left-pad)*k)/k;top=Math.floor((b.top-pad)*k)/k;width=Math.ceil((b.left+b.width+pad-left)*k)/k;height=Math.ceil((b.top+b.height+pad-top)*k)/k;}
     c.backgroundColor='';const pixels=c.toCanvasElement(k,{left,top,width,height,filter:x=>x===o});
     const image=Object.assign(new FabricImage(pixels,{left,top,scaleX:1/k,scaleY:1/k,globalCompositeOperation:o.globalCompositeOperation}),{name:(o as {name?:string}).name});
     c.remove(o);c.insertAt(i,image);
