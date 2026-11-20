@@ -7,14 +7,16 @@ type Feeds=Record<string,{data:Float32Array|BigInt64Array;dims:number[]}>;
 type Loaded={session:ort.InferenceSession;backend:'webgpu'|'wasm'};
 const sessions=new Map<string,Promise<Loaded>>();let base='',remote='',licence='',gpu:'auto'|'any'='auto',hardware:Promise<boolean>|undefined;
 // Models kept on the CPU: on WebGPU, Segment Anything (int8) selected six
-// times the object's area, and LaMa does not load there (it fell back to the
-// CPU after the wait). The others gave the CPU's results: the text detector
+// times the object's area, LaMa does not load there and the server text
+// detector (High accuracy) stops at its first MaxPool ("using ceil() in shape
+// computation is not yet supported"), both falling back to the CPU after
+// the wait. The others gave the CPU's results: the text detector
 // and recognizer read the same text, upscaling, flattening and orientation
 // matched to one level, background removal on all but 0.2% of edge pixels.
 // The text recognizers too, as a precaution: every line comes with its own
 // input width, the cost of that on a graphics card could not be measured
 // here (no hardware GPU), and on the CPU a line takes milliseconds.
-const CPU_ONLY=new Set(['sam-encoder','sam-decoder','lama']),onCpu=(model:string)=>CPU_ONLY.has(model)||/^ppocr-.+-rec$/.test(model);
+const CPU_ONLY=new Set(['sam-encoder','sam-decoder','lama','ppocr-det-server']),onCpu=(model:string)=>CPU_ONLY.has(model)||/^ppocr-.+-rec$/.test(model);
 // WebGPU only on a graphics card. Where there is no usable one, a browser may
 // offer a software adapter (SwiftShader): the same results, but the text
 // detector took minutes per page on it instead of seconds on the CPU.
