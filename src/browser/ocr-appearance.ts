@@ -1,4 +1,5 @@
-import {alphaCoverage,contrastCoverage,coreGain,coverageFit,matchedInkColor,coverageEdgeWidth,type Coverage} from '../ocr-appearance';
+import {alphaCoverage,blurCoverage,contrastCoverage,coreGain,coverageFit,matchedInkColor,coverageEdgeWidth,type Coverage} from '../ocr-appearance';
+import {clampTextSoftness} from '../text-appearance';
 import {rankOcrFonts,type FontSample} from '../ocr-font';
 import type {TextRegion} from '../text-regions';
 import type {Textbox} from '../text-appearance';
@@ -31,22 +32,35 @@ function localSamples(raster:HTMLCanvasElement,region:TextRegion,regions:TextReg
  });
 }
 
+// The text's ink over a sample. Soft text is drawn sharp, four times finer,
+// and its coverage blurred here by a Gaussian of its softness: a canvas blur
+// filter per try took 96% of a font match (26 s for one line of a letter,
+// 100 s on a 300 dpi PDF). Measured on the edit benchmark, matches with this
+// blur were as close or closer (68% → 71% of font edits without a visible
+// difference) and 6 times faster (median 1.6 s → 0.27 s, slowest 100 s → 1.1 s).
 function coverageRenderer(sample:Sample,scale=1){
  const canvas=document.createElement('canvas'),ctx=canvas.getContext('2d',{willReadFrequently:true})!,hi=document.createElement('canvas'),hiCtx=hi.getContext('2d')!;
  canvas.width=sample.source.width;canvas.height=sample.source.height;hi.width=canvas.width*4;hi.height=canvas.height*4;
  return (text:Textbox)=>{
   ctx.clearRect(0,0,canvas.width,canvas.height);
-  if(text.textSoftness){
-   hiCtx.clearRect(0,0,hi.width,hi.height);hiCtx.save();hiCtx.translate(-sample.left*4,-sample.top*4);hiCtx.scale(4*scale,4*scale);text.render(hiCtx);hiCtx.restore();ctx.drawImage(hi,0,0,canvas.width,canvas.height);
-  }else{ctx.save();ctx.translate(-sample.left,-sample.top);ctx.scale(scale,scale);text.render(ctx);ctx.restore();}
+  const softness=text.textSoftness??0;
+  if(softness){
+   text.textSoftness=0;
+   try{hiCtx.clearRect(0,0,hi.width,hi.height);hiCtx.save();hiCtx.translate(-sample.left*4,-sample.top*4);hiCtx.scale(4*scale,4*scale);text.render(hiCtx);hiCtx.restore();ctx.drawImage(hi,0,0,canvas.width,canvas.height);}
+   finally{text.textSoftness=softness;}
+   return blurCoverage(alphaCoverage(ctx.getImageData(0,0,canvas.width,canvas.height).data,canvas.width,canvas.height),clampTextSoftness(softness)*scale);
+  }
+  ctx.save();ctx.translate(-sample.left,-sample.top);ctx.scale(scale,scale);text.render(ctx);ctx.restore();
   return alphaCoverage(ctx.getImageData(0,0,canvas.width,canvas.height).data,canvas.width,canvas.height);
  };
 }
 
 // Render through the same editable Textbox used by the workspace, at native
 // resolution. Fit fractional positioning without re-rendering every offset.
-export async function matchOcrAppearance(raster:HTMLCanvasElement,region:TextRegion,regions:TextRegion[],family:string,{autoFont,matchBlur,makeText,onFit}:{autoFont:boolean;matchBlur:boolean;makeText:(region:TextRegion,family:string)=>Promise<Textbox>;onFit?:(fit:Fit)=>void}){
- const samples=localSamples(raster,region,regions);if(!samples.length)return undefined;
+export async function matchOcrAppearance(raster:HTMLCanvasElement,region:TextRegion,regions:TextRegion[],family:string,{autoFont,matchBlur,makeText,onFit,own=false}:{autoFont:boolean;matchBlur:boolean;makeText:(region:TextRegion,family:string)=>Promise<Textbox>;onFit?:(fit:Fit)=>void;own?:boolean}):Promise<Fit|undefined>{
+ // `own`: the selected line's letters alone, when its neighbours fit badly
+ // (a sharp name beside a label blurred far more than the name allows).
+ const samples=own?[samplePixels(raster,region,regions)].filter((s):s is Sample=>!!s):localSamples(raster,region,regions);if(!samples.length)return undefined;
  // Font/size can use reliable neighbouring words, but edge clarity belongs
  // to the selected letters. Compare actual native pixels, not a blur-radius
  // estimate, which varies with the font's stroke thickness.
@@ -130,7 +144,7 @@ export async function matchOcrAppearance(raster:HTMLCanvasElement,region:TextReg
   if(!best||score>best.score+(best.family===family?FAMILY_MARGIN:0))best=result;
  }
  // Low confidence or mismatched OCR should retain the existing estimate.
- if(!best||best.score<.55)return undefined;
+ if(!best||best.score<.55)return own||samples.every(s=>s.region.id===region.id)?undefined:matchOcrAppearance(raster,region,regions,family,{autoFont,matchBlur,makeText,onFit,own:true});
  // Neighbours can guide the font and placement, but their ink can differ
  // from the selected line. Measure its own cores at the final fitted tuple.
  if(selected&&paintSelected){
