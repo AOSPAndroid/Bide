@@ -9,7 +9,7 @@ import {hasBlending} from './browser/layer-utils';
 import {detectPdfText,pagePreview,pdfScanScale} from './browser/engine';
 import {pageRaster,rasterLayer} from './retouch-canvas';
 import {repairTextBackground} from './text-replacement';
-import {estimateOcrBold,glyphInk,wordInk,classifyWordWeights} from './ocr-weight';
+import {estimateOcrBold,glyphInk,wordInk,classifyWordWeights,lineWeight} from './ocr-weight';
 import {darkenToInk,prepareOcrPixels,estimateLineHeight} from './ocr-image';
 import {ensureFont,ensureEmbeddedFont,ensureDocumentFonts} from './fonts';
 import {bundledFonts} from './font-catalog';
@@ -159,21 +159,29 @@ export async function detectedTextbox(region:TextRegion,{ocrFont,ocrStyle,matchB
  const italic=region.kind==='ocr'?ocrStyle.includes('italic'):region.italic,words=region.words;
  // Auto weight is estimated per word so mixed bold/regular lines keep both.
  const auto=region.kind==='ocr'&&ocrStyle==='auto',measurable=(t:string)=>/[\p{L}\p{N}\p{Sc}%&@#]/u.test(t);
- const inkOf=(w:{text:string;inkMass?:number;width?:number})=>{if(!measurable(w.text)||!w.inkMass||!w.width)return undefined;const regular=glyphInk(w.text,family,'normal'),heavy=glyphInk(w.text,family,'bold');return regular&&heavy?wordInk(w.text,w.inkMass,w.width,regular,heavy):undefined;};
- // Stroke-coverage vote, used when a whole line has a single weight.
- const vote=(list:{text:string;inkDensity?:number}[])=>{let b=0,r=0;for(const w of list){if(w.inkDensity===undefined||!measurable(w.text))continue;const n=Array.from(w.text).length;if(estimateOcrBold(w.text,family,region.height,w.inkDensity,region.blur))b+=n;else r+=n;}return b>r;};
+ const inks=new Map<object,ReturnType<typeof wordInk>|undefined>(),inkOf=(w:{text:string;inkMass?:number;width?:number})=>{if(!measurable(w.text)||!w.inkMass||!w.width)return undefined;if(!inks.has(w)){const regular=glyphInk(w.text,family,'normal'),heavy=glyphInk(w.text,family,'bold');inks.set(w,regular&&heavy?wordInk(w.text,w.inkMass,w.width,regular,heavy):undefined);}return inks.get(w);};
+ // The weight of a region set in one weight, from the shape of its strokes
+ // (lineWeight): its words' cores against the face drawn in both weights at
+ // the scan's blur. Scan measures are in scan pixels (`scale` per page unit).
+ const scale=pageInk?.scale??1,rgb=(h:string)=>[1,3,5].map(i=>parseInt(h.slice(i,i+2),16)||0),peak=/^#[0-9a-f]{6}$/i.test(region.color)?Math.max(...rgb(region.color).map((v,i)=>Math.abs(v-rgb(region.background||'#ffffff')[i])))/255:undefined;
+ const single=(own:{text:string;inkDensity?:number;inkMass?:number;width?:number}[])=>{
+  const list=own.filter(w=>measurable(w.text)).map(w=>({text:w.text,density:w.inkDensity,ink:inkOf(w)})),regular=list.some(w=>w.ink)?undefined:glyphInk(region.text,family,'normal'),heavy=regular&&glyphInk(region.text,family,'bold');
+  return lineWeight(list,family,(region.blur??0)*scale,peak,regular&&heavy?[64*region.width*scale/regular.width,64*region.width*scale/heavy.width]:undefined)??{bold:false,sure:false};
+ };
+ // Ink levels only settle a line whose own strokes leave it open.
+ const classify=(list:{text:string;inkDensity?:number;inkMass?:number;width?:number}[],own:typeof list)=>{const w=single(own);return classifyWordWeights(list.map(inkOf),w.bold,sameInk(region,pageInk),w.sure);};
  let weights:ReturnType<typeof mixedWeights>|undefined,inkLevel:number|undefined,ownBold:boolean|undefined;
  if(auto&&region.line&&region.line.words.every(w=>!measurable(w.text)||(w.inkMass!==undefined&&w.width))){
   // Judge weights across the full text line (blur-proof ink comparison), then
   // take this region's words: a lone word is compared with its neighbours.
-  const {words:line,start,count}=region.line,result=classifyWordWeights(line.map(inkOf),vote(line),sameInk(region,pageInk)),own=attachNumberParts(line.map(w=>w.text),result.bold).slice(start,start+count);inkLevel=result.ink;
+  const {words:line,start,count}=region.line,result=classify(line,line.slice(start,start+count)),own=attachNumberParts(line.map(w=>w.text),result.bold).slice(start,start+count);inkLevel=result.ink;
   if(words&&words.length>1&&words.length===own.length&&words.map(w=>w.text).join(' ')===region.text)weights=mixedWeights(words,own);
   else if(count===1)ownBold=own[0];
  }else if(auto&&words&&words.length>1&&words.map(w=>w.text).join(' ')===region.text){
-  if(words.every(w=>!measurable(w.text)||(w.inkMass!==undefined&&w.width))){const result=classifyWordWeights(words.map(inkOf),vote(words),sameInk(region,pageInk));weights=mixedWeights(words,result.bold);inkLevel=result.ink;}
+  if(words.every(w=>!measurable(w.text)||(w.inkMass!==undefined&&w.width))){const result=classify(words,words);weights=mixedWeights(words,result.bold);inkLevel=result.ink;}
   else weights=mixedWeights(words,words.map(w=>w.inkDensity===undefined||!measurable(w.text)?undefined:estimateOcrBold(w.text,family,region.height,w.inkDensity,region.blur)));
  }
- const bold=weights?weights.base:ownBold??(region.kind==='ocr'?(auto?estimateOcrBold(region.text,family,region.height,region.inkDensity,region.blur):ocrStyle.includes('bold')):region.bold&&!weightFamilies.has(family));
+ const bold=weights?weights.base:ownBold??(region.kind==='ocr'?(auto?single(words??[{text:region.text,inkDensity:region.inkDensity}]).bold:ocrStyle.includes('bold')):region.bold&&!weightFamilies.has(family));
  let size=region.size,ocrAscent=region.height,charSpacing=region.kind==='pdf'&&!embedded?fallbackCharSpacing(family):0,boxWidth=Math.max(region.width+4,20);
  if(region.kind==='ocr'){
   const ctx=document.createElement('canvas').getContext('2d')!,font=(b:boolean)=>`${italic?'italic ':''}${b?'bold ':''}100px "${family}"`;ctx.font=font(bold);const metrics=ctx.measureText(region.text);
@@ -295,27 +303,34 @@ export async function aiSharpenImage(image:FabricImage,onProgress?:(fraction:num
  return {element:sharp,props:{...crop,width:(image.width??source.width)*2,height:(image.height??source.height)*2,scaleX:(image.scaleX??1)/2,scaleY:(image.scaleY??1)/2}};
 }
 
-// Ink level of the page's text, measured on lines that mix bold and regular
-// (their split pins the level down). Used to settle single-weight lines on the
-// same page when blur makes their own evidence ambiguous.
-export type PageInk={ink:number;luma:number};
+// What a page's lines share. `ink`: ink level of the page's text, measured on
+// lines that mix bold and regular (their split pins the level down), used to
+// settle single-weight lines on the same page when blur makes their own
+// evidence ambiguous. `scale`: scan pixels per page unit (a scanned PDF is
+// read on a larger raster): a region's box is in page units, its words' ink
+// and blur were measured in scan pixels.
+export type PageInk={scale:number;ink?:number;luma?:number};
 const luma=(hex:string)=>{const v=[1,3,5].map(i=>parseInt(hex.slice(i,i+2),16));return .299*v[0]+.587*v[1]+.114*v[2];};
 export async function pageInkLevel(regions:TextRegion[],family:string):Promise<PageInk|undefined>{
  await ensureFont(family);
- const seen=new Set<unknown>(),levels:{ink:number;luma:number}[]=[];
+ const seen=new Set<unknown>(),levels:{ink:number;luma:number}[]=[],scales:number[]=[],ctx=document.createElement('canvas').getContext('2d')!;
+ ctx.font=`64px "${family}"`;const span=(t:string)=>{const m=ctx.measureText(t);return m.actualBoundingBoxLeft+m.actualBoundingBoxRight;};
  for(const r of regions){
-  if(r.kind!=='ocr'||!r.line||seen.has(r.line.words)||!/^#[0-9a-f]{6}$/i.test(r.color))continue;seen.add(r.line.words);
+  if(r.kind!=='ocr'||!r.line)continue;
+  // The region's text at the size that fits its words' scan widths, against its width on the page.
+  const own=r.line.words.slice(r.line.start,r.line.start+r.line.count).filter(w=>w.width&&span(w.text)>0),drawn=own.reduce((s,w)=>s+span(w.text),0);
+  if(drawn>0&&r.width>0)scales.push(span(r.text)*own.reduce((s,w)=>s+w.width!,0)/drawn/r.width);
+  if(seen.has(r.line.words)||!/^#[0-9a-f]{6}$/i.test(r.color))continue;seen.add(r.line.words);
   const inks=r.line.words.map(w=>{if(!/[\p{L}\p{N}]/u.test(w.text)||!w.inkMass||!w.width)return undefined;const a=glyphInk(w.text,family,'normal'),b=glyphInk(w.text,family,'bold');return a&&b?wordInk(w.text,w.inkMass,w.width,a,b):undefined;});
   const result=classifyWordWeights(inks,false);
   if(result.ink!==undefined&&result.bold.includes(true)&&result.bold.includes(false))levels.push({ink:result.ink,luma:luma(r.color)});
  }
- if(!levels.length)return undefined;
  const mid=(v:number[])=>v.sort((a,b)=>a-b)[v.length>>1];
- return {ink:mid(levels.map(l=>l.ink)),luma:mid(levels.map(l=>l.luma))};
+ return {scale:scales.length?mid(scales):1,...levels.length?{ink:mid(levels.map(l=>l.ink)),luma:mid(levels.map(l=>l.luma))}:{}};
 }
 // Only text of a similar colour shares the page's ink level (a light grey
 // caption must not be judged against black body text).
-function sameInk(region:TextRegion,page:PageInk|undefined){return page&&/^#[0-9a-f]{6}$/i.test(region.color)&&luma(region.color)<=page.luma+90?page.ink:undefined;}
+function sameInk(region:TextRegion,page:PageInk|undefined){return page?.ink!==undefined&&page.luma!==undefined&&/^#[0-9a-f]{6}$/i.test(region.color)&&luma(region.color)<=page.luma+90?page.ink:undefined;}
 
 // Rebuild an edited OCR line from the image's own letters (see glyph-edit.ts):
 // from the first changed character onward, this line's letters are erased and
