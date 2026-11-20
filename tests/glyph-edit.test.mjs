@@ -111,3 +111,16 @@ test('a right-aligned line that grows keeps its right edge; a new digit takes a 
  assert.equal(right.end,149,'the end stays');assert.equal(right.startX,100-12,'the start moves left by the same advance');
  assert.equal(plan('17,80',cells,'71,80',[],{right:true}).end,149,'no change of width: nothing moves');
 });
+test('a letter standing clear is taken before one cut from a blot',async()=>{
+ const {planGlyphEdit:plan,fusedCells}=await import('../tmp/glyph-edit.mjs');
+ // "rme" on a soft scan: r and m one blot (the r's ink runs to the cut at 14), e clear after a gap.
+ const cells=[cell('r',0,14,2,14),cell('m',14,30,14,28),cell('e',31,40,32,39)];
+ assert.deepEqual(fusedCells(cells),[true,true,false]);
+ assert.deepEqual(fusedCells([cell('a',0,10,1,9),{ch:' ',x0:10,x1:14,space:true},cell('b',14,24,14,23)]),[false,false,false],'a space between: nothing cut');
+ // "me" → "mem": the line's m is cut, the page has a clear one.
+ const lent={ch:'m',x0:200,x1:216,y0:50,y1:60,source:'ocr-9',m:208,i0:201,i1:215};
+ const p=plan('rme',cells,'rmem',[lent]);
+ assert.equal(p.pieces.at(-1).source,'ocr-9','the clear m from another line');
+ assert.equal(plan('rme',cells,'rmem',[{...lent,fused:true}]).pieces.at(-1).source,undefined,'a cut one either way: this line\'s own');
+ assert.equal(plan('rme',cells,'rmem').pieces.at(-1).x0,14,'no other: this line\'s cut m');
+});

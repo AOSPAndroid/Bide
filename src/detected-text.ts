@@ -17,8 +17,8 @@ import {matchedInkColor} from './ocr-appearance';
 import {weightFamilies} from './font-weights';
 import {rasterSearchWords} from './searchable-text';
 import {fallbackFont,fallbackCharSpacing,fitOcrText,type TextRegion} from './text-regions';
-import {lineCells,planGlyphEdit,missingLetters,withUnread,ownInk,lineMetrics,UNREAD,type LibraryGlyph} from './glyph-edit';
-import {letterCover,sameLettering,overBackground,telling,type Cover} from './letter-match';
+import {lineCells,planGlyphEdit,missingLetters,withUnread,ownInk,lineMetrics,fusedCells,UNREAD,type LibraryGlyph} from './glyph-edit';
+import {letterCover,sameLettering,overBackground,telling,LETTERING,type Cover} from './letter-match';
 import {markDoubts} from './ocr-checks';
 import {mixedWeights,attachNumberParts,recognitionKey,scaleRegions,unconvertedRegions,ocrPatchBounds,ocrScanStatus,isUncertain,frameOf,turn,turnedBounds,inFrame,type Frame} from './ocr-regions';
 import type {OcrGrouping} from './ocr-segmentation';
@@ -409,11 +409,13 @@ function verifiedLibrary(raster:HTMLCanvasElement,regions:TextRegion[],region:Te
  for(let i=0;i<box.length;i+=4){const v=Math.max(Math.abs(box[i]-bg[0]),Math.abs(box[i+1]-bg[1]),Math.abs(box[i+2]-bg[2]));if(v>40)inked.push(v);}
  if(inked.length<8)return [];inked.sort((a,b)=>a-b);const contrast=inked[Math.floor((inked.length-1)*.95)];
  const cover=(g:{x0:number;x1:number},base:number,paper:number[]):Cover|undefined=>{const x=Math.floor(g.x0),w=Math.ceil(g.x1)-x,y=Math.round(base)-up;if(w<1||x<0||y<0||x+w>raster.width||y+up+down>raster.height)return undefined;return letterCover(ctx.getImageData(x,y,w,up+down).data,w,up+down,paper,contrast);};
- // Up to two instances of each telling character.
- const covers=(list:{ch:string;x0:number;x1:number;space?:boolean}[],base:number,paper:number[],only?:Set<string>)=>{const m=new Map<string,Cover[]>();for(const g of list){if(g.space||!telling(g.ch)||only&&!only.has(g.ch)||(m.get(g.ch)?.length??0)>=2)continue;const c=cover(g,base,paper);if(c)m.set(g.ch,[...m.get(g.ch)??[],c]);}return m;};
- const mine=covers(cells,baseline,bg),ink=inkOf(ctx,region,bg);if(!mine.size||!ink)return [];
+ // Up to two instances of each telling character, none cut from a blot (fusedCells).
+ const covers=(list:{ch:string;x0:number;x1:number;space?:boolean}[],base:number,paper:number[],only?:Set<string>,fused?:boolean[])=>{const m=new Map<string,Cover[]>();for(const [i,g] of list.entries()){if(g.space||fused?.[i]||!telling(g.ch)||only&&!only.has(g.ch)||(m.get(g.ch)?.length??0)>=2)continue;const c=cover(g,base,paper);if(c)m.set(g.ch,[...m.get(g.ch)??[],c]);}return m;};
+ // Judged on letters standing clear; where too few do (soft digits touch), on all of them.
+ const mineFused=fusedCells(cells),mine=covers(cells,baseline,bg,undefined,mineFused),mineAll=covers(cells,baseline,bg),ink=inkOf(ctx,region,bg);if(!mineAll.size||!ink)return [];
+ const judge=(list:{ch:string;x0:number;x1:number;space?:boolean}[],base:number,paper:number[],fused:boolean[])=>{const clear=sameLettering(mine,covers(list,base,paper,new Set(mine.keys()),fused));return clear.shared>=2?clear:sameLettering(mineAll,covers(list,base,paper,new Set(mineAll.keys())));};
  const centre=(r:{left:number;top:number;width:number;height:number})=>[r.left+r.width/2,r.top+r.height/2],[cx,cy]=centre(region);
- const candidates=regions.filter(r=>r.id!==region.id&&r.kind==='ocr'&&r.glyphs&&wanted.some(ch=>r.text.includes(ch))&&[...mine.keys()].some(ch=>r.text.includes(ch))&&!blocked.some(b=>b.left<r.left+r.width&&b.left+b.width>r.left&&b.top<r.top+r.height&&b.top+b.height>r.top))
+ const candidates=regions.filter(r=>r.id!==region.id&&r.kind==='ocr'&&r.glyphs&&wanted.some(ch=>r.text.includes(ch))&&[...mineAll.keys()].some(ch=>r.text.includes(ch))&&!blocked.some(b=>b.left<r.left+r.width&&b.left+b.width>r.left&&b.top<r.top+r.height&&b.top+b.height>r.top))
   .sort((a,b)=>Math.abs(centre(a)[1]-cy)+Math.abs(centre(a)[0]-cx)*.25-Math.abs(centre(b)[1]-cy)-Math.abs(centre(b)[0]-cx)*.25).slice(0,16);
  const out:LibraryGlyph[]=[],left=new Set(wanted);
  for(const r of candidates){
@@ -422,11 +424,41 @@ function verifiedLibrary(raster:HTMLCanvasElement,regions:TextRegion[],region:Te
   const base=y0+m.baseline,paper=paperOf(ctx,r),theirs=inkOf(ctx,r,paper);
   // The same ink colour (black digits must not stand in a grey or green line).
   if(!theirs||theirs.some((v,n)=>Math.abs(v-ink[n])>30))continue;
-  const verdict=sameLettering(mine,covers(own,base,paper,new Set(mine.keys())));
+  const middles=inkMiddles(ctx,r,paper,own),fused=fusedCells(own.map((g,i)=>({...g,...middles[i]})));
+  const verdict=judge(own,base,paper,fused);
   if(!verdict.ok)continue;
-  const middles=inkMiddles(ctx,r,paper,own);
-  own.forEach((g,i)=>{if(g.space||g.ch===UNREAD||!left.has(g.ch))return;out.push({...g,y0:r.top,y1:r.top+r.height,source:r.id,baseline:base+verdict.dy,page,...middles[i]});});
-  for(const ch of wanted)if(r.text.includes(ch))left.delete(ch);
+  own.forEach((g,i)=>{if(g.space||g.ch===UNREAD||!left.has(g.ch))return;out.push({...g,y0:r.top,y1:r.top+r.height,source:r.id,baseline:base+verdict.dy,page,...middles[i],fused:fused[i]});});
+  // A letter only found cut from a blot is kept, but a clearer one is still looked for.
+  for(const ch of wanted)if(own.some((g,i)=>g.ch===ch&&!fused[i]))left.delete(ch);
+ }
+ // Through one other line: a line holding a missing letter but sharing none
+ // with the edited line is compared with a line verified against it on two
+ // letters or more (in a table, "1 205" with "1 482" for the cell "4,8"). The
+ // ink of both steps together stays within the same 8%, so a slightly heavier
+ // face cannot pass in two halves; a line that shares letters with the edited
+ // one is only ever judged directly, above.
+ if(left.size){
+  const unblocked=(r:TextRegion)=>!blocked.some(b=>b.left<r.left+r.width&&b.left+b.width>r.left&&b.top<r.top+r.height&&b.top+b.height>r.top);
+  const shares=(r:TextRegion)=>new Set([...r.text].filter(ch=>mineAll.has(ch))).size;
+  const pool=regions.filter(r=>r.id!==region.id&&r.kind==='ocr'&&r.glyphs&&unblocked(r)).sort((a,b)=>Math.abs(centre(a)[1]-cy)+Math.abs(centre(a)[0]-cx)*.25-Math.abs(centre(b)[1]-cy)-Math.abs(centre(b)[0]-cx)*.25);
+  const measured=(r:TextRegion)=>{const {rows,y0}=rowInk(raster,r),m=lineMetrics(rows),own=lineCells(r.text,r.glyphs!);if(!m||!own)return undefined;const paper=paperOf(ctx,r),theirs=inkOf(ctx,r,paper);if(!theirs||theirs.some((v,n)=>Math.abs(v-ink[n])>30))return undefined;const middles=inkMiddles(ctx,r,paper,own);return {r,own,base:y0+m.baseline,paper,middles,fused:fusedCells(own.map((g,i)=>({...g,...middles[i]})))};};
+  const links:{covers:Map<string,Cover[]>;dy:number;mass:number}[]=[];
+  for(const r of pool.filter(r=>shares(r)>=2).slice(0,8)){
+   const line=measured(r);if(!line)continue;const verdict=judge(line.own,line.base,line.paper,line.fused);
+   if(verdict.ok&&verdict.shared>=2)links.push({covers:covers(line.own,line.base,line.paper,undefined,line.fused),dy:verdict.dy,mass:verdict.mass});
+  }
+  for(const r of pool.filter(r=>!shares(r)&&[...left].some(ch=>r.text.includes(ch))).slice(0,12)){
+   if(!links.length||!left.size)break;
+   const line=measured(r);if(!line)continue;
+   for(const link of links){
+    const verdict=sameLettering(link.covers,covers(line.own,line.base,line.paper,new Set(link.covers.keys()),line.fused)),mass=link.mass*verdict.mass;
+    if(!verdict.ok||verdict.shared<2||mass>LETTERING.mass||mass<1/LETTERING.mass)continue;
+    const {middles,fused}=line;
+    line.own.forEach((g,i)=>{if(g.space||g.ch===UNREAD||!left.has(g.ch))return;out.push({...g,y0:r.top,y1:r.top+r.height,source:r.id,baseline:line.base+verdict.dy+link.dy,page,...middles[i],fused:fused[i]});});
+    for(const ch of [...left])if(line.own.some((g,i)=>g.ch===ch&&!fused[i]))left.delete(ch);
+    break;
+   }
+  }
  }
  return out;
 }
@@ -462,7 +494,10 @@ export async function glyphEditPatch(c:Canvas,p:Page,lineRegion:TextRegion,next:
  const baseline=target.y0+metrics.baseline,rasters=new Map<string,HTMLCanvasElement>([[p.id,raster]]);
  // Earlier edits drawn on a picture page changed what their lines show.
  const blocked=p.source?[]:c.getObjects().filter(o=>typeof (o as Tagged&{editedText?:string}).editedText==='string'||o instanceof Textbox).map(o=>o.getBoundingRect());
- const library=page.length?verifiedLibrary(raster,page,region,cells,baseline,missingLetters(read,cells,wanted),blocked,p.id):[];
+ // Letters to look for on the page's other lines: those this line lacks, and
+ // those it only has cut from a blot (fusedCells) when the edit adds one.
+ const fused=fusedCells(cells),cutOnly=[...new Set(Array.from(wanted))].filter(ch=>telling(ch)&&cells.some(c=>c.ch===ch)&&cells.every((c,i)=>c.ch!==ch||fused[i]));
+ const library=page.length?verifiedLibrary(raster,page,region,cells,baseline,[...missingLetters(read,cells,wanted),...cutOnly],blocked,p.id):[];
  let plan=planGlyphEdit(read,cells,wanted,library,layout);
  // A letter missing from this page: look for it on the other pages.
  for(const other of otherPages){

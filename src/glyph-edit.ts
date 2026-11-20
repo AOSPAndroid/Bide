@@ -12,7 +12,16 @@ export const UNREAD='\uFFFC';
 // where that ink starts and ends, when measured.
 export type Cell=Glyph&{space?:boolean;m?:number;i0?:number;i1?:number};
 // Borrowed letters carry their line's band and baseline (page units) and the page they come from.
-export type LibraryGlyph=Glyph&{y0:number;y1:number;source:string;baseline?:number;page?:string;m?:number;i0?:number;i1?:number};
+// `fused`: the letter's ink runs into a neighbour's, so its cell was cut through ink.
+export type LibraryGlyph=Glyph&{y0:number;y1:number;source:string;baseline?:number;page?:string;m?:number;i0?:number;i1?:number;fused?:boolean};
+// Letters whose ink runs into a neighbour's (on a soft scan "rm" is one blot):
+// their cell was cut through ink, at the faintest column between the two
+// centres, which can fall inside the letter (between the stems of an m,
+// leaving an n). A letter standing clear is taken first when there is one.
+export function fusedCells(cells:{space?:boolean;i0?:number;i1?:number}[]){
+ const meet=(a?:{space?:boolean;i1?:number},b?:{space?:boolean;i0?:number})=>!!a&&!!b&&!a.space&&!b.space&&a.i1!==undefined&&b.i0!==undefined&&a.i1>=b.i0;
+ return cells.map((c,i)=>meet(cells[i-1],c)||meet(c,cells[i+1]));
+}
 // Where a new letter goes for its ink to stand where the old one's stood:
 // ink of about the same width is laid edge to edge (a 3 over a 6: their
 // centroids differ, their outlines do not); a narrower or wider letter (a 1
@@ -188,7 +197,13 @@ export function planGlyphEdit(text:string,cells:Cell[],next:string,library:Libra
  // The advance of the line's digits: between the ink middles of two that touch.
  const steps=cells.flatMap((c,i)=>i&&digit(c.ch)&&digit(cells[i-1].ch)&&c.m!==undefined&&cells[i-1].m!==undefined?[c.m-cells[i-1].m!]:[]).sort((x,y)=>x-y),figures=steps.length?steps[steps.length>>1]:undefined;
  // A new letter: the nearest identical one on this line (by position), then the page library.
- const letter=(ch:string,j:number):(Cell|LibraryGlyph)|undefined=>cells.map((c,i)=>({c,i})).filter(({c})=>!c.space&&c.ch===ch).sort((x,y)=>Math.abs(x.i-Math.min(j,a.length-1))-Math.abs(y.i-Math.min(j,a.length-1)))[0]?.c??library.find(g=>g.ch===ch);
+ // A letter standing clear before one cut from a blot (fusedCells): this line's, the page library's, then cut ones.
+ const fused=fusedCells(cells);
+ const letter=(ch:string,j:number):(Cell|LibraryGlyph)|undefined=>{
+  const own=cells.map((c,i)=>({c,i})).filter(({c})=>!c.space&&c.ch===ch).sort((x,y)=>+fused[x.i]-+fused[y.i]||Math.abs(x.i-Math.min(j,a.length-1))-Math.abs(y.i-Math.min(j,a.length-1)))[0];
+  const lent=library.filter(g=>g.ch===ch).sort((x,y)=>+!!x.fused-+!!y.fused)[0];
+  return own&&!fused[own.i]?own.c:lent&&!lent.fused?lent:own?.c??lent;
+ };
  const piece=(g:Cell|LibraryGlyph):Piece=>'source' in g?{x0:g.x0,x1:g.x1,y0:g.y0,y1:g.y1,source:g.source,...g.baseline===undefined?{}:{baseline:g.baseline},...g.page===undefined?{}:{page:g.page}}:{x0:g.x0,x1:g.x1};
  const placed=(pieces:Piece[],from:number)=>({startX:Math.min(from,...pieces.map(q=>q.to!)),oldEnd,end:Math.max(...pieces.map(q=>q.to!+q.x1-q.x0)),pieces});
  // The same length, each changed character on the advance of the one it replaces.
