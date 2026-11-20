@@ -11,7 +11,10 @@ const sessions=new Map<string,Promise<Loaded>>();let base='',remote='',licence='
 // CPU after the wait). The others gave the CPU's results: the text detector
 // and recognizer read the same text, upscaling, flattening and orientation
 // matched to one level, background removal on all but 0.2% of edge pixels.
-const CPU_ONLY=new Set(['sam-encoder','sam-decoder','lama']);
+// The text recognizers too, as a precaution: every line comes with its own
+// input width, the cost of that on a graphics card could not be measured
+// here (no hardware GPU), and on the CPU a line takes milliseconds.
+const CPU_ONLY=new Set(['sam-encoder','sam-decoder','lama']),onCpu=(model:string)=>CPU_ONLY.has(model)||/^ppocr-.+-rec$/.test(model);
 // WebGPU only on a graphics card. Where there is no usable one, a browser may
 // offer a software adapter (SwiftShader): the same results, but the text
 // detector took minutes per page on it instead of seconds on the CPU.
@@ -38,7 +41,7 @@ function load(model:string,cpuOnly=false,onProgress?:(progress:ModelProgress)=>v
  const key=cpuOnly?model+'#cpu':model;
  if(!sessions.has(key))sessions.set(key,(async()=>{
   const bytes=await modelBytes(model,base,undefined,{onProgress,...(remote?{remote,licence}:{})});
-  if(!cpuOnly&&!CPU_ONLY.has(model)&&await graphicsCard())try{return await create(bytes.slice(),'webgpu',onProgress);}catch{}
+  if(!cpuOnly&&!onCpu(model)&&await graphicsCard())try{return await create(bytes.slice(),'webgpu',onProgress);}catch{}
   try{return await create(bytes,'wasm',onProgress);}
   catch(e){throw new RuntimeInitializationError(e instanceof Error?e.message:String(e));}
  })().catch(e=>{sessions.delete(key);throw e;}));
