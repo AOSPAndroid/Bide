@@ -4,6 +4,7 @@
 // caching, including cached copies that may have been damaged or replaced.
 import manifest from '../../public/ai/manifest.json';
 import {PUBLIC_DEMO} from '../build-flags';
+import {digest} from './crypto';
 
 export type PinnedModel={url:string;bytes:number;sha256:string};
 type ModelSource=PinnedModel&{output?:{bytes:number;sha256:string}};
@@ -20,8 +21,9 @@ function keyFor(source:PinnedModel){
 async function verified(bytes:Uint8Array,source:PinnedModel,onProgress?:ModelOptions['onProgress']){
  if(bytes.byteLength!==source.bytes)throw new Error(downloadError+' The model size did not match.');
  onProgress?.({stage:'verify',loaded:bytes.byteLength,total:source.bytes});
- const digest=await crypto.subtle.digest('SHA-256',bytes);
- const hash=Array.from(new Uint8Array(digest),n=>n.toString(16).padStart(2,'0')).join('');
+ // An HTTP address on the office network (a shared bide) has no SubtleCrypto:
+ // digest() hashes in JavaScript there, so the AI tools still load and verify.
+ const hash=Array.from(await digest(bytes),n=>n.toString(16).padStart(2,'0')).join('');
  if(hash!==source.sha256)throw new Error(downloadError+' The model integrity check failed.');
  return bytes;
 }

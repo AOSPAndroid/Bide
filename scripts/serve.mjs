@@ -2,6 +2,8 @@
 import {createServer as createHttpServer} from 'node:http';
 import {createServer as createHttpsServer} from 'node:https';
 import {createReadStream} from 'node:fs';
+import {brotliCompress, gzip, constants as zlib} from 'node:zlib';
+import {promisify} from 'node:util';
 import {readFile, realpath, stat} from 'node:fs/promises';
 import {resolve, extname, sep, isAbsolute} from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -10,6 +12,42 @@ import {networkInterfaces} from 'node:os';
 
 const types = {'.html':'text/html; charset=utf-8', '.js':'application/javascript', '.mjs':'application/javascript', '.onnx':'application/octet-stream', '.css':'text/css', '.svg':'image/svg+xml', '.wasm':'application/wasm', '.json':'application/json', '.webmanifest':'application/manifest+json', '.png':'image/png', '.jpg':'image/jpeg', '.jpeg':'image/jpeg', '.gif':'image/gif', '.webp':'image/webp', '.ico':'image/x-icon', '.ttf':'font/ttf', '.woff':'font/woff', '.woff2':'font/woff2', '.xml':'application/xml; charset=utf-8', '.txt':'text/plain; charset=utf-8', '.properties':'text/plain; charset=utf-8'};
 const within = (root, path) => path === root || path.startsWith(root + sep);
+// Colleagues on the office network fetch the whole app (scripts, the PDF and
+// OCR engines' WebAssembly, fonts) on each visit. Text and WebAssembly are sent
+// compressed: the ONNX runtime goes from 24 MB to under 6, MuPDF from 10 MB to
+// under 5. AI models and pre-compressed data barely shrink and are sent as they are.
+const compressible = new Set(['.html','.js','.mjs','.css','.json','.webmanifest','.svg','.wasm','.ttf','.txt','.xml','.yml','.aff','.dic','.properties','.map']);
+const encoders = {br:(bytes) => promisify(brotliCompress)(bytes, {params:{[zlib.BROTLI_PARAM_QUALITY]:5, [zlib.BROTLI_PARAM_SIZE_HINT]:bytes.length}}), gzip:(bytes) => promisify(gzip)(bytes, {level:6})};
+// Compressed copies, by file, version and encoding, made once and shared by every visitor.
+const compressed = new Map();
+let compressedBytes = 0;
+function compressedCopy(file, info, encoding) {
+  const key = `${file}|${info.size}|${info.mtimeMs}|${encoding}`;
+  let entry = compressed.get(key);
+  if (!entry) {
+    entry = readFile(file).then(bytes => encoders[encoding](bytes)).then(bytes => { compressedBytes += bytes.length; return bytes; });
+    entry.catch(() => compressed.delete(key));
+    // A shared copy of the app is about 50 MB compressed; start afresh well past that.
+    if (compressedBytes > 512e6) { compressed.clear(); compressedBytes = 0; }
+    compressed.set(key, entry);
+  }
+  return entry;
+}
+// Whether the browser accepts an encoding (Accept-Encoding: "gzip, deflate, br;q=0.9").
+const accepted = (header, encoding) => (header ?? '').split(',').some(part => {
+  const [name, ...params] = part.trim().toLowerCase().split(';'), q = params.map(p => p.trim()).find(p => p.startsWith('q='));
+  return name === encoding && (q === undefined || Number(q.slice(2)) > 0);
+});
+// A version of each file for the browser's cache: a reload or a second visit
+// asks "still this one?" and gets "304 Not Modified" instead of the file again
+// (without it, no-cache meant downloading the AI models on every visit).
+const versionOf = (info, encoding) => `W/"${info.size.toString(36)}-${Math.floor(info.mtimeMs).toString(36)}${encoding ? '-' + encoding : ''}"`;
+function unchanged(req, tag, info) {
+  const match = req.headers['if-none-match'];
+  if (match) return match.split(',').some(value => value.trim() === tag || value.trim() === '*');
+  const since = Date.parse(req.headers['if-modified-since'] ?? '');
+  return Number.isFinite(since) && Math.floor(info.mtimeMs / 1000) * 1000 <= since;
+}
 const loopback = address => ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(address);
 
 export async function createBideServer({root, tls}) {
@@ -42,7 +80,18 @@ export async function createBideServer({root, tls}) {
       const info = await stat(file);
       if (!info.isFile()) throw new Error('Invalid path');
       if(/^\/assets\/[^/]+-[A-Za-z0-9_-]{8,}\.[a-z0-9]+$/.test(pathname))res.setHeader('Cache-Control','public, max-age=31536000, immutable');
-      res.writeHead(200, {'Content-Type':types[extname(file)] || 'application/octet-stream', 'Content-Length':info.size});
+      const type = types[extname(file)] || 'application/octet-stream', squeeze = compressible.has(extname(file)) && info.size >= 1024;
+      if (squeeze) res.setHeader('Vary', 'Accept-Encoding');
+      const encoding = squeeze ? ['br', 'gzip'].find(name => accepted(req.headers['accept-encoding'], name)) : undefined, tag = versionOf(info, encoding);
+      res.setHeader('ETag', tag); res.setHeader('Last-Modified', new Date(info.mtimeMs).toUTCString());
+      if (unchanged(req, tag, info)) { res.writeHead(304); res.end(); return; }
+      if (encoding) {
+        const bytes = await compressedCopy(file, info, encoding);
+        res.writeHead(200, {'Content-Type':type, 'Content-Encoding':encoding, 'Content-Length':bytes.length});
+        res.end(req.method === 'HEAD' ? undefined : bytes);
+        return;
+      }
+      res.writeHead(200, {'Content-Type':type, 'Content-Length':info.size});
       if (req.method === 'HEAD') { res.end(); return; }
       const stream = createReadStream(file);
       stream.on('error', () => res.destroy());
