@@ -13,7 +13,8 @@ const engines=(process.argv.slice(2).length?process.argv.slice(2):['tesseract','
 const only=process.env.BENCH_PAGES?.split(',');
 const chosen=pages.filter(p=>!only||only.includes(p.id));
 await mkdir('tmp/ocr-bench',{recursive:true});
-const server=await createServer({logLevel:'error',server:{port:0,host:'127.0.0.1'}});await server.listen();
+// No file watching: a source file saved during a run must not reload the page under it.
+const server=await createServer({logLevel:'error',server:{port:0,host:'127.0.0.1',hmr:false,watch:null}});await server.listen();
 // CHROMIUM_ARGS=--enable-unsafe-webgpu runs the AI models on WebGPU (SwiftShader where there is no graphics card).
 const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||undefined,args:process.env.CHROMIUM_ARGS?.split(' ').filter(Boolean)});
 const results=[],backends=new Set();
@@ -30,6 +31,8 @@ try{
  }
  const page=await browser.newPage();page.on('pageerror',e=>console.error('page error',e.message));
  await page.goto(server.resolvedUrls.local[0]);await page.waitForTimeout(1500);
+ // A software WebGPU adapter is used too when one is all there is (the app keeps to the CPU then).
+ if(process.env.CHROMIUM_ARGS?.includes('webgpu'))await page.evaluate(()=>{globalThis.BIDE_AI_GPU='any';});
  for(const p of chosen){
   const {truth,png}=shots[p.id];
   const degraded=await page.evaluate(async([png,d])=>{
