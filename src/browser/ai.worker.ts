@@ -1,11 +1,31 @@
 // Runs the bundled ONNX models off the main thread. WebGPU (graphics card) is
-// used when the browser offers it, otherwise multithreaded WebAssembly on the
+// used when the browser offers one, otherwise multithreaded WebAssembly on the
 // CPU; a model that fails on WebGPU is reloaded on the CPU.
 import * as ort from 'onnxruntime-web';
 import {modelBytes,type ModelProgress} from './ai-models';
 type Feeds=Record<string,{data:Float32Array|BigInt64Array;dims:number[]}>;
 type Loaded={session:ort.InferenceSession;backend:'webgpu'|'wasm'};
-const sessions=new Map<string,Promise<Loaded>>();let base='',remote='',licence='';
+const sessions=new Map<string,Promise<Loaded>>();let base='',remote='',licence='',gpu:'auto'|'any'='auto',hardware:Promise<boolean>|undefined;
+// Models kept on the CPU: on WebGPU, Segment Anything (int8) selected six
+// times the object's area, and LaMa does not load there (it fell back to the
+// CPU after the wait). The others gave the CPU's results: the text detector
+// and recognizer read the same text, upscaling, flattening and orientation
+// matched to one level, background removal on all but 0.2% of edge pixels.
+const CPU_ONLY=new Set(['sam-encoder','sam-decoder','lama']);
+// WebGPU only on a graphics card. Where there is no usable one, a browser may
+// offer a software adapter (SwiftShader): the same results, but the text
+// detector took minutes per page on it instead of seconds on the CPU.
+// `gpu` 'any' (tests) accepts it.
+type Adapter={isFallbackAdapter?:boolean;info?:{isFallbackAdapter?:boolean;vendor?:string;architecture?:string;description?:string}};
+const graphicsCard=()=>hardware??=(async()=>{
+ const gpuApi=(navigator as Navigator&{gpu?:{requestAdapter:(options?:object)=>Promise<Adapter|null>}}).gpu;if(!gpuApi)return false;
+ try{
+  const adapter=await gpuApi.requestAdapter({powerPreference:'high-performance'});if(!adapter)return false;
+  const info=adapter.info??{},software=!!(adapter.isFallbackAdapter||info.isFallbackAdapter)||/swiftshader|llvmpipe|lavapipe|software/i.test(`${info.vendor} ${info.architecture} ${info.description}`);
+  if(software&&gpu!=='any')return false;
+  (ort.env.webgpu as {adapter?:unknown}).adapter=adapter;return true;
+ }catch{return false;}
+})();
 // ONNX retains a failed WASM initialization inside this worker. Clearing a
 // model's session promise cannot make a later attempt initialize it again.
 class RuntimeInitializationError extends Error{}
@@ -18,7 +38,7 @@ function load(model:string,cpuOnly=false,onProgress?:(progress:ModelProgress)=>v
  const key=cpuOnly?model+'#cpu':model;
  if(!sessions.has(key))sessions.set(key,(async()=>{
   const bytes=await modelBytes(model,base,undefined,{onProgress,...(remote?{remote,licence}:{})});
-  if(!cpuOnly&&'gpu' in navigator)try{return await create(bytes.slice(),'webgpu',onProgress);}catch{}
+  if(!cpuOnly&&!CPU_ONLY.has(model)&&await graphicsCard())try{return await create(bytes.slice(),'webgpu',onProgress);}catch{}
   try{return await create(bytes,'wasm',onProgress);}
   catch(e){throw new RuntimeInitializationError(e instanceof Error?e.message:String(e));}
  })().catch(e=>{sessions.delete(key);throw e;}));
@@ -34,7 +54,7 @@ async function run(model:string,feeds:Feeds,cpuOnly=false,onProgress?:(progress:
 async function handle(event:MessageEvent){
  const {id,type}=event.data;
  try{
-  if(type==='init'){base=event.data.base;remote=event.data.remote??'';licence=event.data.licence??'';ort.env.wasm.wasmPaths={mjs:new URL('ai/ort/ort-wasm-simd-threaded.jsep.mjs',base).href,wasm:new URL('ai/ort/ort-wasm-simd-threaded.jsep.wasm',base).href};ort.env.wasm.numThreads=self.crossOriginIsolated?Math.max(1,Math.min(4,navigator.hardwareConcurrency||1)):1;ort.env.logLevel='error';self.postMessage({id});return;}
+  if(type==='init'){base=event.data.base;gpu=event.data.gpu==='any'?'any':'auto';remote=event.data.remote??'';licence=event.data.licence??'';ort.env.wasm.wasmPaths={mjs:new URL('ai/ort/ort-wasm-simd-threaded.jsep.mjs',base).href,wasm:new URL('ai/ort/ort-wasm-simd-threaded.jsep.wasm',base).href};ort.env.wasm.numThreads=self.crossOriginIsolated?Math.max(1,Math.min(4,navigator.hardwareConcurrency||1)):1;ort.env.logLevel='error';self.postMessage({id});return;}
   if('remote' in event.data){remote=event.data.remote??'';licence=event.data.licence??'';}
   const {outputs,backend}=await run(event.data.model,event.data.feeds,false,progress=>self.postMessage({id,progress}));
   self.postMessage({id,outputs,backend},{transfer:Object.values(outputs).map(o=>o.data.buffer as ArrayBuffer)});
