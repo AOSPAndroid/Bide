@@ -1,27 +1,28 @@
 import {test} from 'node:test';import assert from 'node:assert/strict';
-import {typesetRegions,dashFor,curlyShape,measureLine,markShape} from '../tmp/ocr-typography.mjs';
+import {typesetRegions,dashFor,curlyShape,measureLine,markShape,decimalShape} from '../tmp/ocr-typography.mjs';
 import {lineCells,withUnread,planGlyphEdit,UNREAD} from '../tmp/glyph-edit.mjs';
 
 // Synthetic lines on a white page: lowercase letters are boxes over rows
 // 10-20 (x-height 10, baseline 20), capitals and digits rows 6-20, dashes
 // 2-px bars at mid x-height, apostrophes over rows 6-12 (all `dy` lower).
-// A part is [read, shape, width]; '' reads nothing (ink the recognizer
+// A full stop sits on the baseline, a comma hangs 3 rows below it.
+// A part is [read, shape, width, probability]; '' reads nothing (ink the recognizer
 // missed), a shape ending in '+' widens the previous cell over it, one
 // ending in '<' the next cell, 'skip' is a gap that adds no space to the text.
 const W=400,H=60,page=()=>({width:W,height:H,data:new Uint8ClampedArray(W*H*4).fill(255)});
 const ink=(img,x0,y0,x1,y1)=>{for(let y=y0;y<y1;y++)for(let x=x0;x<x1;x++){const i=(y*W+x)*4;img.data[i]=img.data[i+1]=img.data[i+2]=20;}};
 function line(img,parts,{dy=0,...extra}={}){
  let x=10,text='',from;const glyphs=[],at=(x0,y0,x1,y1)=>ink(img,x0,y0+dy,x1,y1+dy);
- for(const [read,shape,w=7] of parts){
+ for(const [read,shape,w=7,p=.9] of parts){
   if(shape==='gap'||shape==='skip'){if(shape==='gap')text+=' ';x+=w;continue;}
-  const kind=shape.replace(/[+<]/,''),width={dot:2,tick:2,curl:4}[kind]??w;
+  const kind=shape.replace(/[+<]/,''),width={dot:2,tick:2,curl:4,stop:2,comma:2}[kind]??w;
   if(kind==='x')at(x,10,x+w,20);else if(kind==='X')at(x,6,x+w,20);
   else if(kind==='bar')at(x,14,x+w,16);else if(kind==='dot')at(x,14,x+2,16);
-  else if(kind==='tick')at(x,6,x+2,12);
+  else if(kind==='tick')at(x,6,x+2,12);else if(kind==='stop')at(x,18,x+2,20);else if(kind==='comma')at(x,18,x+2,23);
   // A raised comma: a head, then a tail curling back left.
   else if(kind==='curl'){at(x+1,6,x+4,10);at(x+2,10,x+4,11);at(x,11,x+2,12);}
   else if(kind==='star')at(x,8,x+w,18);
-  if(shape.endsWith('+'))glyphs.at(-1).x1=x+width+1;else if(shape.endsWith('<'))from=x-1;else if(read){glyphs.push({ch:read,x0:from??x-1,x1:x+width+1,p:.9});text+=read;from=undefined;}
+  if(shape.endsWith('+'))glyphs.at(-1).x1=x+width+1;else if(shape.endsWith('<'))from=x-1;else if(read){glyphs.push({ch:read,x0:from??x-1,x1:x+width+1,p});text+=read;from=undefined;}
   x+=width+2;
  }
  return {id:'r'+dy,text,left:9,top:6+dy,width:x-9,height:14,background:'#ffffff',glyphs,...extra};
@@ -92,6 +93,46 @@ test('ink no cell covers becomes a dash or a placeholder cell that a letter edit
  assert.equal(lead.text,'E 48');assert.deepEqual(lead.glyphs.map(g=>g.ch),['E',UNREAD,'4','8']);assert.ok(lead.glyphs[2].x0>=lead.glyphs[1].x1);
  // Specks and accents stay with their letter.
  assert.deepEqual(read([...word('a'),['','skip',3],['','dot+'],...word('b')]).glyphs.map(g=>g.ch),['a','b']);
+});
+
+test('a decimal mark the recognizer was unsure of is what its ink shows on large print',()=>{
+ // Digits 30 rows high around a 4-column mark: a full stop sits on the baseline, a comma hangs 7 rows below it.
+ const big=page(),digit=x=>ink(big,x,10,x+16,40),glyph=(ch,x,w,p)=>({ch,x0:x-1,x1:x+w+1,p});
+ const number=(x,read,p,comma)=>{digit(x);ink(big,x+20,36,x+24,comma?47:40);digit(x+28);return {id:'n'+x,text:'4'+read+'8',left:x-1,top:10,width:46,height:38,background:'#ffffff',glyphs:[glyph('4',x,16,1),glyph(read,x+20,4,p),glyph('8',x+28,16,1)]};};
+ const rows=[number(10,',',.7,false),number(70,'.',.7,true),number(130,',',.95,false),number(190,'.',.7,false),number(250,',',.7,true)];
+ const m=measureLine(big,rows[0]),n=measureLine(big,rows[1]);
+ assert.equal(decimalShape(m,m.runs(29,35)[0]),'.');assert.equal(decimalShape(n,n.runs(89,95)[0]),',');
+ assert.deepEqual(typesetRegions(rows,big).map(r=>r.text),['4.8','4,8','4,8','4.8','4,8'],'unsure marks follow their ink, the sure one is kept');
+ // Small print (an x-height of 10): a comma and a full stop are the same blot, the reading stays.
+ const small=page(),tiny=line(small,[...word('4'),['.','comma',2,.7],...word('8')],{height:18}),t=measureLine(small,tiny);
+ assert.equal(decimalShape(t,t.runs(Math.round(tiny.glyphs[1].x0),Math.round(tiny.glyphs[1].x1))[0]),undefined);
+ assert.equal(typesetRegions([tiny],small)[0].text,'4.8');
+ // Only between two digits.
+ const end=page(),last=line(end,[...word('ab'),[',','stop',2,.7]],{height:18});assert.equal(typesetRegions([last],end)[0].text,'ab,');
+});
+
+test('a 0 or O becomes what its look-alikes on the page are read as',()=>{
+ // Rings 14 x 20: an O is hollow, this face's zero has a dot in it.
+ const P=()=>({width:W,height:120,data:new Uint8ClampedArray(W*120*4).fill(255)});
+ const ring=(img,x,y,dot,w=14,h=20)=>{for(let j=0;j<h;j++)for(let i=0;i<w;i++)if(i<2||i>=w-2||j<2||j>=h-2||dot&&Math.abs(i-w/2+.5)<2&&Math.abs(j-h/2+.5)<3){const k=((y+j)*W+x+i)*4;img.data[k]=img.data[k+1]=img.data[k+2]=20;}};
+ const glyphs=(img,specs,opts={})=>specs.map(([read,dot],i)=>{const x=10+i*24,y=opts.y??10,w=opts.w??14,h=opts.h??20;ring(img,x,y,dot,w,h);return {id:'g'+i+y,text:read,left:x-1,top:y,width:w+2,height:h,background:'#ffffff',glyphs:[{ch:read,x0:x-1,x1:x+w+1,p:.9}]};});
+ const reads=(specs,opts)=>{const img=P();return typesetRegions(glyphs(img,specs,opts),img).map(r=>r.text).join('');};
+ assert.equal(reads([['0',true],['0',true],['0',true],['O',false],['O',false],['O',false],['0',false],['O',true]]),'000OOOO0','a hollow ring read 0 is an O, a dotted one read O a zero');
+ assert.equal(reads([['0',false],['0',false],['0',false],['O',false],['O',false]]),'000OO','one shape for both: nothing to go by');
+ assert.equal(reads([['0',true],['O',false],['O',false],['O',false],['0',false]]),'0OOO0','no two zeros that look different');
+ assert.equal(reads([['0',true],['0',true],['0',true],['O',false],['0',false]]),'000O0','one look-alike is not enough');
+ assert.equal(reads([['0',true],['0',true],['0',true],['O',false],['O',false],['O',false],['0',false]],{w:10,h:14}),'000OOO0','too small to tell');
+ // A letter that touches its neighbour, or comes in pieces, has no shape of
+ // its own: wide rings read O and one read 0, narrow zeros, all joined to a
+ // bar on their right, or all cut through the middle.
+ const paint=(img,x0,x1,y,v)=>{for(let j=y;j<y+20;j++)for(let x=x0;x<x1;x++){const k=(j*W+x)*4;img.data[k]=img.data[k+1]=img.data[k+2]=v;}};
+ const both=(change)=>{const img=P(),all=[...glyphs(img,[['O',false],['O',false],['O',false],['0',false]]),...glyphs(img,[['0',false],['0',false],['0',false]],{y:50,w:9})];all.forEach((r,i)=>change(img,r,r.left+1,i<4?14:9,i<4?10:50));return typesetRegions(all,img).map(r=>r.text).join('');};
+ assert.equal(both(()=>{}),'OOOO000','whole and apart, the wide ring read 0 is an O');
+ assert.equal(both((img,r,x,w,y)=>{paint(img,x+w,x+w+4,y,20);r.width+=6;}),'OOO0000');
+ assert.equal(both((img,r,x,w,y)=>paint(img,x+(w>>1)-1,x+(w>>1)+(w&1?0:1),y,255)),'OOO0000');
+ // A narrow zero and a round O differ by their width alone.
+ const img=P(),wide=glyphs(img,[['O',false],['O',false],['O',false],['0',false]]),narrow=glyphs(img,[['0',false],['0',false],['0',false],['O',false]],{y:50,w:9});
+ assert.equal(typesetRegions([...wide,...narrow],img).map(r=>r.text).join(''),'OOOO0000');
 });
 
 test('words follow the new text, and a line shared by fields stays in step',()=>{

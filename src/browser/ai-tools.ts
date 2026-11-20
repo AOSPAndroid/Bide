@@ -2,7 +2,7 @@
 import {runModel} from './ai';
 import type {ModelProgress} from './ai-models';
 import {segmentGlyphs,type Glyph} from '../glyph-edit';
-import {tilePlan,toPlanar,dbBoxes,ctcDecode,ctcWords,trimToInk,growToInk,inkBand,inpaintWindows,resizeBilinear,snapToGap,rtlReorder,separateLetters,ocrScripts,pickMask,mergeLineBoxes,type Rect,type OcrScript} from '../ai-image';
+import {tilePlan,toPlanar,dbBoxes,ctcDecode,ctcWords,softCommas,lostSpaces,trimToInk,growToInk,inkBand,inpaintWindows,resizeBilinear,snapToGap,rtlReorder,separateLetters,ocrScripts,pickMask,mergeLineBoxes,type Rect,type OcrScript} from '../ai-image';
 
 type Progress=(fraction:number,label?:string)=>void;
 const canvas=(width:number,height:number)=>Object.assign(document.createElement('canvas'),{width,height});
@@ -154,18 +154,36 @@ export async function paddleOcr(source:HTMLCanvasElement,onProgress?:Progress,si
    // Columns over the line's own rows only, so a neighbouring line inside the
    // padded box does not fill the blank columns between letters.
    const bandColumns=new Float32Array(w);for(let y=top;y<bottom;y++)for(let x=x0;x<x1;x++){const p=(y*width+x)*4;bandColumns[x-x0]+=Math.max(Math.abs(src.data[p]-bg[0]),Math.abs(src.data[p+1]-bg[1]),Math.abs(src.data[p+2]-bg[2]))>60?1:0;}
-   const lineHeight=bottom-top,gap=Math.max(2,Math.round(lineHeight*.15)),raw=ctcWords(decoded.chars,rw/steps,rw).map(w=>rtl?{...w,text:rtlReorder(w.text)}:w);
-   const edges=raw.map((word,i)=>({x0:i?snapToGap(columns,word.x0*w/rw,gap,lineHeight):growToInk(columns,word.x0*w/rw,-1,lineHeight/2),x1:i<raw.length-1?snapToGap(columns,word.x1*w/rw,gap,lineHeight):growToInk(columns,word.x1*w/rw,1,lineHeight/2)}));
-   const words=raw.map((word,i)=>{
-    const t=trimToInk(columns,edges[i].x0,edges[i].x1),wordRows=new Float32Array(h);
-    for(let y=top;y<bottom;y++)for(let x=x0+t.x0;x<x0+t.x1;x++){const p=(y*width+x)*4;wordRows[y-y0]+=Math.max(Math.abs(src.data[p]-bg[0]),Math.abs(src.data[p+1]-bg[1]),Math.abs(src.data[p+2]-bg[2]))>60?1:0;}
-    const v=trimToInk(wordRows,top-y0,bottom-y0);
-    // Character cells, for editing with the image's own letters (glyph-edit.ts).
-    // Each letter keeps the recognizer's probability, to flag doubtful ones.
-    const chars=separateLetters(best.script)?segmentGlyphs(word.text,word.centers.map(c=>c*w/rw),t.x0,t.x1,bandColumns)?.map((g,k)=>({...g,x0:x0+g.x0,x1:x0+g.x1,p:word.probs[k],c:x0+word.centers[k]*w/rw})):undefined;
-    return {text:word.text,confidence:word.confidence,bbox:{x0:x0+t.x0,y0:y0+v.x0,x1:x0+t.x1,y1:y0+v.x1},chars};
-   });
-   lines.push({script:best.script,text:rtl?rtlReorder(decoded.text):decoded.text,confidence:decoded.confidence*100,bbox:{x0:words.length?Math.min(...words.map(w=>w.bbox.x0)):x0,y0:top,x1:words.length?Math.max(...words.map(w=>w.bbox.x1)):x1,y1:bottom},words});
+   const lineHeight=bottom-top,gap=Math.max(2,Math.round(lineHeight*.15));
+   const build=(read:typeof decoded.chars)=>{
+    const raw=ctcWords(read,rw/steps,rw).map(w=>rtl?{...w,text:rtlReorder(w.text)}:w);
+    const edges=raw.map((word,i)=>({x0:i?snapToGap(columns,word.x0*w/rw,gap,lineHeight):growToInk(columns,word.x0*w/rw,-1,lineHeight/2),x1:i<raw.length-1?snapToGap(columns,word.x1*w/rw,gap,lineHeight):growToInk(columns,word.x1*w/rw,1,lineHeight/2)}));
+    return raw.map((word,i)=>{
+     const t=trimToInk(columns,edges[i].x0,edges[i].x1),wordRows=new Float32Array(h);
+     for(let y=top;y<bottom;y++)for(let x=x0+t.x0;x<x0+t.x1;x++){const p=(y*width+x)*4;wordRows[y-y0]+=Math.max(Math.abs(src.data[p]-bg[0]),Math.abs(src.data[p+1]-bg[1]),Math.abs(src.data[p+2]-bg[2]))>60?1:0;}
+     const v=trimToInk(wordRows,top-y0,bottom-y0);
+     // Character cells, for editing with the image's own letters (glyph-edit.ts).
+     // Each letter keeps the recognizer's probability, to flag doubtful ones.
+     const chars=separateLetters(best.script)?segmentGlyphs(word.text,word.centers.map(c=>c*w/rw),t.x0,t.x1,bandColumns)?.map((g,k)=>({...g,x0:x0+g.x0,x1:x0+g.x1,p:word.probs[k],c:x0+word.centers[k]*w/rw})):undefined;
+     return {text:word.text,confidence:word.confidence,bbox:{x0:x0+t.x0,y0:y0+v.x0,x1:x0+t.x1,y1:y0+v.x1},chars};
+    });
+   };
+   // Full stops between digits that were the recognizer's doubt about a comma (softCommas).
+   const settled=softCommas(decoded.chars),spell=(read:typeof settled)=>read.map(c=>c.ch).join('').replace(/\s+/g,' ').trim();
+   let words=build(settled),text=settled===decoded.chars?decoded.text:spell(settled);
+   // Spaces the recognizer left out but the ink shows (lostSpaces): the line
+   // is cut into words again with them, so each word gets its own box and cells.
+   const lost=lostSpaces(words,bandColumns,lineHeight,x0);
+   if(lost.length){
+    const read:typeof settled=[];let word=-1,letter=0,open=true;
+    for(const c of settled){
+     read.push(c);if(/\s/.test(c.ch)){open=true;continue;}
+     if(open){word++;letter=0;open=false;}else letter++;
+     if(lost.some(l=>l.word===word&&l.after===letter))read.push({ch:' ',t:c.t,p:c.p});
+    }
+    words=build(read);text=spell(read);
+   }
+   lines.push({script:best.script,text:rtl?rtlReorder(text):text,confidence:decoded.confidence*100,bbox:{x0:words.length?Math.min(...words.map(w=>w.bbox.x0)):x0,y0:top,x1:words.length?Math.max(...words.map(w=>w.bbox.x1)):x1,y1:bottom},words});
   }
   onProgress?.(.1+.9*(k+1)/boxes.length);
  }

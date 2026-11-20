@@ -6,11 +6,13 @@
 //   node scripts/edit-bench.mjs                      every document, both modes
 //   BENCH_CASES=workshop/clean,slip/pdf  BENCH_MODES=letters  BENCH_KINDS=own,page
 //   BENCH_CROPS=all   also save original | edit | reference crops of good edits
+//   BENCH_DOCS=reading   the reading pages instead (tests/edit-bench/reading.mjs): codes with 0 and O,
+//                        awkward spacing, decimal marks, in nine faces; they have no edits, only "=== Reading"
 // Per edit: letters = the default (the page's own letters, or a refusal);
 // font = the explicit fallback. Writes tmp/edit-bench/results.json and crops.
 import {createServer} from 'vite';import {chromium} from 'playwright-core';import {writeFile,mkdir,rm} from 'node:fs/promises';
 import * as mupdf from 'mupdf';import {PDFDocument} from 'pdf-lib';
-import {templates,variants,cases} from '../tests/edit-bench/docs.mjs';
+const {templates,variants,cases}=await import(`../tests/edit-bench/${process.env.BENCH_DOCS??'docs'}.mjs`);
 import {ocrFields,cellErrors,verdict} from '../tests/edit-bench/score.mjs';
 
 const pick=(name)=>process.env[name]?.split(',').map(s=>s.trim()).filter(Boolean);

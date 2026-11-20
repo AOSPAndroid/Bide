@@ -14,6 +14,8 @@
 //   between cells) gets a cell of its own: a level bar at dash height is a
 //   dash; a symbol-sized blot is an UNREAD placeholder, which adds nothing
 //   to the text but lets a letter edit keep its pixels (glyph-edit.ts).
+// - a decimal comma or full stop the recognizer was unsure of is judged by
+//   its ink on large print, and a 0 or O by its look-alikes on the page.
 // Anything not clearly one way keeps the recognizer's reading.
 import {UNREAD,type Glyph} from './glyph-edit';
 
@@ -183,6 +185,34 @@ export function dashFor(L:number,prev:string|undefined,next:string|undefined,H=.
 // rows and the height of an apostrophe (0.3 to 0.75 x-heights).
 export const curlyShape=(s:{tail:number;height:number}|undefined,xh:number)=>!!s&&s.height>=2.5&&s.height>=.3*xh&&s.height<=.75*xh&&s.tail>=Math.max(.5,.08*s.height);
 
+// What a comma or full stop's own ink shows, on lines large enough to tell
+// (an x-height of 14 px): a comma hangs below the baseline by a fifth of
+// the x-height or more and is taller than wide, a full stop sits on the
+// baseline and is about as tall as wide.
+export function decimalShape(m:LineInk,run:Run):','|'.'|undefined{
+ const s=m.span(run.a,run.b,Math.round(m.baseline-.6*m.xh));if(!s||m.xh<14)return undefined;
+ const below=s.bottom-m.baseline,tall=s.bottom-s.top,wide=run.b-run.a;
+ return below>=.2*m.xh&&tall>=1.4*wide?',':below<=.06*m.xh&&tall<=1.25*wide?'.':undefined;
+}
+// A 0 or O as a shape: the ink box of its cell's one run of columns, its
+// contrast sampled on a 10 x 14 grid, centred and scaled so that the product
+// of two shapes is their correlation. None when it touches a neighbour (the
+// cut between two letters is not the letter's outline) or comes in pieces
+// (a soft serif zero thresholds to its two sides, and half a zero looks
+// like half an O).
+function roundShape(m:LineInk,g:Glyph){
+ const runs=m.runs(Math.round(g.x0),Math.round(g.x1));if(runs.length!==1)return undefined;
+ const r=runs[0],s=m.span(r.a,r.b);if(!s||m.cols[r.a-1-m.x0]||m.cols[r.b-m.x0])return undefined;
+ const w=r.b-r.a,h=s.bottom-s.top,v=new Float32Array(140);let mean=0,norm=0;
+ for(let j=0;j<14;j++)for(let i=0;i<10;i++){
+  const fx=r.a+(i+.5)*w/10-.5,fy=s.top+(j+.5)*h/14-.5,x=Math.floor(fx),y=Math.floor(fy),ax=fx-x,ay=fy-y;
+  mean+=(v[j*10+i]=(m.at(x,y)*(1-ax)+m.at(x+1,y)*ax)*(1-ay)+(m.at(x,y+1)*(1-ax)+m.at(x+1,y+1)*ax)*ay)/140;
+ }
+ for(let i=0;i<140;i++){v[i]-=mean;norm+=v[i]*v[i];}
+ norm=Math.sqrt(norm)||1;for(let i=0;i<140;i++)v[i]/=norm;
+ return {w,h,v};
+}
+
 export function typesetRegions<T extends TypeRegion>(regions:T[],img:Pixels):T[]{
  const lines=regions.map(r=>{const tokens=r.glyphs?.length?tokensOf(r.text,r.glyphs):undefined;return tokens&&{m:measureLine(img,r),tokens};});
  for(const l of lines)if(l)unreadInk(l.m,l.tokens);
@@ -202,6 +232,38 @@ export function typesetRegions<T extends TypeRegion>(regions:T[],img:Pixels):T[]
   // one it read as — stays so from an x-height long (a monospace em dash).
   const next=ch==='–'&&t.ch==='—'&&L>=1?undefined:ch??(t.found?'–':undefined);if(next){t.ch=next;t.glyph.ch=next;}
  });
+ // Decimal marks. A soft comma between digits is read as a full stop, and
+ // the decoder turns it back when the comma was the recognizer's second
+ // choice (softCommas in ai-image.ts). Here the ink has the last word: a
+ // mark between two digits the recognizer was unsure of (under 0.9) is what
+ // its own ink shows, on a line large enough to tell (decimalShape).
+ for(const l of lines)if(l)l.tokens.forEach((t,i)=>{
+  if(t.ch!=='.'&&t.ch!==','||!t.glyph||(t.glyph.p??1)>=.9||!DIGIT.test(near(l.tokens,i,-1)??'')||!DIGIT.test(near(l.tokens,i,1)??''))return;
+  const r=own(l,t),shape=r&&decimalShape(l.m,r);if(shape&&shape!==t.ch){t.ch=shape;t.glyph.ch=shape;}
+ });
+ // 0 and O. Between capitals and digits the recognizer guesses: on invented
+ // reference codes in nine faces it read "AB0CD" as "ABOCD" and "COLIS" as
+ // "C0LIS", about one 0 or O in eight, and neither its confidence nor its
+ // second choice tells which (a rule on the neighbours would have broken ten
+ // readings for each one mended). The page's own letters do: a dotted or
+ // narrow zero does not look like its O. Two of them look alike at the same
+ // size (within 8%) with a correlation of 0.95 or more, and different under
+ // 0.89 or at another width. One is changed when at least two of the other
+ // kind look like it, five times more than of its own kind, and at least
+ // two of its own kind and height look different. In a face where both are
+ // one shape nothing changes, nor under 16 px of height, where the shapes
+ // are too close to call (measured: wrong changes from 13 px down).
+ const rounds=lines.flatMap(l=>l?l.tokens.flatMap(t=>{const s=t.glyph&&/^[0O]$/.test(t.ch)?roundShape(l.m,t.glyph):undefined;return s?[{t,s}]:[];}):[]).slice(0,800);
+ const close=(a:number,b:number)=>Math.abs(a-b)<=Math.max(1.5,.08*Math.max(a,b));
+ const other=rounds.filter(r=>{
+  if(r.s.h<16)return false;let like=0,same=0,unlike=0;
+  for(const o of rounds){
+   if(o===r||!close(o.s.h,r.s.h))continue;let sim=0;if(close(o.s.w,r.s.w))for(let i=0;i<140;i++)sim+=o.s.v[i]*r.s.v[i];
+   if(sim>=.95){if(o.t.ch===r.t.ch)same++;else like++;}else if(sim<.89&&o.t.ch===r.t.ch)unlike++;
+  }
+  return like>=2&&like>=5*same&&unlike>=2;
+ });
+ for(const r of other){const ch=r.t.ch==='0'?'O':'0';r.t.ch=ch;r.t.glyph!.ch=ch;}
  // The recognizer's letter centres are not kept (later mappings move cells only).
  const bare=(g:Glyph):Glyph=>{const {c:_,...rest}=g;return rest;};
  return relink(regions.map((r,k)=>{const l=lines[k];if(!l)return r.glyphs?.some(g=>g.c!==undefined)?{...r,glyphs:r.glyphs.map(bare)}:r;
