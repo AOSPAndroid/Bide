@@ -2,15 +2,19 @@
 
 ## 2026-11-21 — Hosted web integration
 
-- Integrate the complete Claude branch through `1c73a62`, including the latest fixes for a clipped final letter and background fill on coloured or textured pages.
+- Integrate the complete Claude branch through `3c441bc`, including the fixes for a clipped final letter, background fill on coloured or textured pages, and matching weights across verified lines.
 - Improve original-letter placement and verified reuse across matching lines, ink colour, soft-text weight and explicit font rendering. Restore compatible GPU execution with CPU fallbacks.
+- Add 18 display-weight faces alongside the previous 26 document-font assets. Auto style compares nearby weights and matching lines; explicit font/style choices remain intact.
 - Restore **Read selected area → Read text → Copy text** on desktop and phones. Small PDF crops retain detail without rendering a whole large page; reading leaves the document and existing edits unchanged.
 - Guard scan-density selection against invisible, clipped and ambiguous images while retaining the existing resolution and memory limits.
 - Keep typed text and Cancel available while a page opens; Apply becomes available when the page is ready. Selected-area reading respects erasers, blend modes and the current page colour, and retains exact source pixels at fit-to-screen zoom.
+- Verify that each edit-benchmark request actually changes its intended field, including collapsed or Unicode whitespace, before grading the exported result.
 
 Original letters remain the default. A replacement font requires an explicit choice; the edit benchmark's combined letters/font result measures those two choices, not an automatic font fallback. Verification and remaining limits are recorded in [the integration handoff](docs/HANDOFF-CODEX.md).
 
 ## 2026-11-20 — Edits that match the page; AI on the graphics card
+
+Historical branch measurements below predate the corrected field-request harness. Four earlier requests silently did nothing because whitespace differed; those results are retained as history, not the final hosted acceptance figures. The corrected 248-edit verification is recorded in the November 21 handoff.
 
 Measured on 16 invented documents (an invoice, a letter, a parcel slip, a meter table, a booking screen) scanned clean, soft, tilted, at low resolution, as phone shots and as scanned PDFs, 215 edits typed and compared with the document regenerated with the new text (`npm run bench:edit`). In the default flow (the page's own letters, a font when they cannot make the edit): 146 → 207 edits with no visible difference, 56 → 4 visible, fields that could not be read 13 → 4.
 
