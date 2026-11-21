@@ -7,7 +7,7 @@ import type {Textbox} from '../text-appearance';
 
 type Sample={region:TextRegion;left:number;top:number;source:Coverage;font:FontSample};
 const FAMILY_MARGIN=.04;
-type Fit={family:string;score:number;softness:number;ratio:number;dx:number;dy:number;gain:number;mass?:number;masses?:number[]};
+type Fit={family:string;score:number;softness:number;ratio:number;dx:number;dy:number;gain:number;mass?:number;masses?:number[];bold?:boolean};
 const median=(values:number[])=>[...values].sort((a,b)=>a-b)[values.length>>1];
 
 function samplePixels(raster:HTMLCanvasElement,r:TextRegion,regions:TextRegion[],maxArea=120000):Sample|undefined{
@@ -163,7 +163,7 @@ export async function matchOcrAppearance(raster:HTMLCanvasElement,region:TextReg
   // Neighbours set the font, size and softness, but each word's box sits a
   // pixel or two differently: the placement comes from the selected letters.
   const own=ownPlacement(selected.source,paintSelected,text);best.dx+=own.dx;best.dy+=own.dy;
-  const painted=paintSelected(text);best.gain=coreGain(selected.source,painted);
+  const painted=paintSelected(text);best.gain=coreGain(selected.source,painted);best.bold=text.fontWeight==='bold'||Number(text.fontWeight)>=600;
   // Ink of the original letters over the ink of the text as fitted: 1 when
   // the weight is right, whatever the blur (blur moves ink, it keeps its mass).
   // The weight is judged on every line matched (the lines of one list in
@@ -198,19 +198,21 @@ function inkRatio(source:Coverage,painted:Coverage,gain:number){
 // Regular), so the ink decides: a weight is taken when its ink is clearly
 // closer, unless its shapes fit far worse.
 async function heaviness(raster:HTMLCanvasElement,region:TextRegion,regions:TextRegion[],fit:Fit,options:{autoFont:boolean;matchBlur:boolean;makeText:(region:TextRegion,family:string)=>Promise<Textbox>;onFit?:(fit:Fit)=>void;alike?:TextRegion[]}){
- // Only the weights on the side the ink points to: lighter when the match has
- // too much ink, heavier when too little.
+ // Only the weights on the side the ink points to (lighter when the match has
+ // too much ink, heavier when too little), nearest first: ink grows with the
+ // weight, so the walk stops once two weights in a row move away from the
+ // original's (the regular face drawn bold sits between SemiBold and ExtraBold).
  // (Regular may be set bold, so it is on both sides.)
- const base=baseFamily(fit.family),value=(f:string)=>familyWeights(base).find(w=>w.family===f)?.value??400;
- const faces=[base,...familyWeights(base).map(w=>w.family)].filter(f=>f!==fit.family&&(fit.mass!<1?value(f)<=500:value(f)>=500||f===base));
+ const base=baseFamily(fit.family),value=(f:string)=>familyWeights(base).find(w=>w.family===f)?.value??400,current=fit.family===base&&fit.bold?700:value(fit.family);
+ const faces=[base,...familyWeights(base).map(w=>w.family)].filter(f=>f!==fit.family&&(fit.mass!<1?value(f)<=500:value(f)>=500||f===base)).sort((a,b)=>Math.abs(value(a)-current)-Math.abs(value(b)-current));
  if(!faces.length)return fit;
- const off=(f:Fit)=>Math.abs(Math.log(f.mass!));let best=fit;
+ const off=(f:Fit)=>Math.abs(Math.log(f.mass!));let best=fit,bestOff=off(fit),misses=0;
  for(const face of faces){
   const other=await matchOcrAppearance(raster,region,regions,face,{...options,autoFont:false,weights:false,floor:.3});
   if(!other?.mass||other.score<fit.score-.25)continue;
-  if(off(other)<off(best)-.08)best=other;
+  const o=off(other);if(o<bestOff){best=other;bestOff=o;misses=0;}else if(o>bestOff+.02&&++misses>=2)break;
  }
- return best;
+ return bestOff<off(fit)-.08?best:fit;
 }
 
 // The text moved over its own letters, whole pixels then quarters, within
