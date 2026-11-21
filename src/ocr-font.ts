@@ -4,7 +4,8 @@ import {ensureFont} from './fonts';
 import {inkMask,normalizeMask,shapeScore,type Mask} from './font-match';
 
 // Common document/UI faces and their metric-compatible bundled stand-ins.
-export const fontCandidates=['Liberation Sans','Liberation Serif','Liberation Mono','Carlito','Caladea','Roboto','Open Sans','Inter','Lato','PT Sans','PT Serif','Montserrat'];
+// Raleway, Nunito and Poppins: common on cards, flyers and ads (their other weights are tried after the match).
+export const fontCandidates=['Liberation Sans','Liberation Serif','Liberation Mono','Carlito','Caladea','Roboto','Open Sans','Inter','Lato','PT Sans','PT Serif','Montserrat','Raleway','Nunito','Poppins'];
 // System fonts screenshots often use (iPhone, Windows, Office). Only those
 // installed on this computer are compared; others can't be rendered.
 export const systemCandidates=['SF Pro Text','SF Pro Display','Segoe UI','Arial','Calibri','Aptos','Cambria','Tahoma','Verdana','Georgia','Times New Roman'];

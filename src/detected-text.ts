@@ -185,7 +185,9 @@ export async function detectedTextbox(region:TextRegion,{ocrFont,ocrStyle,matchB
   if(words.every(w=>!measurable(w.text)||(w.inkMass!==undefined&&w.width))){const result=classify(words,words);weights=mixedWeights(words,result.bold);inkLevel=result.ink;}
   else weights=mixedWeights(words,words.map(w=>w.inkDensity===undefined||!measurable(w.text)?undefined:estimateOcrBold(w.text,family,region.height,w.inkDensity,region.blur)));
  }
- const bold=weights?weights.base:ownBold??(region.kind==='ocr'?(auto?single(words??[{text:region.text,inkDensity:region.inkDensity}]).bold:ocrStyle.includes('bold')):region.bold&&!weightFamilies.has(family));
+ let bold=weights?weights.base:ownBold??(region.kind==='ocr'?(auto?single(words??[{text:region.text,inkDensity:region.inkDensity}]).bold:ocrStyle.includes('bold')):region.bold&&!weightFamilies.has(family));
+ // A face that is a weight of its own (Raleway Light, Nunito ExtraBold) is never made bold on top.
+ if(weightFamilies.has(family)){weights=undefined;bold=false;}
  let size=region.size,ocrAscent=region.height,charSpacing=region.kind==='pdf'&&!embedded?fallbackCharSpacing(family):0,boxWidth=Math.max(region.width+4,20);
  if(region.kind==='ocr'){
   const ctx=document.createElement('canvas').getContext('2d')!,font=(b:boolean)=>`${italic?'italic ':''}${b?'bold ':''}100px "${family}"`;ctx.font=font(bold);const metrics=ctx.measureText(region.text);
@@ -227,7 +229,8 @@ export async function matchedDetectedTextbox(region:TextRegion,c:Canvas,p:Page,r
  const pdf=!!p.source,f=frameOf(region),fill=region.background||'#ffffff',regionsAll=framed(f,options.appearanceRegions??all,true);
  const native=pdf?await pdfScanScale(p.source!,p.index):undefined,k=pdf?native!==undefined&&native<=letterRasterScale(p.width,p.height,true)?native:Math.max(1,Math.min(4,32/Math.max(1,region.height),Math.sqrt(16e6/(p.width*p.height)))):1;
  const raster=levelRaster(pdf?await previewCanvas(p.source!,p.index,k,Math.ceil(p.width*k),Math.ceil(p.height*k)):await pageComposite(c,p),f,k,fill);
- const fine=(list:TextRegion[])=>k===1?list:scaleRegions(list,k,k),fitted=await matchOcrAppearance(raster,fine([region])[0],fine(regionsAll),options.ocrFont,{autoFont:options.autoFont,matchBlur:options.matchBlur,makeText});
+ const fine=(list:TextRegion[])=>k===1?list:scaleRegions(list,k,k),fineRegion=fine([region])[0],fineAll=fine(regionsAll);
+ const fitted=await matchOcrAppearance(raster,fineRegion,fineAll,options.ocrFont,{autoFont:options.autoFont,matchBlur:options.matchBlur,makeText,alike:alikeLines(raster,fineAll,fineRegion)});
  if(!fitted)return detectedTextbox(region,{...options,pageInk:await ink(options.ocrFont)});
  const text=await makeText(region,fitted.family);applyOcrAppearance(text,region,{...fitted,dx:fitted.dx/k,dy:fitted.dy/k,softness:fitted.softness/k});
  if(pdf){
@@ -420,19 +423,40 @@ function inkOf(ctx:CanvasRenderingContext2D,r:{left:number;top:number;width:numb
 // alike in shape and ink. Nearest lines first; a line under an earlier edit
 // (`blocked`) no longer shows what was read there. Each letter comes with its
 // line's baseline as the shared letters place it against this line's.
-function verifiedLibrary(raster:HTMLCanvasElement,regions:TextRegion[],region:TextRegion,cells:{ch:string;x0:number;x1:number;space?:boolean}[],baseline:number,needed:string[],blocked:{left:number;top:number;width:number;height:number}[],page?:string):LibraryGlyph[]{
- const wanted=needed.filter(ch=>/\S/.test(ch));if(!wanted.length)return [];
+// The lettering of one line, to judge other lines of the page by their own
+// pixels (letter-match.ts): `judge` compares a measured line's letters with
+// it, `line` measures another line (undefined when its ink colour differs).
+function lettering(raster:HTMLCanvasElement,region:TextRegion,cells:{ch:string;x0:number;x1:number;space?:boolean}[],baseline:number){
  const ctx=raster.getContext('2d',{willReadFrequently:true})!,bg=paperOf(ctx,region),up=Math.ceil(baseline-region.top)+1,down=Math.ceil(region.top+region.height-baseline)+1;
  // The line's ink contrast: its strongest pixels (the 95th percentile of the inked ones).
  const box=ctx.getImageData(Math.max(0,Math.floor(region.left)),Math.max(0,Math.floor(region.top)),Math.max(1,Math.ceil(region.width)),Math.max(1,Math.ceil(region.height))).data,inked:number[]=[];
  for(let i=0;i<box.length;i+=4){const v=Math.max(Math.abs(box[i]-bg[0]),Math.abs(box[i+1]-bg[1]),Math.abs(box[i+2]-bg[2]));if(v>40)inked.push(v);}
- if(inked.length<8)return [];inked.sort((a,b)=>a-b);const contrast=inked[Math.floor((inked.length-1)*.95)];
+ if(inked.length<8)return undefined;inked.sort((a,b)=>a-b);const contrast=inked[Math.floor((inked.length-1)*.95)];
  const cover=(g:{x0:number;x1:number},base:number,paper:number[]):Cover|undefined=>{const x=Math.floor(g.x0),w=Math.ceil(g.x1)-x,y=Math.round(base)-up;if(w<1||x<0||y<0||x+w>raster.width||y+up+down>raster.height)return undefined;return letterCover(ctx.getImageData(x,y,w,up+down).data,w,up+down,paper,contrast);};
  // Up to two instances of each telling character, none cut from a blot (fusedCells).
  const covers=(list:{ch:string;x0:number;x1:number;space?:boolean}[],base:number,paper:number[],only?:Set<string>,fused?:boolean[])=>{const m=new Map<string,Cover[]>();for(const [i,g] of list.entries()){if(g.space||fused?.[i]||!telling(g.ch)||only&&!only.has(g.ch)||(m.get(g.ch)?.length??0)>=2)continue;const c=cover(g,base,paper);if(c)m.set(g.ch,[...m.get(g.ch)??[],c]);}return m;};
  // Judged on letters standing clear; where too few do (soft digits touch), on all of them.
- const mineFused=fusedCells(cells),mine=covers(cells,baseline,bg,undefined,mineFused),mineAll=covers(cells,baseline,bg),ink=inkOf(ctx,region,bg);if(!mineAll.size||!ink)return [];
+ const mineFused=fusedCells(cells),mine=covers(cells,baseline,bg,undefined,mineFused),mineAll=covers(cells,baseline,bg),ink=inkOf(ctx,region,bg);if(!mineAll.size||!ink)return undefined;
  const judge=(list:{ch:string;x0:number;x1:number;space?:boolean}[],base:number,paper:number[],fused:boolean[])=>{const clear=sameLettering(mine,covers(list,base,paper,new Set(mine.keys()),fused));return clear.shared>=2?clear:sameLettering(mineAll,covers(list,base,paper,new Set(mineAll.keys())));};
+ const line=(r:TextRegion)=>{const {rows,y0}=rowInk(raster,r),m=lineMetrics(rows),own=lineCells(r.text,r.glyphs!);if(!m||!own)return undefined;const paper=paperOf(ctx,r),theirs=inkOf(ctx,r,paper);if(!theirs||theirs.some((v,n)=>Math.abs(v-ink[n])>30))return undefined;const middles=inkMiddles(ctx,r,paper,own);return {r,own,base:y0+m.baseline,paper,middles,fused:fusedCells(own.map((g,i)=>({...g,...middles[i]})))};};
+ return {ctx,bg,ink,mine,mineAll,covers,judge,line};
+}
+// Lines of the page proven to be in the same lettering as this one (sharing
+// two telling letters or more, alike in shape and ink): an edit set in a font
+// is matched on all of them, so the lines of one list get one face and weight.
+export function alikeLines(raster:HTMLCanvasElement,regions:TextRegion[],region:TextRegion){
+ if(!region.glyphs)return [];
+ const cells=lineCells(region.text,region.glyphs);if(!cells)return [];
+ const target=rowInk(raster,region),metrics=lineMetrics(target.rows);if(!metrics)return [];
+ const ctx=raster.getContext('2d',{willReadFrequently:true})!,middles=inkMiddles(ctx,region,paperOf(ctx,region),cells);cells.forEach((cell,i)=>Object.assign(cell,middles[i]));
+ const L=lettering(raster,region,cells,target.y0+metrics.baseline);if(!L)return [];
+ const shares=(r:TextRegion)=>new Set([...r.text].filter(ch=>L.mineAll.has(ch))).size;
+ return regions.filter(r=>r.id!==region.id&&r.kind==='ocr'&&r.glyphs&&!r.angle===!region.angle&&shares(r)>=2).flatMap(r=>{const line=L.line(r);if(!line)return [];const verdict=L.judge(line.own,line.base,line.paper,line.fused);return verdict.ok&&verdict.shared>=2?[r]:[];});
+}
+function verifiedLibrary(raster:HTMLCanvasElement,regions:TextRegion[],region:TextRegion,cells:{ch:string;x0:number;x1:number;space?:boolean}[],baseline:number,needed:string[],blocked:{left:number;top:number;width:number;height:number}[],page?:string):LibraryGlyph[]{
+ const wanted=needed.filter(ch=>/\S/.test(ch));if(!wanted.length)return [];
+ const L=lettering(raster,region,cells,baseline);if(!L)return [];
+ const {ctx,ink,mine,mineAll,covers,judge}=L;
  const centre=(r:{left:number;top:number;width:number;height:number})=>[r.left+r.width/2,r.top+r.height/2],[cx,cy]=centre(region);
  const candidates=regions.filter(r=>r.id!==region.id&&r.kind==='ocr'&&r.glyphs&&wanted.some(ch=>r.text.includes(ch))&&[...mineAll.keys()].some(ch=>r.text.includes(ch))&&!blocked.some(b=>b.left<r.left+r.width&&b.left+b.width>r.left&&b.top<r.top+r.height&&b.top+b.height>r.top))
   .sort((a,b)=>Math.abs(centre(a)[1]-cy)+Math.abs(centre(a)[0]-cx)*.25-Math.abs(centre(b)[1]-cy)-Math.abs(centre(b)[0]-cx)*.25).slice(0,16);

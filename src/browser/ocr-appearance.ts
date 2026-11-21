@@ -1,12 +1,13 @@
 import {alphaCoverage,blurCoverage,contrastCoverage,coreGain,coverageFit,matchedInkColor,coverageEdgeWidth,type Coverage} from '../ocr-appearance';
 import {clampTextSoftness} from '../text-appearance';
 import {rankOcrFonts,type FontSample} from '../ocr-font';
+import {familyWeights,baseFamily} from '../font-weights';
 import type {TextRegion} from '../text-regions';
 import type {Textbox} from '../text-appearance';
 
 type Sample={region:TextRegion;left:number;top:number;source:Coverage;font:FontSample};
 const FAMILY_MARGIN=.04;
-type Fit={family:string;score:number;softness:number;ratio:number;dx:number;dy:number;gain:number};
+type Fit={family:string;score:number;softness:number;ratio:number;dx:number;dy:number;gain:number;mass?:number;masses?:number[]};
 const median=(values:number[])=>[...values].sort((a,b)=>a-b)[values.length>>1];
 
 function samplePixels(raster:HTMLCanvasElement,r:TextRegion,regions:TextRegion[],maxArea=120000):Sample|undefined{
@@ -23,9 +24,13 @@ function samplePixels(raster:HTMLCanvasElement,r:TextRegion,regions:TextRegion[]
 
 // Prefer neighbouring words over the selected word: OCR may have misread the
 // very letters the user is correcting (e.g. Daliil → Dalil).
-function localSamples(raster:HTMLCanvasElement,region:TextRegion,regions:TextRegion[]):Sample[]{
- const near=regions.filter(r=>r.kind==='ocr'&&r.id!==region.id&&(r.confidence??0)>=85&&r.text.replace(/[^\p{L}\p{N}]/gu,'').length>=4&&r.height>=6&&r.height/region.height>=.7&&r.height/region.height<=1.4&&Math.abs((r.top+r.height/2)-(region.top+region.height/2))<region.height*.6)
-  .sort((a,b)=>Math.abs(a.left-region.left)-Math.abs(b.left-region.left)).slice(0,3);
+// `alike`: lines proven to be in the same lettering (alikeLines), wherever on
+// the page: the lines of one list are matched together, and get one face.
+function localSamples(raster:HTMLCanvasElement,region:TextRegion,regions:TextRegion[],alike:TextRegion[]=[]):Sample[]{
+ const usable=(r:TextRegion)=>r.kind==='ocr'&&r.id!==region.id&&(r.confidence??0)>=85&&r.text.replace(/[^\p{L}\p{N}]/gu,'').length>=4&&r.height>=6&&r.height/region.height>=.7&&r.height/region.height<=1.4;
+ const row=regions.filter(r=>usable(r)&&Math.abs((r.top+r.height/2)-(region.top+region.height/2))<region.height*.6).sort((a,b)=>Math.abs(a.left-region.left)-Math.abs(b.left-region.left)).slice(0,3);
+ const same=alike.filter(r=>usable(r)&&!row.includes(r)).sort((a,b)=>Math.abs(a.top-region.top)-Math.abs(b.top-region.top)).slice(0,Math.max(0,4-row.length));
+ const near=[...row,...same];
  return (near.length?near:[region]).flatMap(r=>{
   if((r.confidence??0)<75||r.text.length<4||r.width>2000)return [];
   const sample=samplePixels(raster,r,regions);return sample?[sample]:[];
@@ -57,10 +62,10 @@ function coverageRenderer(sample:Sample,scale=1){
 
 // Render through the same editable Textbox used by the workspace, at native
 // resolution. Fit fractional positioning without re-rendering every offset.
-export async function matchOcrAppearance(raster:HTMLCanvasElement,region:TextRegion,regions:TextRegion[],family:string,{autoFont,matchBlur,makeText,onFit,own=false}:{autoFont:boolean;matchBlur:boolean;makeText:(region:TextRegion,family:string)=>Promise<Textbox>;onFit?:(fit:Fit)=>void;own?:boolean}):Promise<Fit|undefined>{
+export async function matchOcrAppearance(raster:HTMLCanvasElement,region:TextRegion,regions:TextRegion[],family:string,{autoFont,matchBlur,makeText,onFit,own=false,weights=true,floor,alike}:{autoFont:boolean;matchBlur:boolean;makeText:(region:TextRegion,family:string)=>Promise<Textbox>;onFit?:(fit:Fit)=>void;own?:boolean;weights?:boolean;floor?:number;alike?:TextRegion[]}):Promise<Fit|undefined>{
  // `own`: the selected line's letters alone, when its neighbours fit badly
  // (a sharp name beside a label blurred far more than the name allows).
- const samples=own?[samplePixels(raster,region,regions)].filter((s):s is Sample=>!!s):localSamples(raster,region,regions);if(!samples.length)return undefined;
+ const samples=own?[samplePixels(raster,region,regions)].filter((s):s is Sample=>!!s):localSamples(raster,region,regions,alike);if(!samples.length)return undefined;
  // Font/size can use reliable neighbouring words, but edge clarity belongs
  // to the selected letters. Compare actual native pixels, not a blur-radius
  // estimate, which varies with the font's stroke thickness.
@@ -128,13 +133,14 @@ export async function matchOcrAppearance(raster:HTMLCanvasElement,region:TextReg
     if(fit){
      // Colour from the stroke cores at the chosen placement, not the fit's gain.
      const f=fit as Fit;text.set({fontSize:size*f.ratio,left:sample.region.left+f.dx,top:sample.region.top+ascent-size*f.ratio*.93+f.dy});text.textSoftness=f.softness;text.initDimensions();
-     f.gain=coreGain(sample.source,paint());fits.push(f);onFit?.(f);
+     const painted=paint();f.gain=coreGain(sample.source,painted);f.mass=inkRatio(sample.source,painted,f.gain);fits.push(f);onFit?.(f);
     }
    }
   }
   if(!fits.length)continue;
   const score=fits.reduce((sum,f)=>sum+f.score,0)/fits.length;
-  const aggregate={family:candidateFamily,score,softness:median(fits.map(f=>f.softness)),ratio:median(fits.map(f=>f.ratio)),dx:median(fits.map(f=>f.dx)),dy:median(fits.map(f=>f.dy)),gain:median(fits.map(f=>f.gain))};
+  const masses=fits.flatMap(f=>f.mass===undefined?[]:[f.mass]);
+  const aggregate={family:candidateFamily,score,softness:median(fits.map(f=>f.softness)),ratio:median(fits.map(f=>f.ratio)),dx:median(fits.map(f=>f.dx)),dy:median(fits.map(f=>f.dy)),gain:median(fits.map(f=>f.gain)),masses};
   // Combining separate medians can create a placement we never evaluated.
   // Keep an actual fitted tuple when that combination would soften the edges.
   const result=allows(aggregate.ratio,aggregate.softness,aggregate.dx,aggregate.dy)?aggregate:{...fits.reduce((a,b)=>a.score>b.score?a:b),score};
@@ -143,8 +149,12 @@ export async function matchOcrAppearance(raster:HTMLCanvasElement,region:TextReg
   // near tie on one soft line used to turn Arial into Roboto or Open Sans).
   if(!best||score>best.score+(best.family===family?FAMILY_MARGIN:0))best=result;
  }
- // Low confidence or mismatched OCR should retain the existing estimate.
- if(!best||best.score<.55)return own||samples.every(s=>s.region.id===region.id)?undefined:matchOcrAppearance(raster,region,regions,family,{autoFont,matchBlur,makeText,onFit,own:true});
+ // Low confidence or mismatched OCR should retain the existing estimate. On
+ // the line's own letters a lower score still beats no match: a ligature the
+ // text box does not draw ("ff" in Raleway) costs a tenth of the score, and
+ // the default left a light Raleway line in the page's heavy face.
+ const alone=own||samples.every(s=>s.region.id===region.id);
+ if(!best||best.score<(floor??(alone?.45:.55)))return alone||floor!==undefined?undefined:matchOcrAppearance(raster,region,regions,family,{autoFont,matchBlur,makeText,onFit,own:true,alike});
  // Neighbours can guide the font and placement, but their ink can differ
  // from the selected line. Measure its own cores at the final fitted tuple.
  if(selected&&paintSelected){
@@ -153,7 +163,52 @@ export async function matchOcrAppearance(raster:HTMLCanvasElement,region:TextReg
   // Neighbours set the font, size and softness, but each word's box sits a
   // pixel or two differently: the placement comes from the selected letters.
   const own=ownPlacement(selected.source,paintSelected,text);best.dx+=own.dx;best.dy+=own.dy;
-  best.gain=coreGain(selected.source,paintSelected(text));
+  const painted=paintSelected(text);best.gain=coreGain(selected.source,painted);
+  // Ink of the original letters over the ink of the text as fitted: 1 when
+  // the weight is right, whatever the blur (blur moves ink, it keeps its mass).
+  // The weight is judged on every line matched (the lines of one list in
+  // the same lettering) and this one: the median of their ink ratios.
+  const mine=inkRatio(selected.source,painted,best.gain),all=[...best.masses??[],...mine===undefined?[]:[mine]];
+  if(all.length)best.mass=median(all);
+ }
+ if(weights&&best.mass!==undefined)return heaviness(raster,region,regions,best,{autoFont,matchBlur,makeText,onFit,alike});
+ return best;
+}
+
+// Ink of the original letters over the ink of the text as fitted, at its
+// gain: 1 when the weight is right, whatever the blur (blur moves ink, it
+// keeps its mass). A textured background (a photo under a gradient, scanner
+// noise) reads as faint ink everywhere: its level where no letter is drawn
+// is taken off first.
+function inkRatio(source:Coverage,painted:Coverage,gain:number){
+ let floor=0,clear=0;for(let i=0;i<painted.data.length;i++)if(painted.data[i]===0){floor+=source.data[i];clear++;}
+ floor=clear?floor/clear:0;
+ let ink=0,drawn=0;for(const v of source.data)ink+=Math.max(0,v-floor);for(const v of painted.data)drawn+=v;
+ return drawn>0&&gain>0?ink/(drawn*gain):undefined;
+}
+
+// The family's other bundled weights (Raleway Light, Nunito ExtraBold…): a
+// light title set in the regular face has a third more ink, a heavy one in
+// bold a fifth less. Measured on invented pages: Raleway Light lines 1.03-1.07
+// of the original's ink in Light against 0.78-0.81 in Regular; Nunito
+// ExtraBold 1.03-1.05 against 1.14-1.21 in Bold; a Roboto Light title 0.99
+// against 0.67. Weights share their letter shapes, and the shape score
+// favours heavier faces on thin text (a hair stroke a fraction of a pixel off
+// loses most of its overlap: that title scored 0.46 in Light, 0.68 in
+// Regular), so the ink decides: a weight is taken when its ink is clearly
+// closer, unless its shapes fit far worse.
+async function heaviness(raster:HTMLCanvasElement,region:TextRegion,regions:TextRegion[],fit:Fit,options:{autoFont:boolean;matchBlur:boolean;makeText:(region:TextRegion,family:string)=>Promise<Textbox>;onFit?:(fit:Fit)=>void;alike?:TextRegion[]}){
+ // Only the weights on the side the ink points to: lighter when the match has
+ // too much ink, heavier when too little.
+ // (Regular may be set bold, so it is on both sides.)
+ const base=baseFamily(fit.family),value=(f:string)=>familyWeights(base).find(w=>w.family===f)?.value??400;
+ const faces=[base,...familyWeights(base).map(w=>w.family)].filter(f=>f!==fit.family&&(fit.mass!<1?value(f)<=500:value(f)>=500||f===base));
+ if(!faces.length)return fit;
+ const off=(f:Fit)=>Math.abs(Math.log(f.mass!));let best=fit;
+ for(const face of faces){
+  const other=await matchOcrAppearance(raster,region,regions,face,{...options,autoFont:false,weights:false,floor:.3});
+  if(!other?.mass||other.score<fit.score-.25)continue;
+  if(off(other)<off(best)-.08)best=other;
  }
  return best;
 }

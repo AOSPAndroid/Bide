@@ -64,6 +64,21 @@ export const templates={
    ${[1,2,3,4].map(i=>row(`<span style="color:#667">${f(v,'d'+i)}</span>`,`<span style="font-weight:${i===4?700:400}">${f(v,'v'+i)}</span>`,'line-height:2.1;border-bottom:1px solid #e3e6ea')).join('')}
    <div style="margin-top:10px;color:#1f6f5c;font-weight:700">${f(v,'code')}</div></div></div>`,
   edits:[['v1','sam. 11 juil. 2026','own'],['v2','sam. 22 juil. 2026','own'],['v1','sam. 18 juil. 2025','page'],['v2','sam. 25 juil. 2027','page'],['v4','724,00 €','own'],['v4','742,80 €','page'],['v3','2 adultes, 2 enfant','own'],['v3','3 adultes, 1 enfant','page'],['code','Code d’accès : 4318','own'],['code','Code d’accès : 4837','page'],['place','Gîte du Vieux Lavoir','page'],['place','Gîte du Moulin Vieux','own'],['bar','Réservation modifiée','page'],['where','Saint-Antonin, Tarn','shorter']]},
+
+ // A tradesman's card: white text on a pink-to-purple gradient, a thin
+ // Raleway Light name and contact lines, a heavy Nunito ExtraBold list of
+ // services. The edits a business owner asks for: a new phone number, email,
+ // name and services.
+ ad:{width:560,height:340,fonts:async()=>[await face('RalewayL','weights/Raleway-Light.ttf'),await face('NunitoX','weights/Nunito-ExtraBold.ttf')].join(''),
+  fields:{name:'ATELIER LAMBERT',role:'Plombier Chauffagiste',s1:'Dépannage - Rénovation',s2:'Salle de bain clé en main',s3:'Chauffe-eau thermodynamique',s4:'Entretien chaudière',mail:'contact@atelier-lambert.fr',tel:'06 48 27 15 90'},
+  html:(v)=>`<div style="width:560px;height:340px;background:linear-gradient(120deg,#e2336b 0%,#c93f8e 55%,#9b3fa3 100%);color:#fff;padding:30px 40px;box-sizing:border-box">
+   <div style="font-family:RalewayL;font-size:30px;letter-spacing:.5px">${f(v,'name')}</div>
+   <div style="width:60px;border-top:1px solid #fff8;margin:12px 0"></div>
+   <div style="font-family:RalewayL;font-size:18px;margin-bottom:12px">${f(v,'role')}</div>
+   <div style="font-family:NunitoX;font-size:17px;line-height:1.3">${[1,2,3,4].map(i=>`<div>${f(v,'s'+i)}</div>`).join('')}</div>
+   <div style="font-family:RalewayL;font-size:18px;margin-top:14px">${f(v,'mail')}</div>
+   <div style="font-family:RalewayL;font-size:18px">${f(v,'tel')}</div></div>`,
+  edits:[['tel','06 48 27 51 09','own'],['tel','07 33 61 26 84','new'],['mail','atelier.lambert@gmail.com','page'],['mail','contact@lambert.fr','shorter'],['name','ATELIER MARTIN','new'],['name','ATELIER BERTAL','own'],['role','Plombier Couvreur','page'],['s1','Rénovation - Dépannage','own'],['s2','Salle de bain','shorter'],['s3','Chauffe-eau solaire','page'],['s4','Entretien chaudière gaz','new']]},
 };
 
 // How each document reaches the app. `dpi`: pixels per inch of the scan (a CSS
@@ -89,4 +104,5 @@ export const cases=[
  ['slip','clean'],['slip','pdf'],['slip','low'],
  ['readings','clean'],['readings','fine'],['readings','soft'],
  ['screen','shot'],['screen','soft'],
+ ['ad','clean'],['ad','soft'],['ad','shot'],
 ];
