@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-11-21 — Crisp edits on low-resolution scanned PDFs
+
+- Merge the complete Claude branch through `ed92f91` in `306554c`.
+- For explicit New font edits, prevent short, crisp text on a low-resolution scanned PDF from being rendered unnecessarily soft and pale when the edge-width estimate is noisy. Added softness must also match the original letter shapes.
+- Add 96 dpi screen-capture and scanned-PDF benchmark fixtures. Original-letter editing, explicit font consent, manual font/style choices and OCR defaults remain intact.
+
 ## 2026-11-21 — Hosted web integration
 
 - Integrate the complete Claude branch through `3c441bc`, including the fixes for a clipped final letter, background fill on coloured or textured pages, and matching weights across verified lines.
