@@ -94,6 +94,10 @@ export const variants={
  low:{dpi:130,blur:.4,as:'png'},
  // A screenshot: device pixels, no scanner.
  shot:{dpi:216,as:'png'},
+ // A document captured from a screen at its own size: crisp, small letters (a capital 8 px high).
+ view:{dpi:96,as:'png'},
+ // The same inside a PDF: a low-resolution scan or a page saved as an image.
+ viewpdf:{dpi:96,as:'scanpdf'},
 };
 
 // The documents measured: every template clean and as a scanned PDF, and the
@@ -105,4 +109,5 @@ export const cases=[
  ['readings','clean'],['readings','fine'],['readings','soft'],
  ['screen','shot'],['screen','soft'],
  ['ad','clean'],['ad','soft'],['ad','shot'],
+ ['workshop','view'],['letter','view'],['workshop','viewpdf'],
 ];
