@@ -353,3 +353,51 @@ test('a PDF bundled replacement refuses missing glyphs before changing the sourc
   assert.deepEqual(errors,[]);
  }finally{await browser.close();await server.close();}
 });
+
+test('OCR edit controls wait for the page reload while keeping input and Cancel available',{timeout:600000},async()=>{
+ // Hold the real editor Canvas reload after its first committed letter edit,
+ // not the import or OCR. Importing fabric through this Vite module patches
+ // the same Canvas prototype used by App, rather than another module copy.
+ const moduleId='\0virtual:bide-ocr-reload-gate',moduleUrl='/@id/__x00__virtual:bide-ocr-reload-gate';
+ const code=`import {Canvas} from 'fabric';
+ export const state={armed:false,waiting:false,finished:false,calls:0};let releaseLoad;
+ const original=Canvas.prototype.loadFromJSON;
+ Canvas.prototype.loadFromJSON=function(data,...args){
+  if(!state.armed||!data?.objects?.some(o=>o.editedText==='1 974,80 €'))return original.call(this,data,...args);
+  state.armed=false;state.waiting=true;state.calls++;
+  return new Promise((resolve,reject)=>{releaseLoad=async()=>{try{const value=await original.call(this,data,...args);state.waiting=false;state.finished=true;resolve(value);}catch(error){reject(error);throw error;}};});
+ };
+ export function arm(){state.armed=true;}
+ export function release(){if(!releaseLoad)throw new Error('No edited-page reload was held');const run=releaseLoad;releaseLoad=undefined;return run();}`;
+ const server=await createServer({logLevel:'error',plugins:[{name:'test-ocr-reload-gate',resolveId(id){if(id==='virtual:bide-ocr-reload-gate')return moduleId;},load(id){if(id===moduleId)return code;}}],server:{port:0,host:'127.0.0.1'}});await server.listen();
+ const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||undefined});
+ try{
+  const page=await browser.newPage({viewport:{width:1400,height:900}}),errors=[];page.on('pageerror',error=>errors.push(error.message));
+  const field=text=>page.getByRole('button',{name:`Edit detected text: ${text}`,exact:true});
+  const saved=()=>page.evaluate(async()=>{
+   const project=await(await import('/src/model.ts')).restoreLocal(),p=project?.pages[0];if(!p)return null;
+   const canvasHash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(p.canvas)))),n=>n.toString(16).padStart(2,'0')).join('');
+   return {source:p.source,canvasHash,edits:p.canvas.objects.filter(o=>o.editedText).map(o=>({text:o.editedText,type:o.type})),fontLayers:p.canvas.objects.filter(o=>/textbox/i.test(o.type??'')).length};
+  });
+  const waitSaved=async text=>{const until=Date.now()+30000;let value;while(Date.now()<until){value=await saved();if(value?.edits.length===1&&value.edits[0].text===text)return value;await page.waitForTimeout(100);}assert.fail(`the saved page has one edit containing ${text}: ${JSON.stringify(value)}`);};
+  await page.goto(server.resolvedUrls.local[0]+'app/');await page.locator('input[type=file][accept*=".psd"]').setInputFiles('tests/fixtures/scanned-quote.pdf');
+  await field('1 947,80 €').waitFor({timeout:240000});
+  await page.waitForFunction(()=>{const text=document.querySelector('.text-detection-bar > span')?.textContent||'';return text.includes('AI OCR')&&!text.includes('…');},null,{timeout:240000});
+  await page.evaluate(async url=>{window.__ocrReloadGate=await import(url);window.__ocrReloadGate.arm();},moduleUrl);
+  await field('1 947,80 €').click();await page.getByLabel('New text').fill('1 974,80 €');await page.getByRole('button',{name:'Apply',exact:true}).click();
+  await page.waitForFunction(()=>window.__ocrReloadGate.state.waiting,null,{timeout:60000});
+  await page.getByRole('dialog',{name:'Edit image text'}).waitFor({state:'hidden',timeout:60000});const first=await waitSaved('1 974,80 €');
+  await field('1 974,80 €').click();let input=page.getByLabel('New text');await input.fill('1 999,80 €');
+  const apply=page.getByRole('button',{name:'Apply',exact:true}),cancel=page.getByRole('button',{name:'Cancel',exact:true});
+  assert.equal(await apply.isDisabled(),true,'Apply cannot silently discard an edit while the canvas is opening');assert.equal(await cancel.isEnabled(),true,'Cancel remains available during page opening');
+  await input.press('Enter');assert.equal(await input.inputValue(),'1 999,80 €','Enter keeps the typed value');assert.deepEqual(await saved(),first,'Enter cannot change the pending page');
+  await cancel.click();assert.equal(await page.getByRole('dialog',{name:'Edit image text'}).count(),0);assert.deepEqual(await saved(),first,'Cancel leaves the committed page unchanged');
+  await field('1 974,80 €').click();input=page.getByLabel('New text');await input.fill('1 999,80 €');assert.equal(await apply.isDisabled(),true);
+  await page.evaluate(()=>window.__ocrReloadGate.release());await page.waitForFunction(()=>window.__ocrReloadGate.state.finished);
+  await apply.waitFor();await page.waitForFunction(()=>!document.querySelector('[role=dialog][aria-label="Edit image text"] .dialog-actions .primary')?.disabled);
+  assert.equal(await input.inputValue(),'1 999,80 €','finishing the reload preserves the input');assert.deepEqual(await saved(),first,'opening the page does not submit or queue the typed edit');
+  await apply.click();await page.getByRole('dialog',{name:'Edit image text'}).waitFor({state:'hidden',timeout:60000});const latest=await waitSaved('1 999,80 €');
+  assert.equal(latest.source,first.source);assert.equal(latest.fontLayers,0,'the explicit Apply reuses original letters');assert.equal(await page.getByLabel('Edit image text with').inputValue(),'letters');
+  assert.equal(await page.evaluate(()=>window.__ocrReloadGate.state.calls),1,'only the first edited-page reload was held');assert.deepEqual(errors,[]);
+ }finally{await browser.close();await server.close();}
+});

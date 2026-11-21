@@ -11,14 +11,15 @@ import type {TextRegion} from './text-regions';
 // as a text layer instead.
 // `refusal`: why the last Apply could not keep the original letters; `useFont`
 // then offers this one line in a font, as an explicit choice.
-export function EditTextDialog({region,pending=false,close,apply,asTextbox,refusal,useFont}:{region:TextRegion;pending?:boolean;close:()=>void;apply:(text:string)=>void;asTextbox?:(text:string)=>void;refusal?:string;useFont?:(text:string)=>void}){
- const [value,setValue]=useState(region.text),doubts=useDoubts(value,value===region.text?doubtfulLetters(region):[]),pdf=region.kind==='pdf';
+export function EditTextDialog({region,pending=false,loading=false,close,apply,asTextbox,refusal,useFont}:{region:TextRegion;pending?:boolean;loading?:boolean;close:()=>void;apply:(text:string)=>void;asTextbox?:(text:string)=>void;refusal?:string;useFont?:(text:string)=>void}){
+ const [value,setValue]=useState(region.text),doubts=useDoubts(value,value===region.text?doubtfulLetters(region):[]),pdf=region.kind==='pdf',unavailable=pending||loading;
  return <ModalShell title={pdf?'Edit PDF text':'Edit image text'} close={close}>
   <p className="muted">{pdf?'Apply edits the PDF in its original font. If an exact edit is unavailable, your document and input stay unchanged unless you explicitly allow New font. New font text box permits a replacement typeface and may change the appearance.':"Changes reuse this line's own letters and sharpness; a letter it lacks comes from another line of the page only when that line is verified to be in the same lettering. If the original lettering cannot be preserved, nothing is changed. To permit a replacement typeface, choose Use a font for this edit after a refusal, or New font in OCR settings. A replacement font may change the appearance."}</p>
-  <label className="stacked-label">Text<input aria-label="New text" value={value} onChange={e=>setValue(e.target.value)} onKeyDown={e=>{if(!pending&&e.key==='Enter'&&value!==region.text)apply(value);}}/></label>
+  <label className="stacked-label">Text<input aria-label="New text" value={value} onChange={e=>setValue(e.target.value)} onKeyDown={e=>{if(!unavailable&&e.key==='Enter'&&value!==region.text)apply(value);}}/></label>
+  {loading&&<p className="notice" role="status">The page is opening. Your text is kept; apply it when the page is ready.</p>}
   <DoubtList doubts={doubts} onPick={(d,s)=>setValue(v=>applySuggestion(v,d,s))}/>
   {refusal&&<p className="notice lettering-refusal" role="alert">Cannot keep the original lettering: {refusal} Nothing was changed.</p>}
-  <div className="dialog-actions text-edit-actions"><button className="secondary" disabled={pending} onClick={close}>Cancel</button>{asTextbox&&<button className="secondary" disabled={pending} onClick={()=>asTextbox(value)}>New font text box</button>}{refusal&&useFont&&<button className="secondary" disabled={pending||!value.trim()} onClick={()=>useFont(value)}>Use a font for this edit</button>}<button className="primary" disabled={pending||!value.trim()||value===region.text} onClick={()=>apply(value)}>{pending?'Applying…':'Apply'}</button></div>
+  <div className="dialog-actions text-edit-actions"><button className="secondary" disabled={pending} onClick={close}>Cancel</button>{asTextbox&&<button className="secondary" disabled={unavailable} onClick={()=>asTextbox(value)}>New font text box</button>}{refusal&&useFont&&<button className="secondary" disabled={unavailable||!value.trim()} onClick={()=>useFont(value)}>Use a font for this edit</button>}<button className="primary" disabled={unavailable||!value.trim()||value===region.text} onClick={()=>apply(value)}>{pending?'Applying…':'Apply'}</button></div>
  </ModalShell>;
 }
 
