@@ -76,6 +76,18 @@ test('a comma read half a letter late keeps its own small run (small table digit
 });
 // Cells as glyphEditPatch measures them: ink middle `m` and ink extent `i0`-`i1`.
 const cell=(ch,x0,x1,i0=x0+1,i1=x1-1)=>({ch,x0,x1,i0,i1,m:(i0+i1)/2});
+test('edge spaces keep their advance in proportional original-letter edits',()=>{
+ const measured=[cell('a',0,10),cell('b',10,16),{ch:' ',x0:16,x1:20,space:true},cell('a',20,30)];
+ // Read the visible ink positions from the public plan, including blank pieces.
+ const ink=(plan,cells)=>{let cursor=plan.startX;const out=[];for(const q of plan.pieces){const at=q.to??cursor;if(!q.blank){const source=cells.find(c=>c.x0===q.x0&&c.x1===q.x1);assert.ok(source);if(!source.space)out.push(at+source.i0-q.x0);}cursor=at+q.x1-q.x0;}return out;};
+ for(const [next,end,positions] of [[' ab a',34,[5,15,25]],['  ab a',38,[9,19,29]]]){
+  const plan=planGlyphEdit('ab a',measured,next);assert.equal(plan.startX,0);assert.equal(plan.end,end);assert.deepEqual(ink(plan,measured),positions,'each leading space moves the ink by the measured four-pixel word space');
+ }
+ const trailing=planGlyphEdit('ab a',measured,'ab a ');assert.equal(trailing.startX,30);assert.equal(trailing.end,34,'a trailing space retains its four-pixel advance');
+ const right=planGlyphEdit('ab a',measured,'ab a ',[],{right:true});assert.equal(right.end,30);assert.deepEqual(ink(right,measured),[-3,7,17],'a trailing space moves right-aligned ink left by its advance');
+ const leading=[{ch:' ',x0:0,x1:4,space:true},...measured.map(c=>({...c,x0:c.x0+4,x1:c.x1+4,...c.space?{}:{i0:c.i0+4,i1:c.i1+4,m:c.m+4}}))];
+ const removed=planGlyphEdit(' ab a',leading,'ab a');assert.equal(removed.startX,0);assert.equal(removed.end,30);assert.deepEqual(ink(removed,leading),[1,11,21],'removing a source leading space removes its visible indent');
+});
 test('a digit for a digit is drawn where the old one stood and nothing else moves',async()=>{
  const {planGlyphEdit:plan}=await import('../tmp/glyph-edit.mjs');
  // "18,40": the 1 is narrow (cell 0-8, ink 3-6), the others 12 wide.
