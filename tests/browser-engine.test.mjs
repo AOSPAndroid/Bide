@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { mkdir, writeFile, readFile } from 'node:fs/promises';
 import * as mupdf from 'mupdf';
 import { unzipSync, strFromU8 } from 'fflate';
-import { importBytes, exportDocument, restore, render, renderArea, selectionRasterPlan, selectPages, detectPdfText, removePdfText, fontSupportsText, findPdfText, redactPdf, sanitizePdf, pdfFormFields, fillPdfField } from '../tmp/browser-core.mjs';
+import { importBytes, exportDocument, restore, render, scanScale, renderArea, selectionRasterPlan, selectPages, detectPdfText, removePdfText, fontSupportsText, findPdfText, redactPdf, sanitizePdf, pdfFormFields, fillPdfField } from '../tmp/browser-core.mjs';
+import {letterRasterScale} from '../tmp/render-budget.mjs';
 await mkdir('tmp/pdfs',{recursive:true});
 const original=new mupdf.PDFDocument(),font=new mupdf.Font('Helvetica'),fontRef=original.addSimpleFont(font);
 for(const label of ['Original first page','Original second page']){const p=original.addPage([0,0,595,842],0,{Font:{helv:fontRef}},`BT /helv 22 Tf 50 772 Td (${label}) Tj ET 0.2 0.7 0.5 rg 50 642 200 100 re f`);original.insertPage(-1,p);p.destroy();}
@@ -340,6 +341,65 @@ test('scanner text replacement removes the whole old field, including an unchang
   try{assert.deepEqual(a.getPixels(),b.getPixels(),'repairing invisible text never changes the scan or its drawings');}finally{a.destroy();b.destroy();beforePage.destroy();before.destroy();}
  }finally{structured.destroy();page.destroy();output.destroy();}
  }
+});
+
+// Invented, valid grayscale images: metadata is inspected without decoding a
+// whole-page raster, and no real scan is used or written into the repository.
+async function scanFixture({width=432,height=432,images=[['Scan',1200,1200]],commands,states={},forms=[]}={}){
+ const doc=new mupdf.PDFDocument(),refs={},owned=[];
+ try{
+  for(const [name,w,h] of images){const ref=doc.addStream(new Uint8Array(w*h),{Type:'XObject',Subtype:'Image',Width:w,Height:h,ColorSpace:'DeviceGray',BitsPerComponent:8});refs[name]=ref;owned.push(ref);}
+  for(const form of forms){const ref=doc.addStream(form.commands,{Type:'XObject',Subtype:'Form',FormType:1,BBox:form.bounds??[0,0,1,1],Resources:{XObject:{...refs}},Group:form.group});refs[form.name]=ref;owned.push(ref);}
+  const page=doc.addPage([0,0,width,height],0,{XObject:refs,ExtGState:typeof states==='function'?states(refs):states},commands??`q ${width} 0 0 ${height} 0 0 cm /Scan Do Q`);owned.push(page);doc.insertPage(-1,page);
+  const buffer=doc.saveToBuffer('compress');try{return await importBytes(buffer.asUint8Array().slice(),'invented-scan-metadata.pdf');}finally{buffer.destroy();}
+ }finally{for(const ref of owned)ref.destroy();doc.destroy();}
+}
+// The existing glyph caller accepts native density only within this budget.
+const boundedScanScale=source=>{const page=source.pages[0],native=scanScale(source.id,0),budget=letterRasterScale(page.width,page.height,true);return native!==undefined&&native<=budget?native:budget;};
+
+test('a single upright scan keeps native density within existing PDF raster limits',async()=>{
+ for(const dpi of [200,300,500]){
+  const source=await scanFixture({images:[['Scan',6*dpi,6*dpi]]}),native=scanScale(source.id,0),k=boundedScanScale(source);
+  assert.ok(Math.abs(native-dpi/72)<1e-5,`${dpi} dpi image metadata is retained`);
+  assert.ok(Math.abs(k-Math.min(dpi,300)/72)<1e-5,`${dpi} dpi stays within the 300 dpi render cap`);
+ }
+ for(const options of [{width:2000,height:2000,images:[['Scan',6000,6000]]},{width:100,height:14000,images:[['Scan',200,28000]]}]){
+  const source=await scanFixture(options),k=boundedScanScale(source),p=source.pages[0];
+  assert.equal(scanScale(source.id,0),options.images[0][1]/options.width,'native metadata does not expand the caller budget');
+  assert.ok(p.width*p.height*k*k<=16000001,'the 16-million-pixel limit remains');assert.ok(Math.max(p.width,p.height)*k<=8192.001,'the 8192-pixel side limit remains');
+ }
+ // Pixel-rounded A4 dimensions still reproduce the scan through MuPDF. A
+ // float-roundoff-only isotropy test wrongly discarded this verified grid.
+ const rounded=await scanFixture({width:595,height:842,images:[['Scan',1653,2339]]});
+ assert.equal(scanScale(rounded.id,0),Math.min(1653/595,2339/842));
+});
+
+test('invisible and off-page images cannot override the visible scan density',async()=>{
+ const images=[['Scan',1200,1200],['Decoy',2400,2400]],scan='q 432 0 0 432 0 0 cm /Scan Do Q';
+ const cases=[
+  ['off-page image',{commands:`q 864 0 0 864 900 0 cm /Decoy Do Q ${scan}`}],
+  ['zero-alpha image',{states:{Ghost:{Type:'ExtGState',ca:0,CA:0}},commands:`q /Ghost gs 432 0 0 432 0 0 cm /Decoy Do Q ${scan}`}],
+  ['zero-alpha transparency group',{states:{Ghost:{Type:'ExtGState',ca:0,CA:0}},forms:[{name:'Hidden',commands:'/Decoy Do',group:{S:'Transparency',I:true,K:false}}],commands:`q /Ghost gs 432 0 0 432 0 0 cm /Hidden Do Q ${scan}`}]
+ ];
+ for(const [name,options] of cases){const source=await scanFixture({images,...options});assert.equal(scanScale(source.id,0),200/72,name);}
+ const outside=await scanFixture({commands:'q 432 0 0 432 900 0 cm /Scan Do Q'});assert.equal(scanScale(outside.id,0),undefined,'a large image wholly outside the page establishes no density');
+});
+
+test('uncertain scan geometry falls back instead of selecting an unverified pixel grid',async()=>{
+ const group={S:'Transparency',I:true,K:false};
+ const cases=[
+  ['two page images',{images:[['Scan',1200,1200],['Other',1800,1800]],commands:'q 432 0 0 432 0 0 cm /Scan Do Q q 432 0 0 432 0 0 cm /Other Do Q'}],
+  ['small secondary image',{images:[['Scan',1200,1200],['Small',300,300]],commands:'q 432 0 0 432 0 0 cm /Scan Do Q q 40 0 0 40 200 200 cm /Small Do Q'}],
+  ['partly off-page secondary image',{images:[['Scan',1200,1200],['Other',1800,1800]],commands:'q 432 0 0 432 0 0 cm /Scan Do Q q 432 0 0 432 420 0 cm /Other Do Q'}],
+  ['clipped scan',{commands:'q 0 0 100 432 re W n 432 0 0 432 0 0 cm /Scan Do Q'}],
+  ['soft-masked scan',{forms:[{name:'Mask',bounds:[0,0,432,432],commands:'1 g 0 0 432 432 re f',group}],states:refs=>({Masked:{Type:'ExtGState',SMask:{S:'Luminosity',G:refs.Mask}}}),commands:'q /Masked gs 432 0 0 432 0 0 cm /Scan Do Q'}],
+  ['knockout group',{forms:[{name:'ScanGroup',commands:'/Scan Do',group:{...group,K:true}}],commands:'q 432 0 0 432 0 0 cm /ScanGroup Do Q'}],
+  ['non-Normal blend group',{forms:[{name:'ScanGroup',commands:'/Scan Do',group}],states:{Blend:{Type:'ExtGState',BM:'Multiply'}},commands:'q /Blend gs 432 0 0 432 0 0 cm /ScanGroup Do Q'}],
+  ['nonuniformly stretched scan',{images:[['Scan',1200,800]]}],
+  ['turned scan',{commands:'q 0 432 -432 0 432 0 cm /Scan Do Q'}],
+  ['reflected scan',{commands:'q -432 0 0 432 432 0 cm /Scan Do Q'}]
+ ];
+ for(const [name,options] of cases){const source=await scanFixture(options);assert.equal(scanScale(source.id,0),undefined,name);assert.equal(boundedScanScale(source),300/72,'uncertain pages keep the full bounded render fallback');}
 });
 
 const readingArea=(left,top,width,height)=>({points:[{x:left,y:top},{x:left+width,y:top},{x:left+width,y:top+height},{x:left,y:top+height}]});
