@@ -227,6 +227,9 @@ export function planGlyphEdit(text:string,cells:Cell[],next:string,library:Libra
   if(changed.every(i=>!cells[i].space&&!/\s/.test(b[i])&&cells[i].m!==undefined&&(grid||digit(a[i])&&digit(b[i])&&(tabular||alike(i)&&clears(i))))){
    const from=Math.max(0,changed[0]-1),pieces:Piece[]=[],ink:{i:number;left:number;right:number}[]=[];
    const note=(i:number,g:Cell|LibraryGlyph,shift=0)=>{if(g.i0!==undefined&&g.i1!==undefined)ink.push({i,left:g.i0+shift,right:g.i1+shift});};
+   // A leading space in the patch does not remove the preceding word from
+   // the clearance check. Seed its ink without adding an output piece.
+   for(let i=from-1;i>=0;i--)if(!cells[i].space){note(i,cells[i]);break;}
    for(let i=from;i<cells.length;i++){
     const c=cells[i];if(a[i]===b[i]){pieces.push(c.space?{x0:0,x1:c.x1-c.x0,blank:true,to:c.x0}:{x0:c.x0,x1:c.x1,to:c.x0});if(!c.space)note(i,c);continue;}
     const g=letter(b[i],i);if(!g)return undefined;
