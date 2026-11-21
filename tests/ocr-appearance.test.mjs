@@ -52,3 +52,14 @@ test('ink strength comes from the stroke cores, not from how well the shapes ove
  assert.ok(Math.abs(coreGain({...soft,data:soft.data.map(v=>v*.6)},soft)-.6)<.01);
  assert.equal(coreGain(crisp,crisp),1);assert.equal(coreGain(crisp,coverage(()=>0)),0);
 });
+test('coverage blurred by a Gaussian keeps its ink and spreads a line as the kernel says',async()=>{
+ const {blurCoverage}=await import('../tmp/ocr-appearance.mjs');
+ const w=41,h=31,data=new Float32Array(w*h);for(let y=5;y<26;y++)data[y*w+20]=1;// a 1 px vertical line, clear of the edges
+ const c={data,width:w,height:h};
+ assert.equal(blurCoverage(c,0),c,'no softness: unchanged');
+ const b=blurCoverage(c,1),sum=a=>a.reduce((s,v)=>s+v,0);
+ assert.ok(Math.abs(sum(b.data)-sum(data))<1e-3*sum(data),'ink kept away from the edges');
+ const centre=b.data[15*w+20],side=b.data[15*w+21];
+ assert.ok(Math.abs(centre-.4)<.01,`centre ${centre}: a Gaussian of 1 px peaks at 0.40`);
+ assert.ok(Math.abs(side-.24)<.01,`next column ${side}`);
+});

@@ -29,7 +29,7 @@ function call(message:Record<string,unknown>,transfer:Transferable[]=[],onProgre
  const id=++seq;return new Promise<any>((resolve,reject)=>{pending.set(id,{resolve,reject,onProgress});worker!.postMessage({...message,id},transfer);});
 }
 export async function runModel(model:string,feeds:Inputs,signal?:AbortSignal,onProgress?:(progress:ModelProgress)=>void):Promise<Feeds>{
- signal?.throwIfAborted();ready??=call({type:'init',base:new URL('./',document.baseURI).href,...remoteModels()}).then(()=>{});await ready;
+ signal?.throwIfAborted();ready??=call({type:'init',base:new URL('./',document.baseURI).href,gpu:(globalThis as {BIDE_AI_GPU?:string}).BIDE_AI_GPU,...remoteModels()}).then(()=>{});await ready;
  const reply=await call({type:'run',model,feeds,...remoteModels()},Object.values(feeds).map(f=>f.data.buffer as ArrayBuffer),onProgress);aiBackend=reply.backend;signal?.throwIfAborted();return reply.outputs;
 }
 // The hosted edition loads pinned models on demand; local builds require their

@@ -56,7 +56,7 @@ function groupsOf(dict:string[]){
  letterGroups.set(dict,groups);return groups;
 }
 export function ctcDecode(data:ArrayLike<number>,steps:number,classes:number,dict:string[]){
- const chars:{ch:string;t:number;p:number}[]=[],groups=groupsOf(dict);let last=0;
+ const chars:{ch:string;t:number;p:number;alt?:{ch:string;p:number}}[]=[],groups=groupsOf(dict),name=(c:number)=>c<=dict.length?dict[c-1]:' ';let last=0;
  for(let t=0;t<steps;t++){
   let best=0,p=data[t*classes];for(let c=1;c<classes;c++)if(data[t*classes+c]>p){p=data[t*classes+c];best=c;}
   // A blank step is a letter when one letter's variants together outweigh
@@ -67,11 +67,24 @@ export function ctcDecode(data:ArrayLike<number>,steps:number,classes:number,dic
    for(let c=1;c<classes;c++){const v=data[t*classes+c];if(v<.02)continue;const g=groups[c]??0,e=sums.get(g)??{sum:0,best:c,p:0};e.sum+=v;if(v>e.p){e.p=v;e.best=c;}sums.set(g,e);}
    for(const e of sums.values())if(e.sum>p&&e.best!==last&&groups[e.best]!==groups[last]){best=e.best;p=e.sum;}
   }
-  if(best&&best!==last)chars.push({ch:best<=dict.length?dict[best-1]:' ',t,p});
+  // Each character keeps the recognizer's second choice at its step (softCommas).
+  if(best&&best!==last){let second=0,q=0;for(let c=1;c<classes;c++)if(c!==best&&data[t*classes+c]>q){q=data[t*classes+c];second=c;}chars.push({ch:name(best),t,p,...second?{alt:{ch:name(second),p:q}}:{}});}
   last=best;
  }
  const text=chars.map(c=>c.ch).join('').replace(/\s+/g,' ').trim();
  return {text,confidence:chars.length?chars.reduce((s,c)=>s+c.p,0)/chars.length:0,chars};
+}
+
+// A soft or small comma between digits is read as a full stop: on 87
+// invented pages, 45 of 351 decimal and thousands commas were, and none of
+// 143 full stops was read as a comma. The recognizer's second choice tells
+// them apart: for 41 of the 45 the comma had 0.1 to 0.38 at that step, for
+// the true full stops under 0.08 (142 of them under 0.05). So a full stop
+// between two digits whose second choice is a comma at 0.1 or more is a
+// comma; it keeps its low probability, and stays a letter to check.
+export function softCommas<T extends {ch:string;alt?:{ch:string;p:number}}>(chars:T[],min=.1):T[]{
+ const digit=(c?:T)=>!!c&&/^\d$/.test(c.ch),out=chars.map((c,i)=>c.ch==='.'&&c.alt?.ch===','&&c.alt.p>=min&&digit(chars[i-1])&&digit(chars[i+1])?{...c,ch:','}:c);
+ return out.some((c,i)=>c!==chars[i])?out:chars;
 }
 
 // Words of a decoded line with horizontal extents in input pixels: boundaries
@@ -85,6 +98,40 @@ export function ctcWords(chars:{ch:string;t:number;p:number}[],stepWidth:number,
   const x0=prev?(prev.last+w.first+1)/2*stepWidth:Math.max(0,(w.first-1)*stepWidth),x1=next?(w.last+next.first+1)/2*stepWidth:Math.min(lineWidth,(w.last+2)*stepWidth);
   return {text:w.text,x0,x1,confidence:100*w.p.reduce((s,p)=>s+p,0)/w.p.length,centers:w.t.map(t=>(t+.5)*stepWidth),probs:w.p};
  });
+}
+
+// Spaces the recognizer left out. On soft scans (1.1 to 1.3 px of blur at
+// 200 dpi) it read "Le4 février" and "du14 au18 avril": its space class
+// loses to the blank between the two letters (0.06 to 0.5 where a space it
+// reads scores 0.5 to 1), for one space in ten. The ink still shows them:
+// the blank columns between two letters of a word are as wide as the line's
+// spaces that were read (four fifths of their median or more), while every
+// other letter gap of the line is at most half of it. A line with a gap in
+// between is left alone (a monospace comma, faint print in pieces), and so
+// is one that would gain more spaces than it has plus one (letter-spaced
+// capitals). Inside a number gaps prove nothing: tabular figures give a 1
+// as much room as a space ("18" in Roboto: 9 blank columns, the line's
+// spaces 8 to 13), so two digits, or a digit and its comma or point, are
+// never parted, a gap after a 1 must be a full space wide, and no space is
+// added before a full stop or comma.
+// `words`: each word's text and letter cells (as from segmentGlyphs; column
+// x is columns[x - offset], the ink per column over the line's own rows);
+// `height`: the line's letter height. Returns the letters a space follows.
+export function lostSpaces(words:{text:string;chars?:{x0:number;x1:number}[]}[],columns:ArrayLike<number>,height:number,offset=0,min=.5){
+ // The run of blank columns around x, when ink bounds it on both sides.
+ const end=offset+columns.length,blank=(x:number)=>x>=offset&&x<end&&columns[x-offset]<min;
+ const gapAt=(x:number)=>{let a=Math.floor(x),b=a;if(!blank(a))return 0;while(blank(a-1))a--;while(blank(b))b++;return a>offset&&b<end?b-a:0;};
+ const spaces:number[]=[],inner:{word:number;after:number;gap:number;one:boolean}[]=[],numeric=(ch='')=>/^[\d.,]$/.test(ch);
+ words.forEach((w,i)=>{
+  const cells=w.chars,next=words[i+1]?.chars;if(!cells?.length)return;
+  const letters=Array.from(w.text);
+  for(let k=0;k+1<cells.length;k++)if(!/^[.,]$/.test(letters[k+1]??'')&&!(numeric(letters[k])&&numeric(letters[k+1])))inner.push({word:i,after:k,gap:gapAt(cells[k].x1),one:letters[k]==='1'});
+  if(next?.length){const g=gapAt((cells[cells.length-1].x1+next[0].x0)/2);if(g)spaces.push(g);}
+ });
+ if(!spaces.length)return [];
+ const space=spaces.sort((a,b)=>a-b)[(spaces.length-1)>>1],lost=inner.filter(g=>g.gap>=(g.one?1:.8)*space);
+ if(space<Math.max(3,.15*height)||!lost.length||lost.length>spaces.length+1||inner.some(g=>!g.one&&g.gap>.5*space&&g.gap<.8*space))return [];
+ return lost.map(({word,after})=>({word,after}));
 }
 
 // Shrink [x0,x1) to the columns that carry ink (column ink totals per x).

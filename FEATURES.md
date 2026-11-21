@@ -1,3 +1,11 @@
+## Hosted update — edits that match the page
+
+- Original letters: a letter the edited line lacks comes only from a line of the page proven to be in the same lettering by its pixels (same shapes and same ink on the letters they share; directly, or through one line verified against both). Digits are redrawn in the old digit's place, fixed-pitch text keeps its grid, right-aligned amounts keep their right edge, and each letter keeps its soft fringe and the paper's grain. On soft scans, letters whose ink runs together are used only when no clear one exists.
+- Text set in a font keeps the line's weight on soft scans (regular lines used to be set bold), matches 6 times faster, and is blurred finely enough to keep the scan's softness. Over a scanned PDF it is fitted at the scan's resolution, exported as pixels on the scan's grid, and placed on the edited line's own letters.
+- AI OCR puts back word spaces dropped on soft scans, corrects decimal commas read as full stops on small soft digits, and settles 0/O between capitals and digits from the page's own letters. High accuracy finds lines at the page's own size (it read nothing on enlarged scans).
+- AI models use the graphics card where WebGPU offers one (text detection, sharpening, background removal, page flattening); they never did on the hosted site. Text recognition, High accuracy detection, AI fill and object selection stay on the CPU.
+- Measured with `npm run bench:edit` (16 invented documents, 215 edits compared with the regenerated document): 202 edits with no visible difference in the default flow, from 146. Details in CHANGELOG.md.
+
 ## Hosted update — preserve scanned lettering
 
 - Original letters mode reuses pixels from the edited line. It never switches to an OCR font or borrows unverified lettering from another line or page. If it cannot reconstruct an edit, the original stays unchanged and the typed text remains available.
@@ -5,6 +13,10 @@
 
 ## Unreleased — Open, edit, download
 
+- Scanned PDFs keep the ink colour of edited text. On an invented receipt scanned at 200 dpi, in near-black #1d1d1f:
+  - A line set in a font came out #606061 (core ink 29 → 96 on a 0–255 scale); now #1e1e20 (29 → 30). Its ink was measured on the page at 72 dpi, where thin strokes never reach their colour. It is now measured where the softness is, on a finer render.
+  - Letters reused from the line came out lighter (29 → 38): they were cut from a render at another scale than the scan's, so they were resampled twice. They are now cut at the scan's own resolution (29 → 29).
+  - Pictures and digital PDFs already kept the colour, and still do; grey #444444 and a 300 dpi scan are within 2 levels too (`tests/e2e/edit-flow.e2e.mjs`).
 - Digital PDFs, New font text box: a line in a family Bide bundles is set in that family and weight. A light Roboto merchant line on an invented card receipt used to become Liberation Sans Regular (Arial shapes, twice the ink). It is now Roboto Light, and the download is identical to the regenerated receipt (0 differing pixels at 144 dpi, `tests/e2e/pdf-text-inplace.e2e.mjs` i).
   - Any of the 82 bundled families is matched by the PDF font's name ("OpenSans-SemiBoldItalic", "RobotoMono-Regular"); Helvetica, Times, Calibri, Cambria and Courier keep their metric-compatible faces.
   - New Light, Medium and SemiBold faces of Roboto, Inter, Open Sans, Montserrat, Poppins, Source Sans 3 (the derived weights are named Bide Sans 3) and Noto Sans (SIL OFL), loaded only when used. Thin and ExtraLight use Light.

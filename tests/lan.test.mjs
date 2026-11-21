@@ -1,10 +1,12 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtemp, mkdir, writeFile, readFile, rm, symlink} from 'node:fs/promises';
+import {mkdtemp, mkdir, writeFile, readFile, rm, symlink, utimes} from 'node:fs/promises';
 import {join, resolve} from 'node:path';
 import {tmpdir} from 'node:os';
 import {webcrypto, createHash} from 'node:crypto';
 import {get as httpsGet} from 'node:https';
+import {get as httpGet} from 'node:http';
+import {brotliDecompressSync, gunzipSync} from 'node:zlib';
 import * as mupdf from 'mupdf';
 import {createBideServer, readLanSettings} from '../scripts/serve.mjs';
 import {digest, uuid} from '../tmp/browser-crypto.mjs';
@@ -96,4 +98,32 @@ test('hashed assets can be cached while HTML and mutable assets stay fresh',asyn
  assert.equal((await fetch(origin+'/assets/font-ABCDEFGH.ttf')).headers.get('cache-control'),'public, max-age=31536000, immutable');
  assert.equal((await fetch(origin+'/assets/settings.json')).headers.get('cache-control'),'no-cache');
  assert.equal((await fetch(origin+'/')).headers.get('cache-control'),'no-cache');
+});
+
+test('a second visit revalidates instead of downloading, and text and WebAssembly arrive compressed',async t=>{
+ const {root}=await fixture(t);await mkdir(join(root,'ai'));
+ const script='export const x=1;\n'.repeat(400),model=new Uint8Array(4096).map((_,i)=>i*7);
+ await writeFile(join(root,'app.js'),script);await writeFile(join(root,'ai','model.onnx'),model);await writeFile(join(root,'tiny.js'),'1');
+ const server=await createBideServer({root}),port=await listen(t,server),origin=`http://127.0.0.1:${port}`;
+ // fetch() decodes for us; the raw header and length say what crossed the network.
+ const raw=(path,headers={})=>new Promise((yes,no)=>{httpGet({hostname:'127.0.0.1',port,path,headers},res=>{const parts=[];res.on('data',p=>parts.push(p));res.on('end',()=>yes({status:res.statusCode,headers:res.headers,body:Buffer.concat(parts)}));}).on('error',no);});
+ const br=await raw('/app.js',{'accept-encoding':'gzip, deflate, br'});
+ assert.equal(br.headers['content-encoding'],'br');assert.ok(br.body.length<script.length/10,`compressed to ${br.body.length} of ${script.length}`);
+ assert.equal(brotliDecompressSync(br.body).toString(),script);assert.equal(br.headers.vary,'Accept-Encoding');
+ assert.equal(br.headers['cross-origin-embedder-policy'],'require-corp','isolation headers stay on compressed responses');
+ const gz=await raw('/app.js',{'accept-encoding':'gzip;q=1, br;q=0'});assert.equal(gz.headers['content-encoding'],'gzip');assert.equal(gunzipSync(gz.body).toString(),script);
+ const plain=await raw('/app.js');assert.equal(plain.headers['content-encoding'],undefined);assert.equal(plain.body.toString(),script);
+ assert.equal((await raw('/ai/model.onnx',{'accept-encoding':'br'})).headers['content-encoding'],undefined,'models barely compress and are sent as they are');
+ assert.equal((await raw('/tiny.js',{'accept-encoding':'br'})).headers['content-encoding'],undefined);
+ // The browser asks again with the version it holds: nothing is sent.
+ for(const [path,headers] of [['/app.js',{'accept-encoding':'br'}],['/ai/model.onnx',{}],['/',{}]]){
+  const first=await raw(path,headers);assert.ok(first.headers.etag,path);assert.ok(first.headers['last-modified'],path);
+  const again=await raw(path,{...headers,'if-none-match':first.headers.etag});assert.equal(again.status,304,path);assert.equal(again.body.length,0);
+  assert.equal((await raw(path,{...headers,'if-modified-since':first.headers['last-modified']})).status,304,path);
+ }
+ // A changed file is a new version; the gzip copy has its own.
+ const before=(await raw('/app.js',{'accept-encoding':'br'})).headers.etag;
+ assert.notEqual((await raw('/app.js',{'accept-encoding':'gzip'})).headers.etag,before);
+ await writeFile(join(root,'app.js'),script+'export const y=2;\n');await utimes(join(root,'app.js'),new Date(),new Date(Date.now()+5000));
+ const changed=await raw('/app.js',{'accept-encoding':'br','if-none-match':before});assert.equal(changed.status,200);assert.match(brotliDecompressSync(changed.body).toString(),/y=2/);
 });

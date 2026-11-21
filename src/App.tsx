@@ -468,7 +468,7 @@ export default function App() {
   }
 
   // Replace OCR regions in one undo step (see ocr-replace.ts).
-  async function replaceOcrRegions(items:OcrEdit[],{letters,done,refused}:{letters:boolean;done:(lettersUsed:number,fontUsed:number)=>string;refused?:(reason:string)=>void}){
+  async function replaceOcrRegions(items:OcrEdit[],{letters,done,refused}:{letters:boolean;done:(lettersUsed:number,fontUsed:number,borrowed:number)=>string;refused?:(reason:string)=>void}){
     // A field edited before starts again from its original letters, and its earlier edit layer goes.
     const regions=items.filter(i=>i.region.kind==='ocr').map(({region,text})=>({region:region.original??region,text:text??(region.original?region.text:undefined)}));if(busy||loading.current||!regions.length)return false;const originalPage=page,c=canvas.current!;setBusy(`Replacing ${regions.length} text region${regions.length===1?'':'s'}…`);
     const replaced=new Set(items.map(i=>i.region.layer).filter(Boolean)),earlier=c.getObjects().filter(o=>replaced.has((o as Obj).id)).map(o=>({o,at:c.getObjects().indexOf(o)}));
@@ -482,14 +482,14 @@ export default function App() {
       commit({...current,pages:current.pages.map(p=>p.id===originalPage.id?{...p,color:plan.transparent?'transparent':p.color,canvas:{...p.canvas,objects},thumb:undefined}:p)},true);
       // The other fields stay tappable: no rescan after the reload.
       keepRegions(before,originalPage.id,textRegions);keepRegions(projectRef.current,originalPage.id,shown);setTextRegions(shown);
-      notify(done(plan.letters,plan.fonts));return true;
+      notify(done(plan.letters,plan.fonts,plan.borrowed));return true;
     }catch(e){if(refused&&e instanceof LetteringError)refused(e.reason);else fail(e);return false;}finally{if(earlier.length&&pageIdRef.current===originalPage.id){earlier.forEach(({o,at})=>c.insertAt(at,o));c.requestRenderAll();}setBusy('');}
   }
   const convertAllDetectedText=async()=>{if(ocr.editMode!=='font'){fail(new Error('Convert all creates new font text. Choose New font explicitly in OCR settings first.'));return;}await replaceOcrRegions(textRegions.filter(r=>r.kind==='ocr').map(region=>({region})),{letters:false,done:(_,n)=>`${n} text regions are now crisp editable text. Undo restores the original.`});};
   const editRegionText=async(region:TextRegion,text:string)=>{if(region.kind==='pdf'){await editPdfText(region,text);return;}setTextEditRefusal('');if(await replaceOcrRegions([{region,text}],{letters:true,done:lettersNote,refused:setTextEditRefusal}))setTextEdit(null);};
   // After a refusal, the user may set this one line in the OCR font instead.
   const editRegionInFont=async(region:TextRegion,text:string)=>{if(await replaceOcrRegions([{region,text}],{letters:false,done:()=>'This line is now text in the OCR font, as you chose. Undo restores the original.'}))setTextEdit(null);};
-  const findAndReplace=async(find:string,replacement:string,matchCase:boolean)=>{const matches=findMatches(textRegions,find,matchCase);if(await replaceOcrRegions(matches.map(region=>({region,text:replaceText(region.text,find,replacement,matchCase)})),{letters:ocr.editMode==='letters',done:(l,f)=>`Replaced in ${l+f} line${l+f===1?'':'s'}. `+(ocr.editMode==='letters'?lettersNote(l,f):'Undo restores the original.')}))setFindOpen(false);};
+  const findAndReplace=async(find:string,replacement:string,matchCase:boolean)=>{const matches=findMatches(textRegions,find,matchCase);if(await replaceOcrRegions(matches.map(region=>({region,text:replaceText(region.text,find,replacement,matchCase)})),{letters:ocr.editMode==='letters',done:(l,f,b)=>`Replaced in ${l+f} line${l+f===1?'':'s'}. `+(ocr.editMode==='letters'?lettersNote(l,f,b):'Undo restores the original.')}))setFindOpen(false);};
 
   // Selection helpers -----------------------------------------------------
   const outlineOf=(points:SelectionPoint[])=>points.length>2?'M'+points.map(p=>`${p.x} ${p.y}`).join('L')+'Z':'';

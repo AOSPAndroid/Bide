@@ -57,6 +57,6 @@ export default defineConfig(({mode,command}) => {
   }}] : []), ...(publicSite ? [discoveryPlugin(mode,env)] : [])],
   build: {target:'esnext',outDir:mode === 'demo' ? 'out' : mode === 'saas' ? 'dist-saas' : mode === 'app' ? 'dist-app' : 'dist'},
   // Lazily imported deps are listed so the dev server doesn't reload the page mid-session on first use.
-  optimizeDeps: {exclude:['mupdf'], include:['docx','fflate','onnxruntime-web/webgpu','nspell','pdf-lib','@pdf-lib/fontkit','pdfkit','svg-to-pdfkit','@capacitor/core','@capacitor/filesystem','@capacitor/share'], esbuildOptions:{target:'esnext'}},
+  optimizeDeps: {exclude:['mupdf'], include:['docx','fflate','onnxruntime-web','nspell','pdf-lib','@pdf-lib/fontkit','pdfkit','svg-to-pdfkit','@capacitor/core','@capacitor/filesystem','@capacitor/share'], esbuildOptions:{target:'esnext'}},
   worker: {format:'es'}, server:{headers,allowedHosts:['terminal.local']}, preview:{headers},
 };});

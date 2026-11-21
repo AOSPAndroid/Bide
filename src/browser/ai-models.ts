@@ -3,12 +3,15 @@
 // pixels and text never leave the browser. Verify bytes before inference or
 // caching, including cached copies that may have been damaged or replaced.
 import manifest from '../../public/ai/manifest.json';
-import {PUBLIC_DEMO} from '../build-flags';
+import {PUBLIC_DEMO,HOSTED_BUILD} from '../build-flags';
+import {digest} from './crypto';
 
 export type PinnedModel={url:string;bytes:number;sha256:string};
 type ModelSource=PinnedModel&{output?:{bytes:number;sha256:string}};
 export type ModelProgress={loaded:number;total:number;stage:'download'|'verify'|'prepare'};
-type ModelOptions={fetch?:typeof fetch;cacheStorage?:Pick<CacheStorage,'open'>|null;onProgress?:(progress:ModelProgress)=>void;downloadTimeoutMs?:number;remote?:string;licence?:string};
+type ModelOptions={fetch?:typeof fetch;cacheStorage?:Pick<CacheStorage,'open'>|null;onProgress?:(progress:ModelProgress)=>void;downloadTimeoutMs?:number;remote?:string;licence?:string;store?:ModelStore|null};
+// Where a downloaded model is kept between visits, by address and digest.
+export type ModelStore={get(key:string):Promise<Uint8Array|undefined>;put(key:string,bytes:Uint8Array):Promise<void>;delete(key:string):Promise<void>};
 export const MODEL_CACHE='bide-ai-models-sha256-v1';
 const downloadError='AI model download failed. Check your internet connection and try again, or choose Standard OCR.';
 const accessError='An active bide trial or subscription is needed for the AI tools.';
@@ -20,8 +23,9 @@ function keyFor(source:PinnedModel){
 async function verified(bytes:Uint8Array,source:PinnedModel,onProgress?:ModelOptions['onProgress']){
  if(bytes.byteLength!==source.bytes)throw new Error(downloadError+' The model size did not match.');
  onProgress?.({stage:'verify',loaded:bytes.byteLength,total:source.bytes});
- const digest=await crypto.subtle.digest('SHA-256',bytes);
- const hash=Array.from(new Uint8Array(digest),n=>n.toString(16).padStart(2,'0')).join('');
+ // An HTTP address on the office network (a shared bide) has no SubtleCrypto:
+ // digest() hashes in JavaScript there, so the AI tools still load and verify.
+ const hash=Array.from(await digest(bytes),n=>n.toString(16).padStart(2,'0')).join('');
  if(hash!==source.sha256)throw new Error(downloadError+' The model integrity check failed.');
  return bytes;
 }
@@ -121,12 +125,42 @@ async function cachedBundledBytes(url:URL,source:PinnedModel,options:ModelOption
  return bytes;
 }
 
+// A copy of bide shared on the office network is opened from another computer:
+// its models (5 to 106 MB) cross the network, and a browser's HTTP cache
+// keeps no file that large (a fresh profile none over about 6 MB), so every
+// visit downloaded them again. They are kept in IndexedDB, which also works
+// on a plain HTTP address, and verified again on every load. Not for the
+// computer running bide (the files are on its disk) or the hosted editions
+// (their licence decides each download).
+const sharedCopy=()=>!HOSTED_BUILD&&typeof indexedDB!=='undefined'&&!['localhost','127.0.0.1','[::1]'].includes(globalThis.location?.hostname??'localhost');
+export function modelStore(name='bide-ai-models'):ModelStore{
+ let db:Promise<IDBDatabase>|undefined;
+ const open=()=>db??=new Promise((resolve,reject)=>{const r=indexedDB.open(name,1);r.onupgradeneeded=()=>r.result.createObjectStore('models');r.onsuccess=()=>resolve(r.result);r.onerror=()=>{db=undefined;reject(r.error);};});
+ const run=<T,>(mode:IDBTransactionMode,act:(s:IDBObjectStore)=>IDBRequest<T>)=>open().then(d=>new Promise<T>((resolve,reject)=>{const t=d.transaction('models',mode),r=act(t.objectStore('models'));t.oncomplete=()=>resolve(r.result);t.onerror=t.onabort=()=>reject(t.error);}));
+ return {
+  get:async key=>{const v=await run('readonly',s=>s.get(key));return v instanceof ArrayBuffer?new Uint8Array(v):undefined;},
+  // One model per address: an older version of it goes, in the same transaction.
+  put:async(key,bytes)=>{const at=key.split('#')[0];await run('readwrite',s=>{const r=s.openCursor();r.onsuccess=()=>{const c=r.result;if(!c){s.put(bytes.slice().buffer,key);return;}if(String(c.key).split('#')[0]===at&&c.key!==key)c.delete();c.continue();};return r;});},
+  delete:async key=>{await run('readwrite',s=>s.delete(key));},
+ };
+}
+async function storedBundledBytes(url:URL,source:PinnedModel,options:ModelOptions,store:ModelStore){
+ const key=`${url.href}#${source.sha256}`;
+ try{const saved=await store.get(key);if(saved)return await verified(saved,source,options.onProgress);}
+ catch{try{await store.delete(key);}catch{}}
+ const bytes=await bundledBytes(url,source,options);
+ // Storage may be full or refused (private windows): the model still works this time.
+ try{await store.put(key,bytes);}catch{}
+ return bytes;
+}
+
 // Every source is checked against the pinned manifest. The local/app pack may
 // contain converted FP16 weights, whose output digest differs from upstream.
 // Authentication denial is terminal: it must never turn into a public fallback.
 export async function loadModelSources(source:ModelSource,local:URL,publicDemo:boolean,options:ModelOptions={}):Promise<Uint8Array>{
  const bundled={...source,...source.output};let failure:unknown;
- try{return await bundledBytes(local,bundled,options);}catch(error){if(error instanceof Error&&error.message===accessError)throw error;failure=error;}
+ const store=options.store===undefined?sharedCopy()?modelStore():null:options.store;
+ try{return store?await storedBundledBytes(local,bundled,options,store):await bundledBytes(local,bundled,options);}catch(error){if(error instanceof Error&&error.message===accessError)throw error;failure=error;}
  if(options.remote){
   const root=options.remote.endsWith('/')?options.remote:options.remote+'/';
   const remote=new URL(`ai/models/${local.pathname.split('/').pop()}`,root);

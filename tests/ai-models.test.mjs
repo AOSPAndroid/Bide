@@ -162,3 +162,17 @@ test('download timeout covers waiting for headers and a stalled response body',a
  // The timeout and aborted stream do not poison a subsequent attempt.
  assert.deepEqual(await loadPinnedModel(source,{cacheStorage:null,fetch:async()=>new Response(bytes)}),bytes);
 });
+test('a shared copy keeps bundled models between visits and verifies them every time',async()=>{
+ const map=new Map(),store={get:async k=>map.get(k),put:async(k,v)=>{for(const key of [...map.keys()])if(key.split('#')[0]===k.split('#')[0])map.delete(key);map.set(k,v);},delete:async k=>{map.delete(k);}};
+ let calls=0;const fetch=async url=>{calls++;assert.equal(String(url),local.href);return new Response(bytes);};
+ assert.deepEqual(await loadModelSources(source,local,false,{fetch,store}),bytes);assert.equal(calls,1);assert.ok(map.has(`${local.href}#${sha256}`));
+ assert.deepEqual(await loadModelSources(source,local,false,{fetch,store}),bytes);assert.equal(calls,1,'the second visit reads the stored copy');
+ // A damaged stored copy is dropped and fetched again, never passed to ONNX.
+ map.set(`${local.href}#${sha256}`,new Uint8Array([9,9,9,9]));
+ assert.deepEqual(await loadModelSources(source,local,false,{fetch,store}),bytes);assert.equal(calls,2);assert.deepEqual(map.get(`${local.href}#${sha256}`),bytes);
+ // Storage refused (a private window): the model still loads.
+ const full={get:async()=>undefined,put:async()=>{throw new Error('QuotaExceededError');},delete:async()=>{}};
+ assert.deepEqual(await loadModelSources(source,local,false,{fetch,store:full}),bytes);
+ // No store: the bundled file is read as before.
+ assert.deepEqual(await loadModelSources(source,local,false,{fetch,store:null}),bytes);
+});

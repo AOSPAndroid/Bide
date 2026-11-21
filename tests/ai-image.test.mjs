@@ -55,3 +55,51 @@ test('CTC: a letter split between its accented forms still beats the blank',()=>
  const upper=['e','é','t','T'],tt=new Float32Array([[.05,0,0,.95,0],[.45,0,0,.3,.25],[.05,0,0,.95,0]].flat());
  assert.equal(ctcDecode(tt,3,5,upper).text,'tt');
 });
+test('a space the recognizer left out is found where the ink gap matches the spaces it read',async()=>{
+ const {lostSpaces}=await import('../tmp/ai-image.mjs');
+ // Letters 6 columns wide, 2 apart; ' ' is a space that was read (9 blank
+ // columns), '|' one that was not, '~' a gap one column short of a space,
+ // '^' a 6-column gap inside a word.
+ const line=(spec,{space=9,offset=0}={})=>{
+  const columns=[0,0,0],words=[{text:'',chars:[]}];let gap=0;
+  for(const ch of spec){
+   if(ch===' '){words.push({text:'',chars:[]});gap=space;continue;}
+   if(ch==='|'||ch==='^'||ch==='~'){gap=ch==='^'?6:ch==='~'?space-1:space;continue;}
+   const w=words.at(-1),blank=gap||(w.chars.length?2:0),prev=w.chars.at(-1);gap=0;
+   for(let i=0;i<blank;i++)columns.push(0);
+   const a=columns.length,mid=offset+a-blank/2;for(let i=0;i<(ch==='.'?2:6);i++)columns.push(5);
+   // The cells of a word meet midway between two letters.
+   if(prev)prev.x1=mid;w.text+=ch;w.chars.push({x0:prev?mid:offset+a,x1:offset+columns.length});
+  }
+  columns.push(0,0,0);return {words,columns};
+ };
+ const find=(spec,o)=>{const l=line(spec,o);return lostSpaces(l.words,l.columns,20,o?.offset);};
+ assert.deepEqual(find('ab cd ef|gh'),[{word:2,after:1}]);
+ assert.deepEqual(find('ab|cd ef|gh ij'),[{word:0,after:1},{word:1,after:1}]);
+ assert.deepEqual(find('ab cd ef|gh',{offset:300}),[{word:2,after:1}],'cells in page columns');
+ assert.deepEqual(find('abcd ef gh'),[],'nothing to add');
+ assert.deepEqual(find('ef|gh'),[],'no space was read on the line: nothing to compare with');
+ assert.deepEqual(find('ab cd e^f|gh'),[],'a gap between a letter gap and a space: the line is unclear');
+ assert.deepEqual(find('ab cd ef|.'),[],'never before a full stop');
+ assert.deepEqual(find('ab c|d|e|f'),[],'more spaces than the line has plus one: letter-spaced text');
+ assert.deepEqual(find('ab cd 1|8 2|,5 3,|4'),[],'inside a number a gap proves nothing');
+ assert.deepEqual(find('ab cd 1|h'),[{word:2,after:0}],'after a 1 a full space is one');
+ assert.deepEqual(find('ab cd ef g|h1~h',{space:10}),[{word:3,after:0}],'but not a gap just short of one, which would do after another letter');
+ assert.deepEqual(find('ab cd ef g~h',{space:10}),[{word:3,after:0}]);
+ assert.deepEqual(find('ab cd ef|gh',{space:2}),[],'spaces too narrow for the letter height to judge by');
+ const l=line('ab cd ef|gh');l.words[0].chars=undefined;assert.deepEqual(lostSpaces(l.words,l.columns,20),[{word:2,after:1}],'a word without cells is skipped');
+});
+test('a full stop between digits is a comma when the comma was the recognizer\'s second choice',async()=>{
+ const {softCommas}=await import('../tmp/ai-image.mjs');
+ const read=(text,alts={})=>Array.from(text).map((ch,i)=>({ch,t:i,p:.8,...alts[i]?{alt:{ch:alts[i][0],p:alts[i][1]}}:{}})),text=chars=>chars.map(c=>c.ch).join('');
+ assert.equal(text(softCommas(read('104.68',{3:[',',.25]}))),'104,68');
+ assert.equal(text(softCommas(read('1.397 4.8',{1:[',',.11],7:[',',.3]}))),'1,397 4,8','thousands too');
+ assert.equal(text(softCommas(read('104.68',{3:[',',.07]}))),'104.68','a full stop it hardly doubted');
+ assert.equal(text(softCommas(read('104.68',{3:['-',.3]}))),'104.68','another second choice');
+ assert.equal(text(softCommas(read('a.5 4. .5',{1:[',',.3],5:[',',.3],7:[',',.3]}))),'a.5 4. .5','only between two digits');
+ const same=read('12.5');assert.equal(softCommas(same),same,'a line without one is returned as it is');
+ assert.equal(softCommas(read('4.8',{1:[',',.2]}))[1].p,.8,'it stays a doubtful letter');
+ // The decoder keeps each character's second choice.
+ const r=ctcDecode(new Float32Array([[.02,.7,.28,0],[.98,.01,.01,0]].flat()),2,4,['.',',']);
+ assert.equal(r.text,'.');assert.equal(r.chars[0].alt.ch,',');assert.ok(Math.abs(r.chars[0].alt.p-.28)<1e-6);
+});

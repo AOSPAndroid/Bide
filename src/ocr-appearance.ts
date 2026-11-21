@@ -12,6 +12,18 @@ export function alphaCoverage(pixels:ArrayLike<number>,width:number,height:numbe
  const data=new Float32Array(width*height);for(let i=0;i<data.length;i++)data[i]=pixels[i*4+3]/255;
  return {data,width,height};
 }
+// A Gaussian blur of `sigma` pixels (a canvas `blur()` of that radius), as
+// two passes of a sampled kernel; ink beyond the edges counts as none.
+export function blurCoverage(c:Coverage,sigma:number):Coverage{
+ if(!(sigma>0))return c;
+ const r=Math.max(1,Math.ceil(sigma*3)),kernel=new Float32Array(2*r+1);let sum=0;
+ for(let i=-r;i<=r;i++)sum+=kernel[i+r]=Math.exp(-i*i/(2*sigma*sigma));
+ for(let i=0;i<kernel.length;i++)kernel[i]/=sum;
+ const {width:w,height:h,data}=c,tmp=new Float32Array(w*h),out=new Float32Array(w*h);
+ for(let y=0;y<h;y++){const row=y*w;for(let x=0;x<w;x++){let v=0;for(let k=-r;k<=r;k++){const xx=x+k;if(xx>=0&&xx<w)v+=data[row+xx]*kernel[k+r];}tmp[row+x]=v;}}
+ for(let y=0;y<h;y++)for(let x=0;x<w;x++){let v=0;for(let k=-r;k<=r;k++){const yy=y+k;if(yy>=0&&yy<h)v+=tmp[yy*w+x]*kernel[k+r];}out[y*w+x]=v;}
+ return {data:out,width:w,height:h};
+}
 // Compare physical edge widths directly: a calibrated blur radius can vary
 // with glyph shape and size. Include the padded fringe and normalize ink
 // strength so changing text colour does not appear to sharpen its edges.
@@ -57,7 +69,7 @@ export function coreGain(source:Coverage,candidate:Coverage){
   return count>left?sum/(count-left)/255:0;
  };
  let core=0;for(const v of candidate.data)if(v>=.75)core++;
- const count=Math.max(1,core>>1),ink=top(candidate.data,count);
+ const count=Math.max(1,core>>2),ink=top(candidate.data,count);
  return ink>0?Math.min(1,top(source.data,count)/ink):0;
 }
 export function matchedInkColor(color:string,background:string,gain:number){

@@ -13,9 +13,11 @@ const engines=(process.argv.slice(2).length?process.argv.slice(2):['tesseract','
 const only=process.env.BENCH_PAGES?.split(',');
 const chosen=pages.filter(p=>!only||only.includes(p.id));
 await mkdir('tmp/ocr-bench',{recursive:true});
-const server=await createServer({logLevel:'error',server:{port:0,host:'127.0.0.1'}});await server.listen();
-const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||undefined});
-const results=[];
+// No file watching: a source file saved during a run must not reload the page under it.
+const server=await createServer({logLevel:'error',server:{port:0,host:'127.0.0.1',hmr:false,watch:null}});await server.listen();
+// CHROMIUM_ARGS=--enable-unsafe-webgpu runs the AI models on WebGPU (SwiftShader where there is no graphics card).
+const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||undefined,args:process.env.CHROMIUM_ARGS?.split(' ').filter(Boolean)});
+const results=[],backends=new Set();
 try{
  // Render each page and apply its degradation (scan, photo, low resolution) in the browser.
  const shots={};
@@ -29,6 +31,8 @@ try{
  }
  const page=await browser.newPage();page.on('pageerror',e=>console.error('page error',e.message));
  await page.goto(server.resolvedUrls.local[0]);await page.waitForTimeout(1500);
+ // A software WebGPU adapter is used too when one is all there is (the app keeps to the CPU then).
+ if(process.env.CHROMIUM_ARGS?.includes('webgpu'))await page.evaluate(()=>{globalThis.BIDE_AI_GPU='any';});
  for(const p of chosen){
   const {truth,png}=shots[p.id];
   const degraded=await page.evaluate(async([png,d])=>{
@@ -48,21 +52,24 @@ try{
   await writeFile(`tmp/ocr-bench/${p.id}.png`,Buffer.from(degraded,'base64'));
   for(const engine of engines){
    const t0=Date.now();
-   const {tilt,lines}=await page.evaluate(async([png,engine])=>{
+   const {backend,tilt,lines}=await page.evaluate(async([png,engine])=>{
     const img=new Image();img.src='data:image/png;base64,'+png;await img.decode();
     const c=document.createElement('canvas');c.width=img.width;c.height=img.height;c.getContext('2d',{willReadFrequently:true}).drawImage(img,0,0);
     const {recognizeImage,pageTilt}=await import('/src/browser/ocr.ts');
     // ai-sharpen: Real-ESRGAN 2x first; boxes are scaled back to the page.
     let input=c,k=1;if(engine==='ai-sharpen'){const {upscaleCanvas}=await import('/src/browser/ai-tools.ts');input=await upscaleCanvas(c,2);k=.5;}
     const regions=await recognizeImage(input,{grouping:'lines',languages:['eng','fra'],engine:engine.startsWith('tesseract')?'tesseract':'paddle',accurate:engine==='ai-accurate',thorough:engine==='tesseract-thorough'});
-    return {tilt:pageTilt(c)??0,lines:regions.map(r=>({text:r.text,left:r.left*k,top:r.top*k,width:r.width*k,height:r.height*k}))};
-   },[degraded,engine]).catch(e=>{console.error(p.id,engine,e.message);return {tilt:0,lines:[]};});
+    const {aiBackend}=await import('/src/browser/ai.ts');
+    return {backend:aiBackend,tilt:pageTilt(c)??0,lines:regions.map(r=>({text:r.text,left:r.left*k,top:r.top*k,width:r.width*k,height:r.height*k}))};
+   },[degraded,engine]).catch(e=>{console.error(p.id,engine,e.message);return {backend:'',tilt:0,lines:[]};});
+   if(backend)backends.add(backend);
    const seconds=(Date.now()-t0)/1000,rows=joinRows(lines,tilt),cer=lineErrors(truth,[...lines.map(r=>r.text),...rows]),words=wordScores(truth,lines.map(r=>r.text));
    results.push({page:p.id,category:p.category,engine,cer:cer.rate,recall:words.recall,precision:words.precision,seconds,misses:cer.worst,read:lines.map(r=>r.text)});
    console.log(`${p.id.padEnd(16)} ${engine.padEnd(12)} CER ${(cer.rate*100).toFixed(1).padStart(5)}%  words ${(words.recall*100).toFixed(1).padStart(5)}% found, ${(words.precision*100).toFixed(1).padStart(5)}% right  ${seconds.toFixed(1).padStart(5)} s`);
   }
  }
 }finally{await browser.close();await server.close();}
+console.log(`\nAI models ran on: ${[...backends].join(', ')||'-'}`);
 console.log('\nengine        CER    found  right  s/page');
 for(const engine of engines){const r=results.filter(x=>x.engine===engine),avg=k=>r.reduce((s,x)=>s+x[k],0)/r.length;
  console.log(`${engine.padEnd(12)} ${(avg('cer')*100).toFixed(1).padStart(5)}%  ${(avg('recall')*100).toFixed(1).padStart(5)}%  ${(avg('precision')*100).toFixed(1).padStart(5)}%  ${avg('seconds').toFixed(1).padStart(5)}`);}
