@@ -62,7 +62,7 @@ function coverageRenderer(sample:Sample,scale=1){
 
 // Render through the same editable Textbox used by the workspace, at native
 // resolution. Fit fractional positioning without re-rendering every offset.
-export async function matchOcrAppearance(raster:HTMLCanvasElement,region:TextRegion,regions:TextRegion[],family:string,{autoFont,matchBlur,makeText,onFit,own=false,weights=autoFont,floor,alike}:{autoFont:boolean;matchBlur:boolean;makeText:(region:TextRegion,family:string)=>Promise<Textbox>;onFit?:(fit:Fit)=>void;own?:boolean;weights?:boolean;floor?:number;alike?:TextRegion[]}):Promise<Fit|undefined>{
+export async function matchOcrAppearance(raster:HTMLCanvasElement,region:TextRegion,regions:TextRegion[],family:string,{autoFont,matchBlur,makeText,onFit,own=false,weights=autoFont,floor,alike,refine=true}:{autoFont:boolean;matchBlur:boolean;makeText:(region:TextRegion,family:string)=>Promise<Textbox>;onFit?:(fit:Fit)=>void;own?:boolean;weights?:boolean;floor?:number;alike?:TextRegion[];refine?:boolean}):Promise<Fit|undefined>{
  // `own`: the selected line's letters alone, when its neighbours fit badly
  // (a sharp name beside a label blurred far more than the name allows).
  const samples=own?[samplePixels(raster,region,regions)].filter((s):s is Sample=>!!s):localSamples(raster,region,regions,alike);if(!samples.length)return undefined;
@@ -154,7 +154,7 @@ export async function matchOcrAppearance(raster:HTMLCanvasElement,region:TextReg
  // text box does not draw ("ff" in Raleway) costs a tenth of the score, and
  // the default left a light Raleway line in the page's heavy face.
  const alone=own||samples.every(s=>s.region.id===region.id);
- if(!best||best.score<(floor??(alone?.45:.55)))return alone||floor!==undefined?undefined:matchOcrAppearance(raster,region,regions,family,{autoFont,matchBlur,makeText,onFit,own:true,weights,alike});
+ if(!best||best.score<(floor??(alone?.45:.55)))return alone||floor!==undefined?undefined:matchOcrAppearance(raster,region,regions,family,{autoFont,matchBlur,makeText,onFit,own:true,weights,alike,refine});
  // Neighbours can guide the font and placement, but their ink can differ
  // from the selected line. Measure its own cores at the final fitted tuple.
  if(selected&&paintSelected){
@@ -163,26 +163,6 @@ export async function matchOcrAppearance(raster:HTMLCanvasElement,region:TextReg
   // Neighbours set the font, size and softness, but each word's box sits a
   // pixel or two differently: the placement comes from the selected letters.
   const own=ownPlacement(selected.source,paintSelected,text);best.dx+=own.dx;best.dy+=own.dy;
-  // Size and place settled on the line's own letters, in steps down to a
-  // quarter of a percent and a quarter of a pixel: sizes are first tried
-  // 2.5% apart, which on small crisp text (a capital 8 px high) leaves the
-  // end of a line a pixel or two off, in the right face. Crisp lines only:
-  // on blurred letters it drifted to smaller, paler text (7 edits of soft scans).
-  if(best.softness<=.15){
-   const probe=await makeText(region,best.family),size0=probe.fontSize,ascent=probe.top-region.top+size0*.93;
-   probe.set({fill:'#000000',objectCaching:false});probe.textSoftness=best.softness;
-   const at=(r:number,dx:number,dy:number)=>{probe.set({fontSize:size0*r,left:region.left+dx,top:region.top+ascent-size0*r*.93+dy});probe.initDimensions();return coverageFit(selected.source,paintSelected(probe)).score;};
-   let cur={r:best.ratio,dx:best.dx,dy:best.dy},score=at(cur.r,cur.dx,cur.dy);
-   for(const [dr,d] of [[.01,.5],[.005,.25],[.0025,.25]] as const)for(let round=0;round<4;round++){
-    let moved=false;
-    for(const next of [{...cur,r:cur.r-dr},{...cur,r:cur.r+dr},{...cur,dx:cur.dx-d},{...cur,dx:cur.dx+d},{...cur,dy:cur.dy-d},{...cur,dy:cur.dy+d},{r:cur.r+dr,dx:cur.dx-d,dy:cur.dy},{r:cur.r-dr,dx:cur.dx+d,dy:cur.dy}]){
-     if(Math.abs(next.r-best.ratio)>.015||Math.abs(next.dx-best.dx)>2||Math.abs(next.dy-best.dy)>1.5)continue;
-     const v=at(next.r,next.dx,next.dy);if(v>score+.001){score=v;cur=next;moved=true;}
-    }
-    if(!moved)break;
-   }
-   best.ratio=cur.r;best.dx=cur.dx;best.dy=cur.dy;applyOcrAppearance(text,region,best);text.set({fill:'#000000',objectCaching:false});
-  }
   const painted=paintSelected(text);best.gain=coreGain(selected.source,painted);best.bold=text.fontWeight==='bold'||Number(text.fontWeight)>=600;
   // Ink of the original letters over the ink of the text as fitted: 1 when
   // the weight is right, whatever the blur (blur moves ink, it keeps its mass).
@@ -191,7 +171,30 @@ export async function matchOcrAppearance(raster:HTMLCanvasElement,region:TextReg
   const mine=inkRatio(selected.source,painted,best.gain),all=[...best.masses??[],...mine===undefined?[]:[mine]];
   if(all.length)best.mass=median(all);
  }
- if(weights&&best.mass!==undefined)return heaviness(raster,region,regions,best,{autoFont,matchBlur,makeText,onFit,alike});
+ // Choose the weight before fine size/position probing: those small geometry
+ // changes must not make a correctly heavy line switch to a lighter face.
+ if(weights&&best.mass!==undefined)best=await heaviness(raster,region,regions,best,{autoFont,matchBlur,makeText,onFit,alike});
+ // Refine only the chosen face, using the same crisp-only bounded search.
+ // Weight trials request the unrefined fit so their ink comparison is stable.
+ if(refine&&best.softness<=.15&&selected&&paintSelected){
+  const text=await makeText(region,best.family);applyOcrAppearance(text,region,best);
+  const probe=await makeText(region,best.family),size0=probe.fontSize,ascent=probe.top-region.top+size0*.93;
+  probe.set({fill:'#000000',objectCaching:false});probe.textSoftness=best.softness;
+  const at=(r:number,dx:number,dy:number)=>{probe.set({fontSize:size0*r,left:region.left+dx,top:region.top+ascent-size0*r*.93+dy});probe.initDimensions();return coverageFit(selected.source,paintSelected(probe)).score;};
+  let cur={r:best.ratio,dx:best.dx,dy:best.dy},score=at(cur.r,cur.dx,cur.dy);
+  for(const [dr,d] of [[.01,.5],[.005,.25],[.0025,.25]] as const)for(let round=0;round<4;round++){
+   let moved=false;
+   for(const next of [{...cur,r:cur.r-dr},{...cur,r:cur.r+dr},{...cur,dx:cur.dx-d},{...cur,dx:cur.dx+d},{...cur,dy:cur.dy-d},{...cur,dy:cur.dy+d},{r:cur.r+dr,dx:cur.dx-d,dy:cur.dy},{r:cur.r-dr,dx:cur.dx+d,dy:cur.dy}]){
+    if(Math.abs(next.r-best.ratio)>.015||Math.abs(next.dx-best.dx)>2||Math.abs(next.dy-best.dy)>1.5)continue;
+    const v=at(next.r,next.dx,next.dy);if(v>score+.001){score=v;cur=next;moved=true;}
+   }
+   if(!moved)break;
+  }
+  best.ratio=cur.r;best.dx=cur.dx;best.dy=cur.dy;applyOcrAppearance(text,region,best);text.set({fill:'#000000',objectCaching:false});
+  const painted=paintSelected(text);best.gain=coreGain(selected.source,painted);best.bold=text.fontWeight==='bold'||Number(text.fontWeight)>=600;
+  const mine=inkRatio(selected.source,painted,best.gain),all=[...best.masses??[],...mine===undefined?[]:[mine]];
+  if(all.length)best.mass=median(all);
+ }
  return best;
 }
 
@@ -228,7 +231,7 @@ async function heaviness(raster:HTMLCanvasElement,region:TextRegion,regions:Text
  if(!faces.length)return fit;
  const off=(f:Fit)=>Math.abs(Math.log(f.mass!));let best=fit,bestOff=off(fit),misses=0;
  for(const face of faces){
-  const other=await matchOcrAppearance(raster,region,regions,face,{...options,autoFont:false,weights:false,floor:.3});
+  const other=await matchOcrAppearance(raster,region,regions,face,{...options,autoFont:false,weights:false,refine:false,floor:.3});
   if(!other?.mass||other.score<fit.score-.25)continue;
   const o=off(other);if(o<bestOff){best=other;bestOff=o;misses=0;}else if(o>bestOff+.02&&++misses>=2)break;
  }
