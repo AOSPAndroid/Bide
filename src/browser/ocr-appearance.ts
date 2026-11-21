@@ -166,8 +166,9 @@ export async function matchOcrAppearance(raster:HTMLCanvasElement,region:TextReg
   // Size and place settled on the line's own letters, in steps down to a
   // quarter of a percent and a quarter of a pixel: sizes are first tried
   // 2.5% apart, which on small crisp text (a capital 8 px high) leaves the
-  // end of a line a pixel or two off, in the right face.
-  {
+  // end of a line a pixel or two off, in the right face. Crisp lines only:
+  // on blurred letters it drifted to smaller, paler text (7 edits of soft scans).
+  if(best.softness<=.15){
    const probe=await makeText(region,best.family),size0=probe.fontSize,ascent=probe.top-region.top+size0*.93;
    probe.set({fill:'#000000',objectCaching:false});probe.textSoftness=best.softness;
    const at=(r:number,dx:number,dy:number)=>{probe.set({fontSize:size0*r,left:region.left+dx,top:region.top+ascent-size0*r*.93+dy});probe.initDimensions();return coverageFit(selected.source,paintSelected(probe)).score;};
@@ -175,7 +176,7 @@ export async function matchOcrAppearance(raster:HTMLCanvasElement,region:TextReg
    for(const [dr,d] of [[.01,.5],[.005,.25],[.0025,.25]] as const)for(let round=0;round<4;round++){
     let moved=false;
     for(const next of [{...cur,r:cur.r-dr},{...cur,r:cur.r+dr},{...cur,dx:cur.dx-d},{...cur,dx:cur.dx+d},{...cur,dy:cur.dy-d},{...cur,dy:cur.dy+d},{r:cur.r+dr,dx:cur.dx-d,dy:cur.dy},{r:cur.r-dr,dx:cur.dx+d,dy:cur.dy}]){
-     if(Math.abs(next.r-best.ratio)>.04||Math.abs(next.dx-best.dx)>2||Math.abs(next.dy-best.dy)>1.5)continue;
+     if(Math.abs(next.r-best.ratio)>.015||Math.abs(next.dx-best.dx)>2||Math.abs(next.dy-best.dy)>1.5)continue;
      const v=at(next.r,next.dx,next.dy);if(v>score+.001){score=v;cur=next;moved=true;}
     }
     if(!moved)break;
