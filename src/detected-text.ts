@@ -147,7 +147,11 @@ async function suggestFont(raster:HTMLCanvasElement,regions:TextRegion[]){
 export function fitOneLine(text:Textbox){
  if(text.text.includes('\n'))return;
  const width=text.width;text.set({width:1e4});text.initDimensions();
- text.set({width:Math.max(width,Math.ceil(text.calcTextWidth())+2)});text.initDimensions();
+ let w=Math.max(width,Math.ceil(text.calcTextWidth())+2);text.set({width:w});text.initDimensions();
+ // Fabric wraps by its own word widths, a little wider than the line it
+ // measures: "Tuile - Ardoise - Zinc" fitted to 547 px wrapped its "c" onto a
+ // second line, which the edit then cut off. Widen until it is one line.
+ for(let i=0;i<40&&text.textLines.length>1;i++){w+=Math.max(1,text.fontSize*.1);text.set({width:w});text.initDimensions();}
 }
 // Editable text positioned so its first baseline matches the detected text.
 // matchBlur gives OCR text the measured softness of the original letters.
@@ -545,7 +549,20 @@ export async function glyphEditPatch(c:Canvas,p:Page,lineRegion:TextRegion,next:
   for(let dy=-3;dy<=3;dy++)for(let dx=-3;dx<=3;dx++){const nx=x+dx,ny=y+dy;if(nx<0||ny<0||nx>=aw||ny>=ah)continue;const j=ny*aw+nx;nearInk[j]=1;if(own[i]&&Math.abs(dx)<=2&&Math.abs(dy)<=2&&away(j)<=16)fringe[j]=1;}
  }
  const grain:number[]=[];for(let y=Math.max(0,top-ay0);y<Math.min(ah,bottom-ay0);y++)for(let x=0;x<aw;x++){const i=y*aw+x;if(!nearInk[i]&&away(i)<=8)grain.push(i);}
- const paperAt=(x:number,y:number,o:number)=>{if(grain.length<64){out.data.set(bg,o);}else{const i=grain[((Math.imul(x,73856093)^Math.imul(y,19349663))>>>0)%grain.length]*4;out.data[o]=area.data[i];out.data[o+1]=area.data[i+1];out.data[o+2]=area.data[i+2];}out.data[o+3]=255;};
+ // The paper's own colour where a letter left, column by column: from the
+ // rows just above and below the line (each a median of five pixels across),
+ // blended down the line, so a gradient or a picture behind the text carries
+ // on (one colour for the whole line left a lighter smudge on a pink-to-
+ // purple card). The scan's grain is added as each grain pixel's departure
+ // from that local colour, never as a colour from elsewhere on the line.
+ const r0=Math.max(0,top-1-ay0),r1=Math.min(ah-1,bottom-ay0),edge=(row:number)=>Array.from({length:aw},(_,x)=>[0,1,2].map(c=>{const v:number[]=[];for(let dx=-2;dx<=2;dx++){const xx=Math.max(0,Math.min(aw-1,x+dx));v.push(area.data[(row*aw+xx)*4+c]);}return v.sort((a,b)=>a-b)[2];}));
+ const above=edge(r0),below=edge(r1),local=(x:number,y:number,c:number)=>{const f=r1>r0?Math.max(0,Math.min(1,(y-r0)/(r1-r0))):0;return above[x][c]*(1-f)+below[x][c]*f;};
+ const paperAt=(x:number,y:number,o:number)=>{
+  const ax=Math.max(0,Math.min(aw-1,x-ax0)),ay=y-ay0;
+  if(grain.length<64){for(let c=0;c<3;c++)out.data[o+c]=local(ax,ay,c);}
+  else{const g=grain[((Math.imul(x,73856093)^Math.imul(y,19349663))>>>0)%grain.length],gx=g%aw,gy=(g-gx)/aw;for(let c=0;c<3;c++)out.data[o+c]=local(ax,ay,c)+area.data[g*4+c]-local(gx,gy,c);}
+  out.data[o+3]=255;
+ };
  // Borrowed letters may reach below the line box (descenders): the patch grows to fit them.
  const reach=Math.max(0,...pieces.filter(q=>q.source!==undefined).map(q=>Math.ceil((q.y1??0)-(q.baseline??0))-(bottom-baseline)));
  const patchW=Math.max(1,endX-startX),patchH=Math.min(H,bottom+reach)-top,out=new ImageData(patchW,patchH);
