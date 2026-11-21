@@ -179,6 +179,13 @@ export async function matchOcrAppearance(raster:HTMLCanvasElement,region:TextReg
  // Choose the weight before fine size/position probing: those small geometry
  // changes must not make a correctly heavy line switch to a lighter face.
  if(weights&&best.mass!==undefined)best=await heaviness(raster,region,regions,best,{autoFont,matchBlur,makeText,onFit,alike});
+ // Compare the familiar family in its fitted weight before switching faces:
+ // a Light face can match the scan while its Regular face loses to a new
+ // candidate. Use the existing family margin on the fully weighted fits.
+ if(autoFont&&baseFamily(best.family)!==baseFamily(family)){
+  const familiar=await matchOcrAppearance(raster,region,regions,family,{autoFont:false,matchBlur,makeText,onFit,own,weights,floor,alike,refine:false});
+  if(familiar&&best.score<=familiar.score+FAMILY_MARGIN)best=familiar;
+ }
  // Refine only the chosen face, using the same crisp-only bounded search.
  // Weight trials request the unrefined fit so their ink comparison is stable.
  if(refine&&best.softness<=.15&&selected&&paintSelected){
