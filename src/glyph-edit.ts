@@ -231,7 +231,10 @@ export function planGlyphEdit(text:string,cells:Cell[],next:string,library:Libra
  const inkLayout=(p:number,keep:number[])=>{
   // Edge spaces carry an explicit indent or trailing advance. Keep the
   // existing cell planner for those edits, including removal of source spaces.
-  if(grid||/^\s|\s$/u.test(text)||/^\s|\s$/u.test(next))return undefined;
+  // Unread symbols are fixed source cells, not letters whose side gaps can
+  // be inferred. In particular, a symbol before the changed suffix must not
+  // be skipped when deciding where that suffix starts.
+  if(grid||cells.some(c=>c.ch===UNREAD)||/^\s|\s$/u.test(text)||/^\s|\s$/u.test(next))return undefined;
   const real=cells.map((c,i)=>({c,i})).filter(({c})=>!c.space&&c.ch!==UNREAD);
   if(real.length<2||real.some(({c})=>c.i0===undefined||c.i1===undefined))return undefined;
   const median=(v:number[])=>v.length?[...v].sort((x,y)=>x-y)[v.length>>1]:undefined;
