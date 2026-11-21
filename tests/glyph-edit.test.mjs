@@ -117,6 +117,12 @@ test('short proportional figures do not collide when a wide digit replaces a nar
  ];
  for(const [text,next,cells,prefixEnd]of examples){const plan=planGlyphEdit(text,cells,next,[donor]);assert.ok(plan);const borrowed=plan.pieces.find(q=>q.source===donor.source);assert.ok(borrowed);const left=borrowed.to+donor.i0-borrowed.x0;assert.ok(left>=prefixEnd+1,`${text} → ${next}: replacement ink starts${left}, prefix ends${prefixEnd}`);const spans=plan.pieces.map(q=>{const g=q.source?donor:cells.find(c=>c.x0<=q.x0&&c.x1>=q.x1);assert.ok(g);return {left:q.to+g.i0-q.x0,right:q.to+g.i1-q.x0};});for(let i=1;i<spans.length;i++)assert.ok(spans[i].left>=spans[i-1].right+1,'changed digits retain a clear gap from each other');}
 });
+test('a wide digit after a narrow space clears the preceding word',()=>{
+ const measured=[cell('a',0,20),{ch:' ',x0:20,x1:21,space:true},cell('1',21,30,22,28)];
+ const donor={ch:'9',x0:99,x1:121,i0:100,i1:120,m:110,y0:0,y1:30,source:'verified-wide-digit'};
+ const plan=planGlyphEdit('a 1',measured,'a 9',[donor]);assert.ok(plan);const borrowed=plan.pieces.find(q=>q.source===donor.source);assert.ok(borrowed);
+ const left=borrowed.to+donor.i0-borrowed.x0;assert.ok(left>=20,`replacement ink at${left} must clear the preceding word ending at19`);assert.ok(plan.startX>=20,'the patch must not erase the preceding word');
+});
 test('a digit for a digit is drawn where the old one stood and nothing else moves',async()=>{
  const {planGlyphEdit:plan}=await import('../tmp/glyph-edit.mjs');
  // "18,40": the 1 is narrow (cell 0-8, ink 3-6), the others 12 wide.
