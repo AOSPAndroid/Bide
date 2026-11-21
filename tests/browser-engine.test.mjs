@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdir, writeFile, readFile } from 'node:fs/promises';
 import * as mupdf from 'mupdf';
 import { unzipSync, strFromU8 } from 'fflate';
-import { importBytes, exportDocument, restore, render, selectPages, detectPdfText, removePdfText, fontSupportsText, findPdfText, redactPdf, sanitizePdf, pdfFormFields, fillPdfField } from '../tmp/browser-core.mjs';
+import { importBytes, exportDocument, restore, render, renderArea, selectionRasterPlan, selectPages, detectPdfText, removePdfText, fontSupportsText, findPdfText, redactPdf, sanitizePdf, pdfFormFields, fillPdfField } from '../tmp/browser-core.mjs';
 await mkdir('tmp/pdfs',{recursive:true});
 const original=new mupdf.PDFDocument(),font=new mupdf.Font('Helvetica'),fontRef=original.addSimpleFont(font);
 for(const label of ['Original first page','Original second page']){const p=original.addPage([0,0,595,842],0,{Font:{helv:fontRef}},`BT /helv 22 Tf 50 772 Td (${label}) Tj ET 0.2 0.7 0.5 rg 50 642 200 100 re f`);original.insertPage(-1,p);p.destroy();}
@@ -340,4 +340,70 @@ test('scanner text replacement removes the whole old field, including an unchang
   try{assert.deepEqual(a.getPixels(),b.getPixels(),'repairing invisible text never changes the scan or its drawings');}finally{a.destroy();b.destroy();beforePage.destroy();before.destroy();}
  }finally{structured.destroy();page.destroy();output.destroy();}
  }
+});
+
+const readingArea=(left,top,width,height)=>({points:[{x:left,y:top},{x:left+width,y:top},{x:left+width,y:top+height},{x:left,y:top+height}]});
+const readingPixels=png=>{const image=new mupdf.Image(png),pix=image.toPixmap();try{return {width:pix.getWidth(),height:pix.getHeight(),channels:pix.getNumberOfComponents(),pixels:pix.getPixels().slice()};}finally{pix.destroy();image.destroy();}};
+
+test('selected-area raster budgets depend on the crop, retaining tiny text on a large sheet',()=>{
+ const plan=selectionRasterPlan(2400,3200,readingArea(10,20,160,30));
+ assert.equal(plan.scale,300/72);assert.equal(plan.width,668);assert.equal(plan.height,126);
+ assert.equal(plan.left,plan.pixelBounds[0]/plan.scale);assert.equal(plan.top,plan.pixelBounds[1]/plan.scale);
+ for(const area of [readingArea(0,0,14400,14400),readingArea(.12,.56,14000,.8),readingArea(.12,.56,.8,14000)]){
+  const p=selectionRasterPlan(14400,14400,area,20);assert.ok(p.width<=8192&&p.height<=8192&&p.width*p.height<=16000000);assert.ok(p.scale<=300/72);
+ }
+ const mask={width:400,height:300,data:new Uint8ClampedArray(400*300)};mask.data[50*400+20]=255;mask.data[59*400+29]=255;
+ const p=selectionRasterPlan(400,300,{points:[],mask},1);assert.deepEqual([p.left,p.top,p.width,p.height],[20,50,10,10]);
+ assert.throws(()=>selectionRasterPlan(400,300,{points:[],mask:{...mask,data:new Uint8ClampedArray(2)}}),/mask/);
+ assert.throws(()=>selectionRasterPlan(400,300,{points:[]}),/Draw an area/);
+ assert.throws(()=>selectionRasterPlan(400,300,readingArea(500,500,30,30)),/inside the page/);
+ assert.throws(()=>selectionRasterPlan(400,300,readingArea(10,20,0,30)),/inside the page/);
+ assert.throws(()=>selectionRasterPlan(400,300,readingArea(NaN,20,30,30)),/Draw an area/);
+ assert.throws(()=>selectionRasterPlan(Infinity,300,readingArea(10,20,30,30)),/invalid/);
+});
+
+async function readingPdf({box=[0,0,600,400],rotation=0}={}){
+ const doc=new mupdf.PDFDocument(),font=new mupdf.Font('Helvetica'),ref=doc.addSimpleFont(font),page=doc.addPage(box,rotation,{Font:{F:ref}},'1 1 1 rg -1000 -1000 4000 4000 re f 0.2 0.4 0.6 rg 50 80 190 150 re f 0 0 0 rg BT /F 6 Tf 70 180 Td (Reference ZX 4827 TOTAL 1947.80 EUR) Tj ET 0.8 0.1 0.4 rg 120 120 20 25 re f');
+ doc.insertPage(-1,page);const buffer=doc.saveToBuffer(''),bytes=buffer.asUint8Array().slice();buffer.destroy();page.destroy();ref.destroy();font.destroy();doc.destroy();return {bytes,source:await importBytes(bytes,'invented-reading.pdf')};
+}
+
+test('selected PDF crops reproduce native render pixels through page rotation, nonzero boxes and resizing',async()=>{
+ for(const fixture of [{},{rotation:90},{box:[20,30,620,430]},{box:[20,30,620,430],rotation:270}]){
+  const made=await readingPdf(fixture),doc=mupdf.Document.openDocument(made.bytes,'pdf'),page=doc.loadPage(0),bounds=page.getBounds(),native={width:bounds[2]-bounds[0],height:bounds[3]-bounds[1]};
+  try{
+   for(const size of [undefined,{width:native.width*.6,height:native.height*.8}]){
+    const frame=size??native,area=readingArea(15.3,25.7,Math.min(220,frame.width-20),Math.min(180,frame.height-30)),crop=renderArea(made.source.id,0,area,2.5,size),actual=readingPixels(crop.png),sx=crop.scale*frame.width/native.width,sy=crop.scale*frame.height/native.height;
+    const full=page.toPixmap([sx,0,0,sy,-bounds[0]*sx,-bounds[1]*sy],mupdf.ColorSpace.DeviceRGB,true,true);
+    try{
+     assert.deepEqual([actual.width,actual.height,actual.channels],[crop.width,crop.height,4]);
+     const expected=new Uint8ClampedArray(crop.width*crop.height*4),x0=Math.round(crop.left*crop.scale)-full.getX(),y0=Math.round(crop.top*crop.scale)-full.getY(),pixels=full.getPixels();
+     for(let y=0;y<crop.height;y++)expected.set(pixels.subarray(((y+y0)*full.getWidth()+x0)*4,((y+y0)*full.getWidth()+x0+crop.width)*4),y*crop.width*4);
+     assert.deepEqual(actual.pixels,expected,`rotation ${fixture.rotation??0}, nonzero ${!!fixture.box}, resized ${!!size}`);
+    }finally{full.destroy();}
+   }
+  }finally{page.destroy();doc.destroy();}
+ }
+});
+
+test('native-detail PDF reading allocates only a small crop on a large page and preserves the source',async()=>{
+ const made=await readingPdf({box:[0,0,2400,3200]}),area=readingArea(60,3000,160,30),before=detectPdfText(made.source.id,0);
+ const crop=renderArea(made.source.id,0,area),pixels=readingPixels(crop.png);assert.equal(crop.scale,300/72);assert.ok(crop.width<=669&&crop.height<=126);assert.ok(pixels.pixels.some((v,i)=>i%4!==3&&v<80),'the native crop contains the small printed reference');
+ assert.deepEqual(detectPdfText(made.source.id,0),before,'reading never changes the original page');
+ assert.throws(()=>renderArea(made.source.id,0,area,4,{width:NaN,height:400}),/visible page/);
+ assert.throws(()=>renderArea('missing',0,area),/Reopen/);
+});
+
+test('PDF reading refuses current form appearances in the visible resized coordinate frame',async()=>{
+ const {PDFDocument}=await import('pdf-lib'),pdf=await PDFDocument.create(),page=pdf.addPage([400,300]),field=pdf.getForm().createTextField('Amount');field.setText('Old underlying value');field.addToPage(page,{x:40,y:150,width:160,height:30});
+ page.drawText('Unrelated header',{x:40,y:260,size:12});const imported=await importBytes(await pdf.save(),'invented-reading-form.pdf'),before=pdfFormFields(imported.id,0);
+ assert.throws(()=>renderArea(imported.id,0,readingArea(35,110,175,50)),/editable form field/);
+ assert.throws(()=>renderArea(imported.id,0,readingArea(70,220,350,100),4,{width:800,height:600}),/editable form field/);
+ assert.ok(renderArea(imported.id,0,readingArea(30,20,200,35)).png.length>100,'an unrelated header is still readable');
+ assert.deepEqual(pdfFormFields(imported.id,0),before,'refusal and reading do not change live fields');
+});
+
+test('selected PDF crops retain transparent unpainted pixels for the visible page compositor',async()=>{
+ const doc=new mupdf.PDFDocument(),obj=doc.addPage([0,0,400,300],0,{},'0.2 0.4 0.6 rg 40 210 20 20 re f');doc.insertPage(-1,obj);const buffer=doc.saveToBuffer(''),imported=await importBytes(buffer.asUint8Array().slice(),'invented-transparent-reading.pdf');buffer.destroy();obj.destroy();doc.destroy();
+ const crop=renderArea(imported.id,0,readingArea(20,50,60,60),1),pixels=readingPixels(crop.png);assert.equal(pixels.channels,4);assert.deepEqual([...pixels.pixels.subarray(0,4)],[0,0,0,0]);
+ const ink=((70-50)*pixels.width+(40-20))*4;assert.deepEqual([...pixels.pixels.subarray(ink,ink+4)],[51,102,153,255]);
 });

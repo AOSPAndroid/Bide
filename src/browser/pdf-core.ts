@@ -1,5 +1,7 @@
 import { selectPages } from '../page-range';
 import {pdfRasterScale} from '../render-budget';
+import {selectionRasterPlan,type SelectionArea} from '../selection-ocr-geometry';
+export {selectionRasterPlan} from '../selection-ocr-geometry';
 import { digest } from './crypto';
 export { selectPages } from '../page-range';
 import * as mupdf from 'mupdf';
@@ -218,6 +220,36 @@ export function render(source:string,index:number,scale:number) {
 
   try {const page=doc.loadPage(index),b=page.getBounds();scale=pdfRasterScale(b[2]-b[0],b[3]-b[1],scale);const pix=page.toPixmap(mupdf.Matrix.scale(scale,scale),mupdf.ColorSpace.DeviceRGB,false,true);try{return pix.asPNG().slice() as Uint8Array<ArrayBuffer>;}finally{pix.destroy();page.destroy();}}finally{doc.destroy();}
 
+}
+
+export type PdfAreaRaster={png:Uint8Array<ArrayBuffer>;left:number;top:number;width:number;height:number;scale:number};
+// Render directly into the crop's global device-pixel bounds. The drawing
+// device clips the source without first rasterizing the rest of the sheet.
+export function renderArea(source:string,index:number,area:SelectionArea,requestedScale=300/72,coordinateSize?:{width:number;height:number}):PdfAreaRaster{
+ const data=sources.get(source);if(!data)throw new Error('Reopen the project to restore its PDF pages.');
+ const doc=open(data);
+ try{
+  const page=doc.loadPage(index);
+  try{
+   const bounds=page.getBounds(),nativeWidth=bounds[2]-bounds[0],nativeHeight=bounds[3]-bounds[1];
+   if(!(nativeWidth>0&&nativeHeight>0&&Number.isFinite(nativeWidth)&&Number.isFinite(nativeHeight)))throw new Error('The PDF page has invalid dimensions.');
+   const size=coordinateSize??{width:nativeWidth,height:nativeHeight};
+   if(coordinateSize&&(![size.width,size.height].every(Number.isFinite)||size.width<=0||size.height<=0||size.width>14400||size.height>14400))throw new Error('The visible page has invalid dimensions.');
+   const plan=selectionRasterPlan(size.width,size.height,area,requestedScale),fx=size.width/nativeWidth,fy=size.height/nativeHeight;
+   const right=plan.left+plan.width/plan.scale,bottom=plan.top+plan.height/plan.scale;
+   // HTML form controls can cover an older PDF appearance. Refuse every
+   // overlapping native widget, including types the editor does not expose.
+   const widgets=(page as mupdf.PDFPage).getWidgets();
+   try{if(widgets.some(widget=>{const r=widget.getRect();return (r[0]-bounds[0])*fx<right&&(r[2]-bounds[0])*fx>plan.left&&(r[1]-bounds[1])*fy<bottom&&(r[3]-bounds[1])*fy>plan.top;}))throw new Error('This area contains an editable form field. Choose an area without form fields to read text.');}finally{for(const widget of widgets)widget.destroy();}
+   const pix=new mupdf.Pixmap(mupdf.ColorSpace.DeviceRGB,plan.pixelBounds,true);
+   try{
+    pix.clear();const sx=plan.scale*fx,sy=plan.scale*fy;
+    const device=new mupdf.DrawDevice([sx,0,0,sy,-bounds[0]*sx,-bounds[1]*sy],pix);
+    try{page.run(device,mupdf.Matrix.identity);device.close();}finally{device.destroy();}
+    return {png:pix.asPNG().slice() as Uint8Array<ArrayBuffer>,left:plan.left,top:plan.top,width:plan.width,height:plan.height,scale:plan.scale};
+   }finally{pix.destroy();}
+  }finally{page.destroy();}
+ }finally{doc.destroy();}
 }
 
 
