@@ -274,6 +274,17 @@ export function matchOcrSoftness(raster:HTMLCanvasElement,region:TextRegion,regi
    // Prefer the crisper value unless a softer one is clearly closer.
    const e=Math.abs(edges-target);if(e<error-.03){error=e;best=softness;}
   }
+  // Edge widths are noisy on a short line (six small characters of a crisp
+  // low-resolution scan read as 0.45 px of blur: the amount came out soft,
+  // pale and heavy). The letters themselves must agree: a measured softness
+  // above the one the shape match found is kept only if the text drawn with
+  // it fits them as well. (A crisper measure is kept: the shape match adds a
+  // little blur to make up for placement.)
+  const fitted=clampTextSoftness(saved??0);
+  if(best>fitted+1e-6){
+   const score=(softness:number)=>{text.textSoftness=softness;return coverageFit(selected.source,paint(text)).score;};
+   if(score(best)<score(fitted)-.01)best=fitted;
+  }
  }finally{text.textSoftness=saved;}
  return best;
 }
