@@ -97,6 +97,14 @@ test('an unread symbol before a changed letter stays outside the edit patch',asy
  const replaced=planGlyphEdit(read,measured,withUnread('AB CD',measured,'CD CD'));
  assert.ok(replaced.pieces.some(q=>q.x0===10&&q.x1===20),'a symbol inside a replaced span is still copied from its own source cell');
 });
+test('a compact deletion retains the source-cell advances at its newly joined pair',()=>{
+ // Removing bc makes an unobserved a-d pair. Its gap must retain the source
+ // cell advances rather than borrowing another pair's estimated side gaps.
+ const measured=[cell('a',0,10,2,8),cell('b',10,18),cell('c',18,26),cell('d',26,40,29,37),cell('a',40,50,42,48)];
+ const plan=planGlyphEdit('abcda',measured,'ada');assert.equal(plan.startX,10);assert.equal(plan.end,34);
+ let cursor=plan.startX;const starts=plan.pieces.map(q=>{const at=q.to??cursor,source=measured.find(c=>c.x0===q.x0&&c.x1===q.x1);assert.ok(source);cursor=at+q.x1-q.x0;return at+source.i0-q.x0;});
+ assert.deepEqual(starts,[13,26],'the remaining compact suffix keeps its source-cell spacing');
+});
 test('a digit for a digit is drawn where the old one stood and nothing else moves',async()=>{
  const {planGlyphEdit:plan}=await import('../tmp/glyph-edit.mjs');
  // "18,40": the 1 is narrow (cell 0-8, ink 3-6), the others 12 wide.
