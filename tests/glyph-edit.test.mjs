@@ -87,8 +87,9 @@ test('a digit for a digit is drawn where the old one stood and nothing else move
  // Ink of about the same width goes edge to edge, whatever its centroid.
  const lopsided=[cell('6',0,12),{...cell('3',12,24),m:20},cell('9',24,36)];
  assert.equal(plan('639',lopsided,'339').pieces[0].to,0,'the 3 (cut from 12) covers exactly where the 6 was, from 0');
- // Letters are not on one advance: cells follow each other as before.
- assert.equal(plan('ab',[cell('a',0,10),cell('b',10,16)],'ba').pieces[0].to,undefined);
+ // Letters are not on one advance: they are laid by their ink, with the gap the line shows (2 between a and b).
+ const swapped=plan('ab',[cell('a',0,10),cell('b',10,16)],'ba').pieces;
+ assert.deepEqual(swapped.map(q=>q.to),[0,6],'b where the line began (its ink at 1), then a, its ink 2 after b\'s');
 });
 test('a line set at one pitch keeps its grid when its length changes; proportional text does not qualify',async()=>{
  const {planGlyphEdit:plan,fixedPitch}=await import('../tmp/glyph-edit.mjs');
