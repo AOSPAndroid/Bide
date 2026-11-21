@@ -25,6 +25,7 @@ import w17 from './browser/fonts/weights/SourceSans3-SemiBold.ttf';
 import w18 from './browser/fonts/weights/NotoSans-Light.ttf';
 import w19 from './browser/fonts/weights/NotoSans-Medium.ttf';
 import w20 from './browser/fonts/weights/NotoSans-SemiBold.ttf';
+import {displayWeightFonts} from './font-display-weights';
 export const weightFonts=[
 {family:"Roboto Light",category:"sans",faces:[{style:"Regular",url:w0}]},
 {family:"Roboto Medium",category:"sans",faces:[{style:"Regular",url:w1}]},
@@ -48,4 +49,16 @@ export const weightFonts=[
 {family:"Noto Sans Medium",category:"sans",faces:[{style:"Regular",url:w19}]},
 {family:"Noto Sans SemiBold",category:"sans",faces:[{style:"Regular",url:w20}]}
 ];
+// With the lighter and heavier weights of display families (font-display-weights.ts).
+weightFonts.push(...displayWeightFonts);
 export const weightFamilies=new Set(weightFonts.map(f=>f.family));
+// The bundled weights of a family besides its regular and bold, lightest first:
+// "Raleway" → Raleway ExtraLight, Light, Medium, SemiBold, ExtraBold, Black.
+const ORDER=['ExtraLight','Light','Medium','SemiBold','ExtraBold','Black'];
+export const WEIGHT_VALUES:Record<string,number>={ExtraLight:200,Light:300,Medium:500,SemiBold:600,ExtraBold:800,Black:900};
+// The family a weight belongs to: "Raleway Light" → Raleway, "Bide Sans 3 Medium" → Source Sans 3.
+export function baseFamily(family:string){const base=family.replace(/ (ExtraLight|Light|Medium|SemiBold|ExtraBold|Black)$/,'');return base==='Bide Sans 3'?'Source Sans 3':weightFamilies.has(family)?base:family;}
+export function familyWeights(family:string){
+ const own=family==='Source Sans 3'?'Bide Sans 3':family;
+ return ORDER.map(w=>({weight:w,family:`${own} ${w}`,value:WEIGHT_VALUES[w]})).filter(w=>weightFamilies.has(w.family));
+}

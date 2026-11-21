@@ -17,13 +17,16 @@ export type TextRegion={id:string;text:string;script?:string;left:number;top:num
 // SemiBoldItalic" → Open Sans SemiBold, "Inter-Bold" → Inter. (A light Roboto
 // line used to become Liberation Sans Regular: other shapes, twice the ink.)
 export function fallbackFont(name:string,families:readonly string[]=[]){
- const n=name.replace(/^[A-Z]{6}\+/,'');
+ // Fonts Bide exported carry a "bide-" PostScript name ("bide-raleway-Light"): matched without it.
+ const n=name.replace(/^[A-Z]{6}\+/,'').replace(/^bide-(?!sans3)/i,'');
  const key=(s:string)=>s.toLowerCase().replace(/[^a-z0-9]/g,''),k=key(n);
  const own=families.map(f=>({f,rest:k.startsWith(key(f))?k.slice(key(f).length):null})).filter((m):m is {f:string;rest:string}=>m.rest!==null&&/^(thin|hairline|extralight|ultralight|light|regular|book|normal|roman|medium|semibold|demibold|demi|bold|extrabold|ultrabold|black|heavy|italic|oblique|mt|ps)*$/.test(m.rest)).sort((a,b)=>a.rest.length-b.rest.length)[0];
- if(own){const weight=/semibold|demi/.test(own.rest)?'SemiBold':/medium/.test(own.rest)?'Medium':/thin|hairline|light/.test(own.rest)?'Light':'';
+ if(own){
+  // The weight named, then the nearest bundled one on its side of regular and bold.
+  const r=own.rest,wanted=/semibold|demi/.test(r)?['SemiBold']:/extrabold|ultrabold/.test(r)?['ExtraBold','Black']:/black|heavy/.test(r)?['Black','ExtraBold']:/medium/.test(r)?['Medium']:/extralight|ultralight/.test(r)?['ExtraLight','Light']:/thin|hairline|light/.test(r)?['Light','ExtraLight']:[];
   // The Source Sans 3 weight derivatives have distinct names under their OFL.
-  const weighted=own.f==='Source Sans 3'?`Bide Sans 3 ${weight}`:`${own.f} ${weight}`;
-  return weight&&families.includes(weighted)?weighted:own.f;
+  const weighted=wanted.map(w=>own.f==='Source Sans 3'?`Bide Sans 3 ${w}`:`${own.f} ${w}`).find(w=>families.includes(w));
+  return weighted??own.f;
  }
  const bundled=[['PT Sans',/pt ?sans/i],['PT Serif',/pt ?serif/i],['Poppins',/poppins/i],['Lato',/lato/i]] as const;
  const same=bundled.find(([,pattern])=>pattern.test(n))?.[0];if(same)return same;

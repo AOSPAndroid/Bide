@@ -35,6 +35,17 @@ test('a PDF font named after a bundled family falls back to that family, in its 
  for(const [font,face] of Object.entries(cases))assert.equal(fallbackFont(font,families),face,font);
 });
 
+test('display weights: a PDF font in Light, ExtraBold or Black, and one Bide exported, find their bundled face',async()=>{
+ const {fallbackFont}=await import('../tmp/text-regions.mjs');
+ const families=['Raleway','Raleway ExtraLight','Raleway Light','Raleway ExtraBold','Raleway Black','Nunito','Nunito ExtraBold','Nunito Black','Montserrat','Montserrat ExtraBold','Inter','Lato'];
+ const cases={'Raleway-Light':'Raleway Light','ABCDEF+Raleway-ExtraLight':'Raleway ExtraLight','Raleway-Thin':'Raleway Light','Raleway-ExtraBold':'Raleway ExtraBold','Raleway-Heavy':'Raleway Black','Nunito-Black':'Nunito Black','Nunito-ExtraBoldItalic':'Nunito ExtraBold',
+  // The nearest bundled weight on its side, else the family itself.
+  'Montserrat-Black':'Montserrat ExtraBold','Inter-Black':'Inter',
+  // Reopened from a PDF Bide exported.
+  'ABCDEF+bide-raleway-Light':'Raleway Light','bide-raleway-Regular':'Raleway','bide-nunito-ExtraBold':'Nunito ExtraBold'};
+ for(const [font,face] of Object.entries(cases))assert.equal(fallbackFont(font,families),face,font);
+});
+
 test('reserved-name weight derivatives map both original and reopened PDF names to their distinct families',async()=>{
  const {fallbackFont}=await import('../tmp/text-regions.mjs');
  const families=['Source Sans 3','Bide Sans 3 Light','Bide Sans 3 Medium','Bide Sans 3 SemiBold'];

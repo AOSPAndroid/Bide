@@ -1,0 +1,131 @@
+{
+  "revision": "ea9bc40cb0323afec81e7f1005453eea36f51708",
+  "faces": [
+    {
+      "family": "Raleway ExtraLight",
+      "file": "Raleway-ExtraLight.ttf",
+      "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/raleway/Raleway%5Bwght%5D.ttf",
+      "weight": 200,
+      "sha256": "cdd7e488a421b3959113946a94c1e57a474b1bfeff8d14dc61f77d92d56814c3"
+    },
+    {
+      "family": "Raleway Light",
+      "file": "Raleway-Light.ttf",
+      "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/raleway/Raleway%5Bwght%5D.ttf",
+      "weight": 300,
+      "sha256": "ad9671c2e19f1e2758df4906a44b23389621017ba4b7b19fba3f4b0c2ff4ff50"
+    },
+    {
+      "family": "Raleway Medium",
+      "file": "Raleway-Medium.ttf",
+      "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/raleway/Raleway%5Bwght%5D.ttf",
+      "weight": 500,
+      "sha256": "a35375bed0f5bf38bb75ae4d7eb23f20d2ddd82dcddf7c6a32a0fab2865f6a76"
+    },
+    {
+      "family": "Raleway SemiBold",
+      "file": "Raleway-SemiBold.ttf",
+      "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/raleway/Raleway%5Bwght%5D.ttf",
+      "weight": 600,
+      "sha256": "c1da207ca5930be4b9b1616bdcf6132ca2b84e54dcbfcdecc81953f214b89254"
+    },
+    {
+      "family": "Raleway ExtraBold",
+      "file": "Raleway-ExtraBold.ttf",
+      "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/raleway/Raleway%5Bwght%5D.ttf",
+      "weight": 800,
+      "sha256": "0843e09d771bb5100dd8005911bfdeeeb4f679dee661d1c715b235b22b70fa1d"
+    },
+    {
+      "family": "Raleway Black",
+      "file": "Raleway-Black.ttf",
+      "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/raleway/Raleway%5Bwght%5D.ttf",
+      "weight": 900,
+      "sha256": "c47bef9555bfabd59731d55f1644f7a00ef04968cf8dcb60d84c22db69c95e80"
+    },
+    {
+      "family": "Nunito Light",
+      "file": "Nunito-Light.ttf",
+      "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/nunito/Nunito%5Bwght%5D.ttf",
+      "weight": 300,
+      "sha256": "3e6c8b4743076caaeb82bcc1b4651c05d5e954defbd2944f32982b847c17651e"
+    },
+    {
+      "family": "Nunito SemiBold",
+      "file": "Nunito-SemiBold.ttf",
+      "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/nunito/Nunito%5Bwght%5D.ttf",
+      "weight": 600,
+      "sha256": "8487a56c84e808e2e00b4fd7f818873c84610586c5d7ef209537b636ded38d6d"
+    },
+    {
+      "family": "Nunito ExtraBold",
+      "file": "Nunito-ExtraBold.ttf",
+      "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/nunito/Nunito%5Bwght%5D.ttf",
+      "weight": 800,
+      "sha256": "edd8f0e35c5a23aa57af651b9e579d298b9a12a47b963c42a29a329fde0c9c5f"
+    },
+    {
+      "family": "Nunito Black",
+      "file": "Nunito-Black.ttf",
+      "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/nunito/Nunito%5Bwght%5D.ttf",
+      "weight": 900,
+      "sha256": "b513badeba6fccb1a2a44497cab87abc16fdf5bf8cd1719c40507a5ff5a73bcf"
+    },
+    {
+      "family": "Montserrat ExtraBold",
+      "file": "Montserrat-ExtraBold.ttf",
+      "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/montserrat/Montserrat%5Bwght%5D.ttf",
+      "weight": 800,
+      "sha256": "0a9d3fbe4a49287674a424029f2bc8096beda59396eb127c6fcb394d08482d17"
+    },
+    {
+      "family": "Montserrat Black",
+      "file": "Montserrat-Black.ttf",
+      "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/montserrat/Montserrat%5Bwght%5D.ttf",
+      "weight": 900,
+      "sha256": "4ffe2216c2a1198c633ebd761457425baac4f03353f9e4f275d86bcb0c5aa9df"
+    },
+    {
+      "family": "Poppins ExtraBold",
+      "file": "Poppins-ExtraBold.ttf",
+      "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/poppins/Poppins-ExtraBold.ttf",
+      "weight": 800,
+      "sha256": "e06dc8b4d27fb55a70f386c336466741fd41c3c3ed05ab3c09e780459b2054f7"
+    },
+    {
+      "family": "Poppins Black",
+      "file": "Poppins-Black.ttf",
+      "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/poppins/Poppins-Black.ttf",
+      "weight": 900,
+      "sha256": "1773fa8b4771ee1a36d619a63706d3a394e2d09f004ca21c52cede80a2ee17e2"
+    },
+    {
+      "family": "Open Sans ExtraBold",
+      "file": "OpenSans-ExtraBold.ttf",
+      "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/opensans/OpenSans%5Bwdth%2Cwght%5D.ttf",
+      "weight": 800,
+      "sha256": "81927b56fd1d8da25f38d66db5510bd83b7ebd0843e1e64ae3bac31c7a18a749"
+    },
+    {
+      "family": "Inter ExtraBold",
+      "file": "Inter-ExtraBold.ttf",
+      "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/inter/Inter%5Bopsz%2Cwght%5D.ttf",
+      "weight": 800,
+      "sha256": "f49fe02537cf9740a3dc01529547a5477e55e10058ddc2ea194046f6b2764d48"
+    },
+    {
+      "family": "Inter Black",
+      "file": "Inter-Black.ttf",
+      "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/inter/Inter%5Bopsz%2Cwght%5D.ttf",
+      "weight": 900,
+      "sha256": "261b765ba864643469a30ade8d3caa902ab27b9bc36618afefa9c69126353374"
+    },
+    {
+      "family": "Roboto Black",
+      "file": "Roboto-Black.ttf",
+      "source": "https://raw.githubusercontent.com/google/fonts/ea9bc40cb0323afec81e7f1005453eea36f51708/ofl/roboto/Roboto%5Bwdth%2Cwght%5D.ttf",
+      "weight": 900,
+      "sha256": "57ed3471c955d85ecbd73411dcb732e9afa362bd25ad1b6ca499e1c04fce927b"
+    }
+  ]
+}
