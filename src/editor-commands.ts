@@ -13,7 +13,8 @@ import {type Page,type Project} from './model';
 import {blendModes} from './browser/layer-utils';
 import {type Workspace} from './WorkspaceDock';
 import {bundledFonts,systemFonts} from './font-catalog';
-import {type SelectionPoint} from './selection-mask';
+import type {SelectionRegion} from './canvas-events';
+import type {SelectionPoint} from './selection-mask';
 import {brushWidth,brushNames,type BrushKind} from './brushes';
 import {type TextRegion} from './text-regions';
 import {type ColorStyle} from './DesignTools';
@@ -23,6 +24,7 @@ import {type FormFieldType} from './forms';
 import {TOOLS,type Obj,type Tool,type PaletteAction,type Modal} from './editor-types';
 
 export type EditorCommandsDeps={
+  readSelectionText:()=>Promise<void>;
   selectWorkspace:(next: Workspace) => void;
   setShowDetectedText:Dispatch<SetStateAction<boolean>>;
   setTextScanRevision:Dispatch<SetStateAction<number>>;
@@ -49,7 +51,7 @@ export type EditorCommandsDeps={
   page:Page;
   unlockOriginalPdf:() => Promise<void>;
   runSelection:(action: SelectionAction, amount?: number) => void;
-  region:{ id: string; points: SelectionPoint[]; mask?: Mask | undefined; outline?: string | undefined; } | null;
+  region:SelectionRegion|null;
   aiReady:boolean | undefined;
   selectSubject:() => Promise<void>;
   openColorRange:() => void;
@@ -128,8 +130,9 @@ export type EditorCommandsDeps={
 };
 
 export function editorCommands(d:EditorCommandsDeps){
-  const {selectWorkspace,setShowDetectedText,setTextScanRevision,setTool,changeZoom,zoomRef,setModal,openFiles,projectInput,saveProject,exportDialog,addText,imageInput,addPage,duplicatePage,pageAction,pageId,undo,duplicate,groupLayers,ungroupLayers,fit,setProtect,page,unlockOriginalPdf,runSelection,region,aiReady,selectSubject,openColorRange,mergeDown,addAdjustment,openWarp,project,selected,canvas,syncSelection,setRegion,copyToClipboard,pasteFromClipboard,setMobilePanel,togglePathEdit,trimToContent,selectionPixels,cropTo,toggleRulers,setShowGuides,guides,setGuides,setSidePanel,openPerspective,addLayerMask,invertSelectedMask,applyLayerMask,deleteLayerMask,addEffect,setLayerStyle,selectionTarget,showMask,removeBackground,exportTransparentPng,aiSharpenSelected,aiRemove,straightenPage,flattenPageAi,textRegions,setRedactOpen,addFormField,setProofOpen,setFindOpen,convertAllDetectedText,updateObject,setView,documentView,setPdfHome,setLeftOpen,setPageId,deletePage,clipboard,copyPending,removeSelected,moveLayer,toggleLock,saveCanvas,align,applySelection,setClip,setImageFilter,changeTextFont,setBrushKind,addArtboard,setLayoutGrid,layoutSelection,colorStyles,applyColorStyle,tool,setEraserSize,setRetouchSize,setHighlightSize,setBrushSize,setSnap,layers}=d;
+  const {readSelectionText,selectWorkspace,setShowDetectedText,setTextScanRevision,setTool,changeZoom,zoomRef,setModal,openFiles,projectInput,saveProject,exportDialog,addText,imageInput,addPage,duplicatePage,pageAction,pageId,undo,duplicate,groupLayers,ungroupLayers,fit,setProtect,page,unlockOriginalPdf,runSelection,region,aiReady,selectSubject,openColorRange,mergeDown,addAdjustment,openWarp,project,selected,canvas,syncSelection,setRegion,copyToClipboard,pasteFromClipboard,setMobilePanel,togglePathEdit,trimToContent,selectionPixels,cropTo,toggleRulers,setShowGuides,guides,setGuides,setSidePanel,openPerspective,addLayerMask,invertSelectedMask,applyLayerMask,deleteLayerMask,addEffect,setLayerStyle,selectionTarget,showMask,removeBackground,exportTransparentPng,aiSharpenSelected,aiRemove,straightenPage,flattenPageAi,textRegions,setRedactOpen,addFormField,setProofOpen,setFindOpen,convertAllDetectedText,updateObject,setView,documentView,setPdfHome,setLeftOpen,setPageId,deletePage,clipboard,copyPending,removeSelected,moveLayer,toggleLock,saveCanvas,align,applySelection,setClip,setImageFilter,changeTextFont,setBrushKind,addArtboard,setLayoutGrid,layoutSelection,colorStyles,applyColorStyle,tool,setEraserSize,setRetouchSize,setHighlightSize,setBrushSize,setSnap,layers}=d;
   const actions: PaletteAction[] = [
+    {label:'Read selected area',hint:'',keywords:'read extract copy tiny small text OCR selection crop',icon:Type,run:()=>void readSelectionText()},
     { label:'Open photo editor', hint:'', icon:FileImage, run:()=>selectWorkspace('photo') },
     { label:'Open PDF MasterTool', hint:'', icon:FileText, run:()=>selectWorkspace('pdf') },
     { label:'Open Documents workspace', hint:'', icon:Receipt, run:()=>selectWorkspace('documents') },
@@ -165,7 +168,7 @@ export function editorCommands(d:EditorCommandsDeps){
     {label:'Freehand lasso selection',hint:'L',icon:LassoSelect,run:()=>setTool('lasso')},
     {label:'Magic wand',hint:'W',icon:Wand2,keywords:'select colour color similar tolerance',run:()=>setTool('wand')},
     {label:'Select all pixels',hint:'',icon:SquareDashed,run:()=>runSelection('all')},
-    {label:'Inverse selection',hint:'Ctrl Shift I',icon:SquareDashed,disabled:region?undefined:'Make a selection first',run:()=>runSelection('inverse')},
+    {label:'Inverse selection',hint:'Ctrl Shift I',icon:SquareDashed,disabled:region?.readOnly?'This PDF area only reads text':region?undefined:'Make a selection first',run:()=>runSelection('inverse')},
     {label:'Select subject with AI',hint:'',icon:Sparkles,keywords:'person object cut out isolate',disabled:aiReady?undefined:'AI models are not bundled in this build.',run:()=>void selectSubject()},
     {label:'Select color range',hint:'',icon:SquareDashed,keywords:'similar colour sky background',run:openColorRange},
     { label:'Draw with brush', hint:'B', icon:PenLine, run:()=>setTool('brush') },
@@ -195,7 +198,7 @@ export function editorCommands(d:EditorCommandsDeps){
     {label:'Image size…',hint:'',icon:Scaling,keywords:'resample resize scale pixels dimensions',run:()=>setModal('imagesize')},
     {label:'Canvas size…',hint:'',icon:Scaling,keywords:'extend border space anchor',run:()=>setModal('canvassize')},
     {label:'Trim to content',hint:'',icon:Crop,keywords:'transparent pixels crop auto',run:trimToContent},
-    {label:'Crop to selection',hint:'',icon:Crop,disabled:region?undefined:'Make a selection first',run:()=>{const b=region&&maskBounds(selectionPixels(region));if(b){setRegion(null);cropTo(b);}}},
+    {label:'Crop to selection',hint:'',icon:Crop,disabled:region?.readOnly?'This PDF area only reads text':region?undefined:'Make a selection first',run:()=>{const b=region&&maskBounds(selectionPixels(region));if(b){setRegion(null);cropTo(b);}}},
     {label:'Toggle rulers',hint:'Ctrl R',icon:Ruler,run:toggleRulers},
     {label:'Toggle guides',hint:'Ctrl ;',icon:Ruler,run:()=>setShowGuides(v=>!v)},
     {label:'Clear guides',hint:'',icon:Ruler,disabled:guides.x.length||guides.y.length?undefined:'This page has no guides',run:()=>setGuides({x:[],y:[]})},
@@ -215,7 +218,7 @@ export function editorCommands(d:EditorCommandsDeps){
     {label:'Export text as transparent PNG',hint:'',icon:Download,disabled:requireText,run:()=>void exportTransparentPng(true)},
     {label:'Export page as transparent PNG',hint:'',icon:Download,disabled:page.source?'Unlock Original PDF first':undefined,run:()=>void exportTransparentPng()},
     {label:'Sharpen image layer with AI (2×)',hint:'',keywords:'upscale enhance super resolution blurry esrgan',icon:SlidersHorizontal,disabled:!aiReady?'AI models are not bundled in this build.':requireImage,run:()=>void aiSharpenSelected()},
-    {label:'Remove selection with AI fill',hint:'',keywords:'inpaint erase object content aware lama',icon:Eraser,disabled:!aiReady?'AI models are not bundled in this build.':region?undefined:'Draw a Marquee or Lasso selection first',run:()=>void aiRemove()},
+    {label:'Remove selection with AI fill',hint:'',keywords:'inpaint erase object content aware lama',icon:Eraser,disabled:!aiReady?'AI models are not bundled in this build.':region?.readOnly?'This PDF area only reads text':region?undefined:'Draw a Marquee or Lasso selection first',run:()=>void aiRemove()},
     {label:'Straighten page (fix tilt and rotation)',hint:'',keywords:'deskew skew tilt rotate upright orientation scan photo ocr level',icon:RotateCw,disabled:page.source?'Unlock Original PDF first':undefined,run:()=>void straightenPage()},
     ...(aiReady?[{label:'Flatten photographed page (AI)',hint:'',keywords:'dewarp perspective curved curl unwarp document photo scan keystone',icon:Wand2,disabled:page.source?'Unlock Original PDF first':undefined,run:()=>void flattenPageAi()}]:[]),
     {label:'Find & redact (remove personal data)',hint:'',keywords:'redact redaction black out censor hide remove personal data privacy gdpr email phone iban card name confidential',icon:EyeOff,disabled:textRegions.length?undefined:'Open a page with text first',run:()=>setRedactOpen(true)},
@@ -255,8 +258,8 @@ export function editorCommands(d:EditorCommandsDeps){
     {label:'Export pages as SVG',hint:'',icon:FileImage,run:()=>exportDialog('svg')},
     {label:'Select all layers',hint:'Ctrl A',icon:Layers,run:selectAllLayers},
     {label:'Deselect everything',hint:'Esc',icon:MousePointer2,run:clearSelection},
-    {label:'Copy selected layers',hint:'Ctrl C',icon:Copy,disabled:!selected&&!region?'Select an area or layer first':undefined,run:copyLayers},
-    {label:'Paste copied layers',hint:'Ctrl V',icon:Copy,disabled:!clipboard.current&&!copyPending.current?'Copy an area or layer first':undefined,run:pasteLayers},
+    {label:'Copy selected layers',hint:'Ctrl C',icon:Copy,disabled:region?.readOnly?'Choose Read text to copy this PDF area':!selected&&!region?'Select an area or layer first':undefined,run:copyLayers},
+    {label:'Paste copied layers',hint:'Ctrl V',icon:Copy,disabled:region?.readOnly?'Deselect this PDF area first':!clipboard.current&&!copyPending.current?'Copy an area or layer first':undefined,run:pasteLayers},
     {label:'Delete selected layers',hint:'Delete',icon:Trash2,disabled:requireLayer,run:removeSelected},
     {label:'Bring layer forward',hint:'',icon:ArrowUp,disabled:requireLayer,run:()=>moveLayer('up')},
     {label:'Send layer backward',hint:'',icon:ArrowDown,disabled:requireLayer,run:()=>moveLayer('down')},
@@ -265,7 +268,7 @@ export function editorCommands(d:EditorCommandsDeps){
     ...(['left','center','right'] as const).map(where=>({label:`Align layer ${where} on page`,hint:'',icon:Scaling,disabled:requireLayer,run:()=>align(where)})),
     {label:'Flip layer horizontally',hint:'',icon:Scaling,disabled:requireLayer,run:()=>updateObject({flipX:!selected?.flipX})},
     {label:'Flip layer vertically',hint:'',icon:Scaling,disabled:requireLayer,run:()=>updateObject({flipY:!selected?.flipY})},
-    ...(['keep','hide','copy'] as const).map(mode=>({label:mode==='keep'?'Keep artwork inside selection':mode==='hide'?'Hide artwork inside selection':'Copy selection to new layer',hint:'',icon:SquareDashed,disabled:!region?'Draw a rectangular or lasso selection first':undefined,run:()=>void applySelection(mode)})),
+    ...(['keep','hide','copy'] as const).map(mode=>({label:mode==='keep'?'Keep artwork inside selection':mode==='hide'?'Hide artwork inside selection':'Copy selection to new layer',hint:'',icon:SquareDashed,disabled:region?.readOnly?'This PDF area only reads text':!region?'Draw a rectangular or lasso selection first':undefined,run:()=>void applySelection(mode)})),
     ...(['none','ellipse','rounded'] as const).map(kind=>({label:kind==='none'?'Remove layer mask':`Apply ${kind} layer mask`,hint:'',icon:Circle,disabled:requireLayer,run:()=>setClip(kind)})),
     ...(['grayscale','sepia','invert','reset'] as const).map(kind=>({label:kind==='reset'?'Reset image filters':`Apply ${kind} image filter`,hint:'',icon:SlidersHorizontal,disabled:requireImage,run:()=>setImageFilter(kind)})),
     {label:'Toggle bold text',hint:'',icon:Bold,disabled:requireText,run:()=>updateObject({fontWeight:selected?.fontWeight==='bold'?'normal':'bold'})},
@@ -286,6 +289,6 @@ export function editorCommands(d:EditorCommandsDeps){
     ...layers.map(layer=>({label:`Select layer: ${layer.name||layer.type}`,hint:'',category:'Layers',icon:Layers,run:()=>{canvas.current?.setActiveObject(layer);canvas.current?.requestRenderAll();syncSelection();setTool('select');}})),
   ];
   // The Documents workspace has no canvas, so its palette only switches workspaces.
-  const documentsActions=actions.filter(a=>['Open photo editor','Open PDF MasterTool','Open Documents workspace'].includes(a.label));
+  const documentsActions=actions.filter(a=>['Open photo editor','Open PDF MasterTool','Open Documents workspace','Read selected area'].includes(a.label));
   return {actions,requireLayer,focusSetting,moreActions,documentsActions};
 }

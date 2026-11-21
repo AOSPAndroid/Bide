@@ -24,6 +24,7 @@ export async function importDocument(file:File,password?:string){
 export async function exportInBrowser(spec:ExportSpec){const result=await rpc<{bytes:Uint8Array<ArrayBuffer>;mime:string}>('export',spec);return new Blob([result.bytes],{type:result.mime});}
 const previews=new Map<string,Promise<string>>();
 export function pagePreview(source:string,index:number,scale:number){const key=`${source}/${index}/${scale}`;let p=previews.get(key);if(!p){p=rpc<Uint8Array<ArrayBuffer>>('render',{source,index,scale}).then(data=>URL.createObjectURL(new Blob([data],{type:'image/png'}))).catch(e=>{previews.delete(key);throw e;});previews.set(key,p);}return p;}
+export const renderPdfArea=(source:string,index:number,area:import('../selection-ocr-geometry').SelectionArea,scale=300/72,coordinateSize?:{width:number;height:number})=>rpc<import('./pdf-core').PdfAreaRaster>('renderArea',{source,index,area,scale,coordinateSize});
 
 // A scanned page's own pixels per page unit (see pdf-core scanScale).
 export const pdfScanScale=(source:string,index:number)=>rpc<number|undefined>('scanScale',{source,index});

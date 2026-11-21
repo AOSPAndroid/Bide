@@ -18,7 +18,7 @@ import type {Obj,Tool} from './editor-types';
 import type {TouchHooks} from './touch-gestures';
 import {revealEditedText} from './text-reveal';
 
-export type SelectionRegion={id:string;points:SelectionPoint[];mask?:Mask;outline?:string};
+export type SelectionRegion={id:string;points:SelectionPoint[];mask?:Mask;outline?:string;readOnly?:boolean};
 export type CanvasEventDeps={
   retouch:RefObject<{ down(point: XY, alt: boolean): boolean; move(point: XY): boolean; up(): boolean; cancel: () => void; } | null>;
   retouchSettings:RefObject<{ tool: Tool; pageId: string; width: number; height: number; pdf: boolean; size: number; softness: number; opacity: number; target: Obj | null; }>;
@@ -45,15 +45,15 @@ export type CanvasEventDeps={
   cropRef:RefObject<{ rect: { left: number; top: number; width: number; height: number; }; angle: number; } | null>;
   paintRef:RefObject<{ secondColor: string; gradient: { type: "linear" | "radial"; toTransparent: boolean; opacity: number; }; bucket: { tolerance: number; contiguous: boolean; antiAlias: boolean; allLayers: boolean; opacity: number; }; maskBrush: { reveal: boolean; size: number; softness: number; opacity: number; }; }>;
   colorRef:RefObject<string>;
-  regionRef:RefObject<{ id: string; points: SelectionPoint[]; mask?: Mask | undefined; outline?: string | undefined; } | null>;
-  selectionPixels:(r: { id: string; points: SelectionPoint[]; mask?: Mask | undefined; outline?: string | undefined; }) => Mask;
+  regionRef:RefObject<SelectionRegion|null>;
+  selectionPixels:(r: SelectionRegion) => Mask;
   selectionLayer:() => Obj | undefined;
   selectModeRef:RefObject<MaskOp>;
-  selectObjectRef:RefObject<(id: string, pt: { x: number; y: number; }, op: MaskOp, base: { id: string; points: SelectionPoint[]; mask?: Mask | undefined; outline?: string | undefined; } | null) => Promise<void>>;
+  selectObjectRef:RefObject<(id: string, pt: { x: number; y: number; }, op: MaskOp, base: SelectionRegion|null) => Promise<void>>;
   wandRef:RefObject<{ tolerance: number; contiguous: boolean; antiAlias: boolean; allLayers: boolean; }>;
   showMask:(id: string, mask: Mask) => void;
   outlineOf:(points: SelectionPoint[]) => string;
-  setRegion:Dispatch<SetStateAction<{ id: string; points: SelectionPoint[]; mask?: Mask | undefined; outline?: string | undefined; } | null>>;
+  setRegion:Dispatch<SetStateAction<SelectionRegion|null>>;
   workspace:RefObject<HTMLDivElement | null>;
   textFont:RefObject<string>;
   changeZoom:(value: number, at?: { x: number; y: number; } | undefined) => void;
@@ -83,7 +83,7 @@ export function attachCanvasEvents(c:Canvas,d:CanvasEventDeps){
   let zoomDrag:{x:number;y:number;initial:number;out:boolean;dragged:boolean}|null=null;
   // Screen position of a mouse or touch event (Fabric hands either to the tools).
   const client=(ev:Event)=>{const t=(ev as TouchEvent).touches?.[0]??(ev as TouchEvent).changedTouches?.[0];return t?{clientX:t.clientX,clientY:t.clientY,button:0,altKey:false}:ev as MouseEvent;};
-  let selectionDrag:{id:string;points:SelectionPoint[];op:MaskOp;base:SelectionRegion|null;baseOutline?:string;prior:SelectionRegion|null}|null=null;
+  let selectionDrag:{id:string;points:SelectionPoint[];op:MaskOp;base:SelectionRegion|null;baseOutline?:string;prior:SelectionRegion|null;readOnly?:boolean}|null=null;
   let gradientDrag:{start:SelectionPoint;line:Line}|null=null,maskStroke:ReturnType<typeof createMaskBrush>|null=null,cropStart:SelectionPoint|null=null,cropBefore:typeof cropRef.current=null;
   let origin = { x: 0, y: 0 }, shape: Obj | null = null;
   let pan: { x: number; y: number; left: number; top: number } | null = null;
@@ -128,17 +128,19 @@ export function attachCanvasEvents(c:Canvas,d:CanvasEventDeps){
       const m=paintRef.current.maskBrush;maskStroke=createMaskBrush(target,m,touch(e.e));maskStroke.to({x:e.scenePoint.x,y:e.scenePoint.y});return;
     }
     if(t==='marquee'||t==='lasso'||t==='wand'||t==='object'){
-      const target=selectionLayer();
-      if(!target){notify(projectRef.current.pages.find(p=>p.id===pageIdRef.current)?.source?'Unlock Original PDF in Layers to select its pixels, or select an overlay layer.':'Select an unlocked layer before drawing a selection.');return;}
-      const op=e.e.shiftKey||e.e.altKey?maskOpFor(e.e.shiftKey,e.e.altKey):selectModeRef.current,base=op==='replace'?null:regionRef.current,pt={x:e.scenePoint.x,y:e.scenePoint.y};
-      if(t==='object'){void selectObjectRef.current(target.id!,pt,op,base);return;}
+      const target=selectionLayer(),readOnly=!target&&!!pageRef.current.source&&(t==='marquee'||t==='lasso');
+      if(!target&&!readOnly){notify(pageRef.current.source?'Unlock Original PDF in Layers to select its pixels, or select an overlay layer.':'Select an unlocked layer before drawing a selection.');return;}
+      // PDF reading needs only a bounded polygon, never a full-page pixel mask.
+      const op=readOnly||regionRef.current?.readOnly?'replace':e.e.shiftKey||e.e.altKey?maskOpFor(e.e.shiftKey,e.e.altKey):selectModeRef.current,base=op==='replace'?null:regionRef.current,pt={x:e.scenePoint.x,y:e.scenePoint.y},id=target?.id??`pdf:${pageRef.current.id}`;
+      if(readOnly){c.discardActiveObject();c.requestRenderAll();syncSelection();}
+      if(t==='object'){void selectObjectRef.current(id,pt,op,base);return;}
       if(t==='wand'){
-        try{const p=pageRef.current,w=wandRef.current,sample=samplePage(c,p,w.allLayers?undefined:[target]);
-          showMask(target.id!,combineMasks(base?selectionPixels(base):null,floodSelect(sample.data,sample.width,sample.height,pt.x,pt.y,w),op));}
+        try{const p=pageRef.current,w=wandRef.current,sample=samplePage(c,p,w.allLayers?undefined:[target!]);
+          showMask(id,combineMasks(base?selectionPixels(base):null,floodSelect(sample.data,sample.width,sample.height,pt.x,pt.y,w),op));}
         catch(error){notify(error instanceof Error?error.message:String(error));}
         return;
       }
-      selectionDrag={id:target.id!,points:[pt],op,base,baseOutline:base?base.outline??outlineOf(base.points):undefined,prior:regionRef.current};if(!base)setRegion(null);return;
+      selectionDrag={id:id,points:[pt],op,base,baseOutline:base?base.outline??outlineOf(base.points):undefined,prior:regionRef.current,readOnly};if(!base)setRegion(null);return;
     }
     if (t === 'hand') { const event = client(e.e); pan = { x: event.clientX, y: event.clientY, left: workspace.current!.scrollLeft, top: workspace.current!.scrollTop }; return; }
     if (['select','brush','highlight','eraser'].includes(t)) return;
@@ -160,8 +162,8 @@ export function attachCanvasEvents(c:Canvas,d:CanvasEventDeps){
     if(maskStroke){maskStroke.to({x:e.scenePoint.x,y:e.scenePoint.y});return;}
     if(selectionDrag){const pt={x:e.scenePoint.x,y:e.scenePoint.y};
       const outline=selectionDrag.baseOutline;
-      if(toolRef.current==='marquee'){selectionDrag.points=[selectionDrag.points[0],pt];setRegion({id:selectionDrag.id,points:rectanglePoints(selectionDrag.points[0],pt),outline});}
-      else {const last=selectionDrag.points.at(-1)!;if(Math.hypot(pt.x-last.x,pt.y-last.y)>2&&selectionDrag.points.length<2000)selectionDrag.points.push(pt);setRegion({id:selectionDrag.id,points:[...selectionDrag.points],outline});}return;
+      if(toolRef.current==='marquee'){selectionDrag.points=[selectionDrag.points[0],pt];setRegion({id:selectionDrag.id,points:rectanglePoints(selectionDrag.points[0],pt),outline,readOnly:selectionDrag.readOnly});}
+      else {const last=selectionDrag.points.at(-1)!;if(Math.hypot(pt.x-last.x,pt.y-last.y)>2&&selectionDrag.points.length<2000)selectionDrag.points.push(pt);setRegion({id:selectionDrag.id,points:[...selectionDrag.points],outline,readOnly:selectionDrag.readOnly});}return;
     }
     if (pan) { const event = client(e.e); workspace.current!.scrollLeft = pan.left - event.clientX + pan.x; workspace.current!.scrollTop = pan.top - event.clientY + pan.y; return; }
     if (!shape) return;
