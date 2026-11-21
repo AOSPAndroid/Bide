@@ -88,6 +88,15 @@ test('edge spaces keep their advance in proportional original-letter edits',()=>
  const leading=[{ch:' ',x0:0,x1:4,space:true},...measured.map(c=>({...c,x0:c.x0+4,x1:c.x1+4,...c.space?{}:{i0:c.i0+4,i1:c.i1+4,m:c.m+4}}))];
  const removed=planGlyphEdit(' ab a',leading,'ab a');assert.equal(removed.startX,0);assert.equal(removed.end,30);assert.deepEqual(ink(removed,leading),[1,11,21],'removing a source leading space removes its visible indent');
 });
+test('an unread symbol before a changed letter stays outside the edit patch',async()=>{
+ const {UNREAD,withUnread}=await import('../tmp/glyph-edit.mjs');
+ const measured=[cell('A',0,10),cell(UNREAD,10,20),cell('B',20,30),{ch:' ',x0:30,x1:40,space:true},cell('C',40,50),cell('D',50,60)];
+ const read='A'+UNREAD+'B CD',wanted=withUnread('AB CD',measured,'AD CD');assert.equal(wanted,'A'+UNREAD+'D CD');
+ const plan=planGlyphEdit(read,measured,wanted);assert.equal(plan.startX,20,'the patch cannot start inside the unchanged symbol at10–20');assert.equal(plan.end,60);
+ assert.deepEqual(plan.pieces.map(q=>[q.x0,q.x1]),[[50,60],[30,40],[40,50],[50,60]],'only the changed suffix is rebuilt, without erasing the symbol prefix');
+ const replaced=planGlyphEdit(read,measured,withUnread('AB CD',measured,'CD CD'));
+ assert.ok(replaced.pieces.some(q=>q.x0===10&&q.x1===20),'a symbol inside a replaced span is still copied from its own source cell');
+});
 test('a digit for a digit is drawn where the old one stood and nothing else moves',async()=>{
  const {planGlyphEdit:plan}=await import('../tmp/glyph-edit.mjs');
  // "18,40": the 1 is narrow (cell 0-8, ink 3-6), the others 12 wide.
