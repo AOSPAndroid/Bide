@@ -2,8 +2,8 @@ import {useEffect,useRef,useState} from 'react';
 import {ModalShell} from './ui-kit';
 import type {MaskOp} from './pixel-mask';
 
-export type SelectionAction='unlock'|'copy'|'paste'|'keep'|'hide'|'layer'|'mask'|'ai-remove'|'redact'|'subject'|'inverse'|'all'|'color-range'|'deselect'|'feather'|'expand'|'contract'|'smooth';
-type Props={hasRegion:boolean;busy:boolean;ai:boolean;pdf:boolean;canPaste:boolean;mode:MaskOp;onMode:(mode:MaskOp)=>void;run:(action:SelectionAction,amount?:number)=>void};
+export type SelectionAction='unlock'|'copy'|'paste'|'keep'|'hide'|'layer'|'mask'|'ai-remove'|'redact'|'subject'|'inverse'|'all'|'color-range'|'deselect'|'feather'|'expand'|'contract'|'smooth'|'read-text';
+type Props={hasRegion:boolean;readOnlyArea?:boolean;busy:boolean;ai:boolean;pdf:boolean;canPaste:boolean;mode:MaskOp;onMode:(mode:MaskOp)=>void;run:(action:SelectionAction,amount?:number)=>void};
 
 const modes:{id:MaskOp;label:string;title:string}[]=[
  {id:'replace',label:'New',title:'New selection'},{id:'add',label:'Add',title:'Add to selection (hold Shift)'},
@@ -11,33 +11,34 @@ const modes:{id:MaskOp;label:string;title:string}[]=[
 ];
 
 // Selection actions for the marquee, lasso and magic wand, in one row.
-export default function SelectionBar({hasRegion,busy,ai,pdf,canPaste,mode,onMode,run}:Props){
+export default function SelectionBar({hasRegion,readOnlyArea=false,busy,ai,pdf,canPaste,mode,onMode,run}:Props){
  const [amount,setAmount]=useState(4),refine=useRef<HTMLDetailsElement>(null);
  useEffect(()=>{const close=(e:PointerEvent)=>{if(refine.current?.open&&!refine.current.contains(e.target as Node))refine.current.open=false;};document.addEventListener('pointerdown',close);return()=>document.removeEventListener('pointerdown',close);},[]);
  const go=(action:SelectionAction,value?:number)=>{if(refine.current)refine.current.open=false;run(action,value);};
  return <div className="selection-toolbar">
-  <span className="selection-hint">{hasRegion?'Selection':'Shift adds · Alt subtracts'}</span>
-  <div className="mode-switch" role="group" aria-label="Selection mode">{modes.map(m=><button key={m.id} title={m.title} aria-pressed={mode===m.id} onClick={()=>onMode(m.id)}>{m.label}</button>)}</div>
+  <span className="selection-hint">{hasRegion?(readOnlyArea?'PDF area':'Selection'):'Shift adds · Alt subtracts'}</span>
+  <div className="mode-switch" role="group" aria-label="Selection mode">{modes.map(m=><button key={m.id} title={m.title} aria-pressed={mode===m.id} disabled={readOnlyArea} onClick={()=>onMode(m.id)}>{m.label}</button>)}</div>
   {pdf&&<button disabled={busy} title="Convert PDF background to an editable image; Undo restores it." onClick={()=>run('unlock')}>Unlock PDF as image</button>}
   <button disabled={busy} title="Select the whole page" onClick={()=>run('all')}>All</button>
-  {ai&&<button disabled={busy} title="Select the main subject with AI (ISNet)" onClick={()=>run('subject')}>Subject</button>}
-  <button disabled={busy} title="Select every pixel of a similar colour" onClick={()=>run('color-range')}>Color…</button>
-  <button disabled={!hasRegion} title="Swap selected and unselected areas (Ctrl Shift I)" onClick={()=>run('inverse')}>Inverse</button>
-  <details ref={refine} className="selection-refine"><summary aria-disabled={!hasRegion}>Refine</summary><div>
+  {ai&&<button disabled={busy||readOnlyArea} title="Select the main subject with AI (ISNet)" onClick={()=>run('subject')}>Subject</button>}
+  <button disabled={busy||readOnlyArea} title="Select every pixel of a similar colour" onClick={()=>run('color-range')}>Color…</button>
+  <button disabled={!hasRegion||readOnlyArea} title="Swap selected and unselected areas (Ctrl Shift I)" onClick={()=>run('inverse')}>Inverse</button>
+  <details ref={refine} className="selection-refine"><summary aria-disabled={!hasRegion||readOnlyArea}>Refine</summary><div>
    <label>Pixels<input aria-label="Refine amount" type="number" min={1} max={200} value={amount} onChange={e=>setAmount(Math.max(1,Math.min(200,Number(e.target.value)||1)))}/></label>
-   <button disabled={!hasRegion} onClick={()=>go('feather',amount)}>Feather</button>
-   <button disabled={!hasRegion} onClick={()=>go('expand',amount)}>Expand</button>
-   <button disabled={!hasRegion} onClick={()=>go('contract',amount)}>Contract</button>
-   <button disabled={!hasRegion} onClick={()=>go('smooth',amount)}>Smooth</button>
+   <button disabled={!hasRegion||readOnlyArea} onClick={()=>go('feather',amount)}>Feather</button>
+   <button disabled={!hasRegion||readOnlyArea} onClick={()=>go('expand',amount)}>Expand</button>
+   <button disabled={!hasRegion||readOnlyArea} onClick={()=>go('contract',amount)}>Contract</button>
+   <button disabled={!hasRegion||readOnlyArea} onClick={()=>go('smooth',amount)}>Smooth</button>
   </div></details>
+  <button disabled={!hasRegion||busy} aria-label="Read selected area" title="Read text from this area without changing the document" onClick={()=>run('read-text')}>Read text</button>
   <span className="divider"/>
-  <button disabled={!hasRegion} aria-label="Copy area" title="Copy the selected pixels (Ctrl C)" onClick={()=>run('copy')}>Copy</button>
-  <button disabled={!canPaste} aria-label="Paste as layer" title="Paste as a new layer (Ctrl V)" onClick={()=>run('paste')}>Paste</button>
-  <button disabled={!hasRegion} aria-label="Keep inside" title="Keep inside: mask the layer outside the selection (paintable layer mask)" onClick={()=>run('keep')}>Keep</button>
-  <button disabled={!hasRegion} aria-label="Hide inside" title="Hide inside: mask the selected area" onClick={()=>run('hide')}>Hide</button>
-  <button disabled={!hasRegion} aria-label="Copy to layer" title="Copy the selected pixels to a new layer" onClick={()=>run('layer')}>To layer</button>
-  {ai&&<button disabled={!hasRegion||busy} title="Fill the selection from its surroundings with AI (LaMa). Adds an undoable layer." aria-label="Remove with AI" onClick={()=>run('ai-remove')}>AI remove</button>}
-  <button disabled={!hasRegion||busy} aria-label="Redact selection" title="Redact: permanently remove everything inside the selection (PDF text, image pixels, layers) and leave a black box" onClick={()=>run('redact')}>Redact</button>
+  <button disabled={!hasRegion||readOnlyArea} aria-label="Copy area" title="Copy the selected pixels (Ctrl C)" onClick={()=>run('copy')}>Copy</button>
+  <button disabled={!canPaste||readOnlyArea} aria-label="Paste as layer" title="Paste as a new layer (Ctrl V)" onClick={()=>run('paste')}>Paste</button>
+  <button disabled={!hasRegion||readOnlyArea} aria-label="Keep inside" title="Keep inside: mask the layer outside the selection (paintable layer mask)" onClick={()=>run('keep')}>Keep</button>
+  <button disabled={!hasRegion||readOnlyArea} aria-label="Hide inside" title="Hide inside: mask the selected area" onClick={()=>run('hide')}>Hide</button>
+  <button disabled={!hasRegion||readOnlyArea} aria-label="Copy to layer" title="Copy the selected pixels to a new layer" onClick={()=>run('layer')}>To layer</button>
+  {ai&&<button disabled={!hasRegion||readOnlyArea||busy} title="Fill the selection from its surroundings with AI (LaMa). Adds an undoable layer." aria-label="Remove with AI" onClick={()=>run('ai-remove')}>AI remove</button>}
+  <button disabled={!hasRegion||readOnlyArea||busy} aria-label="Redact selection" title="Redact: permanently remove everything inside the selection (PDF text, image pixels, layers) and leave a black box" onClick={()=>run('redact')}>Redact</button>
   <button onClick={()=>run('deselect')}>Deselect</button>
  </div>;
 }

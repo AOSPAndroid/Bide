@@ -7,7 +7,7 @@ import type {SearchableCommand} from './command-search';
 export type Obj = FabricObject & { layerStyle?:LayerStyle; textSoftness?:number; pdfFontData?:string;pdfOriginalFont?:string;pdfFontFallback?:string;pdfFontBold?:boolean;pdfFontItalic?:boolean;recognizedKey?:string; id?: string; name?: string; text?: string; fontSize?: number; fontFamily?: string; fontWeight?: string | number; fontStyle?: string; underline?: boolean; textAlign?: string; isEditing?: boolean };
 export type Tool = 'select' | 'pen' | 'crop' | 'wand' | 'object' | 'gradient' | 'bucket' | 'mask' | 'text' | 'rect' | 'ellipse' | 'line' | 'brush' | 'highlight' | 'eraser' | 'marquee' | 'lasso' | 'hand' | 'clone' | 'heal' | 'zoom';
 export type PaletteAction = SearchableCommand & {hint:string;icon:typeof Type;run:()=>void};
-export type Modal = 'imagesize' | 'canvassize' | 'new' | 'export' | 'signature' | 'shortcuts' | 'resize' | 'watermark' | 'numbers' | 'crop' | null;
+export type Modal = 'readtext' | 'imagesize' | 'canvassize' | 'new' | 'export' | 'signature' | 'shortcuts' | 'resize' | 'watermark' | 'numbers' | 'crop' | null;
 export const TOOLS: { id: Tool; label: string; key: string; icon: typeof Type }[] = [
   {id:'zoom',label:'Zoom tool',key:'Z',icon:ZoomIn},
   {id:'clone',label:'Clone Stamp',key:'S',icon:Copy},{id:'heal',label:'Healing Brush',key:'J',icon:Sparkles},
