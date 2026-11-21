@@ -203,7 +203,7 @@ export function planGlyphEdit(text:string,cells:Cell[],next:string,library:Libra
  // the blank holds. Proportional digits are laid by their ink like letters.
  const pairs=cells.flatMap((c,i)=>i&&digit(c.ch)&&digit(cells[i-1].ch)&&c.i0!==undefined&&cells[i-1].i1!==undefined&&c.m!==undefined&&cells[i-1].m!==undefined?[{step:c.m-cells[i-1].m!,gap:c.i0-cells[i-1].i1!}]:[]);
  const spread=(v:number[])=>Math.max(...v)-Math.min(...v),tabular=pairs.length<3||spread(pairs.map(p=>p.step))<=spread(pairs.map(p=>p.gap))+Math.max(1.5,.08*(steps[steps.length>>1]??0));
- const figures=steps.length&&tabular?steps[steps.length>>1]:undefined;
+ let figures=steps.length&&tabular?steps[steps.length>>1]:undefined;
  // A new letter: the nearest identical one on this line (by position), then the page library.
  // A letter standing clear before one cut from a blot (fusedCells): this line's, the page library's, then cut ones.
  const fused=fusedCells(cells);
@@ -225,14 +225,21 @@ export function planGlyphEdit(text:string,cells:Cell[],next:string,library:Libra
   const alike=(i:number)=>{const g=letter(b[i],i),c=cells[i];if(!g||g.i0===undefined||g.i1===undefined||c.i0===undefined||c.i1===undefined)return false;const p=g.i1-g.i0,q=c.i1-c.i0;return Math.abs(p-q)<=Math.max(1,.12*Math.max(p,q));};
   const clears=(i:number)=>{const g=letter(b[i],i);if(!g||g.m===undefined||g.i0===undefined||g.i1===undefined)return true;const c=cells[i],to=over(c,g),l=to+g.i0-g.x0,r=to+g.i1-g.x0,prev=cells.slice(0,i).reverse().find(x=>!x.space),nxt=cells.slice(i+1).find(x=>!x.space);return (!prev?.i1||l>=prev.i1+1)&&(!nxt?.i0||r<=nxt.i0-1);};
   if(changed.every(i=>!cells[i].space&&!/\s/.test(b[i])&&cells[i].m!==undefined&&(grid||digit(a[i])&&digit(b[i])&&(tabular||alike(i)&&clears(i))))){
-   const from=Math.max(0,changed[0]-1),pieces:Piece[]=[];
+   const from=Math.max(0,changed[0]-1),pieces:Piece[]=[],ink:{i:number;left:number;right:number}[]=[];
+   const note=(i:number,g:Cell|LibraryGlyph,shift=0)=>{if(g.i0!==undefined&&g.i1!==undefined)ink.push({i,left:g.i0+shift,right:g.i1+shift});};
    for(let i=from;i<cells.length;i++){
-    const c=cells[i];if(a[i]===b[i]){pieces.push(c.space?{x0:0,x1:c.x1-c.x0,blank:true,to:c.x0}:{x0:c.x0,x1:c.x1,to:c.x0});continue;}
+    const c=cells[i];if(a[i]===b[i]){pieces.push(c.space?{x0:0,x1:c.x1-c.x0,blank:true,to:c.x0}:{x0:c.x0,x1:c.x1,to:c.x0});if(!c.space)note(i,c);continue;}
     const g=letter(b[i],i);if(!g)return undefined;
     if(g.m===undefined){pieces.length=0;break;}
-    pieces.push({...piece(g),to:over(c,g)});
+    const to=over(c,g);pieces.push({...piece(g),to});note(i,g,to-g.x0);
    }
-   if(pieces.length)return placed(pieces,cells[from].x0);
+   if(pieces.length){
+    // One or two gaps cannot prove tabular figures. Check the whole proposed
+    // placement (including other changed digits), not obsolete neighbours.
+    const overlap=!grid&&pairs.length<3&&ink.some((r,n)=>{const l=ink[n-1];if(!l||!changed.includes(l.i)&&!changed.includes(r.i)||cells.slice(l.i+1,r.i).some(c=>!c.space))return false;const left=cells[l.i].i1,right=cells[r.i].i0;return left!==undefined&&right!==undefined&&r.left-l.right<Math.min(0,right-left)-1e-6;});
+    if(!overlap)return placed(pieces,cells[from].x0);
+    figures=undefined;
+   }
   }
  }
  // Letters laid by their ink, not their cells. A cell is cut halfway to its

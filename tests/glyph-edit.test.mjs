@@ -105,6 +105,18 @@ test('a compact deletion retains the source-cell advances at its newly joined pa
  let cursor=plan.startX;const starts=plan.pieces.map(q=>{const at=q.to??cursor,source=measured.find(c=>c.x0===q.x0&&c.x1===q.x1);assert.ok(source);cursor=at+q.x1-q.x0;return at+source.i0-q.x0;});
  assert.deepEqual(starts,[13,26],'the remaining compact suffix keeps its source-cell spacing');
 });
+test('short proportional figures do not collide when a wide digit replaces a narrow one',()=>{
+ // Ink bounds from the bundled Manrope Regular at72px. One or two measured
+ // digit gaps cannot establish tabular figures; a9 over a1 otherwise hits2.
+ const measured=rows=>rows.map(([ch,x0,x1,i0,i1])=>({...cell(ch,x0,x1,i0,i1),m:(i0+i1)/2}));
+ const donor={ch:'9',x0:504.572,x1:539.636,i0:504.572,i1:539.636,m:522.104,y0:0,y1:72,source:'verified-manrope'};
+ const examples=[
+  ['21','29',measured([['2',3.6,41.4,3.6,37.44],['1',41.4,60.48,45.36,60.48]]),37.44],
+  ['121','129',measured([['1',4.32,25.56,4.32,19.44],['2',25.56,69.48,31.68,65.52],['1',69.48,88.56,73.44,88.56]]),65.52],
+  ['2031','2009',measured([['2',3.6,41.76,3.6,37.44],['0',41.76,83.88,46.08,79.92],['3',83.88,124.776,87.84,120.456],['1',124.776,144.216,129.096,144.216]]),79.92]
+ ];
+ for(const [text,next,cells,prefixEnd]of examples){const plan=planGlyphEdit(text,cells,next,[donor]);assert.ok(plan);const borrowed=plan.pieces.find(q=>q.source===donor.source);assert.ok(borrowed);const left=borrowed.to+donor.i0-borrowed.x0;assert.ok(left>=prefixEnd+1,`${text} → ${next}: replacement ink starts${left}, prefix ends${prefixEnd}`);const spans=plan.pieces.map(q=>{const g=q.source?donor:cells.find(c=>c.x0<=q.x0&&c.x1>=q.x1);assert.ok(g);return {left:q.to+g.i0-q.x0,right:q.to+g.i1-q.x0};});for(let i=1;i<spans.length;i++)assert.ok(spans[i].left>=spans[i-1].right+1,'changed digits retain a clear gap from each other');}
+});
 test('a digit for a digit is drawn where the old one stood and nothing else moves',async()=>{
  const {planGlyphEdit:plan}=await import('../tmp/glyph-edit.mjs');
  // "18,40": the 1 is narrow (cell 0-8, ink 3-6), the others 12 wide.
