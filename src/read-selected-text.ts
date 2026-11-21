@@ -38,10 +38,13 @@ export async function renderSelectionRaster(c:Canvas,page:Page,area:SelectionAre
   // Match the editor's layers: the PDF sits beneath a transparent canvas.
   // Erasers and blend modes operate on that canvas, leaving the PDF intact.
   // Image pages keep their own matte in the canvas for exact alpha blending.
-  const background=c.backgroundColor,backgroundImage=c.backgroundImage,backgroundVpt=c.backgroundVpt,zoom=c.getZoom(),vp=c.viewportTransform,width=c.width,height=c.height,retina=c.enableRetinaScaling,skipControls=(c as unknown as {skipControlsDrawing:boolean}).skipControlsDrawing;
+  const background=c.backgroundColor,backgroundImage=c.backgroundImage,backgroundVpt=c.backgroundVpt,vp=c.viewportTransform,width=c.width,height=c.height,retina=c.enableRetinaScaling,skipControls=(c as unknown as {skipControlsDrawing:boolean}).skipControlsDrawing;
   try{
    c.backgroundColor=page.source||page.color==='transparent'?'':page.color;
-   raster=c.toCanvasElement(plan.scale/zoom,{left:plan.left*zoom+vp[4],top:plan.top*zoom+vp[5],width:plan.width/plan.scale*zoom,height:plan.height/plan.scale*zoom});
+   // An integer output frame keeps view zoom's float rounding from dropping
+   // the last source-pixel column (200 pixels at 13% became 199).
+   c.viewportTransform=[plan.scale,0,0,plan.scale,-plan.pixelBounds[0],-plan.pixelBounds[1]];c.calcViewportBoundaries();
+   raster=c.toCanvasElement(1,{left:0,top:0,width:plan.width,height:plan.height});
   }finally{c.backgroundColor=background;c.backgroundImage=backgroundImage;c.backgroundVpt=backgroundVpt;c.viewportTransform=vp;c.width=width;c.height=height;c.enableRetinaScaling=retina;(c as unknown as {skipControlsDrawing:boolean}).skipControlsDrawing=skipControls;c.calcViewportBoundaries();}
   signal?.throwIfAborted();
   const g=raster.getContext('2d',{willReadFrequently:true})!;
