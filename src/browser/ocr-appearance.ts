@@ -62,7 +62,7 @@ function coverageRenderer(sample:Sample,scale=1){
 
 // Render through the same editable Textbox used by the workspace, at native
 // resolution. Fit fractional positioning without re-rendering every offset.
-export async function matchOcrAppearance(raster:HTMLCanvasElement,region:TextRegion,regions:TextRegion[],family:string,{autoFont,matchBlur,makeText,onFit,own=false,weights=true,floor,alike}:{autoFont:boolean;matchBlur:boolean;makeText:(region:TextRegion,family:string)=>Promise<Textbox>;onFit?:(fit:Fit)=>void;own?:boolean;weights?:boolean;floor?:number;alike?:TextRegion[]}):Promise<Fit|undefined>{
+export async function matchOcrAppearance(raster:HTMLCanvasElement,region:TextRegion,regions:TextRegion[],family:string,{autoFont,matchBlur,makeText,onFit,own=false,weights=autoFont,floor,alike}:{autoFont:boolean;matchBlur:boolean;makeText:(region:TextRegion,family:string)=>Promise<Textbox>;onFit?:(fit:Fit)=>void;own?:boolean;weights?:boolean;floor?:number;alike?:TextRegion[]}):Promise<Fit|undefined>{
  // `own`: the selected line's letters alone, when its neighbours fit badly
  // (a sharp name beside a label blurred far more than the name allows).
  const samples=own?[samplePixels(raster,region,regions)].filter((s):s is Sample=>!!s):localSamples(raster,region,regions,alike);if(!samples.length)return undefined;
@@ -154,7 +154,7 @@ export async function matchOcrAppearance(raster:HTMLCanvasElement,region:TextReg
  // text box does not draw ("ff" in Raleway) costs a tenth of the score, and
  // the default left a light Raleway line in the page's heavy face.
  const alone=own||samples.every(s=>s.region.id===region.id);
- if(!best||best.score<(floor??(alone?.45:.55)))return alone||floor!==undefined?undefined:matchOcrAppearance(raster,region,regions,family,{autoFont,matchBlur,makeText,onFit,own:true,alike});
+ if(!best||best.score<(floor??(alone?.45:.55)))return alone||floor!==undefined?undefined:matchOcrAppearance(raster,region,regions,family,{autoFont,matchBlur,makeText,onFit,own:true,weights,alike});
  // Neighbours can guide the font and placement, but their ink can differ
  // from the selected line. Measure its own cores at the final fitted tuple.
  if(selected&&paintSelected){
