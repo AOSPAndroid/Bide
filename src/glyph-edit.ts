@@ -220,6 +220,54 @@ export function planGlyphEdit(text:string,cells:Cell[],next:string,library:Libra
    if(pieces.length)return placed(pieces,cells[from].x0);
   }
  }
+ // Letters laid by their ink, not their cells. A cell is cut halfway to its
+ // old neighbours (and at the ink itself at a word's edge), so a word moved
+ // or a letter inserted carried the wrong room with it ("Vieux Moulin" turned
+ // into "Moulin Vieux" closed up before the M; "1 " inserted before "285" sat
+ // too close). The room between two letters is what the line itself shows:
+ // the gap of that very pair where it occurs, else each letter's side as
+ // measured against its other neighbours (a digit's from the digits' advance),
+ // with the line's own word space between words.
+ const inkLayout=(p:number,keep:number[])=>{
+  if(grid)return undefined;
+  const real=cells.map((c,i)=>({c,i})).filter(({c})=>!c.space&&c.ch!==UNREAD);
+  if(real.length<2||real.some(({c})=>c.i0===undefined||c.i1===undefined))return undefined;
+  const median=(v:number[])=>v.length?[...v].sort((x,y)=>x-y)[v.length>>1]:undefined;
+  // Observed gaps: ink to ink between consecutive letters, with the spaces between.
+  const seen=real.slice(1).map((r,n)=>({a:real[n].c.ch,b:r.c.ch,spaces:cells.slice(real[n].i+1,r.i).filter(c=>c.space).length,gap:r.c.i0!-real[n].c.i1!})).filter((o,n)=>real[n+1].i-real[n].i-1===o.spaces);
+  const inner=median(seen.filter(o=>!o.spaces).map(o=>o.gap))??0,width=(ch:string)=>median(real.filter(r=>r.c.ch===ch).map(r=>r.c.i1!-r.c.i0!));
+  // A letter's side: half the usual gap; a digit's from the digits' advance.
+  const side=(ch:string,w?:number)=>figures!==undefined&&digit(ch)&&(w??width(ch))!==undefined?(figures-(w??width(ch))!)/2:inner/2;
+  const word=median(seen.filter(o=>o.spaces===1).map(o=>o.gap-side(o.a)-side(o.b)))??space;
+  if(word===undefined&&(Array.from(next).some(ch=>/\s/.test(ch))))return undefined;
+  // (A digit keeps the side its advance gives it: tabular figures.)
+  const refined=(ch:string,left:boolean)=>figures!==undefined&&digit(ch)?undefined:median(seen.filter(o=>(left?o.b:o.a)===ch&&o.spaces<=1).map(o=>o.gap-(o.spaces?word!:0)-side(left?o.a:o.b)));
+  const room=(x:{ch:string;w:number},y:{ch:string;w:number},spaces:number)=>{
+   const exact=median(seen.filter(o=>o.a===x.ch&&o.b===y.ch&&o.spaces===Math.min(spaces,1)).map(o=>o.gap));
+   const one=exact??(refined(x.ch,false)??side(x.ch,x.w))+(spaces?word!:0)+(refined(y.ch,true)??side(y.ch,y.w));
+   return one+Math.max(0,spaces-1)*(word??0);
+  };
+  // The letters of the new text from the change on, each with its source.
+  type Item={ch:string;g:Cell|LibraryGlyph;kept?:number;spaces:number};const items:Item[]=[];let spaces=0;
+  for(let j=p;j<b.length;j++){
+   if(/\s/.test(b[j])){spaces++;continue;}
+   const k=keep[j],g=k>=p&&!cells[k].space?cells[k]:letter(b[j],j);if(!g)return undefined;
+   if(g.i0===undefined||g.i1===undefined)return undefined;
+   items.push({ch:b[j],g,kept:k>=p?k:undefined,spaces});spaces=0;
+  }
+  const before=real.filter(r=>r.i<p).at(-1),lead=before?cells.slice(before.i+1,p).filter(c=>c.space).length:0,startAt=p<cells.length?cells[p].x0:oldEnd;
+  if(!items.length)return {startX:startAt,oldEnd,end:startAt,pieces:[] as Piece[]};
+  const pieces:Piece[]=[];let prev=before?{ch:before.c.ch,w:before.c.i1!-before.c.i0!,end:before.c.i1!}:undefined;
+  for(const [n,it] of items.entries()){
+   const w=it.g.i1!-it.g.i0!,me={ch:it.ch,w};
+   // A line laid from its start begins where its ink began.
+   const ink=prev?prev.end+room(prev,me,it.spaces+(n?0:lead)):real[0].c.i0!;
+   const x0=Math.max(it.g.x0,it.g.i0!-3),x1=Math.min(it.g.x1,it.g.i1!+3);
+   pieces.push({...piece(it.g),x0,x1,to:ink-(it.g.i0!-x0)});prev={...me,end:ink+w};
+  }
+  const last=items.at(-1)!,tail=Math.max(0,last.g.x1-last.g.i1!);
+  return {startX:Math.min(startAt,...pieces.map(q=>q.to!)),oldEnd,end:prev!.end+Math.min(tail,3),pieces};
+ };
  const plan=(p:number)=>{
   const keep=align(a,b),pieces:Piece[]=[];
   // One pitch: each character from the change on takes its place on the grid.
@@ -234,6 +282,7 @@ export function planGlyphEdit(text:string,cells:Cell[],next:string,library:Libra
    }
    if(pieces.length||p>=b.length)return pieces.length?placed(pieces,p<cells.length?cells[p].x0:oldEnd):{startX:p<cells.length?cells[p].x0:oldEnd,oldEnd,end:p<cells.length?cells[p].x0:oldEnd,pieces};
   }
+  const inked=inkLayout(p,keep);if(inked)return inked;
   for(let j=p;j<b.length;j++){
    const k=keep[j];
    if(k>=p){pieces.push({x0:cells[k].x0,x1:cells[k].x1});continue;}

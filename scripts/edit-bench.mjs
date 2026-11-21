@@ -80,8 +80,11 @@ try{
    // The declared kind against the page's text.
    const fresh=[...new Set(to)].filter(c=>/\S/.test(c)&&!field.text.includes(c)),truth=fresh.some(c=>!original.all.includes(c))?'new':fresh.length?'page':null;
    if(truth?truth!==kind:['page','new'].includes(kind))console.warn(`  ! ${id} ${fid} → "${to}" is declared ${kind} but is ${truth??'own'}`);
-   if(!['exact','merged'].includes(state.status)){rec.unreadable=true;console.log(`  ${fid} → "${to}" (${kind}): the field was not read (${state.status})`);continue;}
-   const region=opened.regions.find(r=>r.id===state.region),text=region.text.replace(field.text.replace(/ /g,' '),to);
+   // Read but for an apostrophe or dash ("mark"): the user edits the text as it was read, changing the same characters.
+   const marked=state.status==='mark'&&state.region&&[...opened.regions.find(r=>r.id===state.region).text].length===[...field.text].length;
+   if(!['exact','merged'].includes(state.status)&&!marked){rec.unreadable=true;console.log(`  ${fid} → "${to}" (${kind}): the field was not read (${state.status})`);continue;}
+   const region=opened.regions.find(r=>r.id===state.region);let text=region.text.replace(field.text.replace(/ /g,' '),to);
+   if(marked){const a=[...field.text],b=[...to],r=[...region.text];let pre=0;while(pre<a.length&&pre<b.length&&a[pre]===b[pre])pre++;let suf=0;while(suf<a.length-pre&&suf<b.length-pre&&a[a.length-1-suf]===b[b.length-1-suf])suf++;text=[...r.slice(0,pre),...b.slice(pre,b.length-suf),...r.slice(r.length-suf)].join('');}
    const reference=await scan(tpl,v,{...tpl.fields,[fid]:to}),after=reference.fields.find(x=>x.id===fid);
    const box={x:Math.min(field.x,after.x),y:Math.min(field.y,after.y),w:Math.max(field.x+field.w,after.x+after.w)-Math.min(field.x,after.x),h:Math.max(field.y+field.h,after.y+after.h)-Math.min(field.y,after.y)};
    for(const mode of modes){

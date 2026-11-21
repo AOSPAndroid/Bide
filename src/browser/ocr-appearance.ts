@@ -163,6 +163,25 @@ export async function matchOcrAppearance(raster:HTMLCanvasElement,region:TextReg
   // Neighbours set the font, size and softness, but each word's box sits a
   // pixel or two differently: the placement comes from the selected letters.
   const own=ownPlacement(selected.source,paintSelected,text);best.dx+=own.dx;best.dy+=own.dy;
+  // Size and place settled on the line's own letters, in steps down to a
+  // quarter of a percent and a quarter of a pixel: sizes are first tried
+  // 2.5% apart, which on small crisp text (a capital 8 px high) leaves the
+  // end of a line a pixel or two off, in the right face.
+  {
+   const probe=await makeText(region,best.family),size0=probe.fontSize,ascent=probe.top-region.top+size0*.93;
+   probe.set({fill:'#000000',objectCaching:false});probe.textSoftness=best.softness;
+   const at=(r:number,dx:number,dy:number)=>{probe.set({fontSize:size0*r,left:region.left+dx,top:region.top+ascent-size0*r*.93+dy});probe.initDimensions();return coverageFit(selected.source,paintSelected(probe)).score;};
+   let cur={r:best.ratio,dx:best.dx,dy:best.dy},score=at(cur.r,cur.dx,cur.dy);
+   for(const [dr,d] of [[.01,.5],[.005,.25],[.0025,.25]] as const)for(let round=0;round<4;round++){
+    let moved=false;
+    for(const next of [{...cur,r:cur.r-dr},{...cur,r:cur.r+dr},{...cur,dx:cur.dx-d},{...cur,dx:cur.dx+d},{...cur,dy:cur.dy-d},{...cur,dy:cur.dy+d},{r:cur.r+dr,dx:cur.dx-d,dy:cur.dy},{r:cur.r-dr,dx:cur.dx+d,dy:cur.dy}]){
+     if(Math.abs(next.r-best.ratio)>.04||Math.abs(next.dx-best.dx)>2||Math.abs(next.dy-best.dy)>1.5)continue;
+     const v=at(next.r,next.dx,next.dy);if(v>score+.001){score=v;cur=next;moved=true;}
+    }
+    if(!moved)break;
+   }
+   best.ratio=cur.r;best.dx=cur.dx;best.dy=cur.dy;applyOcrAppearance(text,region,best);text.set({fill:'#000000',objectCaching:false});
+  }
   const painted=paintSelected(text);best.gain=coreGain(selected.source,painted);best.bold=text.fontWeight==='bold'||Number(text.fontWeight)>=600;
   // Ink of the original letters over the ink of the text as fitted: 1 when
   // the weight is right, whatever the blur (blur moves ink, it keeps its mass).
