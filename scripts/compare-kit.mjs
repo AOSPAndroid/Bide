@@ -15,6 +15,7 @@
 import {createServer} from 'vite';import {chromium} from 'playwright-core';import {writeFile,readFile,mkdir,readdir} from 'node:fs/promises';
 import * as mupdf from 'mupdf';import {PDFDocument} from 'pdf-lib';
 import {templates,variants} from '../tests/edit-bench/docs.mjs';
+import {bideComparisonResult} from './compare-kit-result.mjs';
 
 // The documents and edits of the kit: a scanned invoice (PDF and phone JPEG),
 // a letter scanned at 300 dpi, a business card, a booking screenshot and a
@@ -99,7 +100,7 @@ try{
     },[edited,pdf?'image/png':hit.toLowerCase().endsWith('.png')?'image/png':'image/jpeg',reference.pixels,original.pixels,box,v.dpi,original.width,original.height]);
     row[editor]=s.length?s.join('+'):'ok';
    }
-   if(bench){const r=bench.find(x=>x.doc===`${task.doc.t}/${task.doc.v}`&&x.field===task.fid&&x.to===task.to);const L=r?.letters,F=r?.font;row.bide=!r?'not measured':L&&L.outcome!=='refused'?(L.problems?.length?L.problems.join('+'):'ok'):F?(F.problems?.length?F.problems.join('+'):'ok'):'refused';}
+   if(bench){const r=bench.find(x=>x.doc===`${task.doc.t}/${task.doc.v}`&&x.field===task.fid&&x.to===task.to);row.bide=bideComparisonResult(r);}
    rows.push(row);
   }
   const cols=[...(bench?['bide']:[]),...editors];
