@@ -195,19 +195,36 @@ export async function restore(data: Record<string,string>) {
 
 }
 
-// A scanned page's own resolution, in pixels per page unit: the largest image
-// covering at least half the page, drawn upright. Letters cut from a render at
-// exactly this scale are the scan's own pixels (a render at another scale
-// resamples them, and reused letters came out lighter, 29 → 38 on near-black).
+// A single unambiguous scan's own pixels per page unit. Off-page, invisible,
+// clipped or differently stretched images cannot establish that pixel grid.
+// The caller still applies the PDF raster's density and memory limits.
 export function scanScale(source:string,index:number):number|undefined{
  const data=sources.get(source);if(!data)throw new Error('Reopen the project to restore its PDF pages.');
- const doc=open(data),page=doc.loadPage(index),b=page.getBounds(),area=(b[2]-b[0])*(b[3]-b[1]);let best:{cover:number;scale:number}|undefined;
- const device=new mupdf.Device({fillImage(image,ctm){
-  if(Math.abs(ctm[1])>1e-3||Math.abs(ctm[2])>1e-3||ctm[0]<=0)return;
-  const w=Math.abs(ctm[0]),h=Math.abs(ctm[3]),cover=w*h/area;if(cover<.5)return;
-  const scale=Math.min(image.getWidth()/w,image.getHeight()/h);if(!best||cover>best.cover)best={cover,scale};
- }});
- try{page.run(device,mupdf.Matrix.identity);device.close();return best&&best.scale>=1&&best.scale<=8?best.scale:undefined;}finally{device.destroy();page.destroy();doc.destroy();}
+ const doc=open(data),page=doc.loadPage(index),b=page.getBounds(),area=(b[2]-b[0])*(b[3]-b[1]),candidates:number[]=[];
+ let clipped=0,mask=0,visibleImages=0,ambiguous=false;const groups=[{alpha:1,uncertain:false}],clip=()=>{clipped++;};
+ const device=new mupdf.Device({
+  clipPath:clip,clipStrokePath:clip,clipText:clip,clipStrokeText:clip,clipImageMask:clip,
+  popClip(){clipped=Math.max(0,clipped-1);},
+  beginMask(){mask++;},endMask(){mask=Math.max(0,mask-1);clipped++;},
+  beginGroup(_area,_space,_isolated,knockout,blend,alpha){const parent=groups[groups.length-1];groups.push({alpha:parent.alpha*alpha,uncertain:parent.uncertain||knockout||blend!=='Normal'});},
+  endGroup(){if(groups.length>1)groups.pop();},
+  fillImage(image,ctm,alpha){
+   const group=groups[groups.length-1];if(!Number.isFinite(alpha)||alpha<=0||group.alpha<=0||mask||!ctm.every(Number.isFinite)||!Number.isFinite(area)||!(area>0))return;
+   // Coverage belongs to the visible page intersection, not an image's area
+   // elsewhere in the PDF content stream.
+   const [xx,xy,yx,yy,tx,ty]=ctm,xs=[tx,tx+xx,tx+yx,tx+xx+yx],ys=[ty,ty+xy,ty+yy,ty+xy+yy];
+   const width=Math.max(0,Math.min(b[2],Math.max(...xs))-Math.max(b[0],Math.min(...xs))),height=Math.max(0,Math.min(b[3],Math.max(...ys))-Math.max(b[1],Math.min(...ys)));
+   if(!(width>0&&height>0))return;visibleImages++;
+   // A second visible image makes it uncertain which contains the letters,
+   // even when that extra image is too small to establish a page's density.
+   if(width*height/area<.5)return;
+   if(clipped||group.uncertain||Math.abs(xy)>1e-3||Math.abs(yx)>1e-3||xx<=0||yy<=0){ambiguous=true;return;}
+   const sx=image.getWidth()/xx,sy=image.getHeight()/yy,scale=Math.min(sx,sy);
+   if(!Number.isFinite(scale)||scale<1||scale>8||Math.abs(sx-sy)>Math.max(sx,sy)*.002){ambiguous=true;return;}
+   candidates.push(scale);
+  }
+ });
+ try{page.run(device,mupdf.Matrix.identity);device.close();return !ambiguous&&visibleImages===1&&candidates.length===1?candidates[0]:undefined;}finally{device.destroy();page.destroy();doc.destroy();}
 }
 
 export function render(source:string,index:number,scale:number) {
