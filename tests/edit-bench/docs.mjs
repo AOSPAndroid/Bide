@@ -79,6 +79,16 @@ export const templates={
    <div style="font-family:RalewayL;font-size:18px;margin-top:14px">${f(v,'mail')}</div>
    <div style="font-family:RalewayL;font-size:18px">${f(v,'tel')}</div></div>`,
   edits:[['tel','06 48 27 51 09','own'],['tel','07 33 61 26 84','new'],['mail','atelier.lambert@gmail.com','page'],['mail','contact@lambert.fr','shorter'],['name','ATELIER MARTIN','new'],['name','ATELIER BERTAL','own'],['role','Plombier Couvreur','page'],['s1','Rénovation - Dépannage','own'],['s2','Salle de bain','shorter'],['s3','Chauffe-eau solaire','page'],['s4','Entretien chaudière gaz','new']]},
+
+ // An event ticket on tinted paper: dates and a number in a geometric face
+ // (Manrope), a small monospaced label above each. Edits change digits in
+ // place, including a digit narrower or wider than the one it replaces.
+ ticket:{width:420,height:250,fonts:async()=>[await face('ManropeT','library/manrope-Regular.ttf'),await face('ManropeT','library/manrope-Bold.ttf',700)].join(''),
+  fields:{l1:'DOORS OPEN',d1:'2031-06-01',l2:'LAST ENTRY',d2:'1994-04-16',l3:'SEAT',seat:'Row 12 · 48'},
+  html:(v)=>`<div style="width:420px;height:250px;background:#e8ecdc;color:#1f3a30;padding:22px 30px;box-sizing:border-box;font-family:ManropeT">
+   ${[1,2].map(i=>`<div style="font-family:'Liberation Mono',monospace;font-size:11px;letter-spacing:.5px;color:#3d5a4c;margin-top:${i>1?14:0}px">${f(v,'l'+i)}</div><div style="font-size:26px;font-weight:500">${f(v,'d'+i)}</div>`).join('')}
+   <div style="font-family:'Liberation Mono',monospace;font-size:11px;color:#3d5a4c;margin-top:14px">${f(v,'l3')}</div><div style="font-size:18px">${f(v,'seat')}</div></div>`,
+  edits:[['d1','2009-06-01','page'],['d1','2013-06-10','own'],['d1','2031-06-07','new'],['d2','1994-04-19','own'],['d2','1949-04-16','own'],['d2','1994-11-16','own'],['seat','Row 21 · 84','own'],['seat','Row 12 · 9','page']]},
 };
 
 // How each document reaches the app. `dpi`: pixels per inch of the scan (a CSS
@@ -110,4 +120,5 @@ export const cases=[
  ['screen','shot'],['screen','soft'],
  ['ad','clean'],['ad','soft'],['ad','shot'],
  ['workshop','view'],['letter','view'],['workshop','viewpdf'],
+ ['ticket','clean'],['ticket','pdf'],['ticket','soft'],
 ];

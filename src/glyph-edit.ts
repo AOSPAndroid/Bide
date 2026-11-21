@@ -195,7 +195,15 @@ export function planGlyphEdit(text:string,cells:Cell[],next:string,library:Libra
  const oldEnd=cells[cells.length-1].x1,digit=(ch:string)=>/^\p{Nd}$/u.test(ch),grid=fixedPitch(cells);
  const spaces=cells.filter(c=>c.space).map(c=>c.x1-c.x0).sort((x,y)=>x-y),space=spaces.length?spaces[spaces.length>>1]:undefined;
  // The advance of the line's digits: between the ink middles of two that touch.
- const steps=cells.flatMap((c,i)=>i&&digit(c.ch)&&digit(cells[i-1].ch)&&c.m!==undefined&&cells[i-1].m!==undefined?[c.m-cells[i-1].m!]:[]).sort((x,y)=>x-y),figures=steps.length?steps[steps.length>>1]:undefined;
+ const steps=cells.flatMap((c,i)=>i&&digit(c.ch)&&digit(cells[i-1].ch)&&c.m!==undefined&&cells[i-1].m!==undefined?[c.m-cells[i-1].m!]:[]).sort((x,y)=>x-y);
+ // Tabular figures (one advance per digit, as in most document faces) or
+ // proportional ones (Manrope, Raleway: a 1 of 26 px, a 9 of 45)? In a
+ // tabular face the step between neighbouring digits' ink middles holds while
+ // the blank between them varies (a 1 has wide sides); in a proportional one
+ // the blank holds. Proportional digits are laid by their ink like letters.
+ const pairs=cells.flatMap((c,i)=>i&&digit(c.ch)&&digit(cells[i-1].ch)&&c.i0!==undefined&&cells[i-1].i1!==undefined&&c.m!==undefined&&cells[i-1].m!==undefined?[{step:c.m-cells[i-1].m!,gap:c.i0-cells[i-1].i1!}]:[]);
+ const spread=(v:number[])=>Math.max(...v)-Math.min(...v),tabular=pairs.length<3||spread(pairs.map(p=>p.step))<=spread(pairs.map(p=>p.gap))+Math.max(1.5,.08*(steps[steps.length>>1]??0));
+ const figures=steps.length&&tabular?steps[steps.length>>1]:undefined;
  // A new letter: the nearest identical one on this line (by position), then the page library.
  // A letter standing clear before one cut from a blot (fusedCells): this line's, the page library's, then cut ones.
  const fused=fusedCells(cells);
@@ -209,7 +217,14 @@ export function planGlyphEdit(text:string,cells:Cell[],next:string,library:Libra
  // The same length, each changed character on the advance of the one it replaces.
  if(a.length===b.length){
   const changed=a.flatMap((ch,i)=>ch===b[i]?[]:[i]);
-  if(changed.every(i=>!cells[i].space&&!/\s/.test(b[i])&&cells[i].m!==undefined&&(grid||digit(a[i])&&digit(b[i])))){
+  // A new digit stays in the old one's place only where its ink clears its
+  // neighbours': with proportional figures (Manrope: a 1 of 26 px, a 9 of
+  // 45) a 9 in a 1's place ran into them ("2031" → "2009"); the line is then
+  // laid out again by its ink.
+  // Proportional digits of about the same ink width (a 9 for a 4) still swap in place.
+  const alike=(i:number)=>{const g=letter(b[i],i),c=cells[i];if(!g||g.i0===undefined||g.i1===undefined||c.i0===undefined||c.i1===undefined)return false;const p=g.i1-g.i0,q=c.i1-c.i0;return Math.abs(p-q)<=Math.max(1,.12*Math.max(p,q));};
+  const clears=(i:number)=>{const g=letter(b[i],i);if(!g||g.m===undefined||g.i0===undefined||g.i1===undefined)return true;const c=cells[i],to=over(c,g),l=to+g.i0-g.x0,r=to+g.i1-g.x0,prev=cells.slice(0,i).reverse().find(x=>!x.space),nxt=cells.slice(i+1).find(x=>!x.space);return (!prev?.i1||l>=prev.i1+1)&&(!nxt?.i0||r<=nxt.i0-1);};
+  if(changed.every(i=>!cells[i].space&&!/\s/.test(b[i])&&cells[i].m!==undefined&&(grid||digit(a[i])&&digit(b[i])&&(tabular||alike(i)&&clears(i))))){
    const from=Math.max(0,changed[0]-1),pieces:Piece[]=[];
    for(let i=from;i<cells.length;i++){
     const c=cells[i];if(a[i]===b[i]){pieces.push(c.space?{x0:0,x1:c.x1-c.x0,blank:true,to:c.x0}:{x0:c.x0,x1:c.x1,to:c.x0});continue;}
