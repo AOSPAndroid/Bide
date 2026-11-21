@@ -14,6 +14,7 @@ import {createServer} from 'vite';import {chromium} from 'playwright-core';impor
 import * as mupdf from 'mupdf';import {PDFDocument} from 'pdf-lib';
 const {templates,variants,cases}=await import(`../tests/edit-bench/${process.env.BENCH_DOCS??'docs'}.mjs`);
 import {ocrFields,cellErrors,verdict} from '../tests/edit-bench/score.mjs';
+import {replaceBenchmarkField} from '../tests/edit-bench/replace-field.mjs';
 
 const pick=(name)=>process.env[name]?.split(',').map(s=>s.trim()).filter(Boolean);
 const onlyCases=pick('BENCH_CASES'),modes=pick('BENCH_MODES')??['letters','font'],kinds=pick('BENCH_KINDS'),out=process.env.BENCH_OUT??'tmp/edit-bench';
@@ -81,7 +82,8 @@ try{
    const fresh=[...new Set(to)].filter(c=>/\S/.test(c)&&!field.text.includes(c)),truth=fresh.some(c=>!original.all.includes(c))?'new':fresh.length?'page':null;
    if(truth?truth!==kind:['page','new'].includes(kind))console.warn(`  ! ${id} ${fid} → "${to}" is declared ${kind} but is ${truth??'own'}`);
    if(!['exact','merged'].includes(state.status)){rec.unreadable=true;console.log(`  ${fid} → "${to}" (${kind}): the field was not read (${state.status})`);continue;}
-   const region=opened.regions.find(r=>r.id===state.region),text=region.text.replace(field.text.replace(/ /g,' '),to);
+   const region=opened.regions.find(r=>r.id===state.region),text=replaceBenchmarkField(region.text,field.text,to);
+   Object.assign(rec,{regionText:region.text,sentText:text});
    const reference=await scan(tpl,v,{...tpl.fields,[fid]:to}),after=reference.fields.find(x=>x.id===fid);
    const box={x:Math.min(field.x,after.x),y:Math.min(field.y,after.y),w:Math.max(field.x+field.w,after.x+after.w)-Math.min(field.x,after.x),h:Math.max(field.y+field.h,after.y+after.h)-Math.min(field.y,after.y)};
    for(const mode of modes){
