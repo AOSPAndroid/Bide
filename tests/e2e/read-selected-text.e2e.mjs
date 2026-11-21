@@ -17,7 +17,8 @@ const digest=bytes=>createHash('sha256').update(bytes).digest('hex');
 
 async function runBrowser(body){
  const shared=dirname(await realpath('node_modules'));
- const server=await createServer({logLevel:'error',cacheDir:'tmp/vite-selected-text-e2e',server:{port:0,host:'127.0.0.1',fs:{allow:[process.cwd(),shared]}}});
+ const virtual='\0selected-text-test-fabric';
+ const server=await createServer({logLevel:'error',cacheDir:process.env.BIDE_ROI_TEST_CACHE||'tmp/vite-selected-text-e2e',plugins:[{name:'selected-text-test-fabric',resolveId(id){if(id==='/selected-text-test-fabric.ts'||id===virtual)return virtual;},load(id){if(id===virtual)return "export {StaticCanvas,FabricImage,Rect,Group} from 'fabric';";}}],server:{port:0,host:'127.0.0.1',fs:{allow:[process.cwd(),shared]}}});
  await server.listen();const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||undefined});
  try{return await body(browser,server.resolvedUrls.local[0]);}finally{await browser.close();await server.close();}
 }
@@ -54,7 +55,7 @@ async function drawArea(page,b,{touch=false,modifiers=[]}={}){
  for(const key of [...modifiers].reverse())await page.keyboard.up(key);
  await page.locator('.selection-outline path.ants').first().waitFor();
 }
-async function setZoom(page){const input=page.getByLabel('Zoom percentage');await input.fill('100');await input.press('Enter');await page.waitForFunction(()=>Math.abs(document.querySelector('.artboard').getBoundingClientRect().width/2400-1)<.01);}
+async function setZoom(page){await command(page,'Actual size (100%)');await page.waitForFunction(()=>Math.abs(document.querySelector('.artboard').getBoundingClientRect().width/2400-1)<.01);}
 async function readArea(page){const button=page.getByRole('button',{name:'Read selected area',exact:true});await button.scrollIntoViewIfNeeded();await button.click();const dialog=page.getByRole('dialog',{name:'Read selected text'});await dialog.waitFor();const input=dialog.getByLabel('Detected text');await input.waitFor({timeout:240000});assert.equal(await input.inputValue(),reference);assert.equal(await input.getAttribute('readonly'),'');return dialog;}
 async function exportPdf(page){
  await command(page,'Export PDF');const [file]=await Promise.all([page.waitForEvent('download',{timeout:120000}),page.getByRole('button',{name:'Export PDF',exact:true}).click()]);const bytes=await readFile(await file.path());await file.delete();return bytes;
@@ -71,7 +72,7 @@ test('native-detail selected PDF text is recovered and copied on desktop and a p
    assert.ok(!fields.some(text=>text.includes(reference)),'the small original field was actually missed by whole-page OCR');
    await command(page,'Read selected area');await page.getByText('Draw an area around the text, then choose Read text.',{exact:true}).waitFor();await setZoom(page);
    await drawArea(page,area,{touch:phone});
-   await page.getByText('PDF area',{exact:true}).waitFor();
+   await page.getByText('PDF area',{exact:true}).waitFor({state:'attached'});
    for(const name of ['Copy area','Keep inside','Copy to layer','Redact selection'])assert.equal(await page.getByRole('button',{name,exact:true}).isDisabled(),true,'a locked-PDF area cannot '+name);
    const before=await saved(page);
    await page.keyboard.press('Delete');await page.keyboard.press('Control+c');await page.keyboard.press('Control+Shift+i');assert.deepEqual(await saved(page),before,'pixel shortcuts cannot change a read-only PDF area');
@@ -84,6 +85,10 @@ test('native-detail selected PDF text is recovered and copied on desktop and a p
    await dialog.getByRole('button',{name:'Cancel',exact:true}).click();assert.deepEqual(await saved(page),before,'reading and copying preserve sources, pages, fields and canvas objects');
    assert.deepEqual(pdfPixels(await exportPdf(page)),originalPixels,'the downloaded PDF retains every original pixel');
    assert.deepEqual(errors,[]);console.log(`# selected text ${phone?'phone':'desktop'}: whole-page missed; native crop exact; original/export pixels ${originalPixels.hash}`);
+  }catch(error){
+   const dom=await page.evaluate(()=>({dialog:document.querySelector('[role=dialog]')?.innerText,status:document.querySelector('.text-detection-bar > span')?.textContent,selection:document.querySelector('.selection-outline path.ants')?.getAttribute('d'),url:location.href})).catch(()=>null);
+   const project=await Promise.race([saved(page),new Promise(resolve=>setTimeout(()=>resolve(null),3000))]).catch(()=>null);
+   console.log('# selected text failure '+JSON.stringify({phone,dom,errors,project:project&&{name:project.name,pages:project.pages.map(p=>({id:p.id,source:p.source,width:p.width,height:p.height,objects:p.canvas.objects?.length,forms:p.forms?.length}))}}));throw error;
   }finally{await context.close();}
  }
 }));
@@ -91,7 +96,7 @@ test('native-detail selected PDF text is recovered and copied on desktop and a p
 test('selected-area rendering preserves the visible page colour, transparent ink and overlays, and clips polygon/mask holes',{timeout:180000},async()=>runBrowser(async(browser,url)=>{
  const page=await browser.newPage();await page.route('**/selected-text-harness',route=>route.fulfill({contentType:'text/html',body:'<!doctype html><title>Selected text raster checks</title>'}));await page.goto(url+'selected-text-harness');
  const result=await page.evaluate(async()=>{
-  const {blankPage}=await import('/src/model.ts'),{StaticCanvas,FabricImage,Rect}=await import('fabric'),{renderSelectionRaster}=await import('/src/read-selected-text.ts');
+  const {blankPage}=await import('/src/model.ts'),{StaticCanvas,FabricImage,Rect}=await import('/selected-text-test-fabric.ts'),{renderSelectionRaster}=await import('/src/read-selected-text.ts');
   const p={...blankPage(400,300),color:'#d6c9b1'},c=new StaticCanvas(undefined,{width:400,height:300,backgroundColor:p.color,enableRetinaScaling:false}),source=document.createElement('canvas');source.width=200;source.height=160;const ink=source.getContext('2d');ink.fillStyle='#123456';ink.fillRect(20,20,100,35);ink.fillStyle='rgba(190,20,40,.5)';ink.fillRect(30,80,110,40);
   const image=new FabricImage(source,{left:40,top:30,strokeWidth:0,objectCaching:false});c.add(image);c.add(new Rect({left:100,top:70,width:40,height:55,strokeWidth:0,fill:'#1357dd',opacity:.5,objectCaching:false}));c.renderAll();
   const before=JSON.stringify(c.toObject()),b={left:50,top:40,width:180,height:130},rect=[{x:50,y:40},{x:230,y:40},{x:230,y:170},{x:50,y:170}],expected=document.createElement('canvas');expected.width=180;expected.height=130;const g=expected.getContext('2d');g.fillStyle=p.color;g.fillRect(0,0,180,130);g.drawImage(source,40-50,30-40);g.globalAlpha=.5;g.fillStyle='#1357dd';g.fillRect(100-50,70-40,40,55);g.globalAlpha=1;
@@ -116,7 +121,7 @@ test('selected-area OCR cancellation and page changes discard late results; edit
   await page.goto(url+'app/');await importPdf(page,fixture);await command(page,'Read selected area');await setZoom(page);await drawArea(page,area);const before=await saved(page);
   await page.evaluate(()=>{window.__roiGate=true;window.__roiCanvases=[];});await page.getByRole('button',{name:'Read selected area',exact:true}).click();
   await page.waitForFunction(()=>window.__roiHeld.length>0,null,{timeout:120000});assert.match(await page.evaluate(()=>window.__roiHeld[0].model),/ppocr/,'the actual OCR model call is pending');
-  const cropCount=await page.evaluate(()=>{window.__roiSourceCrops=window.__roiCanvases.filter(c=>c.width===700&&c.height===150);return window.__roiSourceCrops.length;});assert.ok(cropCount>0,'the native selected raster exists before inference finishes');
+  const cropEvidence=await page.evaluate(async()=>{const {selectionRasterPlan}=await import('/src/selection-ocr-geometry.ts'),path=document.querySelector('.selection-outline path.ants').getAttribute('d'),values=(path.match(/-?\d+(?:\.\d+)?/g)||[]).map(Number),points=values.filter((_,i)=>i%2===0).map((x,i)=>({x,y:values[i*2+1]})),plan=selectionRasterPlan(2400,3200,{points},300/72);window.__roiSourceCrops=window.__roiCanvases.filter(c=>c.width===plan.width&&c.height===plan.height);return {path,plan,created:window.__roiCanvases.map(c=>[c.width,c.height]),count:window.__roiSourceCrops.length};});assert.ok(cropEvidence.count>0,'the pending native crop matches its actual selection plan: '+JSON.stringify(cropEvidence));
   await page.getByRole('dialog',{name:'Read selected text'}).getByRole('button',{name:'Cancel',exact:true}).click();
   assert.equal(await page.evaluate(()=>window.__roiSourceCrops[0].width<=1&&window.__roiSourceCrops[0].height<=1),true,'Cancel immediately releases the selected raster, even while inference is pending');
   assert.deepEqual(await saved(page),before);await page.evaluate(()=>window.__roiRelease());await page.waitForTimeout(2000);assert.equal(await page.getByRole('dialog',{name:'Read selected text'}).count(),0,'a late result cannot reopen the cancelled dialog');
@@ -128,7 +133,7 @@ test('selected-area OCR cancellation and page changes discard late results; edit
  const made=await PDFDocument.create(),pg=made.addPage([420,300]),font=await made.embedFont(StandardFonts.Helvetica);pg.drawText('READABLE HEADER',{x:40,y:260,size:14,font,color:rgb(0,0,0)});const form=made.getForm(),field=form.createTextField('Native value');field.setText('OLD VALUE');field.addToPage(pg,{x:40,y:180,width:180,height:25});
  const harness=await browser.newPage();await harness.route('**/selected-form-harness',route=>route.fulfill({contentType:'text/html',body:'<!doctype html><title>Selected form guard</title>'}));await harness.goto(url+'selected-form-harness');
  const guard=await harness.evaluate(async encoded=>{
-  const {blankPage}=await import('/src/model.ts'),{StaticCanvas}=await import('fabric'),{importDocument}=await import('/src/browser/engine.ts'),{renderSelectionRaster}=await import('/src/read-selected-text.ts'),data=Uint8Array.from(atob(encoded),s=>s.charCodeAt(0)),source=await importDocument(new File([data],'invented-form.pdf',{type:'application/pdf'})),p={...blankPage(420,300),source:source.id,index:0},c=new StaticCanvas(undefined,{width:420,height:300}),rect=(left,top,width,height)=>({points:[{x:left,y:top},{x:left+width,y:top},{x:left+width,y:top+height},{x:left,y:top+height}]});
+  const {blankPage}=await import('/src/model.ts'),{StaticCanvas}=await import('/selected-text-test-fabric.ts'),{importDocument}=await import('/src/browser/engine.ts'),{renderSelectionRaster}=await import('/src/read-selected-text.ts'),data=Uint8Array.from(atob(encoded),s=>s.charCodeAt(0)),source=await importDocument(new File([data],'invented-form.pdf',{type:'application/pdf'})),p={...blankPage(420,300),source:source.id,index:0},c=new StaticCanvas(undefined,{width:420,height:300}),rect=(left,top,width,height)=>({points:[{x:left,y:top},{x:left+width,y:top},{x:left+width,y:top+height},{x:left,y:top+height}]});
   const refused=async(selection,page=p)=>{try{await renderSelectionRaster(c,page,selection);return '';}catch(error){return error.message;}};
   const native=await refused(rect(35,90,200,40)),own=await refused(rect(250,180,100,30),{...p,forms:[{id:'edited',type:'text',name:'Current value',left:250,top:180,width:100,height:30,value:'CURRENT VALUE'}]}),header=await renderSelectionRaster(c,p,rect(35,20,200,35)),out={native,own,headerSize:[header.width,header.height],objects:c.getObjects().length};await c.dispose();return out;
  },Buffer.from(await made.save()).toString('base64'));
@@ -138,7 +143,7 @@ test('selected-area OCR cancellation and page changes discard late results; edit
 test('scaled and grouped pictures retain their native image pixels when an area is read',{timeout:180000},async()=>runBrowser(async(browser,url)=>{
  const page=await browser.newPage();await page.route('**/selected-image-harness',route=>route.fulfill({contentType:'text/html',body:'<!doctype html><title>Selected native image detail</title>'}));await page.goto(url+'selected-image-harness');
  const results=await page.evaluate(async()=>{
-  const {blankPage}=await import('/src/model.ts'),{StaticCanvas,FabricImage,Group}=await import('fabric'),{renderSelectionRaster}=await import('/src/read-selected-text.ts'),source=document.createElement('canvas');source.width=200;source.height=120;const g=source.getContext('2d'),pixels=g.createImageData(200,120);
+  const {blankPage}=await import('/src/model.ts'),{StaticCanvas,FabricImage,Group}=await import('/selected-text-test-fabric.ts'),{renderSelectionRaster}=await import('/src/read-selected-text.ts'),source=document.createElement('canvas');source.width=200;source.height=120;const g=source.getContext('2d'),pixels=g.createImageData(200,120);
   for(let y=0;y<120;y++)for(let x=0;x<200;x++){const i=(y*200+x)*4;pixels.data[i]=(x*29+y*7)%256;pixels.data[i+1]=(x*3+y*17)%256;pixels.data[i+2]=(x*11+y*13)%256;pixels.data[i+3]=255;}g.putImageData(pixels,0,0);const results=[];
   for(const [scale,grouped]of [[.5,false],[.24,false],[.5,true]]){
    const p=blankPage(300,200),c=new StaticCanvas(undefined,{width:300,height:200,enableRetinaScaling:false}),image=new FabricImage(source,{left:0,top:0,strokeWidth:0,objectCaching:false}),object=grouped?new Group([image],{left:0,top:0,scaleX:scale,scaleY:scale,objectCaching:false}):image; if(!grouped)object.set({scaleX:scale,scaleY:scale});c.add(object);c.renderAll();const before=JSON.stringify(c.toObject()),w=200*scale,h=120*scale,crop=await renderSelectionRaster(c,p,{points:[{x:0,y:0},{x:w,y:0},{x:w,y:h},{x:0,y:h}]}),actual=crop.getContext('2d').getImageData(0,0,crop.width,crop.height).data;let different=actual.length===pixels.data.length?0:-1;if(different===0)for(let i=0;i<actual.length;i++)if(actual[i]!==pixels.data[i])different++;results.push({scale,grouped,size:[crop.width,crop.height],different,unchanged:JSON.stringify(c.toObject())===before});await c.dispose();
