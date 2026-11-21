@@ -1,6 +1,7 @@
 import {alphaCoverage,blurCoverage,contrastCoverage,coreGain,coverageFit,matchedInkColor,coverageEdgeWidth,type Coverage} from '../ocr-appearance';
 import {clampTextSoftness} from '../text-appearance';
-import {rankOcrFonts,type FontSample} from '../ocr-font';
+import {rankOcrFonts,fontCandidates,systemCandidates,type FontSample} from '../ocr-font';
+import {extendedFonts} from '../font-library';
 import {familyWeights,baseFamily} from '../font-weights';
 import type {TextRegion} from '../text-regions';
 import type {Textbox} from '../text-appearance';
@@ -71,7 +72,11 @@ export async function matchOcrAppearance(raster:HTMLCanvasElement,region:TextReg
  // estimate, which varies with the font's stroke thickness.
  const selected=samplePixels(raster,region,regions),selectedEdges=selected&&coverageEdgeWidth(selected.source),paintSelected=selected&&coverageRenderer(selected);
  const softnessValues=matchBlur?[0,.1,.2,.3,.4,.6,.8,1,1.4,2]:[0];
- const ranked=autoFont?await rankOcrFonts(samples.map(s=>s.font)):[];
+ // Ranked against every bundled text face (63 families), not only the usual
+ // dozen: a face outside the list was approximated by whichever fitted least
+ // badly (Manrope dates were set in Lora, a serif). Handwriting and
+ // decorative display faces are left out: their shapes won near ties.
+ const ranked=autoFont?await rankOcrFonts(samples.map(s=>s.font),[...new Set([...fontCandidates,...extendedFonts.filter(f=>f.category==='sans'||f.category==='serif'||f.category==='mono').map(f=>f.family),...systemCandidates])]):[];
  const families=[...new Set([family,...ranked.slice(0,3).map(r=>r.family)])];
  let best:Fit|undefined;
  for(const candidateFamily of families){
