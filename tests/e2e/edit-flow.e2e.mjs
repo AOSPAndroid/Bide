@@ -13,6 +13,9 @@ const fields=page=>page.locator('button[aria-label^="Edit detected text"]').eval
 async function editField(page,from,to){
  await page.locator(`button[aria-label^="Edit detected text: ${from}"]`).first().click();
  await page.getByLabel('New text').fill(to);await page.getByRole('button',{name:'Apply'}).click();
+ // A preceding edit's toast can still be visible. This edit must finish and
+ // close its dialog, so an ignored Apply cannot satisfy the helper.
+ await page.getByRole('dialog',{name:'Edit image text'}).waitFor({state:'hidden',timeout:60000});
  await page.getByText("Edited with the image's own letters",{exact:false}).last().waitFor({timeout:60000});
  return Date.now();
 }
@@ -40,7 +43,14 @@ test('fields stay live across edits, Undo and Rescan on a scanned quote',{timeou
   assert.ok(!after.some(t=>t.startsWith('1 947,80')),'the old value is gone from the fields');
   // The same field again: it starts from the page's original letters, and replaces the first edit.
   done=await editField(page,'1 974,80 €','1 999,80 €');await tappable(page,'3 612,50',done);
-  const layers=await page.evaluate(async()=>{const {restoreLocal}=await import('/src/model.ts');await new Promise(r=>setTimeout(r,1500));return (await restoreLocal()).pages[0].canvas.objects.filter(o=>/^Edited text/.test(o.name??'')).map(o=>o.name);});
+  // Reloading the canvas also updates its thumbnail and restarts autosave.
+  // Wait for the current value to persist, then keep the exact one-layer check.
+  let layers=[];const savedBy=Date.now()+30000;
+  while(Date.now()<savedBy){
+   layers=await page.evaluate(async()=>{const {restoreLocal}=await import('/src/model.ts');return (await restoreLocal()).pages[0].canvas.objects.filter(o=>/^Edited text/.test(o.name??'')).map(o=>o.name);});
+   if(layers.includes('Edited text: 1 999,80 €'))break;
+   await page.waitForTimeout(100);
+  }
   assert.deepEqual(layers,['Edited text: 1 999,80 €'],'one edit layer for the field, holding the latest text');
   assert.ok((await fields(page)).some(t=>t.startsWith('1 999,80 €')));
   // Undo shows the previous text at once, twice back to the first reading.
