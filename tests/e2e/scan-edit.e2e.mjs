@@ -13,10 +13,15 @@ async function edgeAt(page,b){
  const at=await page.evaluate(([b])=>{const a=document.querySelector('.artboard'),r=a.getBoundingClientRect(),z=r.width/595,ws=document.querySelector('.canvas-workspace'),w=ws.getBoundingClientRect();
   ws.scrollTop+=r.top+b.top*z-w.top-200;ws.scrollLeft+=r.left+b.left*z-w.left-100;const r2=a.getBoundingClientRect();
   return {x:r2.left+b.left*z-6,y:r2.top+b.top*z-6,width:b.width*z+12,height:b.height*z+12};},[b]);
- await page.waitForTimeout(800);
- const png=await page.screenshot({clip:{x:Math.max(0,at.x),y:Math.max(0,at.y),width:Math.min(1300,at.width),height:at.height}});
- return page.evaluate(async b64=>{const img=new Image();img.src='data:image/png;base64,'+b64;await img.decode();const c=document.createElement('canvas');c.width=img.width;c.height=img.height;const g=c.getContext('2d');g.drawImage(img,0,0);
-  const {edgeWidth}=await import('/src/ocr-image.ts'),d=g.getImageData(0,0,c.width,c.height);return edgeWidth({data:d.data,width:c.width,height:c.height},{x0:0,y0:0,x1:c.width,y1:c.height},[250,250,250]);},png.toString('base64'));
+ // Measure scanned ink without the editor's field borders or hover tint,
+ // like the independent large-scan screen capture below.
+ const overlay=page.locator('.detected-text-overlay'),visibility=await overlay.evaluate(e=>{const previous=e.style.visibility;e.style.visibility='hidden';return previous;});
+ try{
+  await page.waitForTimeout(800);
+  const png=await page.screenshot({clip:{x:Math.max(0,at.x),y:Math.max(0,at.y),width:Math.min(1300,at.width),height:at.height}});
+  return await page.evaluate(async b64=>{const img=new Image();img.src='data:image/png;base64,'+b64;await img.decode();const c=document.createElement('canvas');c.width=img.width;c.height=img.height;const g=c.getContext('2d');g.drawImage(img,0,0);
+   const {edgeWidth}=await import('/src/ocr-image.ts'),d=g.getImageData(0,0,c.width,c.height);return edgeWidth({data:d.data,width:c.width,height:c.height},{x0:0,y0:0,x1:c.width,y1:c.height},[250,250,250]);},png.toString('base64'));
+ }finally{await overlay.evaluate((e,previous)=>{e.style.visibility=previous;},visibility);}
 }
 // A detected line's box in page units.
 const lineBox=(page,text)=>page.evaluate(([text])=>{const b=[...document.querySelectorAll('button[aria-label^="Edit detected text"]')].find(x=>x.getAttribute('aria-label').includes(text));if(!b)return null;
@@ -32,7 +37,7 @@ async function editAmount(browser,url,file,from,to){
  await page.getByText("Edited with the image's own letters",{exact:false}).waitFor({timeout:60000});
  await page.keyboard.press('Escape');await page.waitForTimeout(1500);
  const layer=await page.evaluate(async()=>{const {restoreLocal}=await import('/src/model.ts');return (await restoreLocal()).pages[0].canvas.objects.find(o=>/^Edited text/.test(o.name??''));});
- const zoom=page.getByLabel('Zoom percentage');await zoom.fill('300');await zoom.press('Enter');await page.waitForTimeout(2500);
+ const zoom=page.getByLabel('Zoom percentage');await zoom.fill('300');await zoom.press('Enter');await page.waitForFunction(()=>{const a=document.querySelector('.artboard'),p=document.querySelector('.pdf-background');return Math.abs(a.getBoundingClientRect().width/595-3)<.01&&p?.complete&&p.naturalWidth>=1785;},null,{timeout:30000});
  const result={title:edited.title,layer,edited:await edgeAt(page,edited),reference:await edgeAt(page,reference)};
  assert.deepEqual(errors,[]);await page.close();return result;
 }
