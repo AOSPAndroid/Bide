@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-11-21 — Original-letter spacing and crisp font fitting
+
+- Merge the complete Claude branch through `5cac356`, including `dfe8624` and `35b18f4`.
+- Position proportional original letters from their measured ink and observed gaps, improving spacing when inserting characters or moving words. Preserve the existing planner for intentional edge spaces, unreadable symbols and compact text deletions.
+- Choose the automatic font weight before refining size and position for explicit font edits on crisp text, within the existing matched size by 1.5%. Soft text retains its previous fitting path.
+- Add a local comparison kit that exports invented documents and references for manual editor comparisons. Failed, unread and unmeasured edits cannot count as successful comparisons.
+- Measure edits of text recognized with a different apostrophe or dash, while preserving literal matching, whitespace handling and rejection of unchanged benchmark requests.
+- Verify all 121 browser cases and 288 edit cases: eleven appearance improvements and no newly failing cases against the prior hosted revision. Original-letter edits remain the default; replacement fonts require explicit consent.
+
 ## 2026-11-21 — Crisp edits on low-resolution scanned PDFs
 
 - Merge the complete Claude branch through `ed92f91` in `306554c`.
