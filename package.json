@@ -23,6 +23,7 @@
     "typecheck:cloud": "tsc -p cloud/tsconfig.json",
     "bench:ocr": "node scripts/ocr-bench.mjs",
     "bench:edit": "node scripts/edit-bench.mjs",
+    "compare:kit": "node scripts/compare-kit.mjs",
     "build:all": "tsc -b && vite build && vite build --mode demo",
     "prebuild:all": "node scripts/prepare-ocr.mjs && node scripts/prepare-ai.mjs && node scripts/check-assets.mjs",
     "build:local": "tsc -b && vite build",
