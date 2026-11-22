@@ -80,7 +80,7 @@ export async function matchOcrAppearance(raster:HTMLCanvasElement,region:TextReg
  // badly (Manrope dates were set in Lora, a serif). Handwriting and
  // decorative display faces are left out: their shapes won near ties.
  const ranked=autoFont?await rankOcrFonts(samples.map(s=>s.font),[...new Set([...extraFonts('yours').map(f=>f.family),...fontCandidates,...extendedFonts.filter(f=>f.category==='sans'||f.category==='serif'||f.category==='mono').map(f=>f.family),...systemCandidates])]):[];
- const families=[...new Set([family,...ranked.slice(0,3).map(r=>r.family)])];
+ const families=[...new Set([family,...(autoFont?[...pageFaces.keys()]:[]),...ranked.slice(0,3).map(r=>r.family)])];
  let best:Fit|undefined;
  for(const candidateFamily of families){
   const selectedText=await makeText(region,candidateFamily),selectedSize=selectedText.fontSize,selectedAscent=selectedText.top-region.top+selectedSize*.93;
@@ -155,7 +155,11 @@ export async function matchOcrAppearance(raster:HTMLCanvasElement,region:TextReg
   // The page's font stays unless another fits these letters clearly better
   // (faces of one kind score within a few hundredths of each other, and a
   // near tie on one soft line used to turn Arial into Roboto or Open Sans).
-  if(!best||score>best.score+(best.family===family?FAMILY_MARGIN:0))best=result;
+  // A face that already won a line of this document is kept against a near
+  // tie too: a page is set in one or two faces, and a short line (a seat
+  // number, a date) ranked a look-alike first (Barlow for Manrope).
+  const settled=(f:string)=>f===family||pageFaces.has(baseFamily(f));
+  if(!best||score>best.score+(settled(best.family)&&!settled(candidateFamily)?FAMILY_MARGIN:0)-(settled(candidateFamily)&&!settled(best.family)?FAMILY_MARGIN:0))best=result;
  }
  // Low confidence or mismatched OCR should retain the existing estimate. On
  // the line's own letters a lower score still beats no match: a ligature the
@@ -212,13 +216,18 @@ export async function matchOcrAppearance(raster:HTMLCanvasElement,region:TextReg
    if(other&&other.score>best.score+.03){best=other;if(!webWinners.includes(family))webWinners.unshift(family);}
   }
  }
- if(weights&&best.mass!==undefined)return heaviness(raster,region,regions,best,{autoFont,matchBlur,makeText,onFit,alike});
- return best;
+ const chosen=weights&&best.mass!==undefined?await heaviness(raster,region,regions,best,{autoFont,matchBlur,makeText,onFit,alike}):best;
+ // Remembered for the document's other lines when the match is a sure one.
+ if(weights&&autoFont&&chosen.score>=.8)pageFaces.set(baseFamily(chosen.family),(pageFaces.get(baseFamily(chosen.family))??0)+1);
+ return chosen;
 }
 
 // Open families whose letters look like the samples', downloaded and ready
 // to draw (at most four; none when the index or the network is not there).
 const webWinners:string[]=[];
+// Faces matched surely on the document being edited (forgetPageFaces when another opens).
+const pageFaces=new Map<string,number>();
+export const forgetPageFaces=()=>{pageFaces.clear();webWinners.length=0;};
 async function webCandidates(samples:Sample[]){
  const index=await fontIndex();if(!index)return [];
  const glyphs:{ch:string;d:Descriptor}[]=[];

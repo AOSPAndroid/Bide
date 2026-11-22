@@ -107,7 +107,10 @@ function aiOcrLabel(regions:TextRegion[]){
  const scripts=[...new Set(regions.map(r=>r.script).filter((s):s is OcrScript=>!!s))];
  return scripts.length?`AI OCR (${scripts.map(s=>scriptLabels[s]).join(' + ')})`:'AI OCR (Latin languages)';
 }
+let scannedDocument='';
 export async function scanPageText(p:Page,c:Canvas,{signal,grouping,thorough,languages,engine='tesseract',aiSharpen=false,script='auto',accurate=false,onStatus,onRegions}:{signal:AbortSignal;grouping:OcrGrouping;thorough:boolean;languages:string[];engine?:'tesseract'|'paddle';aiSharpen?:boolean;script?:OcrScript|'auto';accurate?:boolean;onStatus:(status:string)=>void;onRegions?:(regions:TextRegion[])=>void}):Promise<{regions:TextRegion[];all?:TextRegion[];status:string;suggestedFont?:string}>{
+ // Another document: the faces matched on the last one no longer apply.
+ {const key=p.source??p.id;if(key!==scannedDocument){scannedDocument=key;try{(await import('./browser/ocr-appearance')).forgetPageFaces();}catch{}}}
  onStatus('Detecting text…');
  let ocrLayer=false;
  if(p.source){const detected=await detectPdfText(p.source,p.index);signal.throwIfAborted();ocrLayer=!!detected.ocrLayer;if(detected.regions.length)return {regions:detected.regions,status:`${detected.regions.length} editable text regions${detected.skipped?' · rotated text kept unchanged':''}`};}
