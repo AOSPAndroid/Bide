@@ -217,14 +217,15 @@ export function planGlyphEdit(text:string,cells:Cell[],next:string,library:Libra
  // The same length, each changed character on the advance of the one it replaces.
  if(a.length===b.length){
   const changed=a.flatMap((ch,i)=>ch===b[i]?[]:[i]);
-  // A proportional run can exchange its own figures without changing its
-  // total advance (15 →51). Replacing wide figures with narrow ones (04 →11)
-  // still needs reflow. All proposed replacements must clear their new
-  // neighbours below, including simultaneous changes and the preceding word.
+  // Separate numeric groups keep their word spaces when they exchange their
+  // own figures (15 →51) without changing each group's total advance. Dates,
+  // mixed text and width-changing replacements (04 →11) still need reflow.
+  // All replacements must clear their proposed neighbours below.
+  const grouped=/^\p{Nd}+(?:\s+\p{Nd}+)+$/u.test(text);
   const permutes=(i:number)=>{let l=i,r=i+1;while(l&&digit(a[l-1])&&digit(b[l-1]))l--;while(r<a.length&&digit(a[r])&&digit(b[r]))r++;return a.slice(l,r).sort().join('')===b.slice(l,r).sort().join('');};
   const alike=(i:number)=>{const g=letter(b[i],i),c=cells[i];if(!g||g.i0===undefined||g.i1===undefined||c.i0===undefined||c.i1===undefined)return false;const p=g.i1-g.i0,q=c.i1-c.i0;return Math.abs(p-q)<=Math.max(1,.12*Math.max(p,q));};
   const clears=(i:number)=>{const g=letter(b[i],i);if(!g||g.m===undefined||g.i0===undefined||g.i1===undefined)return true;const c=cells[i],to=over(c,g),l=to+g.i0-g.x0,r=to+g.i1-g.x0,prev=cells.slice(0,i).reverse().find(x=>!x.space),nxt=cells.slice(i+1).find(x=>!x.space);return (!prev?.i1||l>=prev.i1+1)&&(!nxt?.i0||r<=nxt.i0-1);};
-  if(changed.every(i=>!cells[i].space&&!/\s/.test(b[i])&&cells[i].m!==undefined&&(grid||digit(a[i])&&digit(b[i])&&(tabular||permutes(i)||alike(i)&&clears(i))))){
+  if(changed.every(i=>!cells[i].space&&!/\s/.test(b[i])&&cells[i].m!==undefined&&(grid||digit(a[i])&&digit(b[i])&&(tabular||grouped&&permutes(i)||alike(i)&&clears(i))))){
    const from=Math.max(0,changed[0]-1),pieces:Piece[]=[],ink:{i:number;left:number;right:number}[]=[];
    const note=(i:number,g:Cell|LibraryGlyph,shift=0)=>{if(g.i0!==undefined&&g.i1!==undefined)ink.push({i,left:g.i0+shift,right:g.i1+shift});};
    // A leading space in the patch does not remove the preceding word from
