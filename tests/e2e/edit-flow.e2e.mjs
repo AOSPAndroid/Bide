@@ -54,7 +54,7 @@ test('fields stay live across edits, Undo and Rescan on a scanned quote',{timeou
   assert.deepEqual(layers,['Edited text: 1 999,80 €'],'one edit layer for the field, holding the latest text');
   assert.ok((await fields(page)).some(t=>t.startsWith('1 999,80 €')));
   // Undo shows the previous text at once, twice back to the first reading.
-  await page.keyboard.press('Escape');await page.mouse.click(5,450);
+  await page.keyboard.press('Escape');await page.locator('.tool-rail').getByRole('button',{name:'Move & select',exact:true}).click();
   await page.getByRole('button',{name:'Undo (Ctrl Z)'}).click();
   done=Date.now();await tappable(page,'1 974,80 €',done);
   await page.getByRole('button',{name:'Undo (Ctrl Z)'}).click();
@@ -292,7 +292,7 @@ test('a scanned PDF keeps its ink: letters reused at the scan\'s own pixels, a f
   await page.getByText("Edited with the image's own letters",{exact:false}).last().waitFor({timeout:60000});
   await field('9,40').click();await page.getByLabel('New text').fill('6,40 €');await page.getByRole('button',{name:'Apply',exact:true}).click();
   await page.getByRole('button',{name:'Use a font for this edit'}).click();await page.getByText('This line is now text in the OCR font',{exact:false}).waitFor({timeout:60000});
-  await page.keyboard.press('Escape');await page.mouse.click(5,450);await page.waitForTimeout(800);
+  await page.keyboard.press('Escape');await page.locator('.tool-rail').getByRole('button',{name:'Move & select',exact:true}).click();await page.waitForTimeout(800);
   await page.locator('.document-actions .primary').click();
   const [d]=await Promise.all([page.waitForEvent('download',{timeout:120000}),page.locator('.modal .dialog-actions .primary').click()]);
   // Darkest 8% of the ink in each line, on renders at the scan's resolution.

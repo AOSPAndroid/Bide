@@ -216,7 +216,7 @@ test('#31 dialog controls are finger-sized and explain themselves without toolti
   await page.waitForTimeout(4500); // the import toast has gone
   // On phones the OCR bar's actions sit behind More.
   if(await page.locator('.ocr-more').isVisible())await tap(page,page.locator('.ocr-more'));
-  await tap(page,page.getByRole('button',{name:'Proofread'}));
+  await tap(page,page.locator('.text-detection-bar').getByRole('button',{name:'Proofread'}));
   const chips=page.locator('.proofread-line .doubt button');await chips.first().waitFor({timeout:60000});
   const b=await chips.evaluateAll(bs=>bs.map(b=>b.getBoundingClientRect().toJSON()));
   for(const r of b)assert.ok(r.height>=40,`a suggestion is ${r.height}px tall`);

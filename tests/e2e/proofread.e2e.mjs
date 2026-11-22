@@ -30,7 +30,7 @@ test('Proofread retains unsupported corrections and fixes words using the same l
   // correction and keep it available, with the saved page unchanged.
   const saved=()=>page.evaluate(async()=>{const {restoreLocal}=await import('/src/model.ts');return JSON.stringify((await restoreLocal()).pages[0].canvas);});
   const before=await saved();
-  await page.getByRole('button',{name:'Proofread'}).click();
+  await page.locator('.text-detection-bar').getByRole('button',{name:'Proofread'}).click();
   const pending=page.locator('.proofread-line',{hasText:'rnodern'});await pending.waitFor({timeout:60000});
   await pending.getByRole('button',{name:'Use modern'}).click();
   await page.getByText('Cannot preserve the original lettering',{exact:false}).waitFor({timeout:30000});
@@ -49,7 +49,7 @@ test('Proofread retains unsupported corrections and fixes words using the same l
   await page.goto(server.resolvedUrls.local[0]+'app/');await page.locator('input[type=file][accept*=".psd"]').setInputFiles(available);
   await page.locator('button[aria-label^="Edit detected text: Our rnodern"]').waitFor({timeout:240000});
   // Proofread finds it across the page; one click fixes it.
-  await page.getByRole('button',{name:'Proofread'}).click();
+  await page.locator('.text-detection-bar').getByRole('button',{name:'Proofread'}).click();
   const line=page.locator('.proofread-line',{hasText:'rnodern'});await line.waitFor({timeout:60000});
   assert.equal(await page.locator('.proofread-line').count(),1,'only the misspelled line is listed');
   await line.getByRole('button',{name:'Use modern'}).click();
@@ -70,7 +70,7 @@ test('Proofread retains unsupported corrections and fixes words using the same l
   await page.waitForFunction(()=>{const status=document.querySelector('.text-detection-bar > span')?.textContent||'';return status.includes('AI OCR')&&!status.includes('…');},null,{timeout:240000});
   const matchingBefore=JSON.parse(await saved()),original=matchingBefore.objects.find(o=>o.type?.toLowerCase()==='image');assert.ok(original,'the imported source image is present');
   assert.equal(await page.getByLabel('Edit image text with').inputValue(),'letters');
-  await page.getByRole('button',{name:'Proofread'}).click();const borrowedLine=page.locator('.proofread-line',{hasText:'rnodern'});await borrowedLine.waitFor({timeout:60000});
+  await page.locator('.text-detection-bar').getByRole('button',{name:'Proofread'}).click();const borrowedLine=page.locator('.proofread-line',{hasText:'rnodern'});await borrowedLine.waitFor({timeout:60000});
   await borrowedLine.getByRole('button',{name:'Use modern'}).click();
   await page.locator('.toast',{hasText:/a missing one came from another line in the same lettering/}).waitFor({timeout:120000});
   await page.getByRole('button',{name:'Close',exact:true}).click();
