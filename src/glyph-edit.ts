@@ -217,14 +217,11 @@ export function planGlyphEdit(text:string,cells:Cell[],next:string,library:Libra
  // The same length, each changed character on the advance of the one it replaces.
  if(a.length===b.length){
   const changed=a.flatMap((ch,i)=>ch===b[i]?[]:[i]);
-  // A new digit stays in the old one's place only where its ink clears its
-  // neighbours': with proportional figures (Manrope: a 1 of 26 px, a 9 of
-  // 45) a 9 in a 1's place ran into them ("2031" → "2009"); the line is then
-  // laid out again by its ink.
-  // Proportional digits of about the same ink width (a 9 for a 4) still swap in place.
-  const alike=(i:number)=>{const g=letter(b[i],i),c=cells[i];if(!g||g.i0===undefined||g.i1===undefined||c.i0===undefined||c.i1===undefined)return false;const p=g.i1-g.i0,q=c.i1-c.i0;return Math.abs(p-q)<=Math.max(1,.12*Math.max(p,q));};
-  const clears=(i:number)=>{const g=letter(b[i],i);if(!g||g.m===undefined||g.i0===undefined||g.i1===undefined)return true;const c=cells[i],to=over(c,g),l=to+g.i0-g.x0,r=to+g.i1-g.x0,prev=cells.slice(0,i).reverse().find(x=>!x.space),nxt=cells.slice(i+1).find(x=>!x.space);return (!prev?.i1||l>=prev.i1+1)&&(!nxt?.i0||r<=nxt.i0-1);};
-  if(changed.every(i=>!cells[i].space&&!/\s/.test(b[i])&&cells[i].m!==undefined&&(grid||digit(a[i])&&digit(b[i])&&(tabular||alike(i)&&clears(i))))){
+  // Keep a numeric edit in place whenever the complete proposed ink fits.
+  // Proportional figures alone do not require reflow: telephone digits can
+  // exchange places safely despite having different widths. Validate all
+  // simultaneous replacements below, including the preceding word's ink.
+  if(changed.every(i=>!cells[i].space&&!/\s/.test(b[i])&&cells[i].m!==undefined&&(grid||digit(a[i])&&digit(b[i])))){
    const from=Math.max(0,changed[0]-1),pieces:Piece[]=[],ink:{i:number;left:number;right:number}[]=[];
    const note=(i:number,g:Cell|LibraryGlyph,shift=0)=>{if(g.i0!==undefined&&g.i1!==undefined)ink.push({i,left:g.i0+shift,right:g.i1+shift});};
    // A leading space in the patch does not remove the preceding word from
@@ -237,9 +234,10 @@ export function planGlyphEdit(text:string,cells:Cell[],next:string,library:Libra
     const to=over(c,g);pieces.push({...piece(g),to});note(i,g,to-g.x0);
    }
    if(pieces.length){
-    // One or two gaps cannot prove tabular figures. Check the whole proposed
-    // placement (including other changed digits), not obsolete neighbours.
-    const overlap=!grid&&pairs.length<3&&ink.some((r,n)=>{const l=ink[n-1];if(!l||!changed.includes(l.i)&&!changed.includes(r.i)||cells.slice(l.i+1,r.i).some(c=>!c.space))return false;const left=cells[l.i].i1,right=cells[r.i].i0;return left!==undefined&&right!==undefined&&r.left-l.right<Math.min(0,right-left)-1e-6;});
+    // Reflow if a replacement creates overlapping ink; retain any original
+    // touching ink without making the overlap worse. Check the complete new
+    // placement, rather than comparing each digit to obsolete neighbours.
+    const overlap=!grid&&ink.some((r,n)=>{const l=ink[n-1];if(!l||!changed.includes(l.i)&&!changed.includes(r.i)||cells.slice(l.i+1,r.i).some(c=>!c.space))return false;const left=cells[l.i].i1,right=cells[r.i].i0;return left!==undefined&&right!==undefined&&r.left-l.right<Math.min(0,right-left)-1e-6;});
     if(!overlap)return placed(pieces,cells[from].x0);
     figures=undefined;
    }
