@@ -401,3 +401,44 @@ test('OCR edit controls wait for the page reload while keeping input and Cancel 
   assert.equal(await page.evaluate(()=>window.__ocrReloadGate.state.calls),1,'only the first edited-page reload was held');assert.deepEqual(errors,[]);
  }finally{await browser.close();await server.close();}
 });
+
+test('Undo requested while the edited page reloads is applied once the canvas is ready',{timeout:600000},async()=>{
+ // Hold the second real edited-page reload so an enabled Undo is deliberately
+ // clicked during opening. Autosave and elapsed time cannot release this gate.
+ const moduleId='\0virtual:bide-undo-reload-gate',moduleUrl='/@id/__x00__virtual:bide-undo-reload-gate';
+ const code=`import {Canvas} from 'fabric';
+ export const state={armed:false,waiting:false,finished:false,calls:0};let releaseLoad;
+ const original=Canvas.prototype.loadFromJSON;
+ Canvas.prototype.loadFromJSON=function(data,...args){
+  if(!state.armed||!data?.objects?.some(o=>o.editedText==='1 999,80 €'))return original.call(this,data,...args);
+  state.armed=false;state.waiting=true;state.calls++;
+  return new Promise((resolve,reject)=>{releaseLoad=async()=>{try{const value=await original.call(this,data,...args);state.waiting=false;state.finished=true;resolve(value);}catch(error){reject(error);throw error;}};});
+ };
+ export function arm(){state.armed=true;}
+ export function release(){if(!releaseLoad)throw new Error('No edited-page reload was held');const run=releaseLoad;releaseLoad=undefined;return run();}`;
+ const server=await createServer({logLevel:'error',plugins:[{name:'test-undo-reload-gate',resolveId(id){if(id==='virtual:bide-undo-reload-gate')return moduleId;},load(id){if(id===moduleId)return code;}}],server:{port:0,host:'127.0.0.1'}});await server.listen();
+ const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||undefined});
+ try{
+  const page=await browser.newPage({viewport:{width:1400,height:900}}),errors=[];page.on('pageerror',error=>errors.push(error.message));
+  const field=text=>page.getByRole('button',{name:`Edit detected text: ${text}`,exact:true});
+  const saved=()=>page.evaluate(async()=>{const project=await(await import('/src/model.ts')).restoreLocal(),p=project?.pages[0];return p?{source:p.source,edits:p.canvas.objects.filter(o=>o.editedText).map(o=>o.editedText),fontLayers:p.canvas.objects.filter(o=>/textbox/i.test(o.type??'')).length}:null;});
+  const waitSaved=async text=>{const deadline=Date.now()+30000;let value;while(Date.now()<deadline){value=await saved();if(value?.edits.length===1&&value.edits[0]===text)return value;await page.waitForTimeout(100);}assert.fail(`the saved page contains exactly ${text}: ${JSON.stringify(value)}`);};
+  await page.goto(server.resolvedUrls.local[0]+'app/');await page.locator('input[type=file][accept*=".psd"]').setInputFiles('tests/fixtures/scanned-quote.pdf');
+  await field('1 947,80 €').waitFor({timeout:240000});
+  await page.waitForFunction(()=>{const text=document.querySelector('.text-detection-bar > span')?.textContent||'';return text.includes('AI OCR')&&!text.includes('…');},null,{timeout:240000});
+  await editField(page,'1 947,80','1 974,80 €');const first=await waitSaved('1 974,80 €');
+  await page.evaluate(async url=>{window.__undoReloadGate=await import(url);window.__undoReloadGate.arm();},moduleUrl);
+  await editField(page,'1 974,80','1 999,80 €');await page.waitForFunction(()=>window.__undoReloadGate.state.waiting,null,{timeout:60000});
+  const latest=await waitSaved('1 999,80 €');assert.equal(latest.source,first.source);
+  const undo=page.getByRole('button',{name:'Undo (Ctrl Z)',exact:true});assert.equal(await undo.isEnabled(),true,'Undo accepts the user request while the page opens');
+  await undo.click();assert.equal(await page.evaluate(()=>window.__undoReloadGate.state.waiting),true,'the requested Undo does not release the controlled reload');
+  assert.deepEqual(await saved(),latest,'Undo waits until the current canvas finishes opening');
+  await page.evaluate(()=>window.__undoReloadGate.release());await page.waitForFunction(()=>window.__undoReloadGate.state.finished);
+  await field('1 974,80 €').waitFor({timeout:120000});
+  assert.equal(await field('1 999,80 €').count(),0,'the queued Undo restores the previous reading');
+  const restored=await waitSaved('1 974,80 €');assert.equal(restored.source,first.source);assert.equal(restored.fontLayers,0,'Undo retains original-letter editing');
+  await page.getByRole('button',{name:'Redo (Ctrl Shift Z)',exact:true}).click();await field('1 999,80 €').waitFor({timeout:120000});
+  await undo.click();await field('1 974,80 €').waitFor({timeout:120000});
+  assert.equal(await page.evaluate(()=>window.__undoReloadGate.state.calls),1,'exactly one edited-page reload was held');assert.deepEqual(errors,[]);
+ }finally{await browser.close();await server.close();}
+});

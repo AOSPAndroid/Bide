@@ -105,3 +105,27 @@ test('portrait documents open at readable width; footer, toolbar and keyboard Fi
   }finally{await context.close();}
  }}finally{await browser.close();await server.close();}
 });
+
+test('phone font and size controls remain usable after an explicit text-box choice',{timeout:300000},async()=>{
+ const server=await createServer({logLevel:'error',server:{port:0,host:'127.0.0.1'}});await server.listen();
+ const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||undefined});
+ try{
+  const variant=variants.find(v=>v.hasTouch),{context,page,errors}=await session(browser,variant);
+  try{
+   await page.goto(server.resolvedUrls.local[0]+'app/?welcome');await checkCard(page,variant);
+   await welcome(page).getByRole('button',{name:'Explore the example',exact:true}).tap();
+   await page.locator('input[type=file][accept*=".psd"]').setInputFiles(portrait());await field(page).waitFor({timeout:120000});
+   assert.equal(await page.locator('.command-strip.reading>.options-bar').isVisible(),false,'reading a source page leaves more room for text');
+   await field(page).tap();await page.getByRole('dialog',{name:'Edit PDF text',exact:true}).getByRole('button',{name:'New font text box',exact:true}).tap();
+   await page.waitForFunction(()=>document.activeElement?.tagName==='TEXTAREA',null,{timeout:60000});await settle(page);
+   const family=page.getByLabel('Font family',{exact:true}),size=page.getByLabel('Font size',{exact:true});
+   assert.equal(await family.isVisible(),true,'a selected text box exposes its font family on a phone');
+   assert.equal(await size.isVisible(),true,'a selected text box exposes its size on a phone');
+   await family.selectOption('Liberation Sans');await page.waitForFunction(()=>document.querySelector('[aria-label="Font family"]')?.value==='Liberation Sans');
+   await size.fill('18');await size.press('Tab');assert.equal(await size.inputValue(),'18','the size control accepts a deliberate style choice');
+   await page.locator('.text-detection-bar .ocr-more').tap();await page.locator('.ocr-settings summary').tap();
+   assert.equal(await page.getByLabel('Edit image text with').inputValue(),'letters','a per-line font choice does not change the global original-letter default');
+   assert.deepEqual(errors,[]);
+  }finally{await context.close();}
+ }finally{await browser.close();await server.close();}
+});
