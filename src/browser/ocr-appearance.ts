@@ -201,10 +201,10 @@ export async function matchOcrAppearance(raster:HTMLCanvasElement,region:TextReg
  }
  // No bundled face fits well: the page's letters pick open families from the
  // index (web-fonts.ts), which are downloaded and compared on the pixels.
- if(weights&&autoFont&&WEB_FONTS&&best.score<.9){
+ if(weights&&autoFont&&WEB_FONTS&&best.score<.97){
   for(const family of await webCandidates(samples)){
    const other=await matchOcrAppearance(raster,region,regions,family,{autoFont:false,matchBlur,makeText,onFit,weights:false,alike});
-   if(other&&other.score>best.score+.03)best=other;
+   if(other&&other.score>best.score+.03){best=other;if(!webWinners.includes(family))webWinners.unshift(family);}
   }
  }
  if(weights&&best.mass!==undefined)return heaviness(raster,region,regions,best,{autoFont,matchBlur,makeText,onFit,alike});
@@ -213,6 +213,7 @@ export async function matchOcrAppearance(raster:HTMLCanvasElement,region:TextReg
 
 // Open families whose letters look like the samples', downloaded and ready
 // to draw (at most four; none when the index or the network is not there).
+const webWinners:string[]=[];
 async function webCandidates(samples:Sample[]){
  const index=await fontIndex();if(!index)return [];
  const glyphs:{ch:string;d:Descriptor}[]=[];
@@ -221,8 +222,10 @@ async function webCandidates(samples:Sample[]){
   const cover=s.source.data.map(v=>v/peak);
   for(const g of s.region.glyphs??[]){if(glyphs.length>=48)break;if(!/^[a-zA-Z0-9]$/.test(g.ch))continue;const d=describeGlyph(cover,s.source.width,s.source.height,Math.floor(g.x0-s.left),Math.ceil(g.x1-s.left));if(d)glyphs.push({ch:g.ch,d});}
  }
- const bundled=new Set(bundledFonts.map(f=>f.family)),out:string[]=[];
- for(const pick of shortlist(index,glyphs,4,f=>bundled.has(f)))if(await loadWebFont(index,pick.family))out.push(pick.family.family);
+ // Families that already won a line this session come first: a page is
+ // mostly set in one or two faces, and a short line shortlists less surely.
+ const bundled=new Set(bundledFonts.map(f=>f.family)),out:string[]=[...webWinners.slice(0,3)];
+ for(const pick of shortlist(index,glyphs,6,f=>bundled.has(f)))if(!out.includes(pick.family.family)&&await loadWebFont(index,pick.family))out.push(pick.family.family);
  return out;
 }
 
