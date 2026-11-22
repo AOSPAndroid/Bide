@@ -2,10 +2,10 @@
 
 ## 2026-11-22 — Your fonts and on-demand open fonts
 
-- Merge the complete Claude branch through `c09f304`, including font uploads, on-demand matching and the new flyer/poster appearance fixtures.
+- Merge the complete Claude branch through `57fc922`, including font uploads, on-demand matching and the new flyer/poster appearance fixtures.
 - Add local TTF, OTF, WOFF and WOFF2 files from File → Add font files or OCR settings. Uploaded fonts remain in this browser, appear in font lists and are considered when matching scanned text.
-- Serve a curated index of 30 open font families. Download shortlisted families only when needed, using pinned revisions, exact sizes and SHA-256 checks; the downloadable app keeps its offline default.
-- Rebuild the index from the letters’ ink using Claude’s corrected generator, preserving every existing family and pin, and add Be Vietnam Pro for actual on-demand matching coverage.
+- Serve Claude’s full index of 1,817 open font families. Download shortlisted families only when needed, using pinned revisions, exact sizes and SHA-256 checks; the downloadable app keeps its offline default.
+- Use Claude’s corrected ink-based index and expanded shortlist, preserving the existing bundled fonts and their appearance safeguards.
 - Preserve downloaded and uploaded fonts across reloads, protect existing font names, and require a saved custom font before rendering or exporting its text. Original letters remain the default and replacement fonts still require an explicit choice.
 - Keep the previous font-weight, spacing, sharpness and model-delivery safeguards while expanding font choices.
 
