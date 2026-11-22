@@ -2,7 +2,7 @@
 // region and check that an editable text layer and a background patch appear.
 import {test} from 'node:test';import assert from 'node:assert/strict';
 import {createServer} from 'vite';import {chromium} from 'playwright-core';import * as mupdf from 'mupdf';
-import {mkdtemp,writeFile} from 'node:fs/promises';import {tmpdir} from 'node:os';import {join} from 'node:path';
+import {mkdtemp,readFile,writeFile} from 'node:fs/promises';import {tmpdir} from 'node:os';import {join} from 'node:path';
 // OCR options sit in the "OCR settings" dropdown; open it before using one.
 const ocrSetting=async(page,label)=>{await page.locator('.ocr-settings').waitFor({state:'attached',timeout:120000});await page.evaluate(()=>{const d=document.querySelector('.ocr-settings');if(d)d.open=true;});return page.getByLabel(label);};
 
@@ -146,12 +146,44 @@ test('editing image text reuses the original letters; find & replace fixes every
   await (await ocrSetting(page,'Edit image text with')).selectOption('font');
   await page.locator('.detected-text-overlay button[aria-label*="Repas"]').click({timeout:120000});
   await page.getByLabel('Text content').waitFor({timeout:120000});
+  const readText=value=>page.evaluate(async value=>{const {restoreLocal}=await import('/src/model.ts');return (await restoreLocal())?.pages[0].canvas.objects.find(o=>o.text===value);},value);
+  const waitText=async value=>{for(let i=0;i<60;i++){const text=await readText(value);if(text)return text;await page.waitForTimeout(100);}assert.fail('the edited text was not saved: '+value);};
+  const downloadPng=async()=>{
+   await page.locator('.document-actions .primary').click();assert.equal(await page.locator('.modal select').first().inputValue(),'image');
+   const [file]=await Promise.all([page.waitForEvent('download',{timeout:60000}),page.locator('.modal .dialog-actions .primary').click()]);const bytes=await readFile(await file.path());await file.delete();return bytes;
+  };
+  const decodePng=bytes=>{const image=new mupdf.Image(bytes),pix=image.toPixmap();try{return {width:pix.getWidth(),height:pix.getHeight(),components:pix.getNumberOfComponents(),data:new Uint8Array(pix.getPixels())};}finally{pix.destroy();image.destroy();}};
+  const initialText=await waitText(await page.getByLabel('Text content').inputValue()),beforeTyping=decodePng(await downloadPng());
   await page.getByLabel('Text content').fill(requested);
   const fontText=l=>/Repas/.test(l.name)&&(l.type==='Textbox'||l.type==='textbox');
   for(let i=0;i<40&&!(saved=await layers()).some(fontText);i++);
   assert.ok(saved.some(fontText),'explicit font choice creates editable text');
   const edited=await page.evaluate(async()=>{const {restoreLocal}=await import('/src/model.ts');return (await restoreLocal()).pages[0].canvas.objects.find(o=>o.text?.startsWith('Repas'));});
   assert.equal(edited.text,requested,'explicit font text accepts the requested new characters');
+  const sameFace=text=>{for(const key of ['fontFamily','fontSize','fontWeight','fontStyle','charSpacing','textSoftness'])assert.deepEqual(text[key],initialText[key],'editing keeps '+key);};
+  sameFace(edited);
+  assert.ok(edited.height<=initialText.height+.01,'a longer OCR field stays on its original single line');
+  assert.ok(edited.width>initialText.width,'the OCR text box grows to fit the longer value');
+  const afterTyping=decodePng(await downloadPng());
+  assert.deepEqual([afterTyping.width,afterTyping.height,afterTyping.components],[beforeTyping.width,beforeTyping.height,beforeTyping.components]);
+  let spill=0,inside=0;for(let y=0;y<afterTyping.height;y++)for(let x=0;x<afterTyping.width;x++){
+   const offset=(y*afterTyping.width+x)*afterTyping.components;let changed=false;for(let k=0;k<afterTyping.components;k++)changed||=beforeTyping.data[offset+k]!==afterTyping.data[offset+k];
+   if(changed){if(y<Math.floor(initialText.top-3)||y>=Math.ceil(initialText.top+initialText.height+3))spill++;else inside++;}
+  }
+  assert.ok(inside>0,'the downloaded PNG contains the changed field');assert.equal(spill,0,'the downloaded text never spills onto a neighbouring line');
+  // Editing directly on the canvas uses the same one-line field contract.
+  const board=await page.locator('.artboard').boundingBox(),scale=board.width/beforeTyping.width;
+  await page.mouse.dblclick(board.x+(edited.left+20)*scale,board.y+(edited.top+edited.height/2)*scale);
+  await page.waitForFunction(()=>document.activeElement?.tagName==='TEXTAREA'&&document.activeElement.getAttribute('aria-label')!=='Text content');
+  const inline=requested+' More.';await page.keyboard.press('Control+a');await page.keyboard.insertText(inline);await page.keyboard.press('Escape');
+  const typed=await waitText(inline);sameFace(typed);assert.ok(typed.height<=initialText.height+.01,'inline OCR typing stays on one line');assert.ok(typed.width>edited.width,'inline typing widens the field');
+  // An explicit line break is preserved, and ordinary design boxes still wrap.
+  const multiline=requested+'\nAdded line';await page.getByLabel('Text content').fill(multiline);const broken=await waitText(multiline);
+  assert.ok(broken.height>initialText.height*1.5,'an explicit newline creates a second line');assert.equal(broken.width,typed.width,'explicit newlines do not trigger one-line fitting');
+  await page.keyboard.press('Control+k');await page.keyboard.type('Add & edit text');await page.keyboard.press('Enter');await page.getByLabel('Text content').waitFor();
+  const manualBefore=await waitText('Your text'),manual='An ordinary manual text box keeps its chosen width and wraps this longer sentence onto several lines.';
+  await page.getByLabel('Text content').fill(manual);const manualAfter=await waitText(manual);
+  assert.equal(manualAfter.recognizedKey,undefined);assert.equal(manualAfter.width,manualBefore.width,'manual text boxes keep their chosen width');assert.ok(manualAfter.height>manualBefore.height,'manual text still wraps');
   assert.deepEqual(errors,[]);
  }finally{await browser.close();await server.close();}
 });
