@@ -105,8 +105,8 @@ test('native rasters and picture downloads keep their pixels through viewport zo
    const digest=async data=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',data)),b=>b.toString(16).padStart(2,'0')).join('');
    const summary=async raster=>({width:raster.width,height:raster.height,sha256:await digest(raster.data),alpha:[raster.data[3],raster.data[7],raster.data[11]]});
    const decode=async blob=>{const bitmap=await createImageBitmap(blob,{premultiplyAlpha:'none',colorSpaceConversion:'none'}),out=document.createElement('canvas');out.width=bitmap.width;out.height=bitmap.height;out.getContext('2d').drawImage(bitmap,0,0);bitmap.close();return read(out);};
-   const snapshot=()=>({viewport:c.viewportTransform,values:[...c.viewportTransform],boundaries:JSON.stringify(c.vptCoords),background:c.backgroundColor,objects:JSON.stringify(c.toObject())});
-   const unchanged=before=>c.viewportTransform===before.viewport&&JSON.stringify(c.viewportTransform)===JSON.stringify(before.values)&&JSON.stringify(c.vptCoords)===before.boundaries&&c.backgroundColor===before.background&&JSON.stringify(c.toObject())===before.objects;
+   const snapshot=()=>({viewport:c.viewportTransform,values:[...c.viewportTransform],boundaryRef:c.vptCoords,boundaries:JSON.stringify(c.vptCoords),background:c.backgroundColor,objects:JSON.stringify(c.toObject()),width:c.width,height:c.height,retina:c.enableRetinaScaling,skipControls:c.skipControlsDrawing});
+   const unchanged=before=>c.viewportTransform===before.viewport&&JSON.stringify(c.viewportTransform)===JSON.stringify(before.values)&&c.vptCoords===before.boundaryRef&&JSON.stringify(c.vptCoords)===before.boundaries&&c.backgroundColor===before.background&&JSON.stringify(c.toObject())===before.objects&&c.width===before.width&&c.height===before.height&&c.enableRetinaScaling===before.retina&&c.skipControlsDrawing===before.skipControls;
    const rows=[];
    for(const [zoom,x,y] of views){
     c.setViewportTransform([zoom,0,0,zoom,x,y]);c.renderAll();
@@ -122,7 +122,16 @@ test('native rasters and picture downloads keep their pixels through viewport zo
    p.width=5000;p.height=3300;p.file={type:'image/png',width:5000,height:3300};
    const before=snapshot(),large=await sameKindImage(p,c),largeState=unchanged(before),largeBitmap=await createImageBitmap(large.blob);
    const largeDimensions=[large.width,large.height,largeBitmap.width,largeBitmap.height];largeBitmap.close();
-   await c.dispose();return {rows,limited,largeDimensions,largeState};
+   // Fabric's internal export temporarily changes dimensions and rendering
+   // flags. Both callers must restore them even when rendering throws.
+   p.width=width;p.height=height;p.file={type:'image/png',width,height};c.enableRetinaScaling=true;
+   const render=c.renderCanvas;c.renderCanvas=()=>{throw new Error('forced native raster render failure');};
+   const failures=[];
+   try{
+    let before=snapshot(),message='';try{pageRaster(c,width,height,[image]);}catch(e){message=e.message;}failures.push({message,state:unchanged(before)});
+    before=snapshot();message='';try{await sameKindImage(p,c);}catch(e){message=e.message;}failures.push({message,state:unchanged(before)});
+   }finally{c.renderCanvas=render;}
+   await c.dispose();return {rows,limited,largeDimensions,largeState,failures};
   });
   const reference=result.rows[0];
   for(const row of result.rows){
@@ -135,5 +144,6 @@ test('native rasters and picture downloads keep their pixels through viewport zo
   assert.equal(result.limited,true,'retouching still rejects a raster over 16 megapixels');
   assert.deepEqual(result.largeDimensions,[5000,3300,5000,3300],'image export keeps its original size above the retouching limit');
   assert.equal(result.largeState,true,'large image export restores the canvas state');
+  assert.deepEqual(result.failures,[{message:'forced native raster render failure',state:true},{message:'forced native raster render failure',state:true}],'both native raster callers restore all canvas state when rendering throws');
  }finally{await browser.close();await server.close();}
 });
