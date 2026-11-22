@@ -180,7 +180,7 @@ test('editing image text reuses the original letters; find & replace fixes every
   // An explicit line break is preserved, and ordinary design boxes still wrap.
   const multiline=requested+'\nAdded line';await page.getByLabel('Text content').fill(multiline);const broken=await waitText(multiline);
   assert.ok(broken.height>initialText.height*1.5,'an explicit newline creates a second line');assert.equal(broken.width,typed.width,'explicit newlines do not trigger one-line fitting');
-  await page.keyboard.press('Control+k');await page.keyboard.type('Add & edit text');await page.keyboard.press('Enter');await page.getByLabel('Text content').waitFor();
+  await page.keyboard.press('Control+k');await page.keyboard.type('Add text box');await page.keyboard.press('Enter');await page.getByLabel('Text content').waitFor();
   const manualBefore=await waitText('Your text'),manual='An ordinary manual text box keeps its chosen width and wraps this longer sentence onto several lines.';
   await page.getByLabel('Text content').fill(manual);const manualAfter=await waitText(manual);
   assert.equal(manualAfter.recognizedKey,undefined);assert.equal(manualAfter.width,manualBefore.width,'manual text boxes keep their chosen width');assert.ok(manualAfter.height>manualBefore.height,'manual text still wraps');
