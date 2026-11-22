@@ -34,6 +34,7 @@ export default defineConfig(({mode,command}) => {
     // LaMa's verified prepared output stays on-origin to avoid a large upstream
     // first-use download. Other models still use the pinned on-demand sources.
     await mkdir('out', {recursive:true});
+    // `fonts`: the index of open fonts fetched on demand (web-fonts.ts).
     for (const name of ['licenses','favicon.svg','brand-logo.svg',...homeScreen,'_headers','fonts']) await cp(`public/${name}`, `out/${name}`, {recursive:true});
     // OCR always requests OEM 1: these two scripts embed their WASM and cover
     // SIMD and non-SIMD browsers. Legacy cores and separate binaries are unused.

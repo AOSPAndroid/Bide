@@ -181,10 +181,10 @@ export async function matchOcrAppearance(raster:HTMLCanvasElement,region:TextReg
  }
  // No bundled face fits well: the page's letters pick open families from the
  // index (web-fonts.ts), which are downloaded and compared on the pixels.
- if(weights&&autoFont&&WEB_FONTS&&best.score<.9){
+ if(weights&&autoFont&&WEB_FONTS&&best.score<.97){
   for(const family of await webCandidates(samples)){
    const other=await matchOcrAppearance(raster,region,regions,family,{autoFont:false,matchBlur,makeText,onFit,weights:false,alike,refine:false});
-   if(other&&other.score>best.score+.03)best=other;
+   if(other&&other.score>best.score+.03){best=other;if(!webWinners.includes(family))webWinners.unshift(family);}
   }
  }
  // Choose the weight before fine size/position probing: those small geometry
@@ -230,6 +230,7 @@ export async function matchOcrAppearance(raster:HTMLCanvasElement,region:TextReg
 
 // Open families whose letters look like the samples', downloaded and ready
 // to draw (at most four; none when the index or the network is not there).
+const webWinners:string[]=[];
 async function webCandidates(samples:Sample[]){
  const index=await fontIndex();if(!index)return [];
  const glyphs:{ch:string;d:Descriptor}[]=[];
@@ -238,10 +239,10 @@ async function webCandidates(samples:Sample[]){
   const cover=s.source.data.map(v=>v/peak);
   for(const g of s.region.glyphs??[]){if(glyphs.length>=48)break;if(!/^[a-zA-Z0-9]$/.test(g.ch))continue;const d=describeGlyph(cover,s.source.width,s.source.height,Math.floor(g.x0-s.left),Math.ceil(g.x1-s.left));if(d)glyphs.push({ch:g.ch,d});}
  }
- const bundled=new Set(bundledFonts.map(f=>f.family)),eligible=new Set(index.families.filter(f=>['sans','sans_serif','serif','mono','monospace'].includes(f.category.toLowerCase())).map(f=>f.family)),out:string[]=[];
- const picks=shortlist(index,glyphs,4,f=>bundled.has(f)||!eligible.has(f));
+ const bundled=new Set(bundledFonts.map(f=>f.family)),eligible=new Set(index.families.filter(f=>['sans','sans_serif','serif','mono','monospace'].includes(f.category.toLowerCase())).map(f=>f.family)),out:string[]=[...webWinners.slice(0,3)];
+ const picks=shortlist(index,glyphs,6,f=>bundled.has(f)||!eligible.has(f));
  const loaded=await Promise.all(picks.map(pick=>loadWebFont(index,pick.family)));
- for(let i=0;i<picks.length;i++)if(loaded[i])out.push(picks[i].family.family);
+ for(let i=0;i<picks.length;i++)if(loaded[i]&&!out.includes(picks[i].family.family))out.push(picks[i].family.family);
  return out;
 }
 
