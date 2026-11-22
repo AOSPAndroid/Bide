@@ -3,6 +3,7 @@
 // transparency is kept, and only the edited areas change.
 import type {Canvas} from 'fabric';
 import type {Page} from './model';
+import {renderPageFrame} from './canvas-raster-frame';
 
 export const imageFormats:Record<string,{ext:string;label:string;quality?:number}>={
  'image/png':{ext:'png',label:'PNG'},
@@ -17,7 +18,7 @@ export async function sameKindImage(p:Page,c:Canvas){
  // A JPEG has no transparency: it keeps the page colour behind the picture.
  c.backgroundColor=file.type==='image/jpeg'?p.color==='transparent'?'#ffffff':p.color:'';
  try{
-  const output=c.toCanvasElement(file.width/p.width/c.getZoom(),{width:p.width*c.getZoom(),height:p.height*c.getZoom()});
+  const output=renderPageFrame(c,p.width,p.height,file.width/p.width);
   const blob=await new Promise<Blob|null>(resolve=>output.toBlob(resolve,file.type,format.quality));
   if(!blob||blob.type!==file.type)throw new Error(`This browser cannot save ${format.label} files. Choose PNG or PDF.`);
   return {blob,ext:format.ext,width:output.width,height:output.height};
