@@ -276,8 +276,9 @@ export function typesetRegions<T extends TypeRegion>(regions:T[],img:Pixels):T[]
  // page (l and I in a sans), nothing looks different from its own kind and
  // nothing changes.
  const close=(a:number,b:number)=>Math.abs(a-b)<=Math.max(1.5,.08*Math.max(a,b));
- for(const group of ['0O','1lI','5S','8B','2Z','6G']){
-  const rounds=lines.flatMap(l=>l?l.tokens.flatMap(t=>{const s=t.glyph&&t.ch.length===1&&group.includes(t.ch)?roundShape(l.m,t.glyph):undefined;return s?[{t,s}]:[];}):[]).slice(0,800);
+ // (Measured on the reading benchmark: with 1 l I, 5 S, 8 B, 2 Z and 6 G judged this way too, nothing was mended and 7 readings broke; those are settled by drawing them, ocr-redraw.ts.)
+ for(const group of ['0O']){
+  const rounds=lines.flatMap(l=>l?l.tokens.flatMap(t=>{const s=t.glyph&&t.ch.length===1&&group.includes(t.ch)?roundShape(l.m,t.glyph):undefined;return s?[{t,s,lower:l.tokens.some(o=>o!==t&&o.word===t.word&&/\p{Ll}/u.test(o.ch))}]:[];}):[]).slice(0,800);
   const changes:{t:Token;ch:string}[]=[];
   for(const r of rounds){
    if(r.s.h<16)continue;let same=0,unlike=0;const like=new Map<string,number>();
@@ -286,7 +287,8 @@ export function typesetRegions<T extends TypeRegion>(regions:T[],img:Pixels):T[]
     if(sim>=.95){if(o.t.ch===r.t.ch)same++;else like.set(o.t.ch,(like.get(o.t.ch)??0)+1);}else if(sim<.89&&o.t.ch===r.t.ch)unlike++;
    }
    const [ch,n]=[...like].sort((x,y)=>y[1]-x[1])[0]??['',0];
-   if(n>=2&&n>=5*same&&unlike>=2)changes.push({t:r.t,ch});
+   // (A lowercase l is not put among capitals or digits.)
+   if(n>=2&&n>=5*same&&unlike>=2&&!(ch==='l'&&!r.lower))changes.push({t:r.t,ch});
   }
   for(const {t,ch} of changes){t.ch=ch;t.glyph!.ch=ch;}
  }

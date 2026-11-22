@@ -122,7 +122,9 @@ export async function scanPageText(p:Page,c:Canvas,{signal,grouping,thorough,lan
   const probe=raster.getContext('2d',{willReadFrequently:true})!.getImageData(0,0,raster.width,raster.height);prepareOcrPixels(probe);const line=estimateLineHeight(probe);
   if(line!==undefined&&line<20){const {upscaleCanvas}=await import('./browser/ai-tools');raster=await upscaleCanvas(raster,2,f=>onStatus(`Sharpening with AI… ${Math.round(f*100)}%`),signal);}
  }
- const {recognizeImage}=await import('./browser/ocr');const detected=await recognizeImage(raster,{signal,grouping,thorough,languages,engine,script,accurate,onProgress:(fraction,label)=>onStatus(`${label}… ${Math.round(fraction*100)}%`)});signal.throwIfAborted();
+ const {recognizeImage}=await import('./browser/ocr');let detected=await recognizeImage(raster,{signal,grouping,thorough,languages,engine,script,accurate,onProgress:(fraction,label)=>onStatus(`${label}… ${Math.round(fraction*100)}%`)});signal.throwIfAborted();
+ // Look-alike characters (0 and O, 1 and l…) settled by drawing them in the line's own face (ocr-redraw.ts).
+ try{detected=await (await import('./browser/ocr-redraw')).redrawCheck(raster,detected);}catch{}signal.throwIfAborted();
  const layers=c.getObjects().map(o=>({recognizedKey:(o as Tagged).recognizedKey,bounds:o.getBoundingRect()}));
  const all=scaleRegions(detected,p.width/raster.width,p.height/raster.height),regions=markDoubts(unconvertedRegions(all,layers),{ai:engine==='paddle'});
  let suggestedFont:string|undefined;
