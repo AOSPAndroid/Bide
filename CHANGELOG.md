@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-11-22 — Reliable hosted AI model delivery
+
+- Serve the existing, verified LaMa model directly from the hosted site in 21 files no larger than 5 MiB. This avoids the observed timeout downloading the larger upstream model during AI background edits.
+- Validate the prepared model against its existing size and SHA-256 before packaging; keep runtime integrity checks, local-first loading and the pinned external fallback.
+- Retain every OCR and AI model, dictionary, editing default and subscription boundary. Include the model licence and preparation notice with the hosted assets.
+
 ## 2026-11-22 — Broader font matching and proportional digits
 
 - Render OCR samples, image downloads and scanned-PDF overlays in exact page coordinates, independent of editor zoom and pan. This prevents window-size-dependent resampling from changing font weight or sharpness.

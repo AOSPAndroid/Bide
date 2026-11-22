@@ -1,0 +1,10 @@
+LaMa ONNX model weights
+
+Source: https://huggingface.co/Carve/LaMa-ONNX
+Pinned upstream artifact: https://huggingface.co/Carve/LaMa-ONNX/resolve/c3c0c9e468934d62e79c329e35d82dd09ff8c444/lama_fp32.onnx
+Licence: Apache-2.0 (see lama-Apache-2.0.txt).
+
+The hosted copy uses the existing float16-weight preparation from
+scripts/onnx-fp16.mjs. This changes the stored weight representation.
+Prepared SHA-256: a4770bfa878f39f34110c9f806d3c8227c5f006c61ce1cf56736cb6efbfeda22
+Prepared bytes: 106295753
