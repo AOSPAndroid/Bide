@@ -184,7 +184,12 @@ export async function matchOcrAppearance(raster:HTMLCanvasElement,region:TextReg
  // candidate. Use the existing family margin on the fully weighted fits.
  if(autoFont&&baseFamily(best.family)!==baseFamily(family)){
   const familiar=await matchOcrAppearance(raster,region,regions,family,{autoFont:false,matchBlur,makeText,onFit,own,weights,floor,alike,refine:false});
-  if(familiar&&best.score<=familiar.score+FAMILY_MARGIN)best=familiar;
+  if(familiar){
+   // The shape fit favours heavier strokes; use the same ink improvement
+   // and shape tolerance as weight matching before discarding a Light face.
+   const inkBetter=!!(familiar.mass&&best.mass&&Math.abs(Math.log(familiar.mass))<Math.abs(Math.log(best.mass))-.08);
+   if(best.score<=familiar.score+FAMILY_MARGIN||(familiar.score>=best.score-.25&&inkBetter))best=familiar;
+  }
  }
  // Refine only the chosen face, using the same crisp-only bounded search.
  // Weight trials request the unrefined fit so their ink comparison is stable.
