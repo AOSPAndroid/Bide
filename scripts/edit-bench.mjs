@@ -45,6 +45,8 @@ try{
    // Noise and JPEG, in the app page (any canvas will do). Returns the pixels as PNG.
    const done=await app.evaluate(async([png,v])=>{
     const img=new Image();img.src='data:image/png;base64,'+png;await img.decode();const c=document.createElement('canvas');c.width=img.width;c.height=img.height;const g=c.getContext('2d',{willReadFrequently:true});g.drawImage(img,0,0);
+    // `blurBelow`: the lower part of the page softer than the rest (a scan out of focus on one side).
+    if(v.blurBelow){const y=Math.round(c.height*v.blurBelow.from),soft=document.createElement('canvas');soft.width=c.width;soft.height=c.height;const sg=soft.getContext('2d');sg.filter=`blur(${v.blurBelow.blur}px)`;sg.drawImage(c,0,0);g.drawImage(soft,0,y,c.width,c.height-y,0,y,c.width,c.height-y);}
     if(v.noise){const px=g.getImageData(0,0,c.width,c.height);let seed=11;const rnd=()=>(seed=(seed*16807)%2147483647)/2147483647;for(let i=0;i<px.data.length;i+=4){const n=(rnd()+rnd()+rnd()-1.5)*v.noise;for(let k=0;k<3;k++)px.data[i+k]=Math.max(0,Math.min(255,px.data[i+k]+n));}g.putImageData(px,0,0);}
     let jpeg;if(v.jpeg){jpeg=c.toDataURL('image/jpeg',v.jpeg).split(',')[1];const j=new Image();j.src='data:image/jpeg;base64,'+jpeg;await j.decode();g.drawImage(j,0,0);}
     return {pixels:c.toDataURL('image/png').split(',')[1],jpeg,width:c.width,height:c.height};

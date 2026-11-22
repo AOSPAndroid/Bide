@@ -125,6 +125,10 @@ export const variants={
  shot:{dpi:216,as:'png'},
  // A document captured from a screen at its own size: crisp, small letters (a capital 8 px high).
  view:{dpi:96,as:'png'},
+ // A small soft picture: a screen capture saved, resized and sent as a JPEG (a capital 8 px high, blurred).
+ viewsoft:{dpi:96,blur:.8,noise:2,jpeg:.75,as:'jpg'},
+ // Out of focus on one side: the lower 55% of the page softer than the top.
+ uneven:{dpi:200,blurBelow:{from:.45,blur:1.3},noise:3,as:'png'},
  // The same inside a PDF: a low-resolution scan or a page saved as an image.
  viewpdf:{dpi:96,as:'scanpdf'},
 };
@@ -142,4 +146,6 @@ export const cases=[
  ['ticket','clean'],['ticket','pdf'],['ticket','soft'],
  ['flyer','clean'],['flyer','soft'],['flyer','view'],
  ['poster','clean'],['poster','soft'],
+ ['readings','uneven'],['workshop','uneven'],
+ ['workshop','viewsoft'],['flyer','viewsoft'],['letter','viewsoft'],
 ];
