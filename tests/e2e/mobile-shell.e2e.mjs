@@ -1,5 +1,5 @@
 // End-to-end on phones and tablets: the shell around the editor. The workspace switcher is
-// labelled with 44px targets, phones start on the PDF home, landscape phones fit the screen,
+// labelled with 44px targets, phones start in the Photo editor, landscape phones fit the screen,
 // a tapped button keeps its look (no sticky hover), the demo notice works by touch, the
 // subscription build's paywall card and account chip fit and close by touch, and the site has
 // a manifest and a touch icon. Desktop keeps its layout and its hover looks.
@@ -29,14 +29,14 @@ async function open(browser,url,options){
  return {context,page,errors};
 }
 
-test('phone shell: labelled workspaces, PDF home start, landscape fits, no sticky hover, manifest',{timeout:600000},async()=>{
+test('phone shell: labelled workspaces, Photo editor start, landscape fits, no sticky hover, manifest',{timeout:600000},async()=>{
  const server=await createServer({logLevel:'error',server:{port:0,host:'127.0.0.1'}});await server.listen();
  const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||undefined});
  const url=server.resolvedUrls.local[0]+'app/';
  try{
   for(const [width,height] of [[390,844],[360,740]]){
    const {context,page,errors}=await open(browser,url,touch(width,height)),at=`${width}x${height}`;
-   assert.equal(await current(page),'PDF MasterTool',`${at}: a phone starts on the PDF home`);
+   assert.equal(await current(page),'Photo editor',`${at}: a phone starts in the Photo editor, where text is detected and edited`);
    // The three workspaces carry their short names and are 44px targets.
    const buttons=page.locator('.topbar .workspace-nav>button');
    assert.deepEqual(await buttons.evaluateAll(b=>b.map(e=>e.innerText.trim())),['PHOTO','PDF','DOCS'],`${at}: the workspace names show`);
@@ -56,7 +56,7 @@ test('phone shell: labelled workspaces, PDF home start, landscape fits, no stick
   // Landscape phones: the editor fits the screen; the status bar is visible and nothing covers it.
   for(const [width,height] of [[844,390],[740,360]]){
    const {context,page,errors}=await open(browser,url,touch(width,height)),at=`${width}x${height}`;
-   assert.equal(await current(page),'PDF MasterTool',`${at}: a landscape phone starts on the PDF home`);
+   assert.equal(await current(page),'Photo editor',`${at}: a landscape phone starts in the Photo editor`);
    await nav(page,'Photo editor').tap();await page.locator('.artboard').waitFor({timeout:60000});await page.waitForTimeout(800);
    assert.ok(await page.evaluate(()=>document.documentElement.scrollHeight<=innerHeight),`${at}: the page does not scroll`);
    assert.ok((await rect(page.locator('.statusbar'))).bottom<=height,`${at}: the status bar is on screen`);
