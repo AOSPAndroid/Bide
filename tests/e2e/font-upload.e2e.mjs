@@ -55,7 +55,7 @@ async function downloadOwnPng(page){
  const bytes=await readFile(await file.path());await file.delete();assert.match(file.suggestedFilename(),/\.png$/);return bytes;
 }
 async function downloadOwnPdf(page){
- await page.locator('.document-actions .primary').click();const modal=page.getByRole('dialog',{name:'Export document',exact:true});await modal.getByLabel('Format',{exact:true}).selectOption('pdf');await modal.getByLabel('Compression',{exact:true}).selectOption('lossless');
+ await page.locator('.document-actions .primary').click();const modal=page.getByRole('dialog',{name:'Export document',exact:true});await modal.locator('select').first().selectOption('pdf');await modal.locator('label').filter({hasText:/^Compression/}).locator('select').selectOption('lossless');
  const [file]=await Promise.all([page.waitForEvent('download',{timeout:60000}),modal.locator('.dialog-actions .primary').click()]);const bytes=await readFile(await file.path());await file.delete();assert.match(file.suggestedFilename(),/\.pdf$/);return bytes;
 }
 function renderedPdf(bytes){const doc=mupdf.Document.openDocument(bytes,'pdf'),page=doc.loadPage(0),pix=page.toPixmap(mupdf.Matrix.scale(1,1),mupdf.ColorSpace.DeviceRGB,false,true);try{const n=pix.getNumberOfComponents(),source=pix.getPixels(),data=new Uint8Array(pix.getWidth()*pix.getHeight()*4);for(let i=0,j=0;i<source.length;i+=n,j+=4){data[j]=source[i];data[j+1]=source[i+1];data[j+2]=source[i+2];data[j+3]=n===4?source[i+3]:255;}return {width:pix.getWidth(),height:pix.getHeight(),w:pix.getWidth(),h:pix.getHeight(),data};}finally{pix.destroy();page.destroy();doc.destroy();}}
