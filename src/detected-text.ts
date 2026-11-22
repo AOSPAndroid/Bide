@@ -153,6 +153,20 @@ export function fitOneLine(text:Textbox){
  // second line, which the edit then cut off. Widen until it is one line.
  for(let i=0;i<40&&text.textLines.length>1;i++){w+=Math.max(1,text.fontSize*.1);text.set({width:w});text.initDimensions();}
 }
+// A scanned line's wide gaps kept when it is set in a font: "REF 5521-0934
+// COLIS 1/2" printed with two spaces before COLIS was laid out with one, its
+// letters stretched across the line to make up for it. A gap about N times
+// the line's narrowest word space (N of 2 or more) becomes N spaces, in the
+// text as read and in an edit of it that keeps the same number of words.
+export function spacedText(region:TextRegion,text=region.text){
+ if(region.kind!=='ocr'||!region.glyphs)return text;
+ const cells=lineCells(region.text,region.glyphs);if(!cells)return text;
+ const gaps=cells.filter(c=>c.space).map(c=>c.x1-c.x0);if(gaps.length<2)return text;
+ const base=Math.min(...gaps);if(!(base>=region.height*.12))return text;
+ const counts=gaps.map(g=>g>1.7*base?Math.min(8,Math.round(g/base)):1);if(counts.every(n=>n===1))return text;
+ const parts=text.split(' ');if(parts.length!==counts.length+1)return text;
+ return parts.map((w,i)=>i?' '.repeat(counts[i-1])+w:w).join('');
+}
 // Editable text positioned so its first baseline matches the detected text.
 // matchBlur gives OCR text the measured softness of the original letters.
 // A tilted line's text is turned with it, unless `level` (for fitting in its frame).
@@ -189,16 +203,18 @@ export async function detectedTextbox(region:TextRegion,{ocrFont,ocrStyle,matchB
  // A face that is a weight of its own (Raleway Light, Nunito ExtraBold) is never made bold on top.
  if(weightFamilies.has(family)){weights=undefined;bold=false;}
  let size=region.size,ocrAscent=region.height,charSpacing=region.kind==='pdf'&&!embedded?fallbackCharSpacing(family):0,boxWidth=Math.max(region.width+4,20);
+ // (Not on a line with words in two weights: their ranges are character offsets in the text as read.)
+ const shown=weights?.ranges.length?region.text:spacedText(region);
  if(region.kind==='ocr'){
-  const ctx=document.createElement('canvas').getContext('2d')!,font=(b:boolean)=>`${italic?'italic ':''}${b?'bold ':''}100px "${family}"`;ctx.font=font(bold);const metrics=ctx.measureText(region.text);
+  const ctx=document.createElement('canvas').getContext('2d')!,font=(b:boolean)=>`${italic?'italic ':''}${b?'bold ':''}100px "${family}"`;ctx.font=font(bold);const metrics=ctx.measureText(shown);
   // Ink width (not advance), to compare with the original's inked extent.
   let width=metrics.actualBoundingBoxLeft+metrics.actualBoundingBoxRight;
   if(weights?.ranges.length){width=0;let offset=0;for(const w of words!){const own=weights.ranges.find(r=>offset>=r.start&&offset<r.end);ctx.font=font(own?own.bold:bold);width+=ctx.measureText(w.text).width;offset+=Array.from(w.text).length+1;}ctx.font=font(bold);width+=ctx.measureText(' ').width*(words!.length-1)-(metrics.width-(metrics.actualBoundingBoxLeft+metrics.actualBoundingBoxRight));}
-  const fit=fitOcrText(region,{width,actualBoundingBoxAscent:metrics.actualBoundingBoxAscent,actualBoundingBoxDescent:metrics.actualBoundingBoxDescent},Array.from(region.text).length);size=fit.size;ocrAscent=fit.ascent;charSpacing=fit.charSpacing;
+  const fit=fitOcrText(region,{width,actualBoundingBoxAscent:metrics.actualBoundingBoxAscent,actualBoundingBoxDescent:metrics.actualBoundingBoxDescent},Array.from(shown).length);size=fit.size;ocrAscent=fit.ascent;charSpacing=fit.charSpacing;
   // Box wide enough for the fitted line, so Fabric never wraps it.
-  boxWidth=Math.max(boxWidth,width*size/100+(Array.from(region.text).length-1)*charSpacing*size/1000+6);
+  boxWidth=Math.max(boxWidth,width*size/100+(Array.from(shown).length-1)*charSpacing*size/1000+6);
  }
- const text=Object.assign(new Textbox(region.text,{left:region.left,top:region.top,width:boxWidth,fontSize:size,charSpacing,fontFamily:family,fontWeight:embedded?'normal':bold?'bold':'normal',fontStyle:embedded?'normal':italic?'italic':'normal',fill:region.kind==='ocr'?darkenToInk(region.color,region.background,inkLevel):region.color,lineHeight:1,splitByGrapheme:true,objectCaching:false}),{id:uid(),name:region.text.slice(0,40),pdfOriginalFont:region.fontName,pdfFontData:embedded?region.fontData:undefined,pdfFontFallback:fallbackFont(region.fontName),pdfFontBold:bold,pdfFontItalic:italic,recognizedKey:recognitionKey(region),...(region.kind==='ocr'?{ocrOriginalBounds:originalFieldBounds(region)}:{})});
+ const text=Object.assign(new Textbox(shown,{left:region.left,top:region.top,width:boxWidth,fontSize:size,charSpacing,fontFamily:family,fontWeight:embedded?'normal':bold?'bold':'normal',fontStyle:embedded?'normal':italic?'italic':'normal',fill:region.kind==='ocr'?darkenToInk(region.color,region.background,inkLevel):region.color,lineHeight:1,splitByGrapheme:true,objectCaching:false}),{id:uid(),name:region.text.slice(0,40),pdfOriginalFont:region.fontName,pdfFontData:embedded?region.fontData:undefined,pdfFontFallback:fallbackFont(region.fontName),pdfFontBold:bold,pdfFontItalic:italic,recognizedKey:recognitionKey(region),...(region.kind==='ocr'?{ocrOriginalBounds:originalFieldBounds(region)}:{})});
  for(const r of weights?.ranges??[])text.setSelectionStyles({fontWeight:r.bold?'bold':'normal'},r.start,r.end);
  fitOneLine(text);
  if(matchBlur&&region.kind==='ocr'&&(region.blur??0)>=.3)Object.assign(text,{textSoftness:clampTextSoftness(region.blur!)});
@@ -395,7 +411,7 @@ function inkMiddles(ctx:CanvasRenderingContext2D,r:{top:number;height:number},pa
 // A line is right-aligned when its right edge lines up with other lines of
 // its column (amounts in a table) more than its left edge does; a tie goes
 // right for amounts. Boxes are trimmed to ink, hence the tolerance.
-function rightAligned(region:TextRegion,others:TextRegion[]){
+export function rightAligned(region:TextRegion,others:TextRegion[]){
  const tol=Math.max(2,region.height*.08),right=region.left+region.width,column=others.filter(o=>Math.min(o.top+o.height,region.top+region.height)-Math.max(o.top,region.top)<.5*Math.min(o.height,region.height));
  const rights=column.filter(o=>Math.abs(o.left+o.width-right)<tol).length,lefts=column.filter(o=>Math.abs(o.left-region.left)<tol).length;
  const digits=region.text.replace(/\D/g,'').length,letters=region.text.replace(/[^\p{L}]/gu,'').length;

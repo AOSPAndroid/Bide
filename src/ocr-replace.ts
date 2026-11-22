@@ -5,7 +5,7 @@ import type {Textbox} from './text-appearance';
 import type {Page} from './model';
 import type {TextRegion} from './text-regions';
 import type {OcrSettings} from './TextDetectionBar';
-import {detectedTextbox,matchedDetectedTextbox,coverOcrText,pageInkLevel,glyphEditPatch,fitOneLine,type LetterSource,letterEditBlocker} from './detected-text';
+import {detectedTextbox,matchedDetectedTextbox,coverOcrText,pageInkLevel,glyphEditPatch,fitOneLine,rightAligned,spacedText,type LetterSource,letterEditBlocker} from './detected-text';
 
 export type OcrEdit={region:TextRegion;text?:string};
 // An edit the line's own letters cannot rebuild: nothing changes, and the
@@ -40,7 +40,12 @@ export async function planOcrReplacement(c:Canvas,page:Page,items:OcrEdit[],{set
  for(const item of fonts){const {text}=single
   ?await matchedDetectedTextbox(item.region,c,page,pageRegions,{ocrFont:settings.font,ocrStyle:settings.style,matchBlur:settings.matchBlur,autoFont,appearanceRegions:others})
   :await detectedTextbox(item.region,{ocrFont:settings.font,ocrStyle:settings.style,pageInk,matchBlur:false});
-  if(item.text!==undefined&&item.text!==item.region.text){text.set({text:item.text});fitOneLine(text);}texts.push(text);edits.push({region:item.region,text:item.text,layer:(text as Textbox&{id:string}).id,letters:false});}
+  if(item.text!==undefined&&item.text!==item.region.text){
+   // A right-aligned line (an amount in a column) keeps its right edge when its length changes.
+   const before=text.calcTextWidth(),right=!item.region.angle&&rightAligned(item.region,pageRegions);
+   text.set({text:spacedText(item.region,item.text)});fitOneLine(text);
+   if(right)text.set({left:text.left-(text.calcTextWidth()-before)});
+  }texts.push(text);edits.push({region:item.region,text:item.text,layer:(text as Textbox&{id:string}).id,letters:false});}
  return {letters:patches.length,fonts:texts.length,borrowed,transparent,edits,
   async apply(objects:unknown[],onProgress?:(fraction:number)=>void){
    if(fonts.length)await coverOcrText(c,page,fonts.map(f=>f.region),objects,{mode:settings.background,color:settings.color,padding:settings.padding,others,onProgress});
