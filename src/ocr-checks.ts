@@ -5,6 +5,7 @@
 // whose check digits fail, a date that does not exist, a SIREN or SIRET that
 // fails its checksum, an amount without the thousands space the page's other
 // amounts use ("4813,33" among "1 947,80"). Text is only checked, never changed.
+import {sumFixes} from './ocr-arithmetic';
 import {ibanValid,validSiren,validSiret} from './einvoice';
 import {doubtfulLetters} from './ocr-regions';
 import type {TextRegion} from './text-regions';
@@ -40,6 +41,10 @@ export function amountStyle(texts:string[]):'space'|'comma'|undefined{
 
 // Each OCR field with the reason it should be checked, if any.
 export function markDoubts(regions:TextRegion[],{ai}:{ai:boolean}):TextRegion[]{
+ // Sums first (ocr-arithmetic.ts): a doubted digit that alone makes a column add up is corrected.
+ const sums=sumFixes(regions.map(r=>r.kind==='ocr'&&!r.angle?r:{...r,text:''}));
+ if(sums.length)regions=regions.map((r,i)=>{const fix=sums.find(f=>f.index===i);if(!fix)return r;const inked=Array.from(fix.text).filter(ch=>/\S/.test(ch));let k=0;
+  return {...r,text:fix.text,...r.glyphs?{glyphs:r.glyphs.map(g=>g.ch==='\uFFFC'?g:{...g,ch:inked[k++]??g.ch})}:{}};});
  const amounts=amountStyle(regions.map(r=>r.text));
  return regions.map(r=>{
   if(r.kind!=='ocr')return r;
