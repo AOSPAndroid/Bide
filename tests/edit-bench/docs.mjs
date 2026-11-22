@@ -99,6 +99,15 @@ export const templates={
    <div style="font-size:30px;font-weight:700">${f(v,'head')}</div><div style="font-size:16px;margin:6px 0 16px">${f(v,'sub')}</div>
    <div style="font-size:15px;font-weight:700">${f(v,'when')}</div><div style="font-size:15px">${f(v,'where')}</div></div>`,
   edits:[['head','Atelier du dimanche','new'],['head','Stage du samedi','page'],['sub','Poterie et tournage pour tous','page'],['when','Samedi 21 juin, 14 h à 16 h','page'],['where','Maison de quartier, salle C','new']]},
+
+ // A poster in a face the app does not bundle (Be Vietnam Pro, OFL: tests/fixtures/fonts):
+ // matched only when open fonts are fetched on demand (VITE_WEB_FONTS=1, web-fonts.ts).
+ poster:{width:460,height:240,fonts:async()=>[await face('VietnamP','../../../tests/fixtures/fonts/BeVietnamPro-Regular.ttf'),await face('VietnamP','../../../tests/fixtures/fonts/BeVietnamPro-Bold.ttf',700)].join(''),
+  fields:{head:'Marché de printemps',l1:'Producteurs et artisans du canton',l2:'Dimanche 6 avril, de 9 h à 17 h',l3:'Place de la Halle, entrée libre'},
+  html:(v)=>`<div style="width:460px;height:240px;background:#fbf6ea;color:#2b3a2f;padding:28px 34px;box-sizing:border-box;font-family:VietnamP">
+   <div style="font-size:30px;font-weight:700">${f(v,'head')}</div><div style="font-size:16px;margin:8px 0 18px">${f(v,'l1')}</div>
+   <div style="font-size:16px;font-weight:700">${f(v,'l2')}</div><div style="font-size:16px">${f(v,'l3')}</div></div>`,
+  edits:[['head','Marché d’automne','new'],['head','Marché de Noël','new'],['l1','Producteurs et créateurs du canton','page'],['l2','Dimanche 13 avril, de 10 h à 18 h','new'],['l3','Place du Marché, entrée libre','page']]},
 };
 
 // How each document reaches the app. `dpi`: pixels per inch of the scan (a CSS
@@ -132,4 +141,5 @@ export const cases=[
  ['workshop','view'],['letter','view'],['workshop','viewpdf'],
  ['ticket','clean'],['ticket','pdf'],['ticket','soft'],
  ['flyer','clean'],['flyer','soft'],['flyer','view'],
+ ['poster','clean'],['poster','soft'],
 ];

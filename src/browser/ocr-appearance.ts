@@ -3,6 +3,8 @@ import {clampTextSoftness} from '../text-appearance';
 import {rankOcrFonts,fontCandidates,systemCandidates,type FontSample} from '../ocr-font';
 import {extendedFonts} from '../font-library';
 import {extraFonts} from '../extra-fonts';
+import {WEB_FONTS,fontIndex,describeGlyph,shortlist,loadWebFont,type Descriptor} from '../web-fonts';
+import {bundledFonts} from '../font-catalog';
 import {familyWeights,baseFamily} from '../font-weights';
 import type {TextRegion} from '../text-regions';
 import type {Textbox} from '../text-appearance';
@@ -197,8 +199,31 @@ export async function matchOcrAppearance(raster:HTMLCanvasElement,region:TextReg
   const mine=inkRatio(selected.source,painted,best.gain),all=[...best.masses??[],...mine===undefined?[]:[mine]];
   if(all.length)best.mass=median(all);
  }
+ // No bundled face fits well: the page's letters pick open families from the
+ // index (web-fonts.ts), which are downloaded and compared on the pixels.
+ if(weights&&autoFont&&WEB_FONTS&&best.score<.9){
+  for(const family of await webCandidates(samples)){
+   const other=await matchOcrAppearance(raster,region,regions,family,{autoFont:false,matchBlur,makeText,onFit,weights:false,alike});
+   if(other&&other.score>best.score+.03)best=other;
+  }
+ }
  if(weights&&best.mass!==undefined)return heaviness(raster,region,regions,best,{autoFont,matchBlur,makeText,onFit,alike});
  return best;
+}
+
+// Open families whose letters look like the samples', downloaded and ready
+// to draw (at most four; none when the index or the network is not there).
+async function webCandidates(samples:Sample[]){
+ const index=await fontIndex();if(!index)return [];
+ const glyphs:{ch:string;d:Descriptor}[]=[];
+ for(const s of samples){
+  let peak=0;for(const v of s.source.data)if(v>peak)peak=v;if(peak<=0)continue;
+  const cover=s.source.data.map(v=>v/peak);
+  for(const g of s.region.glyphs??[]){if(glyphs.length>=48)break;if(!/^[a-zA-Z0-9]$/.test(g.ch))continue;const d=describeGlyph(cover,s.source.width,s.source.height,Math.floor(g.x0-s.left),Math.ceil(g.x1-s.left));if(d)glyphs.push({ch:g.ch,d});}
+ }
+ const bundled=new Set(bundledFonts.map(f=>f.family)),out:string[]=[];
+ for(const pick of shortlist(index,glyphs,4,f=>bundled.has(f)))if(await loadWebFont(index,pick.family))out.push(pick.family.family);
+ return out;
 }
 
 // Ink of the original letters over the ink of the text as fitted, at its
