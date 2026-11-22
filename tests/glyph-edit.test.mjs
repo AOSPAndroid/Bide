@@ -123,6 +123,16 @@ test('a wide digit after a narrow space clears the preceding word',()=>{
  const plan=planGlyphEdit('a 1',measured,'a 9',[donor]);assert.ok(plan);const borrowed=plan.pieces.find(q=>q.source===donor.source);assert.ok(borrowed);
  const left=borrowed.to+donor.i0-borrowed.x0;assert.ok(left>=20,`replacement ink at${left} must clear the preceding word ending at19`);assert.ok(plan.startX>=20,'the patch must not erase the preceding word');
 });
+test('narrower proportional replacements retain the line reflow',()=>{
+ // Replacing two wide figures with1s contracts their natural advances.
+ // Clear ink alone must not keep the obsolete width of the source month.
+ const widths={'2':34,'1':15,'0':34,'4':35,'-':12};let x=0;
+ const measured=[...'2104-04'].map(ch=>{const c=cell(ch,x,x+widths[ch]+8,x,x+widths[ch]);x=c.x1;return c;});
+ const plan=planGlyphEdit('2104-04',measured,'2104-11');assert.ok(plan);
+ const last=plan.pieces.at(-1),donor=measured.find(c=>c.x0<=last.x0&&c.x1>=last.x1);assert.ok(donor);
+ const lastInk=last.to+donor.i1-last.x0;
+ assert.ok(lastInk<measured.at(-1).i1-25,"the new month loses the two wider figures' excess advance");
+});
 test('safe proportional digit swaps keep the original positions and word spaces',()=>{
  // Measured Raleway digits from the generated advert fixture: their widths
  // vary, but swapping15 and90 has room without moving any following digit.
