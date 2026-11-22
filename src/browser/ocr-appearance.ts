@@ -198,6 +198,11 @@ export async function matchOcrAppearance(raster:HTMLCanvasElement,region:TextReg
   // the same lettering) and this one: the median of their ink ratios.
   const mine=inkRatio(selected.source,painted,best.gain),all=[...best.masses??[],...mine===undefined?[]:[mine]];
   if(all.length)best.mass=median(all);
+  // On small soft text (a capital 8 px high, blurred) no stroke keeps its
+  // full ink, and a colour taken from the stroke cores came out 11-17% short
+  // of the line's ink: thin and pale. Blur keeps the total ink, so there the
+  // colour is raised until the totals agree (never past full ink).
+  if(mine!==undefined&&best.softness>=.6&&mine>1.03&&mine<1.35)best.gain=Math.min(1,best.gain*mine);
  }
  // No bundled face fits well: the page's letters pick open families from the
  // index (web-fonts.ts), which are downloaded and compared on the pixels.
