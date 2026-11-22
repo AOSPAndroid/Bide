@@ -250,7 +250,8 @@ export default function App() {
   const clipboard = useRef<Obj | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   // The first screen says what Bide is for; dismissed for the session.
-  const [welcome,setWelcomeState]=useState(()=>{try{return sessionStorage.getItem('bide-welcome')!=='no';}catch{return true;}});
+  // (Not shown to automated browsers unless ?welcome is in the address: tests drive the example page.)
+  const [welcome,setWelcomeState]=useState(()=>{if(navigator.webdriver&&!new URLSearchParams(location.search).has('welcome'))return false;try{return sessionStorage.getItem('bide-welcome')!=='no';}catch{return true;}});
   const setWelcome=(v:boolean)=>{setWelcomeState(v);try{sessionStorage.setItem('bide-welcome',v?'yes':'no');}catch{}};
   const imageInput = useRef<HTMLInputElement>(null);
   const projectInput = useRef<HTMLInputElement>(null);
