@@ -1,5 +1,5 @@
 // Read, redraw, compare. Some characters are one shape to a recognizer and
-// two to a typeface: 0 and O, 1, l and I, 5 and S, 8 and B, 2 and Z, 6 and
+// two to a typeface: 0 and O, 5 and S, 8 and B, 2 and Z, 6 and
 // G. In reference codes ("AB0CD", "X0Z", "0SLO") neither the neighbours nor
 // the recognizer's confidence tells which was printed, but the page does: the
 // line's face is found from its own pixels, each candidate is drawn in it,
@@ -10,7 +10,10 @@ import {rankOcrFonts} from '../ocr-font';
 import {ensureFont} from '../fonts';
 import type {TextRegion} from '../text-regions';
 
-const GROUPS=['0O','1lI','5S','8B','2Z','6G'],UNREAD='￼';
+// Not 1, l and I: most faces draw them nearly alike, and on the reading
+// benchmark the check fixed none of them and broke ten ("COLIS" to "COL1S",
+// "12" to "I2", "Tél." to "TéI."), against 33 lines fixed for 0 and O.
+const GROUPS=['0O','5S','8B','2Z','6G'],UNREAD='￼';
 type Shape={w:number;h:number;v:Float32Array};
 // The ink box of `cover` over columns [x0, x1), sampled 10 x 14, centred and
 // scaled so that the product of two shapes is their correlation.

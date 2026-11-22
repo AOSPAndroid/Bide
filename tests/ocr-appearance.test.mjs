@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {contrastCoverage,coreGain,coverageEdgeWidth,coverageFit,matchedInkColor} from '../tmp/ocr-appearance.mjs';
+import {contrastCoverage,coreGain,coverageEdgeWidth,coverageFit,matchedInkColor,pageInk} from '../tmp/ocr-appearance.mjs';
 const coverage=(fill)=>{const width=28,height=16,data=new Float32Array(width*height);for(let y=0;y<height;y++)for(let x=0;x<width;x++)data[y*width+x]=fill(x,y);return {width,height,data};};
 const glyphs=(x,y)=>y>=4&&y<12&&((x>=5&&x<7)||(x>=11&&x<14)||(y<6&&x>=5&&x<14))?1:0;
 const soft=coverage((x,y)=>{let sum=0;for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++)sum+=glyphs(x+dx,y+dy)*(dx===0?2:1)*(dy===0?2:1);return sum/16;});
@@ -62,4 +62,22 @@ test('coverage blurred by a Gaussian keeps its ink and spreads a line as the ker
  const centre=b.data[15*w+20],side=b.data[15*w+21];
  assert.ok(Math.abs(centre-.4)<.01,`centre ${centre}: a Gaussian of 1 px peaks at 0.40`);
  assert.ok(Math.abs(side-.24)<.01,`next column ${side}`);
+});
+
+test('a pale thin line takes the colour of a surer line of the same hue',()=>{
+ const line=(id,color,height,inkDensity=.2,background='#d33a80')=>({id,kind:'ocr',color,background,height,confidence:95,inkDensity});
+ const thin=line('tel','#fcc7e4',44),title=line('name','#fff0fc',61),heavy=line('s1','#fbfffe',45,.32),alsoThin=line('mail','#fcc8e5',46);
+ // White, from the lines with thicker strokes; its strength over this line's background.
+ const ink=pageInk(thin,[thin,alsoThin,title,heavy]);
+ assert.equal(ink.color,'#fbfffe');assert.ok(Math.abs(ink.gain-196/255)<.01);
+ // Lines as thin as it are no reference, nor a line of another hue, nor a weaker colour.
+ assert.equal(pageInk(thin,[thin,alsoThin]),undefined);
+ assert.equal(pageInk(thin,[thin,line('x','#20ff30',70)]),undefined);
+ assert.equal(pageInk(heavy,[heavy,title]),undefined);
+ // Further than 40% short of it: another colour (grey notes beside black text stay grey).
+ const grey=line('note','#9a9a9a',20,.2,'#ffffff'),black=line('body','#1c1c1e',30,.2,'#ffffff');
+ assert.equal(pageInk(grey,[grey,black]),undefined);
+ // Two inks along one hue: the nearer one.
+ const label=line('l','#627564',22,.2,'#e8ecdd'),head=line('h','#3b5d4a',66,.2,'#e8ecdd'),date=line('d','#213b2f',56,.2,'#e8ecdd');
+ assert.equal(pageInk(label,[label,head,date]).color,'#3b5d4a');
 });

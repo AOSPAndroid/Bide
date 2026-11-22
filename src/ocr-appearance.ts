@@ -79,3 +79,30 @@ export function matchedInkColor(color:string,background:string,gain:number){
  const strength=Math.min(1,Math.max(0,gain))*255/contrast;
  return '#'+ink.map((v,i)=>Math.round(Math.min(255,Math.max(0,bg[i]+(v-bg[i])*strength))).toString(16).padStart(2,'0')).join('');
 }
+
+// The colour a line may share with the page's other lines, and the strength
+// it is over this line's background: another line's colour that lies further
+// from the background along the same hue, up to 40% stronger (a thin line
+// blurred reads paler than it was printed: labels 37 levels short, light
+// lines of a card 55). The nearest such colour; ones within 20 levels of it
+// are one ink, read strongest where the strokes are thickest.
+type InkLine={id:string;kind:string;color:string;background?:string;height:number;confidence?:number;inkDensity?:number};
+export function pageInk(region:InkLine,regions:InkLine[]){
+ const hex=/^#[0-9a-f]{6}$/i,rgb=(h:string)=>[1,3,5].map(i=>parseInt(h.slice(i,i+2),16));
+ if(!hex.test(region.color)||!hex.test(region.background||'#ffffff'))return undefined;
+ const bg=rgb(region.background||'#ffffff'),e=rgb(region.color).map((v,i)=>v-bg[i]),size=(v:number[])=>Math.max(...v.map(Math.abs));
+ if(size(e)<40)return undefined;
+ // Only lines read more surely than this one: taller, or of thicker strokes
+ // (lines as thin as it are as pale as it, and are no reference).
+ const surer=(r:InkLine)=>r.height>=region.height*1.25||r.height>=region.height*.9&&!!r.inkDensity&&!!region.inkDensity&&r.inkDensity>=region.inkDensity*1.25;
+ const peers=regions.flatMap(r=>{
+  if(r.id===region.id||r.kind!=='ocr'||(r.confidence??0)<75||!hex.test(r.color)||!surer(r))return [];
+  const c=rgb(r.color),p=c.map((v,i)=>v-bg[i]),pp=p.reduce((a,v)=>a+v*v,0);if(!pp)return [];
+  const t=e.reduce((a,v,i)=>a+v*p[i],0)/pp;
+  return t>=.6&&t<=1.03&&size(e.map((v,i)=>v-t*p[i]))<=20?[{c,strength:size(p)}]:[];
+ }).sort((a,b)=>a.strength-b.strength);
+ if(!peers.length)return undefined;
+ let pick=peers[0];
+ for(const p of peers)if(p.strength>pick.strength&&size(p.c.map((v,i)=>v-pick.c[i]))<=20)pick=p;
+ return {color:'#'+pick.c.map(v=>v.toString(16).padStart(2,'0')).join(''),gain:pick.strength/255};
+}

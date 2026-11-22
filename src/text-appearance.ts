@@ -5,10 +5,52 @@ import {Textbox as FabricTextbox,classRegistry,util} from 'fabric';
 export function clampTextSoftness(value:number){return Number.isFinite(value)?Math.min(2,Math.max(0,value)):0;}
 export const rasterizedText=(o:{textSoftness?:number;rasterScale?:number;fontFamily:string})=>!!clampTextSoftness(o.textSoftness??0)||!!o.rasterScale||corporateFonts.includes(o.fontFamily)||isExtraFont(o.fontFamily);
 
+// Letter groups a face may draw as one glyph (Calibri and Carlito join "ti"
+// and "tt", most faces "fi" and "ff"): a line typeset with them is narrower
+// than its letters drawn one by one, and matches no face drawn that way (the
+// true face fitted its own line 0.66 on a flyer, and a look-alike was taken).
+const LIGATURES=['ffi','ffl','ff','fi','fl','fj','ft','tt','ti','Th'];
+const ligated=new Map<string,string[]>();
+// Those the face joins (or kerns: either way the pair is best drawn in one
+// call): their width differs when a zero-width non-joiner keeps them apart.
+function ligaturesOf(style:string,weight:string|number,family:string){
+ const font=`${style} ${weight} 100px "${family}"`,known=ligated.get(font);if(known)return known;
+ if(typeof document==='undefined')return [];
+ const g=util.createCanvasElement().getContext('2d');if(!g)return [];
+ g.font=font;const found=LIGATURES.filter(s=>Math.abs(g.measureText(s).width-g.measureText(Array.from(s).join('\u200c')).width)>.4);
+ // (Not remembered while the face is still loading: the fallback face was measured.)
+ try{if(document.fonts.check(font))ligated.set(font,found);}catch{}
+ return found;
+}
+
 // Keep text editable. Apply softness in output pixels, accounting for zoom/DPR.
 export class Textbox extends FabricTextbox {
  static type='Textbox';
  declare textSoftness?:number;
+ private plainLetters=false;
+ // A group the face joins is one unit of the line: measured and drawn in one
+ // call, so the ligature is drawn. Not while the text is being typed (the
+ // caret moves letter by letter), nor on a line with styled ranges (their
+ // positions count letters).
+ graphemeSplit(text:string){
+  const letters=super.graphemeSplit(text);
+  if(this.isEditing||this.plainLetters||this.path||this.styles&&Object.keys(this.styles).length||!/[fT]|t[ti]/.test(text))return letters;
+  const joined=ligaturesOf(this.fontStyle,this.fontWeight,this.fontFamily);if(!joined.length)return letters;
+  const out:string[]=[];
+  for(let i=0;i<letters.length;i++){const hit=joined.find(s=>letters.slice(i,i+s.length).join('')===s);if(hit){out.push(hit);i+=hit.length-1;}else out.push(letters[i]);}
+  return out;
+ }
+ enterEditing(...args:Parameters<FabricTextbox['enterEditing']>){
+  if(!this.isEditing){this.plainLetters=true;this.initDimensions();}
+  const result=super.enterEditing(...args);
+  if(!this.isEditing){this.plainLetters=false;this.initDimensions();}
+  return result;
+ }
+ exitEditing(){
+  const result=super.exitEditing();
+  if(this.plainLetters){this.plainLetters=false;this.initDimensions();this.setCoords();}
+  return result;
+ }
  // Text set over a scan is exported as pixels at the scan's own resolution
  // (pixels per page unit), as it was fitted: vector text over a scan is
  // rendered by each viewer in its own way and stays sharp where the scan is not.

@@ -259,7 +259,7 @@ export async function matchedDetectedTextbox(region:TextRegion,c:Canvas,p:Page,r
   // measured against it came out pale (grey #555 lines set 18% too light):
   // softness by edge width, then the line's own ink at that softness.
   if(options.matchBlur){text.textSoftness=matchOcrSoftness(raster,region,regionsAll,text,k);text.initDimensions();}
-  const gain=matchOcrInk(raster,region,regionsAll,text,k);if(gain!==undefined)text.set({fill:matchedInkColor(region.color,region.background||'#ffffff',gain)});
+  const gain=matchOcrInk(raster,region,regionsAll,text,k);if(gain!==undefined)text.set({fill:fitted.ink&&fitted.inkGain!==undefined&&gain<=fitted.inkGain&&fitted.inkGain-gain<=.08?fitted.ink:matchedInkColor(region.color,region.background||'#ffffff',gain)});
   // Exported as it was fitted: pixels at this scale, not vector text over the scan.
   text.rasterScale=k;
  }
