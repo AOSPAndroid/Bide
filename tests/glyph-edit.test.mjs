@@ -123,6 +123,28 @@ test('a wide digit after a narrow space clears the preceding word',()=>{
  const plan=planGlyphEdit('a 1',measured,'a 9',[donor]);assert.ok(plan);const borrowed=plan.pieces.find(q=>q.source===donor.source);assert.ok(borrowed);
  const left=borrowed.to+donor.i0-borrowed.x0;assert.ok(left>=20,`replacement ink at${left} must clear the preceding word ending at19`);assert.ok(plan.startX>=20,'the patch must not erase the preceding word');
 });
+test('safe proportional digit swaps keep the original positions and word spaces',()=>{
+ // Measured Raleway digits from the generated advert fixture: their widths
+ // vary, but swapping15 and90 has room without moving any following digit.
+ const text='06 48 27 15 90',values=[
+  [114,141.5,114,139,126.33700440528635],[141.5,170,144,170,156.07731958762886],
+  [170,185],[185,212,185,210,199.7863247863248],[212,238,214,238,226.06351791530943],
+  [238,256],[256,279,256,277,266.185],[279,305,281,305,293.6584699453552],
+  [305,320],[320,339.5,320,338,329.2096774193548],[339.5,364,341,364,352.52334630350197],
+  [364,381],[381,408.5,381,406,394.3732876712329],[408.5,436,411,436,423.37068965517244]
+ ];
+ const cells=[...text].map((ch,i)=>{const[x0,x1,i0,i1,m]=values[i];return ch===' '?{ch,x0,x1,space:true}:{ch,x0,x1,i0,i1,m};});
+ const plan=planGlyphEdit(text,cells,'06 48 27 51 09');assert.ok(plan);
+ assert.equal(plan.startX,305,'the unchanged preceding word space keeps its position');
+ assert.equal(plan.oldEnd,436,'the original line extent is retained');
+ const swapped=plan.pieces.filter(q=>!q.blank).map(q=>{const source=cells.find(c=>c.x0===q.x0&&c.x1===q.x1);assert.ok(source);return {ch:source.ch,left:q.to+source.i0-q.x0,right:q.to+source.i1-q.x0};});
+ assert.deepEqual(swapped.map(q=>q.ch),['5','1','0','9']);
+ assert.ok(Math.abs(swapped[0].left-317.6863311158529)<1e-8,'5 is centred over the old1');
+ assert.ok(Math.abs(swapped[1].left-343.31366888414715)<1e-8,'1 is centred over the old5');
+ assert.ok(swapped[1].left>swapped[0].right,'the simultaneous replacements clear each other');
+ assert.equal(swapped[2].left,381,'the same-width0 uses the old9 ink extent');
+ assert.equal(swapped[3].right,436,'the same-width9 uses the old0 ink extent');
+});
 test('a digit for a digit is drawn where the old one stood and nothing else moves',async()=>{
  const {planGlyphEdit:plan}=await import('../tmp/glyph-edit.mjs');
  // "18,40": the 1 is narrow (cell 0-8, ink 3-6), the others 12 wide.
