@@ -8,6 +8,7 @@ import {needsRasterExport} from './layer-style-render';
 import {hasBlending} from './browser/layer-utils';
 import {detectPdfText,pagePreview,pdfScanScale} from './browser/engine';
 import {pageRaster,rasterLayer} from './retouch-canvas';
+import {renderPageFrame} from './canvas-raster-frame';
 import {repairTextBackground} from './text-replacement';
 import {estimateOcrBold,glyphInk,wordInk,classifyWordWeights,lineWeight} from './ocr-weight';
 import {darkenToInk,prepareOcrPixels,estimateLineHeight} from './ocr-image';
@@ -65,7 +66,7 @@ async function ocrRaster(p:Page,c:Canvas){
  const source=p.source?await previewCanvas(p.source,p.index,pdfScale):pageRaster(c,p.width,p.height,c.getObjects().filter(o=>o instanceof FabricImage),3600);
  // Edits drawn over a PDF page are read too: a rescan after an edit used to read the old digits again.
  const edits=p.source?c.getObjects().filter(o=>o instanceof FabricImage&&o.visible):[];
- if(edits.length){const z=c.getZoom(),background=c.backgroundColor;c.backgroundColor='';try{source.getContext('2d')!.drawImage(c.toCanvasElement(pdfScale/z,{width:p.width*z,height:p.height*z,filter:o=>edits.includes(o as FabricObject)}),0,0,source.width,source.height);}finally{c.backgroundColor=background;}}
+ if(edits.length){const background=c.backgroundColor;c.backgroundColor='';try{source.getContext('2d')!.drawImage(renderPageFrame(c,p.width,p.height,pdfScale,o=>edits.includes(o as FabricObject)),0,0,source.width,source.height);}finally{c.backgroundColor=background;}}
  const ratio=Math.min(1,3600/Math.max(source.width,source.height)),reduced=document.createElement('canvas');reduced.width=Math.round(source.width*ratio);reduced.height=Math.round(source.height*ratio);
  const ctx=reduced.getContext('2d')!;ctx.fillStyle=p.color==='transparent'?'#ffffff':p.color;ctx.fillRect(0,0,reduced.width,reduced.height);ctx.drawImage(source,0,0,reduced.width,reduced.height);return reduced;
 }
