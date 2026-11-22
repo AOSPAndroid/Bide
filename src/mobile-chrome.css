@@ -221,3 +221,6 @@
 /* The OCR settings sheet covers the bar on phones: Done closes it (desktop closes it with the summary). */
 .ocr-settings-done{display:none}
 @media (max-width:600px){.ocr-settings-done{display:flex;position:sticky;top:0;z-index:1;margin:-4px 0 6px auto;min-width:64px;min-height:40px;font-size:14px;font-weight:600;color:var(--accent);background:var(--panel,#fff);border-radius:8px}}
+
+/* Phones: with a scan, photo or PDF open and no drawing tool chosen, the options row (it only names the tool) gives its room to the page. */
+@media(max-width:600px),(pointer:coarse) and (max-height:500px){.command-strip.reading>.options-bar{display:none}.welcome-card>div{flex-direction:column}.welcome-card button{min-height:44px}}
