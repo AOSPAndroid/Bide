@@ -11,6 +11,13 @@ Writes public/fonts/index.bin (descriptors) and public/fonts/index.json
 (family, category, licence, files with sha256 and size).
 
   python3 scripts/build-font-index.py [--limit N] [--workers 8]
+  python3 scripts/build-font-index.py --append bevietnampro
+  python3 scripts/build-font-index.py --refresh-descriptors
+
+The append mode reads only the requested families at the pinned revision. It
+preserves the existing family records, row numbers, and descriptor bytes.
+Refresh mode regenerates descriptors for the existing records only, checking
+each source file against its existing pinned size and SHA-256.
 """
 from pathlib import Path
 import json,re,sys,io,hashlib,urllib.request,urllib.parse,urllib.error,concurrent.futures,argparse,struct
@@ -88,19 +95,78 @@ def build(item):
  except Exception as e:
   print('skip',slug,type(e).__name__,str(e)[:80],file=sys.stderr);return None
 
-p=argparse.ArgumentParser();p.add_argument('--limit',type=int,default=0);p.add_argument('--workers',type=int,default=8);a=p.parse_args()
-items=sorted(families().items())
-if a.limit:items=items[:a.limit]
-print(len(items),'families listed',flush=True)
-done=[]
-with concurrent.futures.ThreadPoolExecutor(max_workers=a.workers) as pool:
- for n,r in enumerate(pool.map(build,items)):
-  if r:done.append(r)
-  if n%100==99:print(n+1,'read,',len(done),'kept',flush=True)
-out=ROOT/'public/fonts';out.mkdir(parents=True,exist_ok=True)
-blob=bytearray();row=0
-for r in done:
- for face,d in zip(r['faces'],r.pop('_d')):face['row']=row;blob+=d;row+=1
-(out/'index.bin').write_bytes(bytes(blob))
-(out/'index.json').write_text(json.dumps({'revision':REV,'chars':CHARS,'cell':34,'rows':row,'families':done},separators=(',',':')))
-print(len(done),'families,',row,'faces,',len(blob),'bytes')
+def validate_index(index,blob):
+ if (index.get('revision'),index.get('chars'),index.get('cell'))!=(REV,CHARS,34):
+  raise ValueError('The existing index must use the current pinned revision and descriptor format')
+ rows=[face['row'] for family in index['families'] for face in family['faces']]
+ if rows!=list(range(index['rows'])) or len(blob)!=index['rows']*len(CHARS)*34:
+  raise ValueError('The existing descriptor rows or binary length are invalid')
+ if len({family['slug'] for family in index['families']})!=len(index['families']):
+  raise ValueError('The existing index contains duplicate family slugs')
+
+def refresh_descriptors(index):
+ blob=bytearray(index['rows']*len(CHARS)*34)
+ for family in index['families']:
+  files={}
+  for name,pin in family['files'].items():
+   raw=get(f"{RAW}{family['licence']}/{family['slug']}/{urllib.parse.quote(name)}")
+   if len(raw)!=pin['bytes'] or hashlib.sha256(raw).hexdigest()!=pin['sha256']:
+    raise ValueError(f"Pinned size or SHA-256 mismatch: {family['family']}/{name}")
+   files[name]=raw
+  for face in family['faces']:
+   raw=files[face['file']]
+   if family['files'][face['file']]['variable']:
+    raw=static(raw,{'Regular':400,'Bold':700}[face['style']])
+   d=descriptor(raw);at=face['row']*len(CHARS)*34
+   if len(d)!=len(CHARS)*34:raise ValueError('Invalid descriptor length')
+   blob[at:at+len(d)]=d
+ return blob
+
+def main():
+ p=argparse.ArgumentParser()
+ p.add_argument('--limit',type=int,default=0)
+ p.add_argument('--workers',type=int,default=8)
+ p.add_argument('--append',action='append',default=[],metavar='SLUG',help='Append only this pinned Google Fonts family; repeat for more families')
+ p.add_argument('--refresh-descriptors',action='store_true',help='Regenerate only existing rows from their size/SHA-256-verified pinned source files')
+ a=p.parse_args()
+ if a.workers<1 or a.limit<0:p.error('--workers must be positive and --limit cannot be negative')
+ if a.append and a.limit:p.error('--append cannot be combined with --limit')
+ if a.refresh_descriptors and (a.append or a.limit):p.error('--refresh-descriptors cannot be combined with --append or --limit')
+ if any(not re.fullmatch('[a-z0-9]+',slug) for slug in a.append):p.error('--append requires a lowercase Google Fonts directory slug')
+ out=ROOT/'public/fonts'
+ if a.refresh_descriptors:
+  index=json.loads((out/'index.json').read_text());blob=(out/'index.bin').read_bytes()
+  validate_index(index,blob);blob=refresh_descriptors(index);validate_index(index,blob)
+  (out/'index.bin').write_bytes(bytes(blob))
+  print(len(index['families']),'families,',index['rows'],'faces,',len(blob),'bytes refreshed')
+  return
+ if a.append:
+  index=json.loads((out/'index.json').read_text());blob=bytearray((out/'index.bin').read_bytes())
+  validate_index(index,blob)
+  existing={family['slug'] for family in index['families']}
+  items=[(slug,None) for slug in sorted(set(a.append)-existing)]
+ else:
+  index={'revision':REV,'chars':CHARS,'cell':34,'rows':0,'families':[]};blob=bytearray()
+  items=sorted(families().items())
+  if a.limit:items=items[:a.limit]
+ print(len(items),'families to append' if a.append else 'families listed',flush=True)
+ done=[]
+ with concurrent.futures.ThreadPoolExecutor(max_workers=a.workers) as pool:
+  for n,r in enumerate(pool.map(build,items)):
+   if r:done.append(r)
+   if n%100==99:print(n+1,'read,',len(done),'kept',flush=True)
+ if a.append and len(done)!=len(items):raise ValueError('A requested family could not be built; the existing index was not changed')
+ for r in done:
+  descs=r.pop('_d')
+  for face,d in zip(r['faces'],descs):
+   if len(d)!=len(CHARS)*34:raise ValueError('Invalid descriptor length')
+   face['row']=index['rows'];blob+=d;index['rows']+=1
+  index['families'].append(r)
+ validate_index(index,blob)
+ if not a.append or done:
+  out.mkdir(parents=True,exist_ok=True)
+  (out/'index.bin').write_bytes(bytes(blob))
+  (out/'index.json').write_text(json.dumps(index,separators=(',',':')))
+ print(len(index['families']),'families,',index['rows'],'faces,',len(blob),'bytes')
+
+if __name__=='__main__':main()

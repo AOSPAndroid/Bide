@@ -238,8 +238,10 @@ async function webCandidates(samples:Sample[]){
   const cover=s.source.data.map(v=>v/peak);
   for(const g of s.region.glyphs??[]){if(glyphs.length>=48)break;if(!/^[a-zA-Z0-9]$/.test(g.ch))continue;const d=describeGlyph(cover,s.source.width,s.source.height,Math.floor(g.x0-s.left),Math.ceil(g.x1-s.left));if(d)glyphs.push({ch:g.ch,d});}
  }
- const bundled=new Set(bundledFonts.map(f=>f.family)),out:string[]=[];
- for(const pick of shortlist(index,glyphs,4,f=>bundled.has(f)))if(await loadWebFont(index,pick.family))out.push(pick.family.family);
+ const bundled=new Set(bundledFonts.map(f=>f.family)),eligible=new Set(index.families.filter(f=>['sans','sans_serif','serif','mono','monospace'].includes(f.category.toLowerCase())).map(f=>f.family)),out:string[]=[];
+ const picks=shortlist(index,glyphs,4,f=>bundled.has(f)||!eligible.has(f));
+ const loaded=await Promise.all(picks.map(pick=>loadWebFont(index,pick.family)));
+ for(let i=0;i<picks.length;i++)if(loaded[i])out.push(picks[i].family.family);
  return out;
 }
 

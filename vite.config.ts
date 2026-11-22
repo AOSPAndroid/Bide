@@ -28,13 +28,13 @@ export default defineConfig(({mode,command}) => {
   plugins: [react(), ...(mode === 'app' ? [{name:'bide-app-assets', async closeBundle() { await trimForApp('dist-app'); }}] : []), ...(mode === 'saas' ? [{name:'bide-saas-assets', async closeBundle() {
     // Keep the complete on-origin paid engines, but omit unsupported Office files.
     // A local edition's assets may also exist in public; never copy those blindly.
-    for (const name of ['licenses','favicon.svg','brand-logo.svg',...homeScreen,'_headers','ocr','ai']) await cp(`public/${name}`, `dist-saas/${name}`, {recursive:true});
+    for (const name of ['licenses','favicon.svg','brand-logo.svg',...homeScreen,'_headers','ocr','ai','fonts']) await cp(`public/${name}`, `dist-saas/${name}`, {recursive:true});
     await splitLargeFiles('dist-saas/ai/models');
   }}] : []), ...(mode === 'demo' ? [{name:'bide-demo-assets', async closeBundle() {
     // LaMa's verified prepared output stays on-origin to avoid a large upstream
     // first-use download. Other models still use the pinned on-demand sources.
     await mkdir('out', {recursive:true});
-    for (const name of ['licenses','favicon.svg','brand-logo.svg',...homeScreen,'_headers']) await cp(`public/${name}`, `out/${name}`, {recursive:true});
+    for (const name of ['licenses','favicon.svg','brand-logo.svg',...homeScreen,'_headers','fonts']) await cp(`public/${name}`, `out/${name}`, {recursive:true});
     // OCR always requests OEM 1: these two scripts embed their WASM and cover
     // SIMD and non-SIMD browsers. Legacy cores and separate binaries are unused.
     await cp('public/ocr','out/ocr',{recursive:true,filter:path=>!path.replaceAll('\\','/').includes('/ocr/core/')||/tesseract-core(?:-simd)?-lstm\.wasm\.js$/.test(path)});

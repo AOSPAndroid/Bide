@@ -9,9 +9,9 @@ import {bundledOcrLanguages,defaultOcrLanguages,languageLabel,type OcrLanguage} 
 export type OcrSettings={font:string;style:string;grouping:OcrGrouping;background:ReplacementBackground;color:string;padding:number;thorough:boolean;languages:string[];matchBlur:boolean;engine:'tesseract'|'paddle';aiSharpen:boolean;script:OcrScript|'auto';accurate:boolean;editMode:'letters'|'font'};
 export const defaultOcrSettings:OcrSettings={font:'Liberation Sans',style:'auto',grouping:'smart',background:'sampled',color:'#ffffff',padding:-1,thorough:false,languages:defaultOcrLanguages,matchBlur:true,engine:'paddle',aiSharpen:false,script:'auto',accurate:false,editMode:'letters'};
 
-type Props={yourFonts?:string[];onAddFont?:()=>void;ai:boolean;status:string;regions:TextRegion[];show:boolean;onShow:(show:boolean)=>void;settings:OcrSettings;onChange:(patch:Partial<OcrSettings>)=>void;scanning:boolean;onRescan:()=>void;onConvertAll:()=>void;onFindReplace:()=>void;onProofread:()=>void;tilt?:string;onStraighten?:()=>void};
+type Props={yourFonts?:string[];webFonts?:string[];onAddFont?:()=>void;ai:boolean;status:string;regions:TextRegion[];show:boolean;onShow:(show:boolean)=>void;settings:OcrSettings;onChange:(patch:Partial<OcrSettings>)=>void;scanning:boolean;onRescan:()=>void;onConvertAll:()=>void;onFindReplace:()=>void;onProofread:()=>void;tilt?:string;onStraighten?:()=>void};
 
-export default function TextDetectionBar({yourFonts=[],onAddFont,ai,status,regions,show,onShow,settings,onChange,scanning,onRescan,onConvertAll,onFindReplace,onProofread,tilt,onStraighten}:Props){
+export default function TextDetectionBar({yourFonts=[],webFonts=[],onAddFont,ai,status,regions,show,onShow,settings,onChange,scanning,onRescan,onConvertAll,onFindReplace,onProofread,tilt,onStraighten}:Props){
  const [available,setAvailable]=useState<OcrLanguage[]>([]);
  useEffect(()=>{let live=true;void bundledOcrLanguages().then(list=>{if(live)setAvailable(list);});return()=>{live=false;};},[]);
  const ocr=regions.some(r=>r.kind==='ocr'),menu=useRef<HTMLDetailsElement>(null),[more,setMore]=useState(false);
@@ -32,7 +32,7 @@ export default function TextDetectionBar({yourFonts=[],onAddFont,ai,status,regio
   <details ref={menu} className="ocr-settings"><summary title="OCR font, weight, engine, languages and background cleanup">OCR settings</summary><div className="ocr-settings-panel"><button className="ocr-settings-done" onClick={()=>{if(menu.current)menu.current.open=false;}}>Done</button>
   {ocr&&<>
    <label title="Images contain no font metadata. Choose the closest appearance before editing; use Font family afterward.">OCR font<select aria-label="OCR replacement font" value={settings.font} onChange={e=>onChange({font:e.target.value})}>
-    {yourFonts.length>0&&<optgroup label="Your fonts">{yourFonts.map(f=><option key={f} value={f}>{f}</option>)}</optgroup>}<optgroup label="Bundled · available offline">{bundledFonts.map(f=><option key={f.family} value={f.family}>{f.family}</option>)}</optgroup>
+    {yourFonts.length>0&&<optgroup label="Your fonts">{yourFonts.map(f=><option key={f} value={f}>{f}</option>)}</optgroup>}{webFonts.length>0&&<optgroup label="Open fonts">{webFonts.map(f=><option key={f} value={f}>{f}</option>)}</optgroup>}<optgroup label="Bundled · available offline">{bundledFonts.map(f=><option key={f.family} value={f.family}>{f.family}</option>)}</optgroup>
     <optgroup label="Workplace / system · must be installed">{systemFonts.map(f=><option key={f} value={f}>{f}</option>)}</optgroup>
    </select></label>
    {onAddFont&&<button title="Add your own font file (TTF, OTF, WOFF). It stays in this browser and is tried first when matching scanned text." onClick={onAddFont}>Add your font…</button>}

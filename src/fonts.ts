@@ -1,6 +1,7 @@
 import {corporateFonts,corporateFallback} from './corporate-fonts';
-import {bundledFonts} from './font-catalog';
-import {isExtraFont} from './extra-fonts';
+import {bundledFonts,systemFonts} from './font-catalog';
+import {restoreFonts,protectFontFamilies,ensureExtraFont,requiredFonts,matchingExtraFont,missingFontMessage,type ExtraFontRequirement} from './extra-fonts';
+protectFontFamilies([...bundledFonts.map(f=>f.family),...systemFonts,...corporateFonts]);
 const loaded=new Map<string,Promise<void>>();
 const bundledBytes=new Map<string,Promise<string>>();
 type FontStyle={fontFamily?:string;fontWeight?:string|number;fontStyle?:string};
@@ -32,8 +33,8 @@ export async function bundledPdfFontError(text:PdfFontText,pdfDerived=isPdfDeriv
   if(!await fontSupportsText(await bundledBytes.get(run.url)!,run.text))return `The selected ${run.family} font cannot draw some typed characters. Your text and font were kept. Remove those characters or choose a font that includes them before exporting.`;
  }
 }
-export function ensureFont(family:string):Promise<void> {
-  if(isExtraFont(family))return Promise.resolve();
+export async function ensureFont(family:string):Promise<void> {
+  await restoreFonts();if(await ensureExtraFont(family))return;
   const item=bundledFonts.find(font=>font.family===family);if(!item){if(!corporateFonts.includes(family))return Promise.resolve();if(!loaded.has(family))loaded.set(family,new FontFace(family,`local("${family}")`).load().then(()=>{}).catch(()=>{loaded.delete(family);throw new Error(`${family} is not installed on this PC. Choose bundled ${corporateFallback(family)} or another installed font.`);}));return loaded.get(family)!;}
   if(!loaded.has(family))loaded.set(family,Promise.all(item.faces.map(async face=>{
     const font=new FontFace(family,`url("${face.url}")`,{weight:face.style.includes('Bold')?'700':'400',style:face.style.includes('Italic')?'italic':'normal'});
@@ -42,9 +43,25 @@ export function ensureFont(family:string):Promise<void> {
   return loaded.get(family)!;
 }
 export async function ensureDocumentFonts(value:unknown):Promise<void> {
-  const families=new Set<string>();
-  const visit=(node:unknown)=>{if(!node||typeof node!=='object')return;const obj=node as Record<string,unknown>;if(typeof obj.fontFamily==='string')families.add(obj.fontFamily);if(Array.isArray(obj.objects))obj.objects.forEach(visit);if(obj.styles)Object.values(obj.styles as object).forEach(line=>Object.values(line as object).forEach(visit));};
-  visit(value);await Promise.all(Object.entries(documentEmbeddedFonts(value)).map(([family,data])=>ensureEmbeddedFont(family,data)));await Promise.all([...families].map(ensureFont));
+ await restoreFonts();
+ type Node=Record<string,unknown>;const nodes:Node[]=[],plans:{node:Node;requirements:ExtraFontRequirement[];remaps:Map<string,string>}[]=[];
+ const visit=(node:unknown)=>{if(!node||typeof node!=='object')return;const obj=node as Node;nodes.push(obj);if(Array.isArray(obj.objects))obj.objects.forEach(visit);};visit(value);
+ for(const node of nodes){
+  const requirements=requiredFonts(node.extraFontRequired),remaps=new Map<string,string>();
+  for(const requirement of requirements){
+   await ensureExtraFont(requirement.family);let family=matchingExtraFont(requirement);
+   if(!family&&requirement.origin==='web'){const {restoreRequiredWebFont}=await import('./web-fonts');await restoreRequiredWebFont(requirement);family=matchingExtraFont(requirement);}
+   if(!family)throw new Error(missingFontMessage(requirement.family));remaps.set(requirement.family.toLowerCase(),family);
+  }
+  if(requirements.length)plans.push({node,requirements,remaps});
+ }
+ const familyFields=(node:Node)=>{const fields=[node];if(node.styles&&typeof node.styles==='object')for(const line of Object.values(node.styles))if(line&&typeof line==='object')for(const style of Object.values(line))if(style&&typeof style==='object')fields.push(style as Node);return fields;};
+ const families=new Set<string>();
+ for(const node of nodes){const plan=plans.find(p=>p.node===node);for(const field of familyFields(node))if(typeof field.fontFamily==='string')families.add(plan?.remaps.get(field.fontFamily.toLowerCase())??field.fontFamily);}
+ await Promise.all(Object.entries(documentEmbeddedFonts(value)).map(([family,data])=>ensureEmbeddedFont(family,data)));await Promise.all([...families].map(ensureFont));
+ // Only remap an exact-byte recovery alias once every required font is ready.
+ // A failed recovery keeps the saved document and its original names intact.
+ for(const {node,requirements,remaps} of plans){for(const field of familyFields(node))if(typeof field.fontFamily==='string')field.fontFamily=remaps.get(field.fontFamily.toLowerCase())??field.fontFamily;node.extraFontRequired=requirements.map(r=>({...r,family:remaps.get(r.family.toLowerCase())??r.family}));}
 }
 
 export function ensureEmbeddedFont(family:string,data:string,bold=false,italic=false):Promise<void>{if(!loaded.has(family))loaded.set(family,(async()=>{const bytes=Uint8Array.from(atob(data),c=>c.charCodeAt(0));const font=new FontFace(family,bytes,{weight:bold?'700':'400',style:italic?'italic':'normal'});await font.load();document.fonts.add(font);})().catch(error=>{loaded.delete(family);throw error;}));return loaded.get(family)!;}

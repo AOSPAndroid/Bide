@@ -1,9 +1,9 @@
 import {corporateFonts} from './corporate-fonts';
-import {isExtraFont} from './extra-fonts';
+import {isExtraFont,textFontRequirements,assertExtraFontsAvailable,type ExtraFontRequirement} from './extra-fonts';
 import {Textbox as FabricTextbox,classRegistry,util} from 'fabric';
 
 export function clampTextSoftness(value:number){return Number.isFinite(value)?Math.min(2,Math.max(0,value)):0;}
-export const rasterizedText=(o:{textSoftness?:number;rasterScale?:number;fontFamily:string})=>!!clampTextSoftness(o.textSoftness??0)||!!o.rasterScale||corporateFonts.includes(o.fontFamily)||isExtraFont(o.fontFamily);
+export const rasterizedText=(o:{textSoftness?:number;rasterScale?:number;fontFamily:string;styles?:unknown;extraFontRequired?:unknown})=>!!clampTextSoftness(o.textSoftness??0)||!!o.rasterScale||corporateFonts.includes(o.fontFamily)||isExtraFont(o.fontFamily)||textFontRequirements(o).length>0;
 
 // Keep text editable. Apply softness in output pixels, accounting for zoom/DPR.
 export class Textbox extends FabricTextbox {
@@ -13,6 +13,13 @@ export class Textbox extends FabricTextbox {
  // (pixels per page unit), as it was fitted: vector text over a scan is
  // rendered by each viewer in its own way and stays sharp where the scan is not.
  declare rasterScale?:number;
+ declare extraFontRequired?:ExtraFontRequirement[];
+ toObject(propertiesToInclude:any[]=[]):any{
+  const result=super.toObject(propertiesToInclude),required=textFontRequirements(this);
+  if(required.length){this.extraFontRequired=required;result.extraFontRequired=required;}else{this.extraFontRequired=undefined;delete result.extraFontRequired;}
+  return result;
+ }
+
  private softRaster(requestedScale:number){
   const softness=clampTextSoftness(this.textSoftness??0);
   const pad=Math.ceil(softness*4+this.strokeWidth+this.fontSize*.3),width=this.width+pad*2,height=this.height+pad*2;
@@ -32,13 +39,14 @@ export class Textbox extends FabricTextbox {
   ctx.imageSmoothingQuality='high';ctx.drawImage(raster.bitmap,raster.x,raster.y,raster.width,raster.height);ctx.imageSmoothingQuality=quality;
  }
  _toSVG():string[]{
+  assertExtraFontsAvailable(textFontRequirements(this));
   if(!rasterizedText(this))return super._toSVG();
   // Rasterize this text layer only; other page content stays vector-based.
   const raster=this.softRaster(this.rasterScale??4);
   return [`<image `,'COMMON_PARTS',`x="${raster.x}" y="${raster.y}" width="${raster.width}" height="${raster.height}" opacity="${this.opacity}" visibility="${this.visible?'visible':'hidden'}" xlink:href="${raster.bitmap.toDataURL('image/png')}"/>`];
  }
 }
-Textbox.customProperties=['id','name','pdfFontData','pdfOriginalFont','pdfFontFallback','pdfFontBold','pdfFontItalic','recognizedKey','ocrOriginalBounds','objectCaching','textSoftness','rasterScale','layerMask','layerStyle'];
+Textbox.customProperties=['id','name','pdfFontData','pdfOriginalFont','pdfFontFallback','pdfFontBold','pdfFontItalic','recognizedKey','ocrOriginalBounds','objectCaching','textSoftness','rasterScale','extraFontRequired','layerMask','layerStyle'];
 Textbox.cacheProperties=[...FabricTextbox.cacheProperties,'textSoftness'];
 classRegistry.setClass(Textbox,'Textbox');
 classRegistry.setClass(Textbox,'textbox');

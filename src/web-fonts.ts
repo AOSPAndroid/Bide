@@ -6,21 +6,37 @@
 // families worth trying; only those are downloaded, checked against the
 // index's SHA-256, and compared on the page's pixels like bundled faces.
 // Hosted editions only: the downloadable edition stays offline.
-import {HOSTED_BUILD} from './build-flags';
-import {registerFont,isExtraFont,type FaceStyle} from './extra-fonts';
+import {registerFontFaces,restoreFonts,extraFont,isProtectedFont,protectInstalledFont,availableFontAlias,completedWebFont,validWebSource,type FaceStyle,type WebFontSource,type FontFaceInput,type ExtraFontRequirement} from './extra-fonts';
 import {digest} from './browser/crypto';
 
-export const WEB_FONTS=((import.meta.env as Record<string,string|undefined>).VITE_WEB_FONTS??(HOSTED_BUILD?'1':''))==='1';
+const env=(import.meta as ImportMeta&{env?:Record<string,string|undefined>}).env??{};
+export const WEB_FONTS=(env.VITE_WEB_FONTS??(['demo','saas'].includes(env.MODE??'')?'1':''))==='1';
 type Family={family:string;slug:string;licence:string;category:string;files:Record<string,{sha256:string;bytes:number;variable:boolean}>;faces:{style:FaceStyle;file:string;row:number}[]};
 type Index={revision:string;chars:string;cell:number;rows:number;families:Family[];bin:Uint8Array};
+export const FONT_INDEX_TIMEOUT_MS=5000,FONT_DOWNLOAD_TIMEOUT_MS=8000;
+async function bounded<T>(run:(signal:AbortSignal)=>Promise<T>,timeoutMs:number):Promise<T>{
+ const controller=new AbortController();let timer:ReturnType<typeof setTimeout>|undefined;
+ const stopped=new Promise<never>((_,reject)=>{controller.signal.addEventListener('abort',()=>reject(controller.signal.reason),{once:true});timer=setTimeout(()=>controller.abort(new Error('The font download timed out.')),Math.max(1,timeoutMs));});
+ try{return await Promise.race([run(controller.signal),stopped]);}finally{if(timer)clearTimeout(timer);}
+}
+const hex=(b:Uint8Array)=>Array.from(b,v=>v.toString(16).padStart(2,'0')).join('');
+function sourceFor(index:Pick<Index,'revision'>,family:Family,file:string):WebFontSource{
+ const info=family.files[file];return {revision:index.revision,slug:family.slug,licence:family.licence,file,sha256:info?.sha256,bytes:info?.bytes};
+}
+function validIndex(index:Index){
+ if(!/^[a-f0-9]{40}$/.test(index.revision)||index.chars!=='abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'||index.cell!==34||!Number.isSafeInteger(index.rows)||index.rows<1||index.bin.length!==index.rows*index.cell*index.chars.length||!Array.isArray(index.families))return false;
+ return index.families.every(f=>typeof f.family==='string'&&!!f.family&&Array.isArray(f.faces)&&!!f.faces.length&&f.faces.every(face=>['Regular','Bold','Italic','BoldItalic'].includes(face.style)&&Number.isSafeInteger(face.row)&&face.row>=0&&face.row<index.rows&&validWebSource(sourceFor(index,f,face.file))));
+}
 let loading:Promise<Index|undefined>|undefined;
-export function fontIndex(base=document.baseURI){
- return loading??=(async()=>{
-  try{
-   const [meta,bin]=await Promise.all([fetch(new URL('fonts/index.json',base)),fetch(new URL('fonts/index.bin',base))]);if(!meta.ok||!bin.ok)return undefined;
-   return {...await meta.json(),bin:new Uint8Array(await bin.arrayBuffer())} as Index;
-  }catch{return undefined;}
- })();
+export function fontIndex(base=typeof document==='undefined'?'http://localhost/':document.baseURI,request:typeof fetch=fetch,timeoutMs=FONT_INDEX_TIMEOUT_MS){
+ if(!loading){
+  const attempt=bounded(async signal=>{
+   const [meta,bin]=await Promise.all([request(new URL('fonts/index.json',base),{signal}),request(new URL('fonts/index.bin',base),{signal})]);if(!meta.ok||!bin.ok)return undefined;
+   const index={...await meta.json(),bin:new Uint8Array(await bin.arrayBuffer())} as Index;signal.throwIfAborted();return validIndex(index)?index:undefined;
+  },timeoutMs).catch(()=>undefined);
+  loading=attempt;void attempt.then(index=>{if(!index&&loading===attempt)loading=undefined;});
+ }
+ return loading;
 }
 
 // One letter as the index describes it: the ink box of `cover` (coverage 0-1,
@@ -52,7 +68,7 @@ export function shortlist(index:Index,glyphs:{ch:string;d:Descriptor}[],count=6,
  for(const family of index.families){
   if(skip(family.family))continue;let best=Infinity;
   for(const face of family.faces){
-   let sum=0,n=0;for(const g of known){const at=face.row*index.cell*index.chars.length+g.at*index.cell;sum+=distance(g.d,index.bin,at);n++;}
+   let sum=0,n=0;for(const g of known){const at=face.row*index.cell*index.chars.length+g.at*index.cell;if(!index.bin.subarray(at,at+32).some(v=>v>0)){n=0;break;}sum+=distance(g.d,index.bin,at);n++;}
    if(n&&sum/n<best)best=sum/n;
   }
   if(best<Infinity)scored.push({family,score:best});
@@ -60,25 +76,46 @@ export function shortlist(index:Index,glyphs:{ch:string;d:Descriptor}[],count=6,
  return scored.sort((a,b)=>a.score-b.score).slice(0,count);
 }
 
-const BASE=(import.meta.env as Record<string,string|undefined>).VITE_FONT_BASE??'https://raw.githubusercontent.com/google/fonts/';
+const BASE=env.VITE_FONT_BASE??'https://raw.githubusercontent.com/google/fonts/';
 const fetched=new Map<string,Promise<boolean>>();
-const hex=(b:Uint8Array)=>Array.from(b,v=>v.toString(16).padStart(2,'0')).join('');
-// Downloads a family's Regular and Bold (one file when it is variable),
-// verified, and makes it drawable. False when it could not be had.
-export function loadWebFont(index:Index,family:Family,request:typeof fetch=fetch){
- if(isExtraFont(family.family))return Promise.resolve(true);
- if(!fetched.has(family.family))fetched.set(family.family,(async()=>{
-  const got=new Map<string,Uint8Array>();
-  for(const face of family.faces){
-   const info=family.files[face.file];let bytes=got.get(face.file);
-   if(!bytes){
-    const response=await request(`${BASE}${index.revision}/${family.licence}/${family.slug}/${encodeURIComponent(face.file)}`,{mode:'cors',credentials:'omit',referrerPolicy:'no-referrer'});if(!response.ok)return false;
-    bytes=new Uint8Array(await response.arrayBuffer());if(bytes.length!==info.bytes||hex(await digest(bytes))!==info.sha256)return false;got.set(face.file,bytes);
-   }
-   await registerFont(family.family,bytes,face.style,'web',info.variable);
-   if(info.variable)break;
-  }
-  return true;
- })().catch(()=>false).then(ok=>{if(!ok)fetched.delete(family.family);return ok;}));
- return fetched.get(family.family)!;
+function wantedFaces(index:Pick<Index,'revision'>,family:Family){
+ const seen=new Set<string>();return family.faces.flatMap(face=>{
+  const info=family.files[face.file],id=info?.variable?face.file:`${face.file}/${face.style}`;if(seen.has(id))return [];seen.add(id);
+  return [{style:face.style,variable:!!info?.variable,source:sourceFor(index,family,face.file)}];
+ });
+}
+async function acquire(family:string,sourceFamily:string,wanted:{style:FaceStyle;variable:boolean;source:WebFontSource}[],request:typeof fetch,timeoutMs:number){
+ await protectInstalledFont(family);
+ if(wanted.some(face=>!validWebSource(face.source))||!wanted.length||isProtectedFont(family))return false;
+ const current=extraFont(family);if(current?.origin==='yours')return false;
+ if(completedWebFont(family,wanted))return true;
+ const fingerprint=JSON.stringify([family.toLowerCase(),wanted]);
+ if(!fetched.has(fingerprint)){
+  const attempt=bounded(async signal=>{
+   const byFile=new Map<string,Promise<Uint8Array>>();
+   const inputs:FontFaceInput[]=await Promise.all(wanted.map(async face=>{
+    const pin=face.source,id=JSON.stringify(pin);if(!byFile.has(id))byFile.set(id,(async()=>{
+     const url=`${BASE.endsWith('/')?BASE:BASE+'/'}${pin.revision}/${pin.licence}/${pin.slug}/${encodeURIComponent(pin.file)}`;
+     const response=await request(url,{signal,mode:'cors',credentials:'omit',referrerPolicy:'no-referrer'});if(!response.ok)throw new Error('The font could not be downloaded.');
+     const bytes=new Uint8Array(await response.arrayBuffer());signal.throwIfAborted();if(bytes.length!==pin.bytes||hex(await digest(bytes))!==pin.sha256)throw new Error('The font did not match its pinned size and SHA-256.');signal.throwIfAborted();return bytes;
+    })());
+    return {bytes:await byFile.get(id)!,style:face.style,variable:face.variable,source:pin};
+   }));
+   signal.throwIfAborted();await registerFontFaces(family,inputs,'web',{sourceFamily,persist:true,signal});signal.throwIfAborted();return completedWebFont(family,wanted);
+  },timeoutMs).catch(()=>false);
+  fetched.set(fingerprint,attempt);void attempt.finally(()=>{if(fetched.get(fingerprint)===attempt)fetched.delete(fingerprint);});
+ }
+ return fetched.get(fingerprint)!;
+}
+// A family is published only after every required file passes its pinned checks.
+// The map holds in-flight work only, so removal/failure can always be retried.
+export async function loadWebFont(index:Index,family:Family,request:typeof fetch=fetch,{timeoutMs=FONT_DOWNLOAD_TIMEOUT_MS}:{timeoutMs?:number}={}){
+ await restoreFonts();return acquire(family.family,family.family,wantedFaces(index,family),request,timeoutMs);
+}
+// Saved text can recover the exact same pinned files if its local cache was
+// cleared. Local editions stay offline; uploading those same files also works.
+export async function restoreRequiredWebFont(required:ExtraFontRequirement,request:typeof fetch=fetch){
+ if(!WEB_FONTS||required.origin!=='web'||required.faces.some(face=>!validWebSource(face.source)))return false;
+ const family=extraFont(required.family)||isProtectedFont(required.family)?availableFontAlias(required.family,'web'):required.family;
+ return acquire(family,required.sourceFamily,required.faces.map(face=>({style:face.style,variable:face.variable,source:face.source!})),request,FONT_DOWNLOAD_TIMEOUT_MS);
 }
