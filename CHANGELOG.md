@@ -5,7 +5,8 @@
 - Merge the complete Claude branch through `b6bf947`: open directly in the Photo editor on the web and phones; links to individual PDF tools still open those tools.
 - Add a first-use welcome card with Open a file and Explore the example, a short text-editing guide and plainer edit-dialog wording.
 - Open imported scans, photos and PDFs at a readable width from the top of the page. Keep manual Fit page and Ctrl+0 consistent with the existing whole-page fit.
-- Give phone pages more vertical space and show a one-time hint to tap recognized text. Label the primary output action Download.
+- Give phone pages more vertical space and show a one-time hint to tap recognized text. Keep font and size controls visible when a text box is selected.
+- Keep Undo and Redo clicks made while an edited page reloads, applying them when the canvas is ready.
 - Preserve original-letter defaults, explicit replacement-font choices, page-loading guards, selected-area reading and all verified OCR/model delivery assets.
 
 ## 2026-11-22 — Reliable hosted AI model delivery
