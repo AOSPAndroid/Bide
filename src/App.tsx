@@ -79,8 +79,9 @@ import {editorCommands} from './editor-commands';
 
 export default function App() {
   const [entryTool,setEntryTool] = useState(()=>discoveryTool(window.location.search));
-  // Phones, upright or on their side, start on the PDF tools home rather than the dense Photo editor.
-  const [view, setView] = useState<Workspace>(()=>entryTool || HOSTED_BUILD || matchMedia('(max-width:699px),(pointer:coarse) and (max-height:500px)').matches ? 'pdf' : 'photo');
+  // The Photo editor, where text is detected and edited, opens first everywhere;
+  // a link to one PDF tool (?tool=compress-pdf…) opens the PDF tools.
+  const [view, setView] = useState<Workspace>(()=>entryTool ? 'pdf' : 'photo');
   useEffect(()=>{setMeasurementTool(entryTool || 'edit');trackMeasurement('editor_opened');},[]);
   const [pdfHome, setPdfHome] = useState(true);
   const documentView = useRef<'photo'|'pdf'>(view==='pdf'?'pdf':'photo');
