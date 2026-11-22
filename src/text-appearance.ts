@@ -27,23 +27,28 @@ export class Textbox extends FabricTextbox {
   // pixels (at 1x nothing under 0.8 px, then a 3 px box), so a soft line
   // drawn at a picture's own size came out sharp or too soft and pale.
   const scale=Math.min(Math.max(4,requestedScale),300/72,8192/Math.max(width,height),Math.sqrt(16000000/(width*height)));
-  const bitmap=util.createCanvasElement();bitmap.width=Math.ceil(width*scale);bitmap.height=Math.ceil(height*scale);
-  const context=bitmap.getContext('2d')!;context.scale(scale,scale);context.translate(width/2,height/2);
-  context.filter=`blur(${softness*scale}px)`;super._render(context);
-  return {bitmap,x:-width/2,y:-height/2,width:bitmap.width/scale,height:bitmap.height/scale};
+  const bitmap=util.createCanvasElement();
+  try{
+   bitmap.width=Math.ceil(width*scale);bitmap.height=Math.ceil(height*scale);
+   const context=bitmap.getContext('2d')!;context.scale(scale,scale);context.translate(width/2,height/2);
+   context.filter=`blur(${softness*scale}px)`;super._render(context);
+   return {bitmap,x:-width/2,y:-height/2,width:bitmap.width/scale,height:bitmap.height/scale};
+  }catch(error){bitmap.width=bitmap.height=0;throw error;}
  }
  _render(ctx:CanvasRenderingContext2D){
   if(!clampTextSoftness(this.textSoftness??0)){super._render(ctx);return;}
   const matrix=ctx.getTransform(),scale=Math.sqrt(Math.abs(matrix.a*matrix.d-matrix.b*matrix.c));
   const raster=this.softRaster(scale),quality=ctx.imageSmoothingQuality;
-  ctx.imageSmoothingQuality='high';ctx.drawImage(raster.bitmap,raster.x,raster.y,raster.width,raster.height);ctx.imageSmoothingQuality=quality;
+  try{ctx.imageSmoothingQuality='high';ctx.drawImage(raster.bitmap,raster.x,raster.y,raster.width,raster.height);}
+  finally{ctx.imageSmoothingQuality=quality;raster.bitmap.width=raster.bitmap.height=0;}
  }
  _toSVG():string[]{
   assertExtraFontsAvailable(textFontRequirements(this));
   if(!rasterizedText(this))return super._toSVG();
   // Rasterize this text layer only; other page content stays vector-based.
   const raster=this.softRaster(this.rasterScale??4);
-  return [`<image `,'COMMON_PARTS',`x="${raster.x}" y="${raster.y}" width="${raster.width}" height="${raster.height}" opacity="${this.opacity}" visibility="${this.visible?'visible':'hidden'}" xlink:href="${raster.bitmap.toDataURL('image/png')}"/>`];
+  try{return [`<image `,'COMMON_PARTS',`x="${raster.x}" y="${raster.y}" width="${raster.width}" height="${raster.height}" opacity="${this.opacity}" visibility="${this.visible?'visible':'hidden'}" xlink:href="${raster.bitmap.toDataURL('image/png')}"/>`];}
+  finally{raster.bitmap.width=raster.bitmap.height=0;}
  }
 }
 Textbox.customProperties=['id','name','pdfFontData','pdfOriginalFont','pdfFontFallback','pdfFontBold','pdfFontItalic','recognizedKey','ocrOriginalBounds','objectCaching','textSoftness','rasterScale','extraFontRequired','layerMask','layerStyle'];

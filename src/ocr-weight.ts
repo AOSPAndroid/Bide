@@ -28,17 +28,20 @@ export function chooseBold(source:number|undefined,regular:number|undefined,bold
 // Lines are judged by lineWeight (below).
 export function estimateOcrBold(text:string,family:string,height:number,density:number|undefined,blur=0):boolean{
  if(density===undefined||height<8||!text.trim())return false;
- const canvas=document.createElement('canvas'),ctx=canvas.getContext('2d',{willReadFrequently:true})!,size=Math.max(12,Math.min(100,height/.75)),soft=blur*size/(height/.75);
- function measure(weight:string){
-  const font=`${weight} ${size}px "${family}"`;
-  ctx.font=font;const m=ctx.measureText(text),pad=Math.ceil(soft*3);
-  const w=Math.ceil(m.actualBoundingBoxLeft+m.actualBoundingBoxRight),h=Math.ceil(m.actualBoundingBoxAscent+m.actualBoundingBoxDescent);
-  if(w<1||h<1||(w+pad*2)*(h+pad*2)>2000000)return undefined;
-  canvas.width=w+pad*2;canvas.height=h+pad*2;ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);
-  ctx.font=font;ctx.filter=soft>.05?`blur(${soft}px)`:'none';ctx.fillStyle='#000';ctx.fillText(text,pad+m.actualBoundingBoxLeft,pad+m.actualBoundingBoxAscent);ctx.filter='none';
-  return inkDensity(ctx.getImageData(pad,pad,w,h).data,[255,255,255]);
- }
- return chooseBold(density,measure('normal'),measure('bold'));
+ const canvas=document.createElement('canvas');
+ try{
+  const ctx=canvas.getContext('2d',{willReadFrequently:true})!,size=Math.max(12,Math.min(100,height/.75)),soft=blur*size/(height/.75);
+  function measure(weight:string){
+   const font=`${weight} ${size}px "${family}"`;
+   ctx.font=font;const m=ctx.measureText(text),pad=Math.ceil(soft*3);
+   const w=Math.ceil(m.actualBoundingBoxLeft+m.actualBoundingBoxRight),h=Math.ceil(m.actualBoundingBoxAscent+m.actualBoundingBoxDescent);
+   if(w<1||h<1||(w+pad*2)*(h+pad*2)>2000000)return undefined;
+   canvas.width=w+pad*2;canvas.height=h+pad*2;ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);
+   ctx.font=font;ctx.filter=soft>.05?`blur(${soft}px)`:'none';ctx.fillStyle='#000';ctx.fillText(text,pad+m.actualBoundingBoxLeft,pad+m.actualBoundingBoxAscent);ctx.filter='none';
+   return inkDensity(ctx.getImageData(pad,pad,w,h).data,[255,255,255]);
+  }
+  return chooseBold(density,measure('normal'),measure('bold'));
+ }finally{canvas.width=canvas.height=0;}
 }
 
 // Per-word ink evidence for a line. Words on one line share a text size, so
@@ -92,12 +95,15 @@ export function classifyWordWeights(words:(WordInk|undefined)[],uniformBold:bool
 
 // Reference ink of `text` in a face: alpha-weighted glyph area and ink width at 64px.
 export function glyphInk(text:string,family:string,weight:string):{area:number;width:number}|undefined{
- const canvas=document.createElement('canvas'),ctx=canvas.getContext('2d',{willReadFrequently:true})!,font=`${weight} 64px "${family}"`;
- ctx.font=font;const m=ctx.measureText(text),w=Math.ceil(m.actualBoundingBoxLeft+m.actualBoundingBoxRight),h=Math.ceil(m.actualBoundingBoxAscent+m.actualBoundingBoxDescent);
- if(w<1||h<1||w*h>4e6)return undefined;
- canvas.width=w;canvas.height=h;ctx.font=font;ctx.fillText(text,m.actualBoundingBoxLeft,m.actualBoundingBoxAscent);
- const data=ctx.getImageData(0,0,w,h).data;let area=0;for(let i=3;i<data.length;i+=4)area+=data[i]/255;
- return area>0?{area,width:w}:undefined;
+ const canvas=document.createElement('canvas');
+ try{
+  const ctx=canvas.getContext('2d',{willReadFrequently:true})!,font=`${weight} 64px "${family}"`;
+  ctx.font=font;const m=ctx.measureText(text),w=Math.ceil(m.actualBoundingBoxLeft+m.actualBoundingBoxRight),h=Math.ceil(m.actualBoundingBoxAscent+m.actualBoundingBoxDescent);
+  if(w<1||h<1||w*h>4e6)return undefined;
+  canvas.width=w;canvas.height=h;ctx.font=font;ctx.fillText(text,m.actualBoundingBoxLeft,m.actualBoundingBoxAscent);
+  const data=ctx.getImageData(0,0,w,h).data;let area=0;for(let i=3;i<data.length;i+=4)area+=data[i]/255;
+  return area>0?{area,width:w}:undefined;
+ }finally{canvas.width=canvas.height=0;}
 }
 
 // --- One weight for a line, from the shape of its strokes ---------------------
@@ -202,14 +208,17 @@ export function weightEvidence(observed:(number|undefined)[],chars:number[],blur
 // Words drawn in a face and weight at a font size in pixels, `pad` pixels
 // of margin around each: room for three times the largest blur tried.
 export function drawWords(words:string[],family:string,weight:string,size:number,pad=12):Strokes|undefined{
- const canvas=document.createElement('canvas'),ctx=canvas.getContext('2d',{willReadFrequently:true})!,font=`${weight} ${size}px "${family}"`;
- ctx.font=font;const metrics=words.map(w=>ctx.measureText(w));let x=0;
- const ascent=Math.ceil(Math.max(...metrics.map(m=>m.actualBoundingBoxAscent))),descent=Math.ceil(Math.max(...metrics.map(m=>m.actualBoundingBoxDescent)));
- const slots=metrics.map(m=>{const slot={x0:x,x1:x+Math.ceil(m.actualBoundingBoxLeft+m.actualBoundingBoxRight)+pad*2,left:m.actualBoundingBoxLeft};x=slot.x1;return slot;}),height=ascent+descent+pad*2;
- if(!words.length||x<1||height<1||x*height>6e5)return undefined;
- canvas.width=x;canvas.height=height;ctx.font=font;slots.forEach((s,i)=>ctx.fillText(words[i],s.x0+pad+s.left,pad+ascent));
- const data=ctx.getImageData(0,0,x,height).data,alpha=new Float32Array(x*height);for(let i=0;i<alpha.length;i++)alpha[i]=data[i*4+3]/255;
- return {alpha,width:x,height,slots:slots.map(({x0,x1})=>({x0,x1}))};
+ const canvas=document.createElement('canvas');
+ try{
+  const ctx=canvas.getContext('2d',{willReadFrequently:true})!,font=`${weight} ${size}px "${family}"`;
+  ctx.font=font;const metrics=words.map(w=>ctx.measureText(w));let x=0;
+  const ascent=Math.ceil(Math.max(...metrics.map(m=>m.actualBoundingBoxAscent))),descent=Math.ceil(Math.max(...metrics.map(m=>m.actualBoundingBoxDescent)));
+  const slots=metrics.map(m=>{const slot={x0:x,x1:x+Math.ceil(m.actualBoundingBoxLeft+m.actualBoundingBoxRight)+pad*2,left:m.actualBoundingBoxLeft};x=slot.x1;return slot;}),height=ascent+descent+pad*2;
+  if(!words.length||x<1||height<1||x*height>6e5)return undefined;
+  canvas.width=x;canvas.height=height;ctx.font=font;slots.forEach((s,i)=>ctx.fillText(words[i],s.x0+pad+s.left,pad+ascent));
+  const data=ctx.getImageData(0,0,x,height).data,alpha=new Float32Array(x*height);for(let i=0;i<alpha.length;i++)alpha[i]=data[i*4+3]/255;
+  return {alpha,width:x,height,slots:slots.map(({x0,x1})=>({x0,x1}))};
+ }finally{canvas.width=canvas.height=0;}
 }
 // Weight of a line set in one weight. `words`: its measurable words with the
 // core share of each (inkDensity) and, when the scan measured it, their ink

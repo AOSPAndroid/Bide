@@ -191,7 +191,8 @@ export async function detectedTextbox(region:TextRegion,{ocrFont,ocrStyle,matchB
  if(weightFamilies.has(family)){weights=undefined;bold=false;}
  let size=region.size,ocrAscent=region.height,charSpacing=region.kind==='pdf'&&!embedded?fallbackCharSpacing(family):0,boxWidth=Math.max(region.width+4,20);
  if(region.kind==='ocr'){
-  const ctx=document.createElement('canvas').getContext('2d')!,font=(b:boolean)=>`${italic?'italic ':''}${b?'bold ':''}100px "${family}"`;ctx.font=font(bold);const metrics=ctx.measureText(region.text);
+  const measure=document.createElement('canvas');measure.width=measure.height=0;
+  const ctx=measure.getContext('2d')!,font=(b:boolean)=>`${italic?'italic ':''}${b?'bold ':''}100px "${family}"`;ctx.font=font(bold);const metrics=ctx.measureText(region.text);
   // Ink width (not advance), to compare with the original's inked extent.
   let width=metrics.actualBoundingBoxLeft+metrics.actualBoundingBoxRight;
   if(weights?.ranges.length){width=0;let offset=0;for(const w of words!){const own=weights.ranges.find(r=>offset>=r.start&&offset<r.end);ctx.font=font(own?own.bold:bold);width+=ctx.measureText(w.text).width;offset+=Array.from(w.text).length+1;}ctx.font=font(bold);width+=ctx.measureText(' ').width*(words!.length-1)-(metrics.width-(metrics.actualBoundingBoxLeft+metrics.actualBoundingBoxRight));}
@@ -229,7 +230,11 @@ export async function matchedDetectedTextbox(region:TextRegion,c:Canvas,p:Page,r
  // A tilted line is fitted level, on the page turned back about its centre.
  const pdf=!!p.source,f=frameOf(region),fill=region.background||'#ffffff',regionsAll=framed(f,options.appearanceRegions??all,true);
  const native=pdf?await pdfScanScale(p.source!,p.index):undefined,k=pdf?native!==undefined&&native<=letterRasterScale(p.width,p.height,true)?native:Math.max(1,Math.min(4,32/Math.max(1,region.height),Math.sqrt(16e6/(p.width*p.height)))):1;
- const raster=levelRaster(pdf?await previewCanvas(p.source!,p.index,k,Math.ceil(p.width*k),Math.ceil(p.height*k)):await pageComposite(c,p),f,k,fill);
+ const source=pdf?await previewCanvas(p.source!,p.index,k,Math.ceil(p.width*k),Math.ceil(p.height*k)):await pageComposite(c,p);
+ let raster:HTMLCanvasElement|undefined;
+ try{
+ raster=levelRaster(source,f,k,fill);
+ if(raster!==source)source.width=source.height=0;
  const fine=(list:TextRegion[])=>k===1?list:scaleRegions(list,k,k),fineRegion=fine([region])[0],fineAll=fine(regionsAll);
  const fitted=await matchOcrAppearance(raster,fineRegion,fineAll,options.ocrFont,{autoFont:options.autoFont,matchBlur:options.matchBlur,makeText,weights:options.ocrStyle==='auto',alike:alikeLines(raster,fineAll,fineRegion)});
  if(!fitted)return detectedTextbox(region,{...options,pageInk:await ink(options.ocrFont)});
@@ -244,6 +249,7 @@ export async function matchedDetectedTextbox(region:TextRegion,c:Canvas,p:Page,r
   text.rasterScale=k;
  }
  return {text:turnLayer(text,region),embedded:false};
+ }finally{source.width=source.height=0;if(raster&&raster!==source)raster.width=raster.height=0;}
 }
 
 // Hide the original OCR text by clearing, repairing or patching the area under

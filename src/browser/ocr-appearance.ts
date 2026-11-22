@@ -48,12 +48,14 @@ function localSamples(raster:HTMLCanvasElement,region:TextRegion,regions:TextReg
 // blur were as close or closer (68% → 71% of font edits without a visible
 // difference) and 6 times faster (median 1.6 s → 0.27 s, slowest 100 s → 1.1 s).
 function coverageRenderer(sample:Sample,scale=1){
- const canvas=document.createElement('canvas'),ctx=canvas.getContext('2d',{willReadFrequently:true})!,hi=document.createElement('canvas'),hiCtx=hi.getContext('2d')!;
- canvas.width=sample.source.width;canvas.height=sample.source.height;hi.width=canvas.width*4;hi.height=canvas.height*4;
- return (text:Textbox)=>{
+ const canvas=document.createElement('canvas'),hi=document.createElement('canvas');
+ canvas.width=sample.source.width;canvas.height=sample.source.height;hi.width=hi.height=0;
+ const ctx=canvas.getContext('2d',{willReadFrequently:true})!,hiCtx=hi.getContext('2d')!;
+ const render=(text:Textbox)=>{
   ctx.clearRect(0,0,canvas.width,canvas.height);
   const softness=text.textSoftness??0;
   if(softness){
+   if(!hi.width){hi.width=canvas.width*4;hi.height=canvas.height*4;}
    text.textSoftness=0;
    try{hiCtx.clearRect(0,0,hi.width,hi.height);hiCtx.save();hiCtx.translate(-sample.left*4,-sample.top*4);hiCtx.scale(4*scale,4*scale);text.render(hiCtx);hiCtx.restore();ctx.drawImage(hi,0,0,canvas.width,canvas.height);}
    finally{text.textSoftness=softness;}
@@ -62,6 +64,9 @@ function coverageRenderer(sample:Sample,scale=1){
   ctx.save();ctx.translate(-sample.left,-sample.top);ctx.scale(scale,scale);text.render(ctx);ctx.restore();
   return alphaCoverage(ctx.getImageData(0,0,canvas.width,canvas.height).data,canvas.width,canvas.height);
  };
+ // WebKit can retain a canvas's backing store until a later GC. Release it
+ // explicitly so repeated font trials do not accumulate native bitmaps.
+ return Object.assign(render,{dispose:()=>{canvas.width=canvas.height=hi.width=hi.height=0;}});
 }
 
 // Render through the same editable Textbox used by the workspace, at native
@@ -74,6 +79,7 @@ export async function matchOcrAppearance(raster:HTMLCanvasElement,region:TextReg
  // to the selected letters. Compare actual native pixels, not a blur-radius
  // estimate, which varies with the font's stroke thickness.
  const selected=samplePixels(raster,region,regions),selectedEdges=selected&&coverageEdgeWidth(selected.source),paintSelected=selected&&coverageRenderer(selected);
+ try{
  const softnessValues=matchBlur?[0,.1,.2,.3,.4,.6,.8,1,1.4,2]:[0];
  // Ranked against every bundled text face (63 families), not only the usual
  // dozen: a face outside the list was approximated by whichever fitted least
@@ -101,6 +107,7 @@ export async function matchOcrAppearance(raster:HTMLCanvasElement,region:TextReg
   for(const sample of samples){
    const text=await makeText(sample.region,candidateFamily),size=text.fontSize,ascent=text.top-sample.region.top+size*.93;
    text.set({fill:'#000000',objectCaching:false});const render=coverageRenderer(sample),paint=()=>render(text);
+   try{
    let fit:Fit|undefined;
    const tryShifts=(ratio:number,softness:number)=>{
     text.set({fontSize:size*ratio,left:sample.region.left,top:sample.region.top+ascent-size*ratio*.93});text.initDimensions();
@@ -144,6 +151,7 @@ export async function matchOcrAppearance(raster:HTMLCanvasElement,region:TextReg
      const painted=paint();f.gain=coreGain(sample.source,painted);f.mass=inkRatio(sample.source,painted,f.gain);fits.push(f);onFit?.(f);
     }
    }
+   }finally{render.dispose();}
   }
   if(!fits.length)continue;
   const score=fits.reduce((sum,f)=>sum+f.score,0)/fits.length;
@@ -231,6 +239,7 @@ export async function matchOcrAppearance(raster:HTMLCanvasElement,region:TextReg
   if(all.length)best.mass=median(all);
  }
  return best;
+ }finally{paintSelected?.dispose();}
 }
 
 // Open families whose letters look like the samples', downloaded and ready
@@ -329,7 +338,7 @@ export function matchOcrPlacement(raster:HTMLCanvasElement,region:TextRegion,reg
    const sized={...best};
    for(const r of pass?[-.005,.005]:[-.03,-.02,-.01,.01,.02,.03])tried(sized.dx,sized.dy,sized.ratio+r);
   }
- }finally{place(best.dx,best.dy,best.ratio);text.set({fill:base.fill});}
+ }finally{paint.dispose();place(best.dx,best.dy,best.ratio);text.set({fill:base.fill});}
 }
 
 // Softness alone, for a text already fitted in place: rendered over the
@@ -361,7 +370,7 @@ export function matchOcrSoftness(raster:HTMLCanvasElement,region:TextRegion,regi
    const score=(softness:number)=>{text.textSoftness=softness;return coverageFit(selected.source,paint(text)).score;};
    if(score(best)<score(fitted)-.01)best=fitted;
   }
- }finally{text.textSoftness=saved;}
+ }finally{paint.dispose();text.textSoftness=saved;}
  return best;
 }
 
@@ -371,8 +380,8 @@ export function matchOcrSoftness(raster:HTMLCanvasElement,region:TextRegion,regi
 export function matchOcrInk(raster:HTMLCanvasElement,region:TextRegion,regions:TextRegion[],text:Textbox,scale:number){
  const up=(r:TextRegion)=>({...r,left:r.left*scale,top:r.top*scale,width:r.width*scale,height:r.height*scale});
  const selected=samplePixels(raster,up(region),regions.map(up),FINE_AREA);if(!selected)return undefined;
- const fill=text.fill;text.set({fill:'#000000'});
- try{const gain=coreGain(selected.source,coverageRenderer(selected,scale)(text));return gain>0?gain:undefined;}finally{text.set({fill});}
+ const fill=text.fill,paint=coverageRenderer(selected,scale);text.set({fill:'#000000'});
+ try{const gain=coreGain(selected.source,paint(text));return gain>0?gain:undefined;}finally{paint.dispose();text.set({fill});}
 }
 
 export function applyOcrAppearance(text:Textbox,region:TextRegion,fit:Fit){

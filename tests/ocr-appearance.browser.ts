@@ -17,6 +17,29 @@ function outputEdges(text:Textbox,width:number,height:number){
  const native=document.createElement('canvas');native.width=width;native.height=height;const c=native.getContext('2d')!;c.drawImage(hi,0,0,width,height);
  return coverageEdgeWidth(alphaCoverage(c.getImageData(0,0,width,height).data,width,height));
 }
+// Safari may keep an unreferenced canvas's backing store until a later GC.
+// Hold the temporary canvases ourselves so this checks explicit release after
+// real font matches, independently of the test browser's GC timing.
+function trackTemporaryCanvases(){
+ const create=document.createElement,width=Object.getOwnPropertyDescriptor(HTMLCanvasElement.prototype,'width')!,height=Object.getOwnPropertyDescriptor(HTMLCanvasElement.prototype,'height')!;
+ const canvases:HTMLCanvasElement[]=[],sizes=new Map<HTMLCanvasElement,number>();let bytes=0,peakBytes=0;
+ const observe=(canvas:HTMLCanvasElement)=>{const next=canvas.width*canvas.height*4;bytes+=next-(sizes.get(canvas)??0);sizes.set(canvas,next);peakBytes=Math.max(peakBytes,bytes);};
+ document.createElement=((tag:string,options?:ElementCreationOptions)=>{
+  const element=create.call(document,tag,options);
+  if(element instanceof HTMLCanvasElement){
+   canvases.push(element);observe(element);
+   Object.defineProperties(element,{
+    width:{configurable:true,get:()=>width.get!.call(element),set:(value:number)=>{width.set!.call(element,value);observe(element);}},
+    height:{configurable:true,get:()=>height.get!.call(element),set:(value:number)=>{height.set!.call(element,value);observe(element);}},
+   });
+  }
+  return element;
+ }) as typeof document.createElement;
+ return {
+  snapshot:()=>({canvases:canvases.length,retainedBytes:bytes,peakBytes}),
+  close(){document.createElement=create;for(const canvas of canvases){delete (canvas as Partial<HTMLCanvasElement>).width;delete (canvas as Partial<HTMLCanvasElement>).height;canvas.width=canvas.height=0;}},
+ };
+}
 document.querySelector('#run')!.addEventListener('click',async()=>{
  try{
   const results=[];
@@ -106,6 +129,27 @@ document.querySelector('#run')!.addEventListener('click',async()=>{
    if(converted.textSoftness)throw Error('Convert all softened a single-region page');
    results.push({case:'Original lettering refusal, explicit font choice and crisp bulk conversion',originalUnchanged:true,font:edited.fontFamily,softness:edited.textSoftness,bulkSoftness:converted.textSoftness??0});
   }finally{await scene.dispose();}
+  const temporary=trackTemporaryCanvases(),passes:number[]=[];
+  try{
+   for(let i=0;i<3;i++){
+    const match=await matchOcrAppearance(canvas,regions[0],regions,'Inter',{autoFont:true,matchBlur:true,makeText});
+    if(!match)throw Error('Repeated font choice could not match the original line');
+    passes.push(temporary.snapshot().retainedBytes);
+   }
+   const memory={...temporary.snapshot(),retainedAfterEachMatch:passes,retainedLimit:256*1024,peakLimit:16*1024*1024};
+   results.push({case:'Repeated font choices explicitly release temporary canvas backing stores',...memory});
+   // Permit one persistent Fabric text-measurement canvas (300 × 150 RGBA).
+   // Native and 4× matching rasters and font-ranking masks are temporary.
+   if(passes.some(bytes=>bytes>memory.retainedLimit)||memory.peakBytes>memory.peakLimit)throw Error(`Font matching retained temporary canvas backing stores: ${JSON.stringify(memory)}`);
+  }finally{temporary.close();}
+  const interrupted=trackTemporaryCanvases();
+  try{
+   const unavailable=new Error('The requested font could not be loaded');let failure:unknown;
+   try{await matchOcrAppearance(canvas,regions[0],regions,'Inter',{autoFont:false,matchBlur:true,makeText:async()=>{throw unavailable;}});}catch(error){failure=error;}
+   if(failure!==unavailable)throw Error('The failed font match did not preserve its loading error');
+   const memory=interrupted.snapshot();results.push({case:'A failed font choice releases its temporary backing stores',...memory});
+   if(!memory.canvases||memory.retainedBytes!==0)throw Error(`A failed font match retained temporary canvas backing stores: ${JSON.stringify(memory)}`);
+  }finally{interrupted.close();}
   result.textContent=JSON.stringify({passed:true,results},null,2);
  }catch(error){result.textContent=String(error);}
 });

@@ -16,11 +16,14 @@ function isInstalled(family:string){if(!installed.has(family))installed.set(fami
 export type FontSample={text:string;pixels:ImageData;background:readonly number[]};
 
 function rendered(text:string,family:string,weight:string):Mask|undefined{
- const canvas=document.createElement('canvas'),ctx=canvas.getContext('2d',{willReadFrequently:true})!,font=`${weight} 64px "${family}"`;
- ctx.font=font;const m=ctx.measureText(text),w=Math.ceil(m.actualBoundingBoxLeft+m.actualBoundingBoxRight)+4,h=Math.ceil(m.actualBoundingBoxAscent+m.actualBoundingBoxDescent)+4;
- if(w<2||h<2||w*h>4e6)return undefined;
- canvas.width=w;canvas.height=h;ctx.font=font;ctx.fillStyle='#000';ctx.fillText(text,m.actualBoundingBoxLeft+2,m.actualBoundingBoxAscent+2);
- return normalizeMask(inkMask(ctx.getImageData(0,0,w,h).data,w,h,[255,255,255]));
+ const canvas=document.createElement('canvas');
+ try{
+  const ctx=canvas.getContext('2d',{willReadFrequently:true})!,font=`${weight} 64px "${family}"`;
+  ctx.font=font;const m=ctx.measureText(text),w=Math.ceil(m.actualBoundingBoxLeft+m.actualBoundingBoxRight)+4,h=Math.ceil(m.actualBoundingBoxAscent+m.actualBoundingBoxDescent)+4;
+  if(w<2||h<2||w*h>4e6)return undefined;
+  canvas.width=w;canvas.height=h;ctx.font=font;ctx.fillStyle='#000';ctx.fillText(text,m.actualBoundingBoxLeft+2,m.actualBoundingBoxAscent+2);
+  return normalizeMask(inkMask(ctx.getImageData(0,0,w,h).data,w,h,[255,255,255]));
+ }finally{canvas.width=canvas.height=0;}
 }
 
 export async function rankOcrFonts(samples:FontSample[],candidates=[...fontCandidates,...systemCandidates]):Promise<{family:string;score:number}[]>{
