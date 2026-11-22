@@ -44,12 +44,14 @@ def licence_of(slug):
 
 def descriptor(font_bytes):
  f=ImageFont.truetype(io.BytesIO(font_bytes),SIZE)
- cap=f.getbbox('H');cap_h=max(1,cap[3]-cap[1]);out=bytearray()
+ cap_im=Image.new('L',(SIZE*3,SIZE*3),0);ImageDraw.Draw(cap_im).text((SIZE,SIZE),'H',font=f,fill=255);cap=cap_im.getbbox() or (0,0,1,SIZE);cap_h=max(1,cap[3]-cap[1]);out=bytearray()
  for ch in CHARS:
-  box=f.getbbox(ch)
-  if not box or box[2]<=box[0] or box[3]<=box[1]:out+=bytes(34);continue
-  w,h=box[2]-box[0],box[3]-box[1]
-  im=Image.new('L',(w,h),0);ImageDraw.Draw(im).text((-box[0],-box[1]),ch,font=f,fill=255)
+  # The ink itself: drawn with room around it, then cut to the pixels at 30% or more
+  # (the font's own box starts at the origin, side bearing included).
+  big=Image.new('L',(SIZE*3,SIZE*3),0);ImageDraw.Draw(big).text((SIZE,SIZE),ch,font=f,fill=255)
+  box=big.point(lambda v:255 if v>=77 else 0).getbbox()
+  if not box:out+=bytes(34);continue
+  im=big.crop(box);w,h=im.size
   small=im.resize((8,8),Image.BOX).tobytes()
   cells=bytes(((small[i]>>4)<<4)|(small[i+1]>>4) for i in range(0,64,2))
   out+=cells+bytes([min(255,round(64*w/h)),min(255,round(128*h/cap_h))])
