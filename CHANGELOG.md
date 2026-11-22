@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-11-22 — Editor-first interface and clearer phone flow
+
+- Merge the complete Claude branch through `b6bf947`: open directly in the Photo editor on the web and phones; links to individual PDF tools still open those tools.
+- Add a first-use welcome card with Open a file and Explore the example, a short text-editing guide and plainer edit-dialog wording.
+- Open imported scans, photos and PDFs at a readable width from the top of the page. Keep manual Fit page and Ctrl+0 consistent with the existing whole-page fit.
+- Give phone pages more vertical space and show a one-time hint to tap recognized text. Label the primary output action Download.
+- Preserve original-letter defaults, explicit replacement-font choices, page-loading guards, selected-area reading and all verified OCR/model delivery assets.
+
 ## 2026-11-22 — Reliable hosted AI model delivery
 
 - Serve the existing, verified LaMa model directly from the hosted site in 21 files no larger than 5 MiB. This avoids the observed timeout downloading the larger upstream model during AI background edits.
