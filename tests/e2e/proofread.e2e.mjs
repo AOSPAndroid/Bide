@@ -28,7 +28,7 @@ test('Proofread retains unsupported corrections and fixes words using the same l
   // correction and keep it available, with the saved page unchanged.
   const saved=()=>page.evaluate(async()=>{const {restoreLocal}=await import('/src/model.ts');return JSON.stringify((await restoreLocal()).pages[0].canvas);});
   const before=await saved();
-  await page.getByRole('button',{name:'Proofread'}).click();
+  await page.getByRole('button',{name:'Proofread'}).first().click();
   const pending=page.locator('.proofread-line',{hasText:'rnodern'});await pending.waitFor({timeout:60000});
   await pending.getByRole('button',{name:'Use modern'}).click();
   await page.getByText('Cannot preserve the original lettering',{exact:false}).waitFor({timeout:30000});

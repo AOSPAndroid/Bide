@@ -102,7 +102,7 @@ export async function matchOcrAppearance(raster:HTMLCanvasElement,region:TextReg
   };
   const allowedSoftness=(ratio:number,dx=0,dy=0)=>softnessValues.filter(softness=>allows(ratio,softness,dx,dy));
   const ratios=[.9,.925,.95,.975,1,1.025,1.05,1.075,1.1];
-  const fits:Fit[]=[];
+  const fits:Fit[]=[];let mine:Fit|undefined;
   for(const sample of samples){
    const text=await makeText(sample.region,candidateFamily),size=text.fontSize,ascent=text.top-sample.region.top+size*.93;
    text.set({fill:'#000000',objectCaching:false});const render=coverageRenderer(sample),paint=()=>render(text);
@@ -151,7 +151,7 @@ export async function matchOcrAppearance(raster:HTMLCanvasElement,region:TextReg
     if(fit){
      // Colour from the stroke cores at the chosen placement, not the fit's gain.
      const f=fit as Fit;text.set({fontSize:size*f.ratio,left:sample.region.left+f.dx,top:sample.region.top+ascent-size*f.ratio*.93+f.dy});text.textSoftness=f.softness;text.initDimensions();
-     const painted=paint();f.gain=coreGain(sample.source,painted);f.mass=inkRatio(sample.source,painted,f.gain);fits.push(f);onFit?.(f);
+     const painted=paint();f.gain=coreGain(sample.source,painted);f.mass=inkRatio(sample.source,painted,f.gain);fits.push(f);if(sample.region.id===region.id)mine=f;onFit?.(f);
     }
    }
   }
@@ -162,7 +162,11 @@ export async function matchOcrAppearance(raster:HTMLCanvasElement,region:TextReg
   const score=fits.reduce((sum,f)=>sum+f.score,0)/fits.length;
   // (The softness of two lines is the crisper one's, not a value between that neither has.)
   const masses=fits.flatMap(f=>f.mass===undefined?[]:[f.mass]);
-  const aggregate={family:candidateFamily,score,softness:fits.map(f=>f.softness).sort((a,b)=>a-b)[(fits.length-1)>>1],ratio:median(fits.map(f=>f.ratio)),dx:median(fits.map(f=>f.dx)),dy:median(fits.map(f=>f.dy)),gain:median(fits.map(f=>f.gain)),masses};
+  const middle={family:candidateFamily,score,softness:fits.map(f=>f.softness).sort((a,b)=>a-b)[(fits.length-1)>>1],ratio:median(fits.map(f=>f.ratio)),dx:median(fits.map(f=>f.dx)),dy:median(fits.map(f=>f.dy)),gain:median(fits.map(f=>f.gain)),masses};
+  // Among its neighbours, the line's own letters give its size, place and
+  // softness (the average of two lines is a placement neither has: a 12 px
+  // name came out 4% small beside a label in capitals); the others weigh on the face.
+  const aggregate=mine&&fits.includes(mine)?{...middle,softness:mine.softness,ratio:mine.ratio,dx:mine.dx,dy:mine.dy}:middle;
   // Combining separate medians can create a placement we never evaluated.
   // Keep an actual fitted tuple when that combination would soften the edges.
   const result=allows(aggregate.ratio,aggregate.softness,aggregate.dx,aggregate.dy)?aggregate:{...fits.reduce((a,b)=>a.score>b.score?a:b),score};

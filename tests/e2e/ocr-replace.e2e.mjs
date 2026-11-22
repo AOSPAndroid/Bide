@@ -127,7 +127,7 @@ test('editing image text reuses the original letters; find & replace fixes every
   assert.ok(saved.some(l=>/^Edited text: Nom du client: Jean MARTIN/.test(l.name)),'letters patch: '+saved.map(l=>l.name).join(', '));
   assert.ok(!saved.some(l=>l.type==='Textbox'||l.type==='textbox'),'no font text was needed');
   // Find & replace fixes the remaining line in one step.
-  await page.getByRole('button',{name:'Find & replace'}).click();await page.getByLabel('Find text').fill('Jeaan');await page.getByLabel('Replace with').fill('Jean');
+  await page.getByRole('button',{name:'Find & replace'}).first().click();await page.getByLabel('Find text').fill('Jeaan');await page.getByLabel('Replace with').fill('Jean');
   assert.match(await page.locator('[aria-live=polite]').innerText(),/^1 detected line contains/);
   await page.getByRole('button',{name:'Replace all'}).click();saved=await layers();
   assert.ok(saved.some(l=>/^Edited text: Titulaire: Jean MARTIN/.test(l.name)),'find & replace patch');
