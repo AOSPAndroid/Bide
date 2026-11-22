@@ -17,6 +17,7 @@ import type {XY} from './retouch-pixels';
 import type {Obj,Tool} from './editor-types';
 import type {TouchHooks} from './touch-gestures';
 import {revealEditedText} from './text-reveal';
+import {fitOneLine} from './detected-text';
 
 export type SelectionRegion={id:string;points:SelectionPoint[];mask?:Mask;outline?:string;readOnly?:boolean};
 export type CanvasEventDeps={
@@ -67,7 +68,10 @@ export function attachCanvasEvents(c:Canvas,d:CanvasEventDeps){
   c.on('object:modified', () => saveCanvasRef.current());
   c.on('text:editing:exited', e => {saveCanvasRef.current();void validateTextFont(e.target as Obj);});
   let textTimer: ReturnType<typeof setTimeout>;
-  c.on('text:changed', () => { clearTimeout(textTimer); textTimer = setTimeout(() => saveCanvasRef.current(), 400); });
+  c.on('text:changed', e => {
+    const o=e.target;if(o instanceof Textbox&&(o as Obj).recognizedKey?.startsWith('ocr:')){fitOneLine(o);o.setCoords();c.requestRenderAll();}
+    clearTimeout(textTimer); textTimer = setTimeout(() => saveCanvasRef.current(), 400);
+  });
   c.on('path:created', e => { const erase=toolRef.current==='eraser'; if(erase)makeEraserStroke(e.path); Object.assign(e.path, {id:uid(),name:erase?'Eraser stroke':toolRef.current==='highlight'?'Freehand highlight':'Brush stroke'}); c.requestRenderAll(); saveCanvasRef.current(); });
   c.on('object:moving', e => {
     if (!snapRef.current || e.e.altKey) return;

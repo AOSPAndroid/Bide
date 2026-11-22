@@ -2,7 +2,7 @@ import {isUncertain,fieldBox,closestTextRegion,doubtfulLetters,DOUBT,regionsAfte
 import {imagePage,imageFormats,sameKindImage} from './image-export';
 import {storedOcrLanguages,storeOcrLanguages} from './ocr-languages';
 import TextDetectionBar,{defaultOcrSettings,type OcrSettings} from './TextDetectionBar';
-import {searchableText,hasScannableContent,scanPageText,matchedDetectedTextbox,coverOcrText,aiRemoveSelection,aiSharpenImage,pageComposite} from './detected-text';
+import {searchableText,hasScannableContent,scanPageText,matchedDetectedTextbox,coverOcrText,aiRemoveSelection,aiSharpenImage,pageComposite,fitOneLine} from './detected-text';
 import SelectionBar,{ColorRangeDialog,type SelectionAction} from './SelectionBar';
 import SelectedTextDialog,{type SelectedTextResult} from './SelectedTextDialog';
 import {readSelectedText,sameReadablePage} from './read-selected-text';
@@ -759,7 +759,8 @@ export default function App() {
     if(isAdjustment(o)&&(values.layerStyle||(values.globalCompositeOperation!==undefined&&values.globalCompositeOperation!=='source-over'))){notify('Adjustment layers use Normal blend mode and their own settings.');return;}
     if(o instanceof Textbox&&o.isEditing)o.exitEditing();
     if (o.lockMovementX && !Object.keys(values).every(key => key === 'name')) { notify('Unlock this layer before editing it.'); return; }
-    o.set(values); o.setCoords(); c.requestRenderAll(); refresh(v => v+1); if (save) saveCanvas();if(values.text!==undefined||values.fontFamily!==undefined||values.fontWeight!==undefined||values.fontStyle!==undefined)void validateTextFont(o);
+    o.set(values);if(values.text!==undefined&&o instanceof Textbox&&(o as Obj).recognizedKey?.startsWith('ocr:'))fitOneLine(o);
+    o.setCoords(); c.requestRenderAll(); refresh(v => v+1); if (save) saveCanvas();if(values.text!==undefined||values.fontFamily!==undefined||values.fontWeight!==undefined||values.fontStyle!==undefined)void validateTextFont(o);
   }
   function addObject(o: Obj, name: string) {
     const c = canvas.current; if (!c) return;
