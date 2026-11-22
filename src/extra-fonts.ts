@@ -31,7 +31,7 @@ const slot=(r:Pick<StoredFace,'style'|'variable'>)=>`${r.style}/${r.variable?'va
 const conflicts=(a:Pick<StoredFace,'style'|'variable'|'sha256'>,b:Pick<StoredFace,'style'|'variable'|'sha256'>)=>styles(a).some(style=>styles(b).includes(style))&&(a.sha256!==b.sha256||a.variable!==b.variable);
 const facePresent=(face:FontFace|undefined)=>!!face&&typeof document!=='undefined'&&document.fonts.has(face);
 const complete=(r:Registered)=>r.records.length>0&&r.records.every(face=>facePresent(r.faces.get(slot(face))));
-export const validWebSource=(s:WebFontSource|undefined):s is WebFontSource=>!!s&&/^[a-f0-9]{40}$/.test(s.revision)&&/^[a-z0-9]+$/.test(s.slug)&&['ofl','apache','ufl'].includes(s.licence)&&!!s.file&&!/[\\/]/.test(s.file)&&/\.(?:ttf|otf|woff2?)$/i.test(s.file)&&/^[a-f0-9]{64}$/.test(s.sha256)&&Number.isSafeInteger(s.bytes)&&s.bytes>0&&s.bytes<=32*1024*1024;
+export const validWebSource=(s:WebFontSource|undefined):s is WebFontSource=>!!s&&/^[a-f0-9]{40}$/.test(s.revision)&&/^[a-z0-9]+$/.test(s.slug)&&['ofl','apache','ufl'].includes(s.licence)&&!!s.file&&!/[\\/]/.test(s.file)&&/\.(?:ttf|otf|woff2?)$/i.test(s.file)&&/^[a-f0-9]{64}$/.test(s.sha256)&&Number.isSafeInteger(s.bytes)&&s.bytes>0;
 const sameSource=(a:WebFontSource|undefined,b:WebFontSource|undefined)=>!!a&&!!b&&a.revision===b.revision&&a.slug===b.slug&&a.licence===b.licence&&a.file===b.file&&a.sha256===b.sha256&&a.bytes===b.bytes;
 
 // "Raleway-BoldItalic.ttf" -> Raleway, BoldItalic. File names are aliases;
