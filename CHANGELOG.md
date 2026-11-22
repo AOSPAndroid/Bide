@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-11-22 — Broader font matching and proportional digits
+
+- Merge the full Claude branch through `226925b`, including `d0439d4` and `5a27dfe`.
+- Rank explicit font edits against 60 bundled text families plus available system fonts; add display-serif candidates such as DM Serif Display and Playfair Display. All existing font assets remain available.
+- Compare the current family's fitted stroke weight before switching faces, so a matching Light face is retained when a heavier alternative scores better on shape alone.
+- Use measured digit geometry to distinguish proportional and tabular figures. Additional clearance guards protect short number runs and the preceding word when replacement digits become wider.
+- Keep safe digit swaps in their original positions within each number group. Changes to the group's figure widths retain proportional reflow, avoiding collisions and wide gaps.
+- Keep original-letter editing, explicit font consent, manual style choices and the previous font-weight and sharpness safeguards.
+
+
 ## 2026-11-21 — Original-letter spacing and crisp font fitting
 
 - Merge the complete Claude branch through `5cac356`, including `dfe8624` and `35b18f4`.
