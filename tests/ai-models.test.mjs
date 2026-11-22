@@ -1,9 +1,69 @@
 import {test} from 'node:test';import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
+import {mkdtemp,mkdir,writeFile,readFile,readdir,rm} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {stageDemoLama,splitLargeFiles} from '../scripts/stage-ai-models.mjs';
 import {loadPinnedModel,loadModelSources,modelBytes,MODEL_CACHE} from '../tmp/ai-models.mjs';
 const bytes=new Uint8Array([1,2,3,4]),sha256=createHash('sha256').update(bytes).digest('hex');
 const source={url:'https://example.test/model/resolve/pinned-revision/model.onnx',bytes:bytes.length,sha256};
 const local=new URL('https://local.test/bide/ai/models/model.onnx');
+async function stagingFixture(t,prepared) {
+ const dir=await mkdtemp(join(tmpdir(),'bide-lama-build-'));t.after(()=>rm(dir,{recursive:true,force:true}));
+ const source=join(dir,'public/ai'),destination=join(dir,'out/ai');
+ await mkdir(join(source,'models'),{recursive:true});
+ const output={bytes:prepared.length,sha256:createHash('sha256').update(prepared).digest('hex')};
+ const manifest={files:{'lama.onnx':{bytes:prepared.length+100,sha256:'0'.repeat(64),output}}};
+ await writeFile(join(source,'manifest.json'),JSON.stringify(manifest));
+ await writeFile(join(source,'models/lama.onnx'),prepared);
+ return {source,destination,manifest};
+}
+test('demo build stages only the verified prepared LaMa output in parts no larger than 5 MiB',async t=>{
+ const prepared=Buffer.alloc(5*2**20+17,53);prepared[prepared.length-1]=97;
+ const {source,destination}=await stagingFixture(t,prepared);
+ await writeFile(join(source,'models/other.onnx'),'unrelated model');
+ await writeFile(join(source,'models/ppocr-latin-dict.json'),'source dictionary');
+ await mkdir(join(destination,'models'),{recursive:true});
+ await writeFile(join(destination,'models/ppocr-latin-dict.json'),'existing dictionary');
+ await stageDemoLama(source,destination);
+ assert.deepEqual((await readdir(join(destination,'models'))).sort(),['lama.onnx.part0','lama.onnx.part1','lama.onnx.parts.json','ppocr-latin-dict.json']);
+ const manifest=JSON.parse(await readFile(join(destination,'models/lama.onnx.parts.json'),'utf8'));
+ assert.deepEqual(manifest,{size:prepared.length,parts:2});
+ const parts=await Promise.all(Array.from({length:manifest.parts},(_,i)=>readFile(join(destination,`models/lama.onnx.part${i}`))));
+ assert.ok(parts.every(part=>part.length<=5*2**20));
+ assert.deepEqual(Buffer.concat(parts),prepared);
+ assert.equal(await readFile(join(destination,'models/ppocr-latin-dict.json'),'utf8'),'existing dictionary');
+ assert.equal(await readFile(join(source,'models/other.onnx'),'utf8'),'unrelated model');
+ assert.deepEqual(await readFile(join(source,'models/lama.onnx')),prepared);
+});
+test('demo build rejects corrupt or truncated prepared LaMa before writing the output',async t=>{
+ for(const [damaged,message] of [[Buffer.from([9,2,3,4]),/SHA-256 integrity/],[Buffer.from([1,2]),/output size/]]){
+  const {source,destination}=await stagingFixture(t,bytes);
+  await writeFile(join(source,'models/lama.onnx'),damaged);
+  await assert.rejects(stageDemoLama(source,destination),message);
+  await assert.rejects(readdir(destination),{code:'ENOENT'});
+ }
+});
+test('demo build requires the prepared output pin rather than accepting the upstream model pin',async t=>{
+ for(const output of [undefined,{bytes:0,sha256},{bytes:4,sha256:'invalid'}]){
+  const {source,destination,manifest}=await stagingFixture(t,bytes);
+  manifest.files['lama.onnx']={bytes:bytes.length,sha256,output};
+  await writeFile(join(source,'manifest.json'),JSON.stringify(manifest));
+  await assert.rejects(stageDemoLama(source,destination),/output size and SHA-256 are required/);
+  await assert.rejects(readdir(destination),{code:'ENOENT'});
+ }
+});
+test('shared build splitter preserves the existing paid build threshold and part sizes',async t=>{
+ const prepared=Buffer.alloc(24*2**20,31),{source}=await stagingFixture(t,prepared);
+ await splitLargeFiles(join(source,'models'));
+ assert.deepEqual(await readdir(join(source,'models')),['lama.onnx']);
+ assert.deepEqual(await readFile(join(source,'models/lama.onnx')),prepared);
+ await writeFile(join(source,'models/lama.onnx'),Buffer.concat([prepared,Buffer.from([7])]));
+ await splitLargeFiles(join(source,'models'));
+ assert.deepEqual(JSON.parse(await readFile(join(source,'models/lama.onnx.parts.json'),'utf8')),{size:prepared.length+1,parts:2});
+ assert.equal((await readFile(join(source,'models/lama.onnx.part0'))).length,20*2**20);
+ assert.equal((await readFile(join(source,'models/lama.onnx.part1'))).length,4*2**20+1);
+});
 function storage(initial){
  const state={value:initial,deleted:0,writes:0,key:undefined};
  return {state,async open(name){assert.equal(name,MODEL_CACHE);return {

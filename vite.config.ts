@@ -1,21 +1,8 @@
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import {discoveryPlugin} from './scripts/discovery-plugin.mjs';
-import {cp, mkdir, readdir, readFile, writeFile, rm, stat} from 'node:fs/promises';
-import {join} from 'node:path';
-// Static hosts such as Sites (Cloudflare Static Assets) refuse files over
-// 25 MiB: large AI models are written as 20 MiB parts plus a manifest, which
-// the AI worker joins again.
-async function splitLargeFiles(dir:string, limit=24*2**20, part=20*2**20) {
-  for (const name of await readdir(dir).catch(() => [] as string[])) {
-    const file = join(dir, name);
-    if (!name.endsWith('.onnx') || (await stat(file)).size <= limit) continue;
-    const bytes = await readFile(file), parts = Math.ceil(bytes.length / part);
-    for (let i = 0; i < parts; i++) await writeFile(`${file}.part${i}`, bytes.subarray(i * part, (i + 1) * part));
-    await writeFile(`${file}.parts.json`, JSON.stringify({size: bytes.length, parts}));
-    await rm(file);
-  }
-}
+import {splitLargeFiles, stageDemoLama} from './scripts/stage-ai-models.mjs';
+import {cp, mkdir, readdir, rm} from 'node:fs/promises';
 // The iOS/Android app bundle keeps the models every scan needs; the others
 // (object removal, background removal, high-accuracy OCR, page flattening,
 // other alphabets) are fetched from the bide server on first use.
@@ -44,8 +31,8 @@ export default defineConfig(({mode,command}) => {
     for (const name of ['licenses','favicon.svg','brand-logo.svg',...homeScreen,'_headers','ocr','ai']) await cp(`public/${name}`, `dist-saas/${name}`, {recursive:true});
     await splitLargeFiles('dist-saas/ai/models');
   }}] : []), ...(mode === 'demo' ? [{name:'bide-demo-assets', async closeBundle() {
-    // Hosted AI downloads verified, pinned models on demand. Runtime and OCR
-    // dictionaries stay on this origin; the local edition bundles every model.
+    // LaMa's verified prepared output stays on-origin to avoid a large upstream
+    // first-use download. Other models still use the pinned on-demand sources.
     await mkdir('out', {recursive:true});
     for (const name of ['licenses','favicon.svg','brand-logo.svg',...homeScreen,'_headers']) await cp(`public/${name}`, `out/${name}`, {recursive:true});
     // OCR always requests OEM 1: these two scripts embed their WASM and cover
@@ -54,6 +41,7 @@ export default defineConfig(({mode,command}) => {
     await cp('public/ai/ort','out/ai/ort',{recursive:true});
     await mkdir('out/ai/models',{recursive:true});
     for(const script of ['latin','cyrillic','greek','arabic','korean','cjk'])await cp(`public/ai/models/ppocr-${script}-dict.json`,`out/ai/models/ppocr-${script}-dict.json`);
+    if(command==='build')await stageDemoLama('public/ai','out/ai');
   }}] : []), ...(publicSite ? [discoveryPlugin(mode,env)] : [])],
   build: {target:'esnext',outDir:mode === 'demo' ? 'out' : mode === 'saas' ? 'dist-saas' : mode === 'app' ? 'dist-app' : 'dist'},
   // Lazily imported deps are listed so the dev server doesn't reload the page mid-session on first use.
