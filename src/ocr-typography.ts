@@ -200,6 +200,22 @@ export function decimalShape(m:LineInk,run:Run):','|'.'|undefined{
 // cut between two letters is not the letter's outline) or comes in pieces
 // (a soft serif zero thresholds to its two sides, and half a zero looks
 // like half an O).
+// A word as a picture: its ink box cut into eight slices across, each
+// sampled 6 x 12, centred and scaled as a whole (wordShape), so two copies of
+// one word can be compared slice by slice: a single different letter shows.
+const WORD_SLICES=8,WORD_CELLS=72;
+function wordShape(m:LineInk,a:number,b:number){
+ const s=m.span(a,b);if(!s||b-a<12)return undefined;
+ const w=b-a,h=s.bottom-s.top,cols=WORD_SLICES*6,v=new Float32Array(WORD_SLICES*WORD_CELLS);let mean=0,norm=0;
+ for(let j=0;j<12;j++)for(let i=0;i<cols;i++){
+  const fx=a+(i+.5)*w/cols-.5,fy=s.top+(j+.5)*h/12-.5,x=Math.floor(fx),y=Math.floor(fy),ax=fx-x,ay=fy-y;
+  const k=Math.floor(i/6)*WORD_CELLS+j*6+i%6;
+  mean+=(v[k]=(m.at(x,y)*(1-ax)+m.at(x+1,y)*ax)*(1-ay)+(m.at(x,y+1)*(1-ax)+m.at(x+1,y+1)*ax)*ay)/v.length;
+ }
+ for(let i=0;i<v.length;i++){v[i]-=mean;norm+=v[i]*v[i];}
+ norm=Math.sqrt(norm)||1;for(let i=0;i<v.length;i++)v[i]/=norm;
+ return {w,h,v};
+}
 function roundShape(m:LineInk,g:Glyph){
  const runs=m.runs(Math.round(g.x0),Math.round(g.x1));if(runs.length!==1)return undefined;
  const r=runs[0],s=m.span(r.a,r.b);if(!s||m.cols[r.a-1-m.x0]||m.cols[r.b-m.x0])return undefined;
@@ -253,17 +269,71 @@ export function typesetRegions<T extends TypeRegion>(regions:T[],img:Pixels):T[]
  // two of its own kind and height look different. In a face where both are
  // one shape nothing changes, nor under 16 px of height, where the shapes
  // are too close to call (measured: wrong changes from 13 px down).
- const rounds=lines.flatMap(l=>l?l.tokens.flatMap(t=>{const s=t.glyph&&/^[0O]$/.test(t.ch)?roundShape(l.m,t.glyph):undefined;return s?[{t,s}]:[];}):[]).slice(0,800);
+ // The same holds for the other characters one shape can pass for (1, l and
+ // I; 5 and S; 8 and B; 2 and Z; 6 and G): "the page proofreads itself".
+ // Each group is judged like 0 and O, and a character changed takes the
+ // kind most of its look-alikes have. Where two kinds are one shape on the
+ // page (l and I in a sans), nothing looks different from its own kind and
+ // nothing changes.
  const close=(a:number,b:number)=>Math.abs(a-b)<=Math.max(1.5,.08*Math.max(a,b));
- const other=rounds.filter(r=>{
-  if(r.s.h<16)return false;let like=0,same=0,unlike=0;
-  for(const o of rounds){
-   if(o===r||!close(o.s.h,r.s.h))continue;let sim=0;if(close(o.s.w,r.s.w))for(let i=0;i<140;i++)sim+=o.s.v[i]*r.s.v[i];
-   if(sim>=.95){if(o.t.ch===r.t.ch)same++;else like++;}else if(sim<.89&&o.t.ch===r.t.ch)unlike++;
+ for(const group of ['0O','1lI','5S','8B','2Z','6G']){
+  const rounds=lines.flatMap(l=>l?l.tokens.flatMap(t=>{const s=t.glyph&&t.ch.length===1&&group.includes(t.ch)?roundShape(l.m,t.glyph):undefined;return s?[{t,s}]:[];}):[]).slice(0,800);
+  const changes:{t:Token;ch:string}[]=[];
+  for(const r of rounds){
+   if(r.s.h<16)continue;let same=0,unlike=0;const like=new Map<string,number>();
+   for(const o of rounds){
+    if(o===r||!close(o.s.h,r.s.h))continue;let sim=0;if(close(o.s.w,r.s.w))for(let i=0;i<140;i++)sim+=o.s.v[i]*r.s.v[i];
+    if(sim>=.95){if(o.t.ch===r.t.ch)same++;else like.set(o.t.ch,(like.get(o.t.ch)??0)+1);}else if(sim<.89&&o.t.ch===r.t.ch)unlike++;
+   }
+   const [ch,n]=[...like].sort((x,y)=>y[1]-x[1])[0]??['',0];
+   if(n>=2&&n>=5*same&&unlike>=2)changes.push({t:r.t,ch});
   }
-  return like>=2&&like>=5*same&&unlike>=2;
- });
- for(const r of other){const ch=r.t.ch==='0'?'O':'0';r.t.ch=ch;r.t.glyph!.ch=ch;}
+  for(const {t,ch} of changes){t.ch=ch;t.glyph!.ch=ch;}
+ }
+ // Identical ink is identical text. A word printed several times on the
+ // page (a name, a heading, a unit) is several readings of one picture: when
+ // the pictures are the same, slice by slice, and the readings differ, the
+ // reading most of them share is the word, and a copy read otherwise takes it
+ // with its letter cells, provided the recognizer doubted a letter of that
+ // copy (under 0.9). Words of four letters or more, letters only: two numbers
+ // one digit apart are nearly one picture, and are left alone.
+ {
+  type Word={l:NonNullable<typeof lines[number]>;from:number;to:number;text:string;x0:number;x1:number;sure:boolean;shape:{w:number;h:number;v:Float32Array}};
+  const words:Word[]=[];
+  for(const l of lines){
+   if(!l)continue;
+   for(let i=0;i<l.tokens.length;){
+    if(!l.tokens[i].glyph){i++;continue;}
+    let j=i;while(j<l.tokens.length&&l.tokens[j].glyph&&l.tokens[j].word===l.tokens[i].word)j++;
+    const part=l.tokens.slice(i,j),text=part.map(t=>t.ch).join('');
+    if(part.length>=4&&part.every(t=>LETTER.test(t.ch))){
+     const x0=Math.round(part[0].glyph!.x0),x1=Math.round(part[part.length-1].glyph!.x1),shape=wordShape(l.m,x0,x1);
+     if(shape)words.push({l,from:i,to:j,text,x0,x1,sure:part.every(t=>(t.glyph!.p??1)>=.9),shape});
+    }
+    i=j;
+   }
+  }
+  const same=(a:Word,b:Word)=>{
+   if(!close(a.shape.w,b.shape.w)||!close(a.shape.h,b.shape.h))return false;
+   for(let k=0;k<WORD_SLICES;k++){let sim=0,na=0,nb=0;for(let i=k*WORD_CELLS;i<(k+1)*WORD_CELLS;i++){sim+=a.shape.v[i]*b.shape.v[i];na+=a.shape.v[i]**2;nb+=b.shape.v[i]**2;}
+    if(na<1e-6&&nb<1e-6)continue;if(sim/Math.sqrt(na*nb||1)<.93)return false;}
+   return true;
+  };
+  const done=new Set<Word>(),edits:{w:Word;model:Word}[]=[];
+  for(const w of words.slice(0,600)){
+   if(done.has(w))continue;const group=words.filter(o=>o===w||!done.has(o)&&same(w,o));group.forEach(o=>done.add(o));
+   if(group.length<3)continue;
+   const count=new Map<string,number>();for(const o of group)count.set(o.text,(count.get(o.text)??0)+1);
+   const [text,n]=[...count].sort((x,y)=>y[1]-x[1])[0];if(n<2||n<=group.length-n)continue;
+   const model=group.find(o=>o.text===text&&o.sure)??group.find(o=>o.text===text)!;
+   for(const o of group)if(o.text!==text&&!o.sure)edits.push({w:o,model});
+  }
+  // Later words of a line first, so token positions stay valid.
+  for(const {w,model} of edits.sort((a,b)=>b.w.from-a.w.from)){
+   const dx=w.x0-model.x0,word=w.l.tokens[w.from].word;
+   w.l.tokens.splice(w.from,w.to-w.from,...model.l.tokens.slice(model.from,model.to).map(t=>({ch:t.ch,word,found:true,glyph:{...t.glyph!,x0:t.glyph!.x0+dx,x1:t.glyph!.x1+dx}})));
+  }
+ }
  // The recognizer's letter centres are not kept (later mappings move cells only).
  const bare=(g:Glyph):Glyph=>{const {c:_,...rest}=g;return rest;};
  return relink(regions.map((r,k)=>{const l=lines[k];if(!l)return r.glyphs?.some(g=>g.c!==undefined)?{...r,glyphs:r.glyphs.map(bare)}:r;
