@@ -163,7 +163,7 @@ export function requiredFonts(value:unknown):ExtraFontRequirement[]{
 }
 export function matchingExtraFont(requirement:ExtraFontRequirement):string|undefined{
  const candidates=[...extras.values()].sort((a,b)=>Number(key(b.item.family)===key(requirement.family))-Number(key(a.item.family)===key(requirement.family)));
- for(const registered of candidates){const {item,records}=registered;if(complete(registered)&&key(item.sourceFamily)===key(requirement.sourceFamily)&&requirement.faces.every(face=>records.some(r=>r.sha256===face.sha256&&r.style===face.style&&r.variable===face.variable&&(requirement.origin!=='web'||!face.source||r.origin==='yours'||sameSource(r.source,face.source)))))return item.family;}
+ for(const registered of candidates){const {item,records}=registered;if(complete(registered)&&requirement.faces.every(face=>records.some(r=>r.sha256===face.sha256&&r.style===face.style&&r.variable===face.variable&&(requirement.origin!=='web'||!face.source||r.origin==='yours'||sameSource(r.source,face.source)))))return item.family;}
 }
 export function missingFontMessage(family:string){return `The font “${family}” used by this document is unavailable. Add the same font file again before opening or exporting. Your document has not been changed.`;}
 export function textFontRequirements(text:{fontFamily:string;styles?:unknown;extraFontRequired?:unknown}):ExtraFontRequirement[]{

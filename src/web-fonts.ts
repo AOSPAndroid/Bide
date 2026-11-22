@@ -17,7 +17,7 @@ export const FONT_INDEX_TIMEOUT_MS=5000,FONT_DOWNLOAD_TIMEOUT_MS=8000;
 async function bounded<T>(run:(signal:AbortSignal)=>Promise<T>,timeoutMs:number):Promise<T>{
  const controller=new AbortController();let timer:ReturnType<typeof setTimeout>|undefined;
  const stopped=new Promise<never>((_,reject)=>{controller.signal.addEventListener('abort',()=>reject(controller.signal.reason),{once:true});timer=setTimeout(()=>controller.abort(new Error('The font download timed out.')),Math.max(1,timeoutMs));});
- try{return await Promise.race([run(controller.signal),stopped]);}finally{if(timer)clearTimeout(timer);}
+ try{return await Promise.race([run(controller.signal),stopped]);}catch(error){controller.abort(error);throw error;}finally{if(timer)clearTimeout(timer);}
 }
 const hex=(b:Uint8Array)=>Array.from(b,v=>v.toString(16).padStart(2,'0')).join('');
 function sourceFor(index:Pick<Index,'revision'>,family:Family,file:string):WebFontSource{
@@ -31,7 +31,7 @@ let loading:Promise<Index|undefined>|undefined;
 export function fontIndex(base=typeof document==='undefined'?'http://localhost/':document.baseURI,request:typeof fetch=fetch,timeoutMs=FONT_INDEX_TIMEOUT_MS){
  if(!loading){
   const attempt=bounded(async signal=>{
-   const [meta,bin]=await Promise.all([request(new URL('fonts/index.json',base),{signal}),request(new URL('fonts/index.bin',base),{signal})]);if(!meta.ok||!bin.ok)return undefined;
+   const [meta,bin]=await Promise.all([request(new URL('fonts/index.json',base),{signal}),request(new URL('fonts/index.bin',base),{signal})]);if(!meta.ok||!bin.ok)throw new Error('The font index could not be downloaded.');
    const index={...await meta.json(),bin:new Uint8Array(await bin.arrayBuffer())} as Index;signal.throwIfAborted();return validIndex(index)?index:undefined;
   },timeoutMs).catch(()=>undefined);
   loading=attempt;void attempt.then(index=>{if(!index&&loading===attempt)loading=undefined;});
