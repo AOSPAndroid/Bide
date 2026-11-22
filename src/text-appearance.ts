@@ -28,13 +28,16 @@ export class Textbox extends FabricTextbox {
  static type='Textbox';
  declare textSoftness?:number;
  private plainLetters=false;
+ declare recognizedKey?:string;
  // A group the face joins is one unit of the line: measured and drawn in one
- // call, so the ligature is drawn. Not while the text is being typed (the
- // caret moves letter by letter), nor on a line with styled ranges (their
+ // call, so the ligature is drawn. On text set over a scan, which is drawn
+ // by the canvas wherever it goes (vector text in a PDF is laid out letter by
+ // letter by the exporter). Not while the text is being typed (the caret
+ // moves letter by letter), nor on a line with styled ranges (their
  // positions count letters).
  graphemeSplit(text:string){
   const letters=super.graphemeSplit(text);
-  if(this.isEditing||this.plainLetters||this.path||this.styles&&Object.keys(this.styles).length||!/[fT]|t[ti]/.test(text))return letters;
+  if(!this.recognizedKey?.startsWith?.('ocr:')||this.isEditing||this.plainLetters||this.path||this.styles&&Object.keys(this.styles).length||!/[fT]|t[ti]/.test(text))return letters;
   const joined=ligaturesOf(this.fontStyle,this.fontWeight,this.fontFamily);if(!joined.length)return letters;
   const out:string[]=[];
   for(let i=0;i<letters.length;i++){const hit=joined.find(s=>letters.slice(i,i+s.length).join('')===s);if(hit){out.push(hit);i+=hit.length-1;}else out.push(letters[i]);}
