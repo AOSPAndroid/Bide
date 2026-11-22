@@ -12,7 +12,7 @@
 // font = the explicit fallback. Writes tmp/edit-bench/results.json and crops.
 import {createServer} from 'vite';import {chromium} from 'playwright-core';import {writeFile,mkdir,rm} from 'node:fs/promises';
 import * as mupdf from 'mupdf';import {PDFDocument} from 'pdf-lib';
-const {templates,variants,cases}=await import(`../tests/edit-bench/${process.env.BENCH_DOCS??'docs'}.mjs`);
+const {templates,variants,cases,realFace={}}=await import(`../tests/edit-bench/${process.env.BENCH_DOCS??'docs'}.mjs`);
 import {ocrFields,cellErrors,verdict} from '../tests/edit-bench/score.mjs';
 
 const pick=(name)=>process.env[name]?.split(',').map(s=>s.trim()).filter(Boolean);
@@ -37,7 +37,7 @@ try{
    const fields=await page.evaluate(dpr=>[...document.querySelectorAll('[data-f]')].map(e=>{
     const b=e.getBoundingClientRect(),node=e.firstChild,text=e.textContent,chars=[];
     if(node?.nodeType===3)for(let i=0;i<text.length;i++){const r=document.createRange();r.setStart(node,i);r.setEnd(node,i+1);const c=r.getBoundingClientRect();chars.push({i,ch:text[i],x0:c.left*dpr,x1:c.right*dpr});}
-    return {id:e.dataset.f,text,x:b.left*dpr,y:b.top*dpr,w:b.width*dpr,h:b.height*dpr,size:parseFloat(getComputedStyle(e).fontSize)*dpr,chars};
+    const cs=getComputedStyle(e);return {id:e.dataset.f,text,x:b.left*dpr,y:b.top*dpr,w:b.width*dpr,h:b.height*dpr,size:parseFloat(cs.fontSize)*dpr,chars,face:cs.fontFamily.split(',')[0].trim().replace(/^["']|["']$/g,''),weight:+cs.fontWeight||400,color:cs.color};
    }),dpr);
    const all=await page.evaluate(()=>document.body.innerText);
    const png=(await page.screenshot({clip:{x:0,y:0,width:tpl.width,height:tpl.height}})).toString('base64');
@@ -92,6 +92,13 @@ try{
    for(const mode of modes){
     let res;try{res=await app.evaluate(async([id,r,text,mode])=>(await import('/tests/edit-bench/bench.ts')).edit(id,r,text,mode),[id,region.id,text,mode]);}catch(e){res={outcome:'error',reason:e.message.split('\n')[0]};}
     const m=rec[mode]={outcome:res.outcome,reason:res.reason,ms:Math.round(res.ms??0),info:res.info};
+    // Set in a font: the same family, the same weight, the same colour as the original?
+    if(res.info){
+     const real=realFace[field.face]??field.face,base=f=>String(f).replace(/ (ExtraLight|Light|Medium|SemiBold|ExtraBold|Black)$/,''),named=f=>({ExtraLight:200,Light:300,Medium:500,SemiBold:600,ExtraBold:800,Black:900})[String(f).split(' ').pop()];
+     const want=named(real)??field.weight,got=named(res.info.font)??(res.info.weight==='bold'||+res.info.weight>=600?700:400),kind=w=>w<=350?'light':w<=550?'regular':w<=750?'bold':'heavy';
+     const rgb=c=>{if(/^#[0-9a-f]{6}$/i.test(c))return [1,3,5].map(i=>parseInt(c.slice(i,i+2),16));const v=String(c).match(/\d+/g)?.map(Number);return v?.length>=3?v.slice(0,3):undefined;},a=rgb(field.color),b=rgb(res.info.fill);
+     m.same={family:base(res.info.font)===base(real),weight:kind(got)===kind(want),colour:a&&b?Math.max(...a.map((v,i)=>Math.abs(v-b[i]))):undefined,want:`${real} ${want}`,got:`${res.info.font} ${got}`};
+    }
     if(!res.data)continue;
     const edited=res.type==='application/pdf'?rasterize(res.data,original):res.data,type=res.type==='application/pdf'?'image/png':res.type;
     const crop=`${out}/${t}-${vn}/${String(n).padStart(2,'0')}-${fid}-${mode}.png`;
@@ -141,4 +148,8 @@ if(modes.includes('letters')&&modes.includes('font')){
  console.log(`\n=== Default flow over ${records.length} edits: clean with the page's letters ${flow.filter(f=>f.how==='letters'&&f.ok).length} · visible with letters ${flow.filter(f=>f.how==='letters'&&!f.ok).length} · refused then clean in a font ${flow.filter(f=>f.how==='font'&&f.ok).length} · refused then visible in a font ${flow.filter(f=>f.how==='font'&&!f.ok).length} · field not read ${records.filter(r=>r.unreadable).length}`);
 }
 await writeFile(`${out}/results.json`,JSON.stringify({ocr,cells,records},null,1));
+{const f=records.filter(r=>r.font?.same);if(f.length){const pct=n=>`${Math.round(100*n/f.length)}%`,col=f.map(r=>r.font.same.colour).filter(v=>v!==undefined).sort((a,b)=>a-b);
+ console.log(`\n=== Set in a font, against the original (${f.length} edits): same family ${pct(f.filter(r=>r.font.same.family).length)} · same weight ${pct(f.filter(r=>r.font.same.weight).length)} · colour off by a median of ${col[col.length>>1]??'-'} levels (${col.filter(v=>v>24).length} over 24)`);
+ const by={};for(const r of f){const k=r.doc;(by[k]??=[]).push(r);}
+ for(const [k,v] of Object.entries(by))console.log(`${k.padEnd(18)} family ${v.filter(r=>r.font.same.family).length}/${v.length} · weight ${v.filter(r=>r.font.same.weight).length}/${v.length} · colour ${Math.max(...v.map(r=>r.font.same.colour??0))} at worst${v.some(r=>!r.font.same.family)?' · got '+[...new Set(v.filter(r=>!r.font.same.family).map(r=>r.font.same.got))].join(', ')+' for '+v[0].font.same.want:''}`);}}
 console.log(`\nDetails: ${out}/results.json · crops of visible edits (original, edit, reference): ${out}/<document>/`);

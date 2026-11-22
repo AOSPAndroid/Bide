@@ -110,6 +110,10 @@ export const templates={
   edits:[['head','Marché d’automne','new'],['head','Marché de Noël','new'],['l1','Producteurs et créateurs du canton','page'],['l2','Dimanche 13 avril, de 10 h à 18 h','new'],['l3','Place du Marché, entrée libre','page']]},
 };
 
+// The bundled family (and weight, when it is a family of its own) each face a
+// template names is: what an edit set in a font should come out in.
+export const realFace={Arial:'Liberation Sans','Times New Roman':'Liberation Serif','Courier New':'Liberation Mono','Liberation Mono':'Liberation Mono',CarlitoF:'Carlito',ManropeT:'Manrope',NunitoX:'Nunito ExtraBold',RalewayL:'Raleway Light',RobotoB:'Roboto',RobotoL:'Roboto Light',SerifD:'DM Serif Display',VietnamP:'Be Vietnam Pro'};
+
 // How each document reaches the app. `dpi`: pixels per inch of the scan (a CSS
 // px is a point); `blur` in scan pixels; `rotate` in degrees; `noise` in grey
 // levels; `jpeg`: quality of the scan itself; `as`: the file opened.
