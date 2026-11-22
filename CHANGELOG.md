@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-11-22 — Replaced text keeps its face, weight and colour
+
+The edit benchmark now compares every edit set in a font with the original's own family, weight and colour (`npm run bench:edit`, "Set in a font, against the original"). Over its 389 font edits on invented pages: same family 95% → 97% (the rest is a poster in a face Bide does not bundle), same weight 98% → 99%, colour more than 24 levels off on 10 → 5 edits, no visible difference 90% → 94% (16 edits better, 1 worse).
+
+- **The true face lost to look-alikes** (Barlow for Manrope on a ticket, Lato for Carlito on a flyer): a candidate was placed within two pixels of the line's box, and at 200 dpi the box sat three to four from its letters, so the right face fitted its own line 0.5–0.8. Placement now reaches up to five pixels on large text; the right faces fit 0.97–0.99.
+- **Ligatures**: text set over a scan draws the letter groups its face joins ("ff", "fi", "ti", "tt"), as the page was typeset. A line with one was narrower than Bide's letters drawn one by one and fitted no face well. While the text is typed, the caret still moves letter by letter.
+- **Weight**: a line's own letters count when its face is judged (an e-mail line was set in Raleway Regular beside lines in Light, on the evidence of a neighbour alone); shapes that fit better count beside the ink; a weight settled for a family on the document decides near ties.
+- **Colour on soft scans**: a thin blurred line reads paler than it was printed, and a heavier weight drawn paler passed for it. The colour of the page's surer lines (taller, or of thicker strokes) along the same hue is the reference: the weight is judged at that colour and the colour is brought up to it when close.
+- **Reading**: the four self-checks together read 1152 → 1175 of 1398 benchmark lines exactly. The redraw check no longer swaps 1, l and I (it fixed none and broke ten: "COLIS" → "COL1S"); for 0 and O it fixed 33.
+
 ## 2026-11-20 — Edits that match the page; AI on the graphics card
 
 Measured on 16 invented documents (an invoice, a letter, a parcel slip, a meter table, a booking screen) scanned clean, soft, tilted, at low resolution, as phone shots and as scanned PDFs, 215 edits typed and compared with the document regenerated with the new text (`npm run bench:edit`). In the default flow (the page's own letters, a font when they cannot make the edit): 146 → 207 edits with no visible difference, 56 → 4 visible, fields that could not be read 13 → 4.
