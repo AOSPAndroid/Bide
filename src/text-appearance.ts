@@ -1,8 +1,9 @@
 import {corporateFonts} from './corporate-fonts';
+import {isExtraFont} from './extra-fonts';
 import {Textbox as FabricTextbox,classRegistry,util} from 'fabric';
 
 export function clampTextSoftness(value:number){return Number.isFinite(value)?Math.min(2,Math.max(0,value)):0;}
-export const rasterizedText=(o:{textSoftness?:number;rasterScale?:number;fontFamily:string})=>!!clampTextSoftness(o.textSoftness??0)||!!o.rasterScale||corporateFonts.includes(o.fontFamily);
+export const rasterizedText=(o:{textSoftness?:number;rasterScale?:number;fontFamily:string})=>!!clampTextSoftness(o.textSoftness??0)||!!o.rasterScale||corporateFonts.includes(o.fontFamily)||isExtraFont(o.fontFamily);
 
 // Keep text editable. Apply softness in output pixels, accounting for zoom/DPR.
 export class Textbox extends FabricTextbox {
