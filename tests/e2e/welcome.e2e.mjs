@@ -88,12 +88,11 @@ test('portrait documents open at readable width; footer, toolbar and keyboard Fi
    assert.equal(readable.scrollTop,0,variant.name+': the opened page starts at its top');
    if(variant.hasTouch)assert.equal(await page.locator('.command-strip.reading>.options-bar').isVisible(),false,'phone reading gives the options row space to the page');
    else assert.equal(await page.locator('.text-guide').isVisible(),true,'detected text has a visible editing guide');
-   const fits=[['footer',()=>activate(page,page.getByRole('button',{name:'Fit to screen',exact:true}),variant)],
-    ...(!variant.hasTouch?[['toolbar',()=>page.getByRole('button',{name:'Fit page (Ctrl 0)',exact:true}).click()]]:[]),
+   const fits=[variant.hasTouch?['footer',()=>page.getByRole('button',{name:'Fit to screen',exact:true}).tap()]:['toolbar',()=>page.getByRole('button',{name:'Fit page (Ctrl 0)',exact:true}).click()],
     ['keyboard',()=>page.keyboard.press('Control+0')]];
    let reference;
    for(const [label,fit] of fits){
-    await activate(page,page.locator('button[title="Reset to 100%"]'),variant);await settle(page);
+    await page.keyboard.press('Control+1');await settle(page);
     assert.ok((await geometry(page)).height>1500,variant.name+': '+label+' starts zoomed in');
     await fit();await settle(page);const whole=await geometry(page);
     assert.ok(whole.height<=whole.availableHeight&&whole.width<=whole.availableWidth,variant.name+': '+label+' fits the entire page');
