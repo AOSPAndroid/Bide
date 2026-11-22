@@ -133,6 +133,13 @@ test('narrower proportional replacements retain the line reflow',()=>{
  const lastInk=last.to+donor.i1-last.x0;
  assert.ok(lastInk<measured.at(-1).i1-25,"the new month loses the two wider figures' excess advance");
 });
+test('permuting proportional digits inside dates retains their natural spacing',()=>{
+ const widths={'2':34,'0':34,'3':33,'1':15,'6':34,'-':12};let x=0;
+ const measured=[...'2031-06-01'].map(ch=>{const c=cell(ch,x,x+widths[ch]+12,x,x+widths[ch]);x=c.x1;return c;});
+ const plan=planGlyphEdit('2031-06-01',measured,'2013-06-10');assert.ok(plan);
+ const firstNew=plan.pieces.find(q=>measured.some(c=>c.ch==='1'&&c.x0<=q.x0&&c.x1>=q.x1));assert.ok(firstNew);const donor=measured.find(c=>c.x0<=firstNew.x0&&c.x1>=firstNew.x1);assert.ok(donor);
+ assert.equal(firstNew.to+donor.i0-firstNew.x0,measured[2].i0,"the narrow1 starts at the third digit's natural ink position");
+});
 test('safe proportional digit swaps keep the original positions and word spaces',()=>{
  // Measured Raleway digits from the generated advert fixture: their widths
  // vary, but swapping15 and90 has room without moving any following digit.
