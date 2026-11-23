@@ -5,7 +5,7 @@ import type {Textbox} from './text-appearance';
 import type {Page} from './model';
 import type {TextRegion} from './text-regions';
 import type {OcrSettings} from './TextDetectionBar';
-import {detectedTextbox,matchedDetectedTextbox,coverOcrText,pageInkLevel,glyphEditPatch,fitOneLine,rightAligned,spacedText,type LetterSource,letterEditBlocker} from './detected-text';
+import {detectedTextbox,matchedDetectedTextbox,coverOcrText,pageInkLevel,glyphEditPatch,fitOneLine,rightAligned,spacedText,type LetterSource,type LetterFace,letterEditBlocker} from './detected-text';
 
 export type OcrEdit={region:TextRegion;text?:string};
 // An edit the line's own letters cannot rebuild: nothing changes, and the
@@ -20,7 +20,7 @@ export class LetteringError extends Error{
 // `mix` (a single edit set in a font): the line keeps its own letters, and
 // only those the page cannot lend are drawn in the matched face; the whole
 // line is set in the font when that cannot be done.
-export async function planOcrReplacement(c:Canvas,page:Page,items:OcrEdit[],{settings,pageRegions,others,letters,autoFont,mix=true}:{settings:OcrSettings;pageRegions:TextRegion[];others:TextRegion[];letters:boolean;autoFont:boolean;otherPages?:LetterSource[];mix?:boolean}){
+export async function planOcrReplacement(c:Canvas,page:Page,items:OcrEdit[],{settings,pageRegions,others,letters,autoFont,mix=true,rule=true}:{settings:OcrSettings;pageRegions:TextRegion[];others:TextRegion[];letters:boolean;autoFont:boolean;otherPages?:LetterSource[];mix?:boolean;rule?:boolean}){
  const patches:FabricObject[]=[],fonts:OcrEdit[]=[],edits:{region:TextRegion;text?:string;layer:string;letters:boolean}[]=[],drawn:string[]=[];let borrowed=0;
  for(const item of items){
   if(letters){
@@ -29,7 +29,11 @@ export async function planOcrReplacement(c:Canvas,page:Page,items:OcrEdit[],{set
    // Neighbouring lines may use another face or weight: a letter this line
    // lacks is taken only from a line of the page verified to be in the same
    // lettering (letter-match.ts), never from unverified lettering.
-   const patch=item.text!==undefined?await glyphEditPatch(c,page,item.region,item.text,pageRegions):undefined;
+   // The matched face is only a ruler here (where letters laid by their ink
+   // go): every pixel is the page's own.
+   let face:LetterFace|undefined;
+   if(rule&&items.length===1&&item.text!==undefined)try{const made=await matchedDetectedTextbox(item.region,c,page,pageRegions,{ocrFont:settings.font,ocrStyle:settings.style,matchBlur:settings.matchBlur,autoFont,appearanceRegions:others});if('score' in made)face={family:made.text.fontFamily,weight:made.text.fontWeight,style:made.text.fontStyle,size:made.text.fontSize,fill:String(made.text.fill),softness:0,charSpacing:made.text.charSpacing,score:made.score as number,draw:false};}catch{}
+   const patch=item.text!==undefined?await glyphEditPatch(c,page,item.region,item.text,pageRegions,[],face):undefined;
    if(!patch)throw new LetteringError(letterEditBlocker(item.region,item.text??item.region.text));
    patches.push(patch);if((patch as FabricObject&{borrowed?:boolean}).borrowed)borrowed++;edits.push({region:item.region,text:item.text,layer:(patch as FabricObject&{id:string}).id,letters:true});
   }else fonts.push(item);

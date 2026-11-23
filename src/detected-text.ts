@@ -541,7 +541,7 @@ export function letterEditBlocker(region:TextRegion,next:string){
 }
 // The face a line was matched with (matchedDetectedTextbox), to draw the
 // letters an edit needs and the page does not have. Sizes in page units.
-export type LetterFace={family:string;weight:string|number;style:string;size:number;fill:string;softness:number;charSpacing?:number;score?:number};
+export type LetterFace={family:string;weight:string|number;style:string;size:number;fill:string;softness:number;charSpacing?:number;score?:number;draw?:boolean};
 // Where the ink of each character of `text` starts and ends when set in
 // `face`, `k` raster pixels per page unit (none for a space): the face's own
 // advances, kerning and letter spacing.
@@ -581,8 +581,9 @@ function drawnLetters(chars:string[],face:LetterFace,k:number,paper:number[],pag
  }
  return {raster,glyphs};
 }
-// `face`: letters the page cannot lend are drawn in it (the caller chose a
-// font for this edit); the returned layer lists them in `drawn`.
+// `face`: the face matched with the line. It rules where letters laid by
+// their ink go; unless `face.draw` is false, letters the page cannot lend are
+// drawn in it (the caller chose a font for this edit), listed in `drawn`.
 export async function glyphEditPatch(c:Canvas,p:Page,lineRegion:TextRegion,next:string,pageRegions:TextRegion[]=[],sources:LetterSource[]=[],face?:LetterFace){
  if(lineRegion.kind!=='ocr'||!lineRegion.glyphs)return undefined;
  // Everything below works in raster pixels, `k` per page unit.
@@ -606,36 +607,36 @@ export async function glyphEditPatch(c:Canvas,p:Page,lineRegion:TextRegion,next:
  // those it only has cut from a blot (fusedCells) when the edit adds one.
  const fused=fusedCells(cells),cutOnly=[...new Set(Array.from(wanted))].filter(ch=>telling(ch)&&cells.some(c=>c.ch===ch)&&cells.every((c,i)=>c.ch!==ch||fused[i]));
  const library=page.length?verifiedLibrary(raster,page,region,cells,baseline,[...missingLetters(read,cells,wanted),...cutOnly],blocked,p.id):[];
- let plan=planGlyphEdit(read,cells,wanted,library,layout);
+ // The face also rules where the letters go, when its ruler describes the
+ // line as it is: set against the ink of the line's own letters (a straight
+ // fit of their middles), it is stretched to them (an approximate face, or
+ // a size a percent off, runs a few pixels long by the end of a line), and
+ // left aside when the letters stray from it by more than 6% of their size.
+ let ruler:ReturnType<typeof faceRuler>|undefined,rulerFrom:number|undefined;
+ if(face&&!wanted.includes(UNREAD)&&!f.angle){
+  const old=faceRuler(read,face,k),pairs=cells.flatMap((cell,i)=>!cell.space&&cell.i0!==undefined&&cell.i1!==undefined&&old[i]?[{x:(old[i]!.i0+old[i]!.i1)/2,y:(cell.i0+cell.i1)/2}]:[]);
+  if(pairs.length>=4){
+   const n=pairs.length,mx=pairs.reduce((a,q)=>a+q.x,0)/n,my=pairs.reduce((a,q)=>a+q.y,0)/n,sxx=pairs.reduce((a,q)=>a+(q.x-mx)**2,0),slope=sxx>0?pairs.reduce((a,q)=>a+(q.x-mx)*(q.y-my),0)/sxx:1;
+   const off=Math.sqrt(pairs.reduce((a,q)=>a+(my+slope*(q.x-mx)-q.y)**2,0)/n);
+   if(slope>.85&&slope<1.15&&off<=face.size*k*.06){ruler=faceRuler(wanted,face,k).map(r=>r&&{i0:r.i0*slope,i1:r.i1*slope});rulerFrom=old.find(Boolean)!.i0*slope;}
+  }
+ }
+ const ruled={...layout,ruler,rulerFrom};
+ let plan=planGlyphEdit(read,cells,wanted,library,ruled);
  // A letter missing from this page: look for it on the other pages.
  for(const other of otherPages){
   if(plan||other.page.id===p.id)continue;
   if(!planGlyphEdit(read,cells,wanted,other.regions.flatMap(r=>r.glyphs?lineCells(r.text,r.glyphs)?.filter(g=>!g.space&&g.ch!==UNREAD).map(g=>({...g,y0:0,y1:0,source:r.id}))??[]:[]),layout)&&!plan)continue;
   const source=levelRaster(await offscreenComposite(other.page,k),other.frame,k,fill);rasters.set(other.page.id,source);
-  plan=planGlyphEdit(read,cells,wanted,[...library,...letterLibrary(source,other.regions,metrics.xHeight,region,other.page.id)],layout);
+  plan=planGlyphEdit(read,cells,wanted,[...library,...letterLibrary(source,other.regions,metrics.xHeight,region,other.page.id)],ruled);
  }
  // Letters found nowhere, when a font was chosen: drawn in the matched face.
  // The line keeps every letter it has; only those are new.
  let drawn:string[]=[];
- if(!plan&&face){
+ if(!plan&&face&&face.draw!==false){
   const lacking=[...new Set(Array.from(wanted))].filter(ch=>/\S/.test(ch)&&ch!==UNREAD&&!cells.some(cell=>cell.ch===ch)&&!library.some(l=>l.ch===ch));
   const made=lacking.length?drawnLetters(lacking,face,k,paperOf(rctx,region),'font:'+region.id):undefined;
-  // The face also rules where the letters go, when its ruler describes the
-  // line as it is: set against the ink of the line's own letters (a straight
-  // fit of their middles), it is stretched to them (an approximate face, or
-  // a size a percent off, runs a few pixels long by the end of a line), and
-  // left aside when the letters stray from it by more than 6% of their size.
-  let ruler:ReturnType<typeof faceRuler>|undefined,rulerFrom:number|undefined;
-  if(!wanted.includes(UNREAD)&&!f.angle){
-   const old=faceRuler(read,face,k),pairs=cells.flatMap((cell,i)=>!cell.space&&cell.i0!==undefined&&cell.i1!==undefined&&old[i]?[{x:(old[i]!.i0+old[i]!.i1)/2,y:(cell.i0+cell.i1)/2}]:[]);
-   if(pairs.length>=4){
-    const n=pairs.length,mx=pairs.reduce((a,q)=>a+q.x,0)/n,my=pairs.reduce((a,q)=>a+q.y,0)/n,sxx=pairs.reduce((a,q)=>a+(q.x-mx)**2,0),slope=sxx>0?pairs.reduce((a,q)=>a+(q.x-mx)*(q.y-my),0)/sxx:1;
-    const off=Math.sqrt(pairs.reduce((a,q)=>a+(my+slope*(q.x-mx)-q.y)**2,0)/n);
-    if(slope>.85&&slope<1.15&&off<=face.size*k*.06){ruler=faceRuler(wanted,face,k).map(r=>r&&{i0:r.i0*slope,i1:r.i1*slope});rulerFrom=old.find(Boolean)!.i0*slope;}
-   }
-  }
-  if(made){rasters.set('font:'+region.id,made.raster);plan=planGlyphEdit(read,cells,wanted,[...library,...made.glyphs],{...layout,ruler,rulerFrom});if(plan)drawn=lacking;}
-  else if(!lacking.length&&ruler)plan=planGlyphEdit(read,cells,wanted,library,{...layout,ruler,rulerFrom});
+  if(made){rasters.set('font:'+region.id,made.raster);plan=planGlyphEdit(read,cells,wanted,[...library,...made.glyphs],ruled);if(plan)drawn=lacking;}
  }
  if(!plan)return undefined;
  // Whole pixels: a placed piece moves by a whole number of them from where it was cut.
