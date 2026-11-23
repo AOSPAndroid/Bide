@@ -35,18 +35,21 @@ export async function open(id:string,b64:string,name:string,type:string){
 
 // One edit of one field, with the page's own letters or in a font, then the
 // download the user would get (the same kind of picture, or a PDF).
-export async function edit(id:string,regionId:string,text:string,mode:'letters'|'font'){
+// 'font': the whole line set in the matched font; 'mixed': the line's own
+// letters, those the page cannot lend drawn in the matched font (what the
+// app does when a font is chosen for an edit).
+export async function edit(id:string,regionId:string,text:string,mode:'letters'|'font'|'mixed'){
  const d=docs.get(id)!,region=d.regions.find(r=>r.id===regionId)!,c=await loaded(d.page),t0=performance.now();
  try{
   let plan;
-  try{plan=await planOcrReplacement(c,d.page,[{region,text}],{settings:d.settings,pageRegions:d.all,others:d.regions,letters:mode==='letters',autoFont:true});}
+  try{plan=await planOcrReplacement(c,d.page,[{region,text}],{settings:d.settings,pageRegions:d.all,others:d.regions,letters:mode==='letters',autoFont:true,mix:mode==='mixed'});}
   catch(e){if(e instanceof LetteringError)return {outcome:'refused' as const,reason:e.reason,ms:performance.now()-t0};throw e;}
   const objects=[...((d.page.canvas.objects||[]) as unknown[])];await plan.apply(objects);
   const ms=performance.now()-t0,page:Page={...d.page,canvas:{...d.page.canvas,objects}};
-  const layer=(objects.at(-1)??{}) as Record<string,unknown>,info=plan.fonts?{font:layer.fontFamily,weight:layer.fontWeight,fill:layer.fill,soft:layer.textSoftness,size:layer.fontSize}:undefined;
-  if(page.source){const project:Project={version:1,name:'bench',pages:[page],sources:d.sources};const blob=await exportInBrowser({...await exportPayload(project),format:'pdf',compression:'lossless',range:'',dpi:300});return {outcome:mode,ms,type:'application/pdf',data:await base64(blob),info};}
+  const layer=(objects.at(-1)??{}) as Record<string,unknown>,drawn=plan.drawn,info=plan.fonts?{font:layer.fontFamily,weight:layer.fontWeight,fill:layer.fill,soft:layer.textSoftness,size:layer.fontSize}:undefined;
+  if(page.source){const project:Project={version:1,name:'bench',pages:[page],sources:d.sources};const blob=await exportInBrowser({...await exportPayload(project),format:'pdf',compression:'lossless',range:'',dpi:300});return {outcome:mode,ms,type:'application/pdf',data:await base64(blob),info,drawn,whole:!!plan.fonts};}
   const out=await loaded(page);
-  try{const {blob}=await sameKindImage(page,out);return {outcome:mode,ms,type:blob.type,data:await base64(blob),info};}finally{await (out as unknown as StaticCanvas).dispose();}
+  try{const {blob}=await sameKindImage(page,out);return {outcome:mode,ms,type:blob.type,data:await base64(blob),info,drawn,whole:!!plan.fonts};}finally{await (out as unknown as StaticCanvas).dispose();}
  }finally{await (c as unknown as StaticCanvas).dispose();}
 }
 export const close=(id:string)=>{docs.delete(id);};

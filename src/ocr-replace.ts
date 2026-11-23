@@ -17,8 +17,11 @@ export class LetteringError extends Error{
 // Everything is rendered before the page is touched; `apply` then adds the
 // result to the page's serialized objects (clearing the background under
 // font-rendered lines first), so the caller can commit it as one undo step.
-export async function planOcrReplacement(c:Canvas,page:Page,items:OcrEdit[],{settings,pageRegions,others,letters,autoFont}:{settings:OcrSettings;pageRegions:TextRegion[];others:TextRegion[];letters:boolean;autoFont:boolean;otherPages?:LetterSource[]}){
- const patches:FabricObject[]=[],fonts:OcrEdit[]=[],edits:{region:TextRegion;text?:string;layer:string;letters:boolean}[]=[];let borrowed=0;
+// `mix` (a single edit set in a font): the line keeps its own letters, and
+// only those the page cannot lend are drawn in the matched face; the whole
+// line is set in the font when that cannot be done.
+export async function planOcrReplacement(c:Canvas,page:Page,items:OcrEdit[],{settings,pageRegions,others,letters,autoFont,mix=true}:{settings:OcrSettings;pageRegions:TextRegion[];others:TextRegion[];letters:boolean;autoFont:boolean;otherPages?:LetterSource[];mix?:boolean}){
+ const patches:FabricObject[]=[],fonts:OcrEdit[]=[],edits:{region:TextRegion;text?:string;layer:string;letters:boolean}[]=[],drawn:string[]=[];let borrowed=0;
  for(const item of items){
   if(letters){
    // Back to the text as read: the field shows the original again (no layer).
@@ -37,18 +40,25 @@ export async function planOcrReplacement(c:Canvas,page:Page,items:OcrEdit[],{set
  // appearance fit and its edge-clarity guard. Bulk conversion stays crisp and
  // uses the scan's suggested face without re-ranking every line on the page.
  const single=items.length===1&&items[0].text!==undefined,pageInk=!single&&settings.style==='auto'?await pageInkLevel(pageRegions,settings.font):undefined,texts:Textbox[]=[];
- for(const item of fonts){const {text}=single
+ const whole:OcrEdit[]=[];
+ for(const item of fonts){const made=single
   ?await matchedDetectedTextbox(item.region,c,page,pageRegions,{ocrFont:settings.font,ocrStyle:settings.style,matchBlur:settings.matchBlur,autoFont,appearanceRegions:others})
   :await detectedTextbox(item.region,{ocrFont:settings.font,ocrStyle:settings.style,pageInk,matchBlur:false});
+  const {text}=made,score='score' in made?made.score as number:undefined;
+  if(single&&mix&&item.text!==item.region.text&&settings.background!=='transparent'){
+   const patch=await glyphEditPatch(c,page,item.region,item.text!,pageRegions,[],{family:text.fontFamily,weight:text.fontWeight,style:text.fontStyle,size:text.fontSize,fill:String(text.fill),softness:text.textSoftness??0,charSpacing:text.charSpacing,score}).catch(()=>undefined);
+   if(patch){patches.push(patch);drawn.push(...((patch as FabricObject&{drawn?:string[]}).drawn??[]));edits.push({region:item.region,text:item.text,layer:(patch as FabricObject&{id:string}).id,letters:true});continue;}
+  }
+  whole.push(item);
   if(item.text!==undefined&&item.text!==item.region.text){
    // A right-aligned line (an amount in a column) keeps its right edge when its length changes.
    const before=text.calcTextWidth(),right=!item.region.angle&&rightAligned(item.region,pageRegions);
    text.set({text:spacedText(item.region,item.text)});fitOneLine(text);
    if(right)text.set({left:text.left-(text.calcTextWidth()-before)});
   }texts.push(text);edits.push({region:item.region,text:item.text,layer:(text as Textbox&{id:string}).id,letters:false});}
- return {letters:patches.length,fonts:texts.length,borrowed,transparent,edits,
+ return {letters:patches.length,fonts:texts.length,borrowed,drawn,transparent,edits,
   async apply(objects:unknown[],onProgress?:(fraction:number)=>void){
-   if(fonts.length)await coverOcrText(c,page,fonts.map(f=>f.region),objects,{mode:settings.background,color:settings.color,padding:settings.padding,others,onProgress});
+   if(whole.length)await coverOcrText(c,page,whole.map(f=>f.region),objects,{mode:settings.background,color:settings.color,padding:settings.padding,others,onProgress});
    objects.push(...patches.map(p=>p.toObject()),...texts.map(t=>t.toObject()));
   }};
 }

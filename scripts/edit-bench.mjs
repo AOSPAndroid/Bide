@@ -16,7 +16,7 @@ const {templates,variants,cases,realFace={}}=await import(`../tests/edit-bench/$
 import {ocrFields,cellErrors,verdict} from '../tests/edit-bench/score.mjs';
 
 const pick=(name)=>process.env[name]?.split(',').map(s=>s.trim()).filter(Boolean);
-const onlyCases=pick('BENCH_CASES'),modes=pick('BENCH_MODES')??['letters','font'],kinds=pick('BENCH_KINDS'),out=process.env.BENCH_OUT??'tmp/edit-bench';
+const onlyCases=pick('BENCH_CASES'),modes=pick('BENCH_MODES')??['letters','font','mixed'],kinds=pick('BENCH_KINDS'),out=process.env.BENCH_OUT??'tmp/edit-bench';
 const chosen=cases.filter(([t,v])=>!onlyCases||onlyCases.includes(`${t}/${v}`)||onlyCases.includes(t));
 await rm(out,{recursive:true,force:true});await mkdir(out,{recursive:true});
 // No file watching: a source file saved during a run must not reload the page under it.
@@ -90,8 +90,10 @@ try{
    const reference=await scan(tpl,v,{...tpl.fields,[fid]:to}),after=reference.fields.find(x=>x.id===fid);
    const box={x:Math.min(field.x,after.x),y:Math.min(field.y,after.y),w:Math.max(field.x+field.w,after.x+after.w)-Math.min(field.x,after.x),h:Math.max(field.y+field.h,after.y+after.h)-Math.min(field.y,after.y)};
    for(const mode of modes){
+    // Mixed (own letters, missing ones drawn in the font) is what follows a refusal.
+    if(mode==='mixed'&&rec.letters&&rec.letters.outcome!=='refused')continue;
     let res;try{res=await app.evaluate(async([id,r,text,mode])=>(await import('/tests/edit-bench/bench.ts')).edit(id,r,text,mode),[id,region.id,text,mode]);}catch(e){res={outcome:'error',reason:e.message.split('\n')[0]};}
-    const m=rec[mode]={outcome:res.outcome,reason:res.reason,ms:Math.round(res.ms??0),info:res.info};
+    const m=rec[mode]={outcome:res.outcome,reason:res.reason,ms:Math.round(res.ms??0),info:res.info,drawn:res.drawn,whole:res.whole};
     // Set in a font: the same family, the same weight, the same colour as the original?
     if(res.info){
      const real=realFace[field.face]??field.face,base=f=>String(f).replace(/ (ExtraLight|Light|Medium|SemiBold|ExtraBold|Black)$/,''),named=f=>({ExtraLight:200,Light:300,Medium:500,SemiBold:600,ExtraBold:800,Black:900})[String(f).split(' ').pop()];
@@ -115,7 +117,7 @@ try{
     if(m.problems.length||process.env.BENCH_CROPS==='all')await writeFile(crop,Buffer.from(score.crop,'base64'));
    }
    const show=m=>!m?'':m.outcome==='refused'?`refused (${m.reason.slice(0,60)})`:m.outcome==='error'?`ERROR ${m.reason}`:`${m.problems.length?m.problems.join('+').toUpperCase():'ok'} [shift ${m.shift} mismatch ${m.mismatch} mass ${m.mass} core ${m.core} sharp ${m.sharp}${m.grain!==1?` grain ${m.grain}`:''}${m.outside?` outside ${m.outside}`:''}${m.info?` · ${m.info.font} ${m.info.weight} soft ${fix(m.info.soft??0)}`:''}]`;
-   console.log(`  ${fid} "${field.text}" → "${to}" (${kind})${state.status==='exact'?'':` {${state.status}}`}\n     letters: ${show(rec.letters)}${rec.font?`\n     font:    ${show(rec.font)}`:''}`);
+   console.log(`  ${fid} "${field.text}" → "${to}" (${kind})${state.status==='exact'?'':` {${state.status}}`}\n     letters: ${show(rec.letters)}${rec.font?`\n     font:    ${show(rec.font)}`:''}${rec.mixed?`\n     mixed:   ${rec.mixed.whole?'(whole line) ':`(drawn ${(rec.mixed.drawn??[]).join('')}) `}${show(rec.mixed)}`:''}`);
   }
   await app.evaluate(async id=>(await import('/tests/edit-bench/bench.ts')).close(id),id);
  }
@@ -143,10 +145,16 @@ for(const mode of modes){
  if(done.length)console.log(`\n=== ${mode}: ${done.length} edits made · no visible difference ${pct(done.filter(m=>!m.problems.length).length,done.length)} · median mismatch ${fix(median(done.map(m=>m.mismatch)))} · problems ${Object.entries(tally).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`${k} ${v}`).join(', ')||'none'} · median time ${Math.round(median(done.map(m=>m.ms)))} ms`);
 }
 // What the default flow gives: the letters edit, or after a refusal the font.
-if(modes.includes('letters')&&modes.includes('font')){
- const flow=records.filter(r=>r.letters).map(r=>r.letters.problems?{how:'letters',ok:!r.letters.problems.length}:r.font?.problems?{how:'font',ok:!r.font.problems.length}:{how:'none',ok:false});
- console.log(`\n=== Default flow over ${records.length} edits: clean with the page's letters ${flow.filter(f=>f.how==='letters'&&f.ok).length} · visible with letters ${flow.filter(f=>f.how==='letters'&&!f.ok).length} · refused then clean in a font ${flow.filter(f=>f.how==='font'&&f.ok).length} · refused then visible in a font ${flow.filter(f=>f.how==='font'&&!f.ok).length} · field not read ${records.filter(r=>r.unreadable).length}`);
+if(modes.includes('letters')&&(modes.includes('font')||modes.includes('mixed'))){
+ // After a refusal the app, asked for a font, keeps the line's letters and draws the missing ones ('mixed'); the whole line in the font otherwise.
+ const flow=records.filter(r=>r.letters).map(r=>r.letters.problems?{how:'letters',ok:!r.letters.problems.length}:r.mixed?.problems?{how:r.mixed.whole?'font':'mixed',ok:!r.mixed.problems.length}:r.font?.problems?{how:'font',ok:!r.font.problems.length}:{how:'none',ok:false});
+ const n=(how,ok)=>flow.filter(f=>f.how===how&&f.ok===ok).length;
+ console.log(`\n=== Default flow over ${records.length} edits: clean with the page's letters ${n('letters',true)} · visible with letters ${n('letters',false)} · refused, then own letters with the missing ones drawn in a font: clean ${n('mixed',true)} · visible ${n('mixed',false)} · refused, then the whole line in a font: clean ${n('font',true)} · visible ${n('font',false)} · field not read ${records.filter(r=>r.unreadable).length}`);
+ // The same edits both ways, where both were made: what drawing only the missing letters changes.
+ const both=records.filter(r=>r.mixed?.problems&&!r.mixed.whole&&r.font?.problems);
+ if(both.length)console.log(`=== Refused edits made both ways (${both.length}): no visible difference with only the missing letters drawn ${both.filter(r=>!r.mixed.problems.length).length} · with the whole line in a font ${both.filter(r=>!r.font.problems.length).length} · median mismatch ${fix(median(both.map(r=>r.mixed.mismatch)))} against ${fix(median(both.map(r=>r.font.mismatch)))}`);
 }
+
 await writeFile(`${out}/results.json`,JSON.stringify({ocr,cells,records},null,1));
 {const f=records.filter(r=>r.font?.same);if(f.length){const pct=n=>`${Math.round(100*n/f.length)}%`,col=f.map(r=>r.font.same.colour).filter(v=>v!==undefined).sort((a,b)=>a-b);
  console.log(`\n=== Set in a font, against the original (${f.length} edits): same family ${pct(f.filter(r=>r.font.same.family).length)} · same weight ${pct(f.filter(r=>r.font.same.weight).length)} · colour off by a median of ${col[col.length>>1]??'-'} levels (${col.filter(v=>v>24).length} over 24)`);

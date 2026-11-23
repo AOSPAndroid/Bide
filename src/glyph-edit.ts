@@ -13,7 +13,8 @@ export const UNREAD='\uFFFC';
 export type Cell=Glyph&{space?:boolean;m?:number;i0?:number;i1?:number};
 // Borrowed letters carry their line's band and baseline (page units) and the page they come from.
 // `fused`: the letter's ink runs into a neighbour's, so its cell was cut through ink.
-export type LibraryGlyph=Glyph&{y0:number;y1:number;source:string;baseline?:number;page?:string;m?:number;i0?:number;i1?:number;fused?:boolean};
+// `l`, `r`: the blank a letter drawn in a font carries on each side of its ink (its side bearings).
+export type LibraryGlyph=Glyph&{y0:number;y1:number;source:string;baseline?:number;page?:string;m?:number;i0?:number;i1?:number;fused?:boolean;l?:number;r?:number};
 // Letters whose ink runs into a neighbour's (on a soft scan "rm" is one blot):
 // their cell was cut through ink, at the faintest column between the two
 // centres, which can fall inside the letter (between the stems of an m,
@@ -189,7 +190,12 @@ export function fixedPitch(cells:Cell[]):{pitch:number;origin:number}|undefined{
 //    on sits on the line's grid.
 // Otherwise cells follow each other at their own widths. `right`: the line is
 // right-aligned, so a change of width moves its start, not its end.
-export function planGlyphEdit(text:string,cells:Cell[],next:string,library:LibraryGlyph[]=[],{right=false}:{right?:boolean}={}):{startX:number;oldEnd:number;end:number;pieces:Piece[]}|undefined{
+// `ruler`: where the ink of each character of `next` starts and ends when the
+// line is set in its matched face (raster pixels from any origin; none for a
+// space). Letters laid by their ink then take the face's own spacing, pair by
+// pair, from the last letter the edit leaves in place (`rulerFrom`: where the
+// ink of the line as it was starts on that ruler, for an edit of its start).
+export function planGlyphEdit(text:string,cells:Cell[],next:string,library:LibraryGlyph[]=[],{right=false,ruler,rulerFrom}:{right?:boolean;ruler?:({i0:number;i1:number}|undefined)[];rulerFrom?:number}={}):{startX:number;oldEnd:number;end:number;pieces:Piece[]}|undefined{
  const a=Array.from(text),b=Array.from(next);if(a.join('')===b.join(''))return undefined;
  let first=0;while(first<a.length&&first<b.length&&a[first]===b[first])first++;
  const oldEnd=cells[cells.length-1].x1,digit=(ch:string)=>/^\p{Nd}$/u.test(ch),grid=fixedPitch(cells);
@@ -257,30 +263,34 @@ export function planGlyphEdit(text:string,cells:Cell[],next:string,library:Libra
   if(word===undefined&&(Array.from(next).some(ch=>/\s/.test(ch))))return undefined;
   // (A digit keeps the side its advance gives it: tabular figures.)
   const refined=(ch:string,left:boolean)=>figures!==undefined&&digit(ch)?undefined:median(seen.filter(o=>(left?o.b:o.a)===ch&&o.spaces<=1).map(o=>o.gap-(o.spaces?word!:0)-side(left?o.a:o.b)));
-  const room=(x:{ch:string;w:number},y:{ch:string;w:number},spaces:number)=>{
+  const room=(x:{ch:string;w:number;r?:number},y:{ch:string;w:number;l?:number},spaces:number)=>{
    const exact=median(seen.filter(o=>o.a===x.ch&&o.b===y.ch&&o.spaces===Math.min(spaces,1)).map(o=>o.gap));
-   const one=exact??(refined(x.ch,false)??side(x.ch,x.w))+(spaces?word!:0)+(refined(y.ch,true)??side(y.ch,y.w));
+   // (A letter drawn in a font brings its own side: the face's bearing.)
+   const one=exact??(x.r??refined(x.ch,false)??side(x.ch,x.w))+(spaces?word!:0)+(y.l??refined(y.ch,true)??side(y.ch,y.w));
    return one+Math.max(0,spaces-1)*(word??0);
   };
   // The letters of the new text from the change on, each with its source.
-  type Item={ch:string;g:Cell|LibraryGlyph;kept?:number;spaces:number};const items:Item[]=[];let spaces=0;
+  type Item={ch:string;g:Cell|LibraryGlyph;kept?:number;spaces:number;j:number};const items:Item[]=[];let spaces=0;
   for(let j=p;j<b.length;j++){
    if(/\s/.test(b[j])){spaces++;continue;}
    const k=keep[j],g=k>=p&&!cells[k].space?cells[k]:letter(b[j],j);if(!g)return undefined;
    if(g.i0===undefined||g.i1===undefined)return undefined;
-   items.push({ch:b[j],g,kept:k>=p?k:undefined,spaces});spaces=0;
+   items.push({ch:b[j],g,kept:k>=p?k:undefined,spaces,j});spaces=0;
   }
   const before=real.filter(r=>r.i<p).at(-1),lead=before?cells.slice(before.i+1,p).filter(c=>c.space).length:0,startAt=p<cells.length?cells[p].x0:oldEnd;
   if(!items.length)return {startX:startAt,oldEnd,end:startAt,pieces:[] as Piece[]};
-  const pieces:Piece[]=[];let prev:{ch:string;w:number;end:number;k?:number}|undefined=before?{ch:before.c.ch,w:before.c.i1!-before.c.i0!,end:before.c.i1!,k:before.i}:undefined;
+  const pieces:Piece[]=[];let prev:{ch:string;w:number;end:number;k?:number;r?:number}|undefined=before?{ch:before.c.ch,w:before.c.i1!-before.c.i0!,end:before.c.i1!,k:before.i}:undefined;
+  // The face's ruler, set on the last letter left in place (or on the line's
+  // first ink): each letter then starts where the face starts it.
+  const ruled=ruler&&ruler.length===b.length&&items.every(it=>ruler[it.j])&&(!before||ruler[before.i])?(before?before.c.i1!-ruler[before.i]!.i1:real[0].c.i0!-(rulerFrom??ruler[items[0].j]!.i0)):undefined;
   for(const [n,it] of items.entries()){
-   const w=it.g.i1!-it.g.i0!,me={ch:it.ch,w};
+   const w=it.g.i1!-it.g.i0!,drawn='l' in it.g?it.g:undefined,me={ch:it.ch,w,l:drawn?.l,r:drawn?.r};
    // A line laid from its start begins where its ink began.
    // An unread symbol (a star the recognizer has no character for) has no
    // letter to measure its room by: beside the neighbour it had, it keeps
    // the gap it had (the text after a star closed up against it).
    const beside=prev?.k!==undefined&&it.kept!==undefined&&(prev.ch===UNREAD||it.ch===UNREAD)&&it.kept>prev.k&&!cells.slice(prev.k+1,it.kept).some(c=>!c.space)&&cells[prev.k].i1!==undefined?cells[it.kept].i0!-cells[prev.k].i1!:undefined;
-   const ink=prev?prev.end+(beside??room(prev,me,it.spaces+(n?0:lead))):real[0].c.i0!;
+   const ink=ruled!==undefined&&beside===undefined?ruled+(ruler![it.j]!.i0+ruler![it.j]!.i1-w)/2:prev?prev.end+(beside??room(prev,me,it.spaces+(n?0:lead))):real[0].c.i0!;
    const x0=Math.max(it.g.x0,it.g.i0!-3),x1=Math.min(it.g.x1,it.g.i1!+3);
    pieces.push({...piece(it.g),x0,x1,to:ink-(it.g.i0!-x0)});prev={...me,end:ink+w,k:it.kept};
   }

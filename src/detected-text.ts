@@ -13,7 +13,7 @@ import {estimateOcrBold,glyphInk,wordInk,classifyWordWeights,lineWeight} from '.
 import {darkenToInk,prepareOcrPixels,estimateLineHeight} from './ocr-image';
 import {ensureFont,ensureEmbeddedFont,ensureDocumentFonts} from './fonts';
 import {bundledFonts} from './font-catalog';
-import {matchedInkColor} from './ocr-appearance';
+import {matchedInkColor,alphaCoverage,blurCoverage} from './ocr-appearance';
 import {weightFamilies} from './font-weights';
 import {rasterSearchWords} from './searchable-text';
 import {fallbackFont,fallbackCharSpacing,fitOcrText,type TextRegion} from './text-regions';
@@ -263,7 +263,7 @@ export async function matchedDetectedTextbox(region:TextRegion,c:Canvas,p:Page,r
   // Exported as it was fitted: pixels at this scale, not vector text over the scan.
   text.rasterScale=k;
  }
- return {text:turnLayer(text,region),embedded:false};
+ return {text:turnLayer(text,region),embedded:false,score:fitted.score};
 }
 
 // Hide the original OCR text by clearing, repairing or patching the area under
@@ -539,7 +539,51 @@ export function letterEditBlocker(region:TextRegion,next:string){
  if(missing.length)return `${missing.length===1?'':'the characters '}${missing.join(', ')} ${missing.length===1?'does':'do'} not appear in this line, nor in another line of the page verified to be in the same lettering.`;
  return 'this line could not be measured precisely enough to rebuild it.';
 }
-export async function glyphEditPatch(c:Canvas,p:Page,lineRegion:TextRegion,next:string,pageRegions:TextRegion[]=[],sources:LetterSource[]=[]){
+// The face a line was matched with (matchedDetectedTextbox), to draw the
+// letters an edit needs and the page does not have. Sizes in page units.
+export type LetterFace={family:string;weight:string|number;style:string;size:number;fill:string;softness:number;charSpacing?:number;score?:number};
+// Where the ink of each character of `text` starts and ends when set in
+// `face`, `k` raster pixels per page unit (none for a space): the face's own
+// advances, kerning and letter spacing.
+function faceRuler(text:string,face:LetterFace,k:number){
+ const up=4,px=face.size*k,g=document.createElement('canvas').getContext('2d')!;g.font=`${face.style} ${face.weight} ${px*up}px "${face.family}"`;
+ const chars=Array.from(text),spacing=(face.charSpacing??0)/1000*px;let prefix='';
+ return chars.map((ch,j)=>{
+  prefix+=ch;if(/\s/.test(ch))return undefined;
+  const m=g.measureText(ch),pen=(g.measureText(prefix).width-m.width)/up+j*spacing;
+  return m.actualBoundingBoxLeft+m.actualBoundingBoxRight>0?{i0:pen-m.actualBoundingBoxLeft/up,i1:pen+m.actualBoundingBoxRight/up}:undefined;
+ });
+}
+// Characters drawn in `face` at `k` raster pixels per page unit over `paper`,
+// side by side on a strip, as letters to lend: each with its ink, its
+// baseline and the blank the face gives it on each side. Drawn four times
+// finer and reduced, softened by the line's own softness (computed, not the
+// canvas blur filter, which some browsers lack).
+function drawnLetters(chars:string[],face:LetterFace,k:number,paper:number[],page:string):{raster:HTMLCanvasElement;glyphs:LibraryGlyph[]}|undefined{
+ const px=face.size*k,sigma=Math.max(0,face.softness)*k,pad=Math.ceil(sigma*3)+4,up=4,font=`${face.style} ${face.weight} ${px*up}px "${face.family}"`;
+ const measure=document.createElement('canvas').getContext('2d')!;measure.font=font;
+ const boxes=chars.map(ch=>{const m=measure.measureText(ch);return {ch,advance:m.width/up,left:m.actualBoundingBoxLeft/up,right:m.actualBoundingBoxRight/up};}).filter(b=>b.right+b.left>0);
+ if(boxes.length!==chars.length||!/^#[0-9a-f]{6}$/i.test(face.fill))return undefined;
+ const base=Math.ceil(px*1.25)+pad,height=base+Math.ceil(px*.45)+pad;let x=pad;
+ const cells=boxes.map(b=>{const w=Math.ceil(b.left+b.right)+2*pad,cell={...b,x0:x,x1:x+w,pen:x+pad+b.left};x+=w+pad;return cell;}),width=x;
+ if(width*up>16000||height*up>4000)return undefined;
+ const hi=document.createElement('canvas');hi.width=width*up;hi.height=height*up;const g=hi.getContext('2d',{willReadFrequently:true})!;g.font=font;g.fillStyle='#000';g.textBaseline='alphabetic';
+ for(const cell of cells)g.fillText(cell.ch,cell.pen*up,base*up);
+ const soft=blurCoverage(alphaCoverage(g.getImageData(0,0,hi.width,hi.height).data,hi.width,hi.height),sigma*up);
+ const raster=document.createElement('canvas');raster.width=width;raster.height=height;const out=new ImageData(width,height),ink=hexRgb(face.fill);
+ for(let y=0;y<height;y++)for(let u=0;u<width;u++){let a=0;for(let dy=0;dy<up;dy++)for(let dx=0;dx<up;dx++)a+=soft.data[(y*up+dy)*hi.width+u*up+dx];a/=up*up;const o=(y*width+u)*4;for(let n=0;n<3;n++)out.data[o+n]=paper[n]+(ink[n]-paper[n])*a;out.data[o+3]=255;}
+ const ctx=raster.getContext('2d',{willReadFrequently:true})!;ctx.putImageData(out,0,0);
+ const middles=inkMiddles(ctx,{top:0,height},paper,cells),glyphs:LibraryGlyph[]=[];
+ for(const [i,cell] of cells.entries()){
+  const m=middles[i];if(!m)return undefined;
+  let top=height,bottom=0;for(let y=0;y<height;y++)for(let u=m.i0;u<m.i1;u++){const o=(y*width+u)*4;if(Math.max(Math.abs(out.data[o]-paper[0]),Math.abs(out.data[o+1]-paper[1]),Math.abs(out.data[o+2]-paper[2]))>60){top=Math.min(top,y);bottom=Math.max(bottom,y+1);}}
+  glyphs.push({ch:cell.ch,x0:cell.x0,x1:cell.x1,y0:top,y1:bottom,source:'font',baseline:base,page,...m,l:Math.max(0,m.i0-(cell.pen-cell.left)),r:Math.max(0,cell.pen-cell.left+cell.advance-m.i1)});
+ }
+ return {raster,glyphs};
+}
+// `face`: letters the page cannot lend are drawn in it (the caller chose a
+// font for this edit); the returned layer lists them in `drawn`.
+export async function glyphEditPatch(c:Canvas,p:Page,lineRegion:TextRegion,next:string,pageRegions:TextRegion[]=[],sources:LetterSource[]=[],face?:LetterFace){
  if(lineRegion.kind!=='ocr'||!lineRegion.glyphs)return undefined;
  // Everything below works in raster pixels, `k` per page unit.
  // A scanned PDF is cut at the scan's own resolution when the render budget
@@ -569,6 +613,17 @@ export async function glyphEditPatch(c:Canvas,p:Page,lineRegion:TextRegion,next:
   if(!planGlyphEdit(read,cells,wanted,other.regions.flatMap(r=>r.glyphs?lineCells(r.text,r.glyphs)?.filter(g=>!g.space&&g.ch!==UNREAD).map(g=>({...g,y0:0,y1:0,source:r.id}))??[]:[]),layout)&&!plan)continue;
   const source=levelRaster(await offscreenComposite(other.page,k),other.frame,k,fill);rasters.set(other.page.id,source);
   plan=planGlyphEdit(read,cells,wanted,[...library,...letterLibrary(source,other.regions,metrics.xHeight,region,other.page.id)],layout);
+ }
+ // Letters found nowhere, when a font was chosen: drawn in the matched face.
+ // The line keeps every letter it has; only those are new.
+ let drawn:string[]=[];
+ if(!plan&&face){
+  const lacking=[...new Set(Array.from(wanted))].filter(ch=>/\S/.test(ch)&&ch!==UNREAD&&!cells.some(cell=>cell.ch===ch)&&!library.some(l=>l.ch===ch));
+  const made=lacking.length?drawnLetters(lacking,face,k,paperOf(rctx,region),'font:'+region.id):undefined;
+  // A face that fits the line surely also rules where its letters go.
+  const ruler=(face.score??0)>=.9&&!wanted.includes(UNREAD)&&!f.angle?faceRuler(wanted,face,k):undefined,rulerFrom=ruler?faceRuler(read,face,k).find(Boolean)?.i0:undefined;
+  if(made){rasters.set('font:'+region.id,made.raster);plan=planGlyphEdit(read,cells,wanted,[...library,...made.glyphs],{...layout,ruler,rulerFrom});if(plan)drawn=lacking;}
+  else if(!lacking.length&&ruler)plan=planGlyphEdit(read,cells,wanted,library,{...layout,ruler,rulerFrom});
  }
  if(!plan)return undefined;
  // Whole pixels: a placed piece moves by a whole number of them from where it was cut.
@@ -636,6 +691,6 @@ export async function glyphEditPatch(c:Canvas,p:Page,lineRegion:TextRegion,next:
  // twice they would only come back softer.
  if(f.angle)for(let y=0;y<patchH&&y+top<ay1;y++)for(let u=0;u<patchW;u++){const o=(y*patchW+u)*4,ai=((y+top-ay0)*area.width+(u+startX-ax0))*4;if(out.data[o]===area.data[ai]&&out.data[o+1]===area.data[ai+1]&&out.data[o+2]===area.data[ai+2]&&out.data[o+3]===area.data[ai+3])out.data[o+3]=0;}
  const patch=document.createElement('canvas');patch.width=patchW;patch.height=patchH;patch.getContext('2d')!.putImageData(out,0,0);
- return Object.assign(turnLayer(new FabricImage(patch,{left:startX/k,top:top/k,scaleX:1/k,scaleY:1/k}),lineRegion),{id:uid(),name:`Edited text: ${next.slice(0,40)}`,editedText:next,ocrOriginalBounds:originalFieldBounds(lineRegion),borrowed:plan.pieces.some(q=>q.source!==undefined)});
+ return Object.assign(turnLayer(new FabricImage(patch,{left:startX/k,top:top/k,scaleX:1/k,scaleY:1/k}),lineRegion),{id:uid(),name:`Edited text: ${next.slice(0,40)}`,editedText:next,ocrOriginalBounds:originalFieldBounds(lineRegion),borrowed:plan.pieces.some(q=>q.source!==undefined&&q.source!=='font'),drawn});
 }
 const hexRgb=(hex:string)=>[1,3,5].map(i=>parseInt(hex.slice(i,i+2),16)||0);
