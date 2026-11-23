@@ -606,7 +606,7 @@ function drawnLetters(chars:string[],face:LetterFace,k:number,paper:number[],pag
 // `face`: the face matched with the line. It rules where letters laid by
 // their ink go; unless `face.draw` is false, letters the page cannot lend are
 // drawn in it (the caller chose a font for this edit), listed in `drawn`.
-export async function glyphEditPatch(c:Canvas,p:Page,lineRegion:TextRegion,next:string,pageRegions:TextRegion[]=[],sources:LetterSource[]=[],faceOf?:LetterFace|(()=>Promise<LetterFace|undefined>)){
+export async function glyphEditPatch(c:Canvas,p:Page,lineRegion:TextRegion,next:string,pageRegions:TextRegion[]=[],sources:LetterSource[]=[],faceOf?:LetterFace|(()=>Promise<LetterFace|undefined>),{overDrawingOnly=false}:{overDrawingOnly?:boolean}={}){
  if(lineRegion.kind!=='ocr'||!lineRegion.glyphs)return undefined;
  // Everything below works in raster pixels, `k` per page unit.
  // A scanned PDF is cut at the scan's own resolution when the render budget
@@ -623,6 +623,7 @@ export async function glyphEditPatch(c:Canvas,p:Page,lineRegion:TextRegion,next:
  // drawing carried on under them (ink-flatten.ts).
  const truth=levelRaster(k===1?await pageComposite(c,p):await previewCanvas(p.source!,p.index,k,Math.ceil(p.width*k),Math.ceil(p.height*k)),f,k,fill),W=truth.width,H=truth.height;
  const {raster,busy}=measuredRaster(truth,region,page,Math.ceil(10*k));
+ if(overDrawingOnly&&!busy)return undefined;
  const target=rowInk(raster,region),metrics=lineMetrics(target.rows);if(!metrics)return undefined;
  const rctx=raster.getContext('2d',{willReadFrequently:true})!,middles=inkMiddles(rctx,region,paperOf(rctx,region),cells);cells.forEach((cell,i)=>Object.assign(cell,middles[i]));
  // (A line taken off the page altogether has no edge to keep: laid from its right edge, nothing of it was erased.)

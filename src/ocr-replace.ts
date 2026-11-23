@@ -61,14 +61,14 @@ export async function planOcrReplacement(c:Canvas,page:Page,items:OcrEdit[],{set
    text.set({text:spacedText(item.region,item.text)});fitOneLine(text);
    if(right)text.set({left:text.left-(text.calcTextWidth()-before)});
   }texts.push(text);edits.push({region:item.region,text:item.text,layer:(text as Textbox&{id:string}).id,letters:false});}
-  // A whole line set in a font: only the old letters' ink is taken off the
- // page (replaced by the paper around it, as a letter edit does), so a
- // drawing, a picture or a gradient behind the line stays. The flat patch in
- // the paper's colour (which covered them) is kept for a line whose letters
- // cannot be told from what lies behind.
+  // A whole line set in a font over a drawing (ink-flatten.ts): only the old
+ // letters' ink is taken off the page, so the drawing behind the line stays.
+ // On plain paper or a gradient the chosen background mode covers the line
+ // as before: there, erasing letter by letter left a faint halo of the old
+ // letters on soft scans (20 font edits of the benchmark read heavy).
  const erasers:FabricObject[]=[],covered:OcrEdit[]=[];
  for(const item of whole){
-  const eraser=single&&settings.background==='sampled'?await glyphEditPatch(c,page,item.region,'',pageRegions).catch(()=>undefined):undefined;
+  const eraser=single&&settings.background==='sampled'?await glyphEditPatch(c,page,item.region,'',pageRegions,[],undefined,{overDrawingOnly:true}).catch(()=>undefined):undefined;
   if(eraser)erasers.push(Object.assign(eraser,{name:'Text background patch',editedText:undefined,ocrOriginalBounds:undefined,borrowed:undefined,drawn:undefined}));else covered.push(item);
  }
  return {letters:patches.length,fonts:texts.length,borrowed,drawn,fit,face:texts[0]?.fontFamily as string|undefined,transparent,edits,
