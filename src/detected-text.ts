@@ -240,7 +240,7 @@ export async function matchedDetectedTextbox(region:TextRegion,c:Canvas,p:Page,r
  const all=regions.length?regions:[region],inkCache=new Map<string,Promise<PageInk|undefined>>();
  const ink=(family:string)=>{if(!inkCache.has(family))inkCache.set(family,options.ocrStyle==='auto'?pageInkLevel(all,family):Promise.resolve(undefined));return inkCache.get(family)!;};
  const makeText=async(r:TextRegion,family:string)=>(await detectedTextbox(r,{...options,ocrFont:family,matchBlur:false,pageInk:await ink(family),level:true})).text;
- const {matchOcrAppearance,applyOcrAppearance,matchOcrSoftness,matchOcrInk}=await import('./browser/ocr-appearance');
+ const {matchOcrAppearance,applyOcrAppearance,matchOcrSoftness,matchOcrInk,SURE_FACE}=await import('./browser/ocr-appearance');
  // A PDF page's units are points (72 dpi): scanned letters are a few pixels
  // at that scale, where the font ranking, size, place and softness all came
  // out coarse (a bold Arial total set in Inter, text a third of a point off,
@@ -257,6 +257,11 @@ export async function matchedDetectedTextbox(region:TextRegion,c:Canvas,p:Page,r
  const fitted=await matchOcrAppearance(raster,fineRegion,fineAll,options.ocrFont,{autoFont:options.autoFont,matchBlur:options.matchBlur,makeText,alike:alikeLines(raster,fineAll,fineRegion)});
  if(!fitted)return detectedTextbox(region,{...options,pageInk:await ink(options.ocrFont)});
  const text=await makeText(region,fitted.family);applyOcrAppearance(text,region,{...fitted,dx:fitted.dx/k,dy:fitted.dy/k,softness:fitted.softness/k});
+ // A face that is not the page's own fits its shapes better blurred, and the
+ // fit took that blur on crisp letters (a sharp Helvetica-like line set in
+ // Liberation Sans at softness 0.6): there the softness is the one whose edges
+ // are as wide as the line's own, never more than the fit's.
+ if(!pdf&&options.matchBlur&&fitted.score<SURE_FACE&&(text.textSoftness??0)>0){text.textSoftness=Math.min(text.textSoftness??0,matchOcrSoftness(raster,region,regionsAll,text,k));text.initDimensions();}
  if(pdf){
   // The shape fit settles on a crisper softness than a soft scan has, and ink
   // measured against it came out pale (grey #555 lines set 18% too light):

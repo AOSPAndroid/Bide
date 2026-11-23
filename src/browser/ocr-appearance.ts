@@ -13,11 +13,8 @@ type Sample={region:TextRegion;left:number;top:number;source:Coverage;font:FontS
 const FAMILY_MARGIN=.04;
 type Fit={family:string;score:number;softness:number;ratio:number;dx:number;dy:number;gain:number;mass?:number;masses?:number[];bold?:boolean;ink?:string;inkGain?:number;sx?:number};
 // Widths tried for a face's letters (scaleX), and how much better a width must fit the line to be taken.
-// How much softer than the line's own letters a fitted render's edges may be
-// (partial pixels per outline pixel). At 0.1 a crisp line in a face not quite
-// its own was blurred to hide the difference in shape (a Helvetica-like line
-// set in Liberation Sans at softness 0.6 on a sharp page): blur that shows.
-const EDGE_SLACK=.03;
+// A fit below this is a face that is not the page's own (a substitute).
+export const SURE_FACE=.9;
 const SCALES=[.88,.91,.94,.97,1.03,1.06,1.09,1.12],WIDTH_MARGIN=.01;
 const median=(values:number[])=>[...values].sort((a,b)=>a-b)[values.length>>1];
 
@@ -104,7 +101,7 @@ export async function matchOcrAppearance(raster:HTMLCanvasElement,region:TextReg
    if(!softness||selectedEdges===undefined||!paintSelected)return true;
    const key=`${ratio}/${dx}/${dy}/${softness}`,cached=allowedCache.get(key);if(cached!==undefined)return cached;
    selectedText.set({fontSize:selectedSize*ratio,left:region.left+dx,top:region.top+selectedAscent-selectedSize*ratio*.93+dy});selectedText.initDimensions();
-   selectedText.textSoftness=softness;const edges=coverageEdgeWidth(paintSelected(selectedText)),allowed=edges!==undefined&&edges<=selectedEdges+EDGE_SLACK;
+   selectedText.textSoftness=softness;const edges=coverageEdgeWidth(paintSelected(selectedText)),allowed=edges!==undefined&&edges<=selectedEdges+.1;
    allowedCache.set(key,allowed);return allowed;
   };
   const allowedSoftness=(ratio:number,dx=0,dy=0)=>softnessValues.filter(softness=>allows(ratio,softness,dx,dy));
@@ -221,7 +218,7 @@ export async function matchOcrAppearance(raster:HTMLCanvasElement,region:TextReg
    // Not when the finer place draws softer edges than the letters have (a
    // half-pixel step greys every horizontal stroke of 12 px text).
    const edgesAt=(r:number,dx:number,dy:number)=>{at(r,dx,dy);return coverageEdgeWidth(paintSelected(probe));},was=edgesAt(best.ratio,best.dx,best.dy),now=edgesAt(cur.r,cur.dx,cur.dy);
-   if(selectedEdges!==undefined&&was!==undefined&&now!==undefined&&now>was+.05&&now>selectedEdges+EDGE_SLACK)cur={r:best.ratio,dx:best.dx,dy:best.dy};
+   if(selectedEdges!==undefined&&was!==undefined&&now!==undefined&&now>was+.05&&now>selectedEdges+.1)cur={r:best.ratio,dx:best.dx,dy:best.dy};
    best.ratio=cur.r;best.dx=cur.dx;best.dy=cur.dy;applyOcrAppearance(text,region,best);text.set({fill:'#000000',objectCaching:false});
   }
   // The width of the letters. A face that is not the page's own (most real
@@ -231,13 +228,16 @@ export async function matchOcrAppearance(raster:HTMLCanvasElement,region:TextReg
   // letters (a Verdana-like line in Lato). The face is drawn a little wider
   // or narrower (at most 12%) when that fits the line's own letters clearly
   // better; the page's own face keeps its proportions.
-  {
+  // (Only below a sure fit: a face that fits this well is the page's own, and
+  // a stretch of a few percent then only greys its stems.)
+  if(best.score<SURE_FACE){
    const probe=await makeText(region,best.family),size0=probe.fontSize,ascent=probe.top-region.top+size0*.93;
    probe.set({fill:'#000000',objectCaching:false});probe.textSoftness=best.softness;
    const at=(sx:number,r:number,dx:number)=>{probe.set({scaleX:sx,fontSize:size0*r,left:region.left+best!.dx+dx,top:region.top+ascent-size0*r*.93+best!.dy});probe.initDimensions();return coverageFit(selected.source,paintSelected(probe)).score;};
    const base=at(1,best.ratio,0);let pick={sx:1,r:best.ratio,dx:0,score:base};
    for(const sx of SCALES)for(const m of [.97,.985,1,1.015,1.03])for(const dx of [-.5,0,.5]){const v=at(sx,best.ratio*m,dx);if(v>pick.score)pick={sx,r:best.ratio*m,dx,score:v};}
-   if(pick.sx!==1&&pick.score>base+WIDTH_MARGIN){best.sx=pick.sx;best.ratio=pick.r;best.dx+=pick.dx;best.score+=pick.score-base;applyOcrAppearance(text,region,best);text.set({fill:'#000000',objectCaching:false});}
+   const edges=(sx:number,r:number,dx:number)=>{at(sx,r,dx);return coverageEdgeWidth(paintSelected(probe));},was=edges(1,best.ratio,0),now=pick.sx!==1?edges(pick.sx,pick.r,pick.dx):was;
+   if(pick.sx!==1&&pick.score>base+WIDTH_MARGIN&&!(was!==undefined&&now!==undefined&&now>was+.05)){best.sx=pick.sx;best.ratio=pick.r;best.dx+=pick.dx;best.score+=pick.score-base;applyOcrAppearance(text,region,best);text.set({fill:'#000000',objectCaching:false});}
   }
   const painted=paintSelected(text);best.gain=coreGain(selected.source,painted);best.bold=text.fontWeight==='bold'||Number(text.fontWeight)>=600;
   // Ink of the original letters over the ink of the text as fitted: 1 when
