@@ -123,13 +123,15 @@ test('editing image text reuses the original letters; find & replace fixes every
   // Click a line: edit in the dialog; the result is a pixel patch, not font text.
   await page.locator('.detected-text-overlay button[aria-label*="Nom du client"]').click();
   const input=page.getByLabel('New text');await input.fill((await input.inputValue()).replace('Jeaan','Jean'));await page.getByRole('button',{name:'Apply',exact:true}).click();
+  // (A letter edit first matches the line's face to place its letters: about two seconds.)
+  await page.getByText("Edited with the image's own letters",{exact:false}).last().waitFor({timeout:60000});
   let saved=await layers();
   assert.ok(saved.some(l=>/^Edited text: Nom du client: Jean MARTIN/.test(l.name)),'letters patch: '+saved.map(l=>l.name).join(', '));
   assert.ok(!saved.some(l=>l.type==='Textbox'||l.type==='textbox'),'no font text was needed');
   // Find & replace fixes the remaining line in one step.
   await page.getByRole('button',{name:'Find & replace'}).first().click();await page.getByLabel('Find text').fill('Jeaan');await page.getByLabel('Replace with').fill('Jean');
   assert.match(await page.locator('[aria-live=polite]').innerText(),/^1 detected line contains/);
-  await page.getByRole('button',{name:'Replace all'}).click();saved=await layers();
+  await page.getByRole('button',{name:'Replace all'}).click();await page.getByText('Replaced in',{exact:false}).last().waitFor({timeout:60000});saved=await layers();
   assert.ok(saved.some(l=>/^Edited text: Titulaire: Jean MARTIN/.test(l.name)),'find & replace patch');
   // Missing letters must not silently replace the original face with a font.
   const original=await page.evaluate(async()=>{const {restoreLocal}=await import('/src/model.ts');return (await restoreLocal()).pages[0].canvas;});

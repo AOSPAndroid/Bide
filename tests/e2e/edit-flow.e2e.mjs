@@ -203,17 +203,19 @@ test('a letter the line lacks comes from a verified line of the page; one found 
   // The explicit choice uses the current input, including changes after the refusal.
   const latest='289,07 $';await input.fill(latest);
   await page.getByRole('button',{name:'Use a font for this edit'}).click();
-  await page.getByText('This line is now text in the OCR font',{exact:false}).waitFor({timeout:60000});
+  // The line keeps its own letters; only the one found nowhere is drawn in the matched face.
+  await page.getByText('The line keeps its own letters; only “$” is drawn',{exact:false}).waitFor({timeout:120000});
   // Read the resolved autosave state: waitForFunction treats an async predicate's
   // Promise as truthy before the IndexedDB read has returned its condition.
   const savedBy=Date.now()+30000;let persisted=false;
   while(!persisted&&Date.now()<savedBy){
-   persisted=(await canvasState()).objects.some(o=>o.type?.toLowerCase()==='textbox'&&o.text===latest);
+   persisted=(await canvasState()).objects.some(o=>o.editedText===latest);
    if(!persisted)await page.waitForTimeout(200);
   }
   assert.ok(persisted,'autosave contains the current explicitly permitted text');
-  const layers=(await canvasState()).objects.filter(o=>o.type?.toLowerCase()==='textbox').map(o=>o.text);
-  assert.deepEqual(layers,[latest]);
+  const state=(await canvasState()).objects;
+  assert.deepEqual(state.filter(o=>typeof o.editedText==='string').map(o=>o.editedText),[latest],'one edited layer holding the permitted text');
+  assert.equal(state.filter(o=>o.type?.toLowerCase()==='textbox').length,0,'its letters are the page\'s own, not a text box over them');
   assert.equal(await mode.inputValue(),'letters','font consent applies only to this line and does not change the global mode');
   // Another field still refuses a missing letter instead of inheriting that font consent.
   const beforeLater=await canvasState(),next='1 947,80 $';
@@ -245,17 +247,26 @@ test('a line set in a font takes the grey of the original ink, not a lighter one
   // The line has no 6, so the edit needs a font, chosen explicitly.
   await field.click();await page.getByLabel('New text').fill('17 654,24 €');await page.getByRole('button',{name:'Apply',exact:true}).click();
   await page.getByRole('button',{name:'Use a font for this edit'}).click();
-  await page.getByText('This line is now text in the OCR font',{exact:false}).waitFor({timeout:60000});
+  await page.getByText('is drawn in the matched font',{exact:false}).waitFor({timeout:120000});
   // Autosave may be delayed under the full suite: await the resolved saved
   // layer rather than assuming a fixed delay has elapsed.
-  const savedBy=Date.now()+30000;let fills=[];
-  while(!fills.length&&Date.now()<savedBy){
-   fills=await page.evaluate(async()=>{const {restoreLocal}=await import('/src/model.ts');return (await restoreLocal())?.pages[0].canvas.objects.filter(o=>o.type?.toLowerCase()==='textbox').map(o=>o.fill)??[];});
-   if(!fills.length)await page.waitForTimeout(200);
+  // The drawn 6 sits among the line's own letters: each letter of the
+  // edited line (a run of inked columns) reaches the same grey at its core,
+  // the drawn one included (a pale one stood out at #606061).
+  const savedBy=Date.now()+30000;let cores=[];
+  while(!cores.length&&Date.now()<savedBy){
+   cores=await page.evaluate(async()=>{
+    const {restoreLocal}=await import('/src/model.ts'),o=(await restoreLocal())?.pages[0].canvas.objects.find(o=>typeof o.editedText==='string');if(!o?.src)return [];
+    const img=new Image();img.src=o.src;await img.decode();const c=document.createElement('canvas');c.width=img.width;c.height=img.height;const g=c.getContext('2d');g.drawImage(img,0,0);const d=g.getImageData(0,0,c.width,c.height).data;
+    const col=x=>{let m=255;for(let y=0;y<c.height;y++){const i=(y*c.width+x)*4;if(d[i+3]>200)m=Math.min(m,d[i]);}return m;};
+    const out=[];let run=[];for(let x=0;x<=c.width;x++){const v=x<c.width?col(x):255;if(v<200)run.push(v);else if(run.length){out.push(Math.min(...run));run=[];}}
+    return out;
+   });
+   if(!cores.length)await page.waitForTimeout(200);
   }
-  assert.equal(fills.length,1);
-  const level=parseInt(fills[0].slice(1,3),16);
-  assert.ok(Math.abs(level-0x4d)<=2,`the font text is #4d4d4d like the original ink (got ${fills[0]})`);
+  // (At 10 px some letters touch and read as one run: "17 654,24 €" gives about seven.)
+  assert.ok(cores.length>=5,`the edited line's letters were found (${cores.length})`);
+  for(const v of cores)assert.ok(Math.abs(v-0x4d)<=14,`every letter's core is the original grey #4d4d4d (cores ${cores.map(v=>v.toString(16)).join(' ')})`);
   assert.deepEqual(errors,[]);
  }finally{await browser.close();await server.close();}
 });
@@ -281,7 +292,7 @@ test('a scanned PDF keeps its ink: letters reused at the scan\'s own pixels, a f
   await field('13,80').click();await page.getByLabel('New text').fill('31,80 €');await page.getByRole('button',{name:'Apply',exact:true}).click();
   await page.getByText("Edited with the image's own letters",{exact:false}).last().waitFor({timeout:60000});
   await field('9,40').click();await page.getByLabel('New text').fill('6,40 €');await page.getByRole('button',{name:'Apply',exact:true}).click();
-  await page.getByRole('button',{name:'Use a font for this edit'}).click();await page.getByText('This line is now text in the OCR font',{exact:false}).waitFor({timeout:60000});
+  await page.getByRole('button',{name:'Use a font for this edit'}).click();await page.getByText('Undo restores the original',{exact:false}).last().waitFor({timeout:120000});
   await page.keyboard.press('Escape');await page.mouse.click(640,150);await page.waitForTimeout(800);
   await page.locator('.document-actions .primary').click();
   const [d]=await Promise.all([page.waitForEvent('download',{timeout:120000}),page.locator('.modal .dialog-actions .primary').click()]);
