@@ -8,6 +8,8 @@ The edit benchmark now compares every edit set in a font with the original's own
 - **Ligatures**: text set over a scan draws the letter groups its face joins ("ff", "fi", "ti", "tt"), as the page was typeset. A line with one was narrower than Bide's letters drawn one by one and fitted no face well. While the text is typed, the caret still moves letter by letter.
 - **Weight**: a line's own letters count when its face is judged (an e-mail line was set in Raleway Regular beside lines in Light, on the evidence of a neighbour alone); shapes that fit better count beside the ink; a weight settled for a family on the document decides near ties.
 - **Colour on soft scans**: a thin blurred line reads paler than it was printed, and a heavier weight drawn paler passed for it. The colour of the page's surer lines (taller, or of thicker strokes) along the same hue is the reference: the weight is judged at that colour and the colour is brought up to it when close.
+- **A symbol the reader has no character for** (a ★ in a line) kept its place but lost its gap when a letter edit moved the line: the text after it closed up against it. It keeps the gap it had.
+- In the default flow (the page's own letters, a font when they cannot make the edit), 354 → 358 of the benchmark's 403 edits show no visible difference.
 - **Reading**: the four self-checks together read 1152 → 1175 of 1398 benchmark lines exactly. The redraw check no longer swaps 1, l and I (it fixed none and broke ten: "COLIS" → "COL1S"); for 0 and O it fixed 33.
 
 ## 2026-11-20 — Edits that match the page; AI on the graphics card
