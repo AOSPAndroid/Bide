@@ -30,7 +30,12 @@ async function convert(name,entry,source){
 }
 if(process.argv[1]?.endsWith('prepare-ai.mjs'))try{
  await mkdir('public/ai/models',{recursive:true});
+ // --demo: only what the hosted demo deploys (the recognizers' character
+ // lists and the ONNX runtime). Its visitors' browsers fetch the models
+ // themselves from the pinned URLs, so the 300 MB of weights are not needed to build it.
+ const demo=process.argv.includes('--demo');
  for(const [name,entry] of Object.entries(manifest.files)){
+  if(demo&&!name.endsWith('.yml'))continue;
   // Converted models (LaMa: float16 weights, half the size, identical output)
   // are downloaded to a cache, verified, converted and verified again.
   const target=entry.convert?`node_modules/.cache/bide-ai/${name}`:`public/ai/models/${name}`;
@@ -49,5 +54,5 @@ if(process.argv[1]?.endsWith('prepare-ai.mjs'))try{
  for(const script of ['latin','cyrillic','greek','arabic','korean','cjk'])await writeFile(`public/ai/models/ppocr-${script}-dict.json`,JSON.stringify(characterDict(await readFile(`public/ai/models/ppocr-${script}-rec.yml`,'utf8'))));
  await mkdir('public/ai/ort',{recursive:true});
  for(const file of ['ort-wasm-simd-threaded.jsep.mjs','ort-wasm-simd-threaded.jsep.wasm'])await cp(`node_modules/onnxruntime-web/dist/${file}`,`public/ai/ort/${file}`);
- console.log('bide AI models are ready.');
+ console.log(demo?'bide AI assets for the hosted demo are ready.':'bide AI models are ready.');
 }catch(e){console.error(e.message);process.exitCode=1;}
