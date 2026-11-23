@@ -11,6 +11,8 @@
 import {readFile} from 'node:fs/promises';
 
 const face=async(family,file,weight=400)=>`@font-face{font-family:"${family}";font-weight:${weight};src:url(data:font/ttf;base64,${(await readFile(new URL('../../src/browser/fonts/'+file,import.meta.url))).toString('base64')})}`;
+// A face from the system, for documents in fonts the app neither bundles nor can fetch.
+const sysFace=async(family,path,weight=400)=>`@font-face{font-family:"${family}";font-weight:${weight};src:url(data:font/ttf;base64,${(await readFile(path)).toString('base64')})}`;
 const f=(fields,id,style='')=>`<span data-f="${id}"${style?` style="${style}"`:''}>${fields[id]}</span>`;
 const row=(a,b,style='')=>`<div style="display:flex;justify-content:space-between;${style}"><span>${a}</span><span>${b}</span></div>`;
 
@@ -124,6 +126,17 @@ export const templates={
     <div style="font-size:32px;font-weight:700">${f(v,'head')}</div><div style="font-size:18px;font-weight:700;margin:10px 0 14px">${f(v,'when')}</div>
     <div style="font-size:17px">${f(v,'where')}</div><div style="font-size:17px;margin-top:6px">${f(v,'note')}</div></div></div>`,
   edits:[['head','Fête du village','new'],['head','Fête des voisins','new'],['when','Samedi 5 juillet à 19 h','new'],['when','Samedi 28 juin à 16 h','page'],['where','Square des Platanes','new'],['where','Parc des Tilleuls','new'],['note','Buvette, jeux et bal','page'],['note','Buvette, jeux et tombola','new']]},
+ // Fonts the app neither bundles nor can fetch (DejaVu Sans, a Verdana-like
+ // face; FreeSans, a Helvetica clone; DejaVu Serif): what most real documents
+ // are. No answer is "the same family"; the edit must still look like it.
+ notice:{width:470,height:300,fonts:async()=>[await sysFace('DejaVuX','/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf'),await sysFace('DejaVuX','/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',700),await sysFace('FreeX','/usr/share/fonts/truetype/freefont/FreeSans.ttf'),await sysFace('FreeX','/usr/share/fonts/truetype/freefont/FreeSansBold.ttf',700),await sysFace('DejaVuSerifX','/usr/share/fonts/truetype/dejavu/DejaVuSerif.ttf')].join(''),
+  fields:{head:'Bibliothèque des Glycines',sub:'Avis de réservation n° 4471',t1:'Le jardin des orages',d1:'À retirer avant le 9 mai',who:'Lecteur 20-381, guichet 2',h2:'Horaires d’été',o1:'Mardi au samedi, 10 h - 18 h',o2:'Fermé le dimanche et le lundi',q:'Une lecture vaut un voyage.'},
+  html:(v)=>`<div style="width:470px;height:300px;background:#fff;color:#202124;padding:24px 32px;box-sizing:border-box">
+   <div style="font-family:DejaVuX;font-size:19px;font-weight:700">${f(v,'head')}</div><div style="font-family:DejaVuX;font-size:12px;color:#444;margin:4px 0 12px">${f(v,'sub')}</div>
+   <div style="font-family:DejaVuX;font-size:13px">${f(v,'t1')}</div><div style="font-family:DejaVuX;font-size:13px;font-weight:700">${f(v,'d1')}</div><div style="font-family:DejaVuX;font-size:11px;color:#444">${f(v,'who')}</div>
+   <div style="font-family:FreeX;font-size:16px;font-weight:700;margin-top:14px">${f(v,'h2')}</div><div style="font-family:FreeX;font-size:13px">${f(v,'o1')}</div><div style="font-family:FreeX;font-size:13px">${f(v,'o2')}</div>
+   <div style="font-family:DejaVuSerifX;font-size:13px;margin-top:12px">${f(v,'q')}</div></div>`,
+  edits:[['head','Bibliothèque des Mimosas','new'],['sub','Avis de réservation n° 5892','new'],['t1','Le jardin des brumes','new'],['d1','À retirer avant le 27 mai','new'],['who','Lecteur 64-917, guichet 3','new'],['h2','Horaires d’hiver','new'],['o1','Mercredi au vendredi, 9 h - 17 h','new'],['o2','Fermé le jeudi et le vendredi','new'],['q','Un livre vaut un voyage.','new'],['q','Chaque page ouvre un chemin.','new']]},
 };
 
 // The bundled family (and weight, when it is a family of its own) each face a
@@ -169,4 +182,5 @@ export const cases=[
  ['readings','uneven'],['workshop','uneven'],
  ['workshop','viewsoft'],['flyer','viewsoft'],['letter','viewsoft'],
  ['party','clean'],['party','soft'],['party','view'],
+ ['notice','clean'],['notice','soft'],['notice','pdf'],
 ];

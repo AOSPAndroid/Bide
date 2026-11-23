@@ -563,17 +563,19 @@ function measuredRaster(truth:HTMLCanvasElement,region:TextRegion,others:TextReg
 
 // The face a line was matched with (matchedDetectedTextbox), to draw the
 // letters an edit needs and the page does not have. Sizes in page units.
-export type LetterFace={family:string;weight:string|number;style:string;size:number;fill:string;softness:number;charSpacing?:number;score?:number;draw?:boolean};
+export type LetterFace={family:string;weight:string|number;style:string;size:number;fill:string;softness:number;charSpacing?:number;scaleX?:number;score?:number;draw?:boolean};
+// (`scaleX`: the face drawn that much wider, to the page's letters' proportions.)
 // Where the ink of each character of `text` starts and ends when set in
 // `face`, `k` raster pixels per page unit (none for a space): the face's own
 // advances, kerning and letter spacing.
 function faceRuler(text:string,face:LetterFace,k:number){
  const up=4,px=face.size*k,g=document.createElement('canvas').getContext('2d')!;g.font=`${face.style} ${face.weight} ${px*up}px "${face.family}"`;
  const chars=Array.from(text),spacing=(face.charSpacing??0)/1000*px;let prefix='';
+ const sx=face.scaleX??1;
  return chars.map((ch,j)=>{
   prefix+=ch;if(/\s/.test(ch))return undefined;
   const m=g.measureText(ch),pen=(g.measureText(prefix).width-m.width)/up+j*spacing;
-  return m.actualBoundingBoxLeft+m.actualBoundingBoxRight>0?{i0:pen-m.actualBoundingBoxLeft/up,i1:pen+m.actualBoundingBoxRight/up}:undefined;
+  return m.actualBoundingBoxLeft+m.actualBoundingBoxRight>0?{i0:(pen-m.actualBoundingBoxLeft/up)*sx,i1:(pen+m.actualBoundingBoxRight/up)*sx}:undefined;
  });
 }
 // Characters drawn in `face` at `k` raster pixels per page unit over `paper`,
@@ -584,13 +586,13 @@ function faceRuler(text:string,face:LetterFace,k:number){
 function drawnLetters(chars:string[],face:LetterFace,k:number,paper:number[],page:string):{raster:HTMLCanvasElement;glyphs:LibraryGlyph[]}|undefined{
  const px=face.size*k,sigma=Math.max(0,face.softness)*k,pad=Math.ceil(sigma*3)+4,up=4,font=`${face.style} ${face.weight} ${px*up}px "${face.family}"`;
  const measure=document.createElement('canvas').getContext('2d')!;measure.font=font;
- const boxes=chars.map(ch=>{const m=measure.measureText(ch);return {ch,advance:m.width/up,left:m.actualBoundingBoxLeft/up,right:m.actualBoundingBoxRight/up};}).filter(b=>b.right+b.left>0);
+ const sx=face.scaleX??1,boxes=chars.map(ch=>{const m=measure.measureText(ch);return {ch,advance:m.width/up*sx,left:m.actualBoundingBoxLeft/up*sx,right:m.actualBoundingBoxRight/up*sx};}).filter(b=>b.right+b.left>0);
  if(boxes.length!==chars.length||!/^#[0-9a-f]{6}$/i.test(face.fill))return undefined;
  const base=Math.ceil(px*1.25)+pad,height=base+Math.ceil(px*.45)+pad;let x=pad;
  const cells=boxes.map(b=>{const w=Math.ceil(b.left+b.right)+2*pad,cell={...b,x0:x,x1:x+w,pen:x+pad+b.left};x+=w+pad;return cell;}),width=x;
  if(width*up>16000||height*up>4000)return undefined;
  const hi=document.createElement('canvas');hi.width=width*up;hi.height=height*up;const g=hi.getContext('2d',{willReadFrequently:true})!;g.font=font;g.fillStyle='#000';g.textBaseline='alphabetic';
- for(const cell of cells)g.fillText(cell.ch,cell.pen*up,base*up);
+ for(const cell of cells){g.setTransform(sx,0,0,1,cell.pen*up,0);g.fillText(cell.ch,0,base*up);}g.setTransform(1,0,0,1,0,0);
  const soft=blurCoverage(alphaCoverage(g.getImageData(0,0,hi.width,hi.height).data,hi.width,hi.height),sigma*up);
  const raster=document.createElement('canvas');raster.width=width;raster.height=height;const out=new ImageData(width,height),ink=hexRgb(face.fill);
  for(let y=0;y<height;y++)for(let u=0;u<width;u++){let a=0;for(let dy=0;dy<up;dy++)for(let dx=0;dx<up;dx++)a+=soft.data[(y*up+dy)*hi.width+u*up+dx];a/=up*up;const o=(y*width+u)*4;for(let n=0;n<3;n++)out.data[o+n]=paper[n]+(ink[n]-paper[n])*a;out.data[o+3]=255;}

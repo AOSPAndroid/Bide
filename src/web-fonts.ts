@@ -55,11 +55,15 @@ function distance(d:Descriptor,bin:Uint8Array,at:number){
 }
 // The families whose letters look most like these (`glyphs`: character and
 // descriptor), best first. A face must have every character it is judged on.
-export function shortlist(index:Index,glyphs:{ch:string;d:Descriptor}[],count=6,skip:(family:string)=>boolean=()=>false){
+// Text faces only: a display or script family's letters can sit nearest a
+// page's on a few descriptors (Bakbak One, a heavy display face, was taken for
+// a plain Verdana-like sans), and set in it the whole line reads as another font.
+export const TEXT_KINDS=new Set(['sans','serif','mono']);
+export function shortlist(index:Index,glyphs:{ch:string;d:Descriptor}[],count=6,skip:(family:string)=>boolean=()=>false,kinds:Set<string>|undefined=TEXT_KINDS){
  const known=glyphs.map(g=>({at:index.chars.indexOf(g.ch),d:g.d})).filter(g=>g.at>=0);if(known.length<4)return [];
  const scored:{family:Family;score:number}[]=[];
  for(const family of index.families){
-  if(skip(family.family))continue;let best=Infinity;
+  if(skip(family.family)||kinds&&!kinds.has(family.category))continue;let best=Infinity;
   for(const face of family.faces){
    let sum=0,n=0;for(const g of known){const at=face.row*index.cell*index.chars.length+g.at*index.cell;sum+=distance(g.d,index.bin,at);n++;}
    if(n&&sum/n<best)best=sum/n;

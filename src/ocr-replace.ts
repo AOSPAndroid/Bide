@@ -31,7 +31,7 @@ export async function planOcrReplacement(c:Canvas,page:Page,items:OcrEdit[],{set
    // lettering (letter-match.ts), never from unverified lettering.
    // The matched face is only a ruler here (where letters laid by their ink
    // go): every pixel is the page's own.
-   const face=rule&&items.length===1&&item.text!==undefined?async():Promise<LetterFace|undefined>=>{try{const made=await matchedDetectedTextbox(item.region,c,page,pageRegions,{ocrFont:settings.font,ocrStyle:settings.style,matchBlur:settings.matchBlur,autoFont,appearanceRegions:others});return 'score' in made?{family:made.text.fontFamily,weight:made.text.fontWeight,style:made.text.fontStyle,size:made.text.fontSize,fill:String(made.text.fill),softness:0,charSpacing:made.text.charSpacing,score:made.score as number,draw:false}:undefined;}catch{return undefined;}}:undefined;
+   const face=rule&&items.length===1&&item.text!==undefined?async():Promise<LetterFace|undefined>=>{try{const made=await matchedDetectedTextbox(item.region,c,page,pageRegions,{ocrFont:settings.font,ocrStyle:settings.style,matchBlur:settings.matchBlur,autoFont,appearanceRegions:others});return 'score' in made?{family:made.text.fontFamily,weight:made.text.fontWeight,style:made.text.fontStyle,size:made.text.fontSize,fill:String(made.text.fill),softness:0,charSpacing:made.text.charSpacing,scaleX:made.text.scaleX,score:made.score as number,draw:false}:undefined;}catch{return undefined;}}:undefined;
    const patch=item.text!==undefined?await glyphEditPatch(c,page,item.region,item.text,pageRegions,[],face):undefined;
    if(!patch)throw new LetteringError(letterEditBlocker(item.region,item.text??item.region.text));
    patches.push(patch);if((patch as FabricObject&{borrowed?:boolean}).borrowed)borrowed++;edits.push({region:item.region,text:item.text,layer:(patch as FabricObject&{id:string}).id,letters:true});
@@ -51,7 +51,7 @@ export async function planOcrReplacement(c:Canvas,page:Page,items:OcrEdit[],{set
   fit=score;
   // (A face that fits the line only roughly was fitted softer than the line is, to make up for its shapes: its letters are drawn no softer than the line was measured.)
   if(single&&mix&&item.text!==item.region.text&&settings.background!=='transparent'){
-   const patch=await glyphEditPatch(c,page,item.region,item.text!,pageRegions,[],{family:text.fontFamily,weight:text.fontWeight,style:text.fontStyle,size:text.fontSize,fill:String(text.fill),softness:(score??0)>=.9?text.textSoftness??0:Math.min(text.textSoftness??0,item.region.blur??0),charSpacing:text.charSpacing,score}).catch(()=>undefined);
+   const patch=await glyphEditPatch(c,page,item.region,item.text!,pageRegions,[],{family:text.fontFamily,weight:text.fontWeight,style:text.fontStyle,size:text.fontSize,fill:String(text.fill),softness:(score??0)>=.9?text.textSoftness??0:Math.min(text.textSoftness??0,item.region.blur??0),scaleX:text.scaleX,charSpacing:text.charSpacing,score}).catch(()=>undefined);
    if(patch){patches.push(patch);drawn.push(...((patch as FabricObject&{drawn?:string[]}).drawn??[]));edits.push({region:item.region,text:item.text,layer:(patch as FabricObject&{id:string}).id,letters:true});continue;}
   }
   whole.push(item);
