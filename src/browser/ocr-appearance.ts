@@ -211,6 +211,10 @@ export async function matchOcrAppearance(raster:HTMLCanvasElement,region:TextReg
     }
     if(!moved)break;
    }
+   // Not when the finer place draws softer edges than the letters have (a
+   // half-pixel step greys every horizontal stroke of 12 px text).
+   const edgesAt=(r:number,dx:number,dy:number)=>{at(r,dx,dy);return coverageEdgeWidth(paintSelected(probe));},was=edgesAt(best.ratio,best.dx,best.dy),now=edgesAt(cur.r,cur.dx,cur.dy);
+   if(selectedEdges!==undefined&&was!==undefined&&now!==undefined&&now>was+.05&&now>selectedEdges+.1)cur={r:best.ratio,dx:best.dx,dy:best.dy};
    best.ratio=cur.r;best.dx=cur.dx;best.dy=cur.dy;applyOcrAppearance(text,region,best);text.set({fill:'#000000',objectCaching:false});
   }
   const painted=paintSelected(text);best.gain=coreGain(selected.source,painted);best.bold=text.fontWeight==='bold'||Number(text.fontWeight)>=600;

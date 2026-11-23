@@ -272,13 +272,17 @@ export function planGlyphEdit(text:string,cells:Cell[],next:string,library:Libra
   }
   const before=real.filter(r=>r.i<p).at(-1),lead=before?cells.slice(before.i+1,p).filter(c=>c.space).length:0,startAt=p<cells.length?cells[p].x0:oldEnd;
   if(!items.length)return {startX:startAt,oldEnd,end:startAt,pieces:[] as Piece[]};
-  const pieces:Piece[]=[];let prev=before?{ch:before.c.ch,w:before.c.i1!-before.c.i0!,end:before.c.i1!}:undefined;
+  const pieces:Piece[]=[];let prev:{ch:string;w:number;end:number;k?:number}|undefined=before?{ch:before.c.ch,w:before.c.i1!-before.c.i0!,end:before.c.i1!,k:before.i}:undefined;
   for(const [n,it] of items.entries()){
    const w=it.g.i1!-it.g.i0!,me={ch:it.ch,w};
    // A line laid from its start begins where its ink began.
-   const ink=prev?prev.end+room(prev,me,it.spaces+(n?0:lead)):real[0].c.i0!;
+   // An unread symbol (a star the recognizer has no character for) has no
+   // letter to measure its room by: beside the neighbour it had, it keeps
+   // the gap it had (the text after a star closed up against it).
+   const beside=prev?.k!==undefined&&it.kept!==undefined&&(prev.ch===UNREAD||it.ch===UNREAD)&&it.kept>prev.k&&!cells.slice(prev.k+1,it.kept).some(c=>!c.space)&&cells[prev.k].i1!==undefined?cells[it.kept].i0!-cells[prev.k].i1!:undefined;
+   const ink=prev?prev.end+(beside??room(prev,me,it.spaces+(n?0:lead))):real[0].c.i0!;
    const x0=Math.max(it.g.x0,it.g.i0!-3),x1=Math.min(it.g.x1,it.g.i1!+3);
-   pieces.push({...piece(it.g),x0,x1,to:ink-(it.g.i0!-x0)});prev={...me,end:ink+w};
+   pieces.push({...piece(it.g),x0,x1,to:ink-(it.g.i0!-x0)});prev={...me,end:ink+w,k:it.kept};
   }
   const last=items.at(-1)!,tail=Math.max(0,last.g.x1-last.g.i1!);
   return {startX:Math.min(startAt,...pieces.map(q=>q.to!)),oldEnd,end:prev!.end+Math.min(tail,3),pieces};

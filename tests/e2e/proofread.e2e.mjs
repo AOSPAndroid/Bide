@@ -4,8 +4,9 @@ import {test} from 'node:test';import assert from 'node:assert/strict';
 import {createServer} from 'vite';import {chromium} from 'playwright-core';
 import {mkdtemp} from 'node:fs/promises';import {tmpdir} from 'node:os';import {join} from 'node:path';
 
-// "rnodern" is corrected to "modern". Only letters on the edited line may be used.
-const scan=`<body style="margin:0;background:#fff;font-family:Arial"><div style="padding:40px 50px;font-size:28px;line-height:2;color:#111">Our rnodern office<br>Weekly meeting notes</div></body>`;
+// "rnodern" is corrected to "modern". Only letters of the edited line, or of a
+// line proven to be in the same lettering, may be used: the other line here is in another face.
+const scan=`<body style="margin:0;background:#fff;font-family:Arial"><div style="padding:40px 50px;font-size:28px;line-height:2;color:#111">Our rnodern office<br><span style="font-family:'Liberation Serif','Times New Roman',serif">Weekly meeting notes</span></div></body>`;
 
 test('Proofread retains unsupported corrections and fixes words using the same line letters',{timeout:600000},async()=>{
  const server=await createServer({logLevel:'error',server:{port:0,host:'127.0.0.1'}});await server.listen();
@@ -24,7 +25,7 @@ test('Proofread retains unsupported corrections and fixes words using the same l
   assert.equal(await page.getByLabel('New text').inputValue(),'Our modern office');
   await page.getByRole('button',{name:'Cancel'}).click();
 
-  // An m on another line is not proof that its typeface matches. Refuse the
+  // An m on a line in another face is not proof that its typeface matches. Refuse the
   // correction and keep it available, with the saved page unchanged.
   const saved=()=>page.evaluate(async()=>{const {restoreLocal}=await import('/src/model.ts');return JSON.stringify((await restoreLocal()).pages[0].canvas);});
   const before=await saved();
@@ -47,7 +48,7 @@ test('Proofread retains unsupported corrections and fixes words using the same l
   await page.goto(server.resolvedUrls.local[0]+'app/');await page.locator('input[type=file][accept*=".psd"]').setInputFiles(available);
   await page.locator('button[aria-label^="Edit detected text: Our rnodern"]').waitFor({timeout:240000});
   // Proofread finds it across the page; one click fixes it.
-  await page.getByRole('button',{name:'Proofread'}).click();
+  await page.getByRole('button',{name:'Proofread'}).first().click();
   const line=page.locator('.proofread-line',{hasText:'rnodern'});await line.waitFor({timeout:60000});
   assert.equal(await page.locator('.proofread-line').count(),1,'only the misspelled line is listed');
   await line.getByRole('button',{name:'Use modern'}).click();
