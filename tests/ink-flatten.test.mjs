@@ -10,6 +10,9 @@ test('a drawing behind a line is told from its ink, and carried on under it',()=
  const data=page(true),clean=page(false);
  assert.equal(busyBackground(data,W,H,ink,paper),true);
  assert.equal(busyBackground(page(true).map((v,i)=>{const x=(i>>2)%W;return x>=20?paper[i%4]??255:v;}),W,H,ink,paper),false,'plain paper is not busy');
+ // A plain page with soft letters (their edges are neither ink nor paper) is not busy.
+ const softPage=new Uint8ClampedArray(60*16*4);for(let y=0;y<16;y++)for(let x=0;x<60;x++){const o=(y*60+x)*4,d=Math.min(Math.abs((x%6)-3),Math.abs(y-8)/2),a=Math.max(0,Math.min(1,1.2-d/1.5));for(let c=0;c<3;c++)softPage[o+c]=paper[c]+(ink[c]-paper[c])*a;softPage[o+3]=255;}
+ assert.equal(busyBackground(softPage,60,16,ink,paper),false,'soft letters on plain paper are not a drawing');
  const {under,alpha,flat}=flattenInk(data,W,H,ink,paper);
  // The page without the bar: the band's edge is kept where the bar crossed it.
  let worst=0;for(let i=0;i<W*H*4;i++)worst=Math.max(worst,Math.abs(under[i]-clean[i]));

@@ -12,11 +12,19 @@ const far=(d:ArrayLike<number>,i:number,c:Rgb)=>Math.max(Math.abs(d[i]-c[0]),Mat
 const strengthOf=(ink:Rgb,paper:Rgb)=>Math.max(40,Math.abs(ink[0]-paper[0]),Math.abs(ink[1]-paper[1]),Math.abs(ink[2]-paper[2]));
 
 // Something other than paper and this ink lies in the box: of the pixels
-// that are not ink, 3% or more are well off the paper's colour.
+// away from the letters, 3% or more are well off the paper's colour. Away
+// from the letters: their own soft edges are neither ink nor paper, and at
+// 96 dpi or on a soft scan they are more than 3% of a tight box (every plain
+// page then counted as drawn on).
 export function busyBackground(data:ArrayLike<number>,width:number,height:number,ink:Rgb,paper:Rgb){
- const strength=strengthOf(ink,paper);let clear=0,drawn=0;
- for(let i=0;i<width*height*4;i+=4){if(far(data,i,ink)<strength*.75)continue;clear++;if(far(data,i,paper)>28)drawn++;}
- return clear>0&&drawn/clear>=.03;
+ const strength=strengthOf(ink,paper),n=width*height,near=new Uint8Array(n),reach=Math.max(3,Math.min(8,Math.round(height*.12)));
+ for(let y=0;y<height;y++)for(let x=0;x<width;x++){
+  if(far(data,(y*width+x)*4,ink)>strength*.7)continue;
+  for(let dy=-reach;dy<=reach;dy++){const v=y+dy;if(v<0||v>=height)continue;for(let dx=-reach;dx<=reach;dx++){const u=x+dx;if(u>=0&&u<width)near[v*width+u]=1;}}
+ }
+ let clear=0,drawn=0;
+ for(let i=0;i<n;i++){if(near[i])continue;clear++;if(far(data,i*4,paper)>28)drawn++;}
+ return clear>=24&&drawn/clear>=.03;
 }
 
 // Fills the masked pixels of `data` (RGBA) from the pixels around them, ring

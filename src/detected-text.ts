@@ -625,7 +625,8 @@ export async function glyphEditPatch(c:Canvas,p:Page,lineRegion:TextRegion,next:
  const {raster,busy}=measuredRaster(truth,region,page,Math.ceil(10*k));
  const target=rowInk(raster,region),metrics=lineMetrics(target.rows);if(!metrics)return undefined;
  const rctx=raster.getContext('2d',{willReadFrequently:true})!,middles=inkMiddles(rctx,region,paperOf(rctx,region),cells);cells.forEach((cell,i)=>Object.assign(cell,middles[i]));
- const layout={right:rightAligned(region,page)};
+ // (A line taken off the page altogether has no edge to keep: laid from its right edge, nothing of it was erased.)
+ const layout={right:next!==''&&rightAligned(region,page)};
  const baseline=target.y0+metrics.baseline,rasters=new Map<string,HTMLCanvasElement>([[p.id,raster]]);
  // Earlier edits drawn on a picture page changed what their lines show.
  const blocked=p.source?[]:c.getObjects().filter(o=>typeof (o as Tagged&{editedText?:string}).editedText==='string'||o instanceof Textbox).map(o=>o.getBoundingRect());
