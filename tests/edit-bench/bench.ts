@@ -47,9 +47,9 @@ export async function edit(id:string,regionId:string,text:string,mode:'letters'|
   const objects=[...((d.page.canvas.objects||[]) as unknown[])];await plan.apply(objects);
   const ms=performance.now()-t0,page:Page={...d.page,canvas:{...d.page.canvas,objects}};
   const layer=(objects.at(-1)??{}) as Record<string,unknown>,drawn=plan.drawn,info=plan.fonts?{font:layer.fontFamily,weight:layer.fontWeight,fill:layer.fill,soft:layer.textSoftness,size:layer.fontSize}:undefined;
-  if(page.source){const project:Project={version:1,name:'bench',pages:[page],sources:d.sources};const blob=await exportInBrowser({...await exportPayload(project),format:'pdf',compression:'lossless',range:'',dpi:300});return {outcome:mode,ms,type:'application/pdf',data:await base64(blob),info,drawn,whole:!!plan.fonts};}
+  if(page.source){const project:Project={version:1,name:'bench',pages:[page],sources:d.sources};const blob=await exportInBrowser({...await exportPayload(project),format:'pdf',compression:'lossless',range:'',dpi:300});return {outcome:mode,ms,type:'application/pdf',data:await base64(blob),info,drawn,whole:!!plan.fonts,fit:plan.fit};}
   const out=await loaded(page);
-  try{const {blob}=await sameKindImage(page,out);return {outcome:mode,ms,type:blob.type,data:await base64(blob),info,drawn,whole:!!plan.fonts};}finally{await (out as unknown as StaticCanvas).dispose();}
+  try{const {blob}=await sameKindImage(page,out);return {outcome:mode,ms,type:blob.type,data:await base64(blob),info,drawn,whole:!!plan.fonts,fit:plan.fit};}finally{await (out as unknown as StaticCanvas).dispose();}
  }finally{await (c as unknown as StaticCanvas).dispose();}
 }
 export const close=(id:string)=>{docs.delete(id);};

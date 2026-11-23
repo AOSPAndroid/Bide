@@ -40,13 +40,15 @@ export async function planOcrReplacement(c:Canvas,page:Page,items:OcrEdit[],{set
  // appearance fit and its edge-clarity guard. Bulk conversion stays crisp and
  // uses the scan's suggested face without re-ranking every line on the page.
  const single=items.length===1&&items[0].text!==undefined,pageInk=!single&&settings.style==='auto'?await pageInkLevel(pageRegions,settings.font):undefined,texts:Textbox[]=[];
- const whole:OcrEdit[]=[];
+ const whole:OcrEdit[]=[];let fit:number|undefined;
  for(const item of fonts){const made=single
   ?await matchedDetectedTextbox(item.region,c,page,pageRegions,{ocrFont:settings.font,ocrStyle:settings.style,matchBlur:settings.matchBlur,autoFont,appearanceRegions:others})
   :await detectedTextbox(item.region,{ocrFont:settings.font,ocrStyle:settings.style,pageInk,matchBlur:false});
   const {text}=made,score='score' in made?made.score as number:undefined;
+  fit=score;
+  // (A face that fits the line only roughly was fitted softer than the line is, to make up for its shapes: its letters are drawn no softer than the line was measured.)
   if(single&&mix&&item.text!==item.region.text&&settings.background!=='transparent'){
-   const patch=await glyphEditPatch(c,page,item.region,item.text!,pageRegions,[],{family:text.fontFamily,weight:text.fontWeight,style:text.fontStyle,size:text.fontSize,fill:String(text.fill),softness:text.textSoftness??0,charSpacing:text.charSpacing,score}).catch(()=>undefined);
+   const patch=await glyphEditPatch(c,page,item.region,item.text!,pageRegions,[],{family:text.fontFamily,weight:text.fontWeight,style:text.fontStyle,size:text.fontSize,fill:String(text.fill),softness:(score??0)>=.9?text.textSoftness??0:Math.min(text.textSoftness??0,item.region.blur??0),charSpacing:text.charSpacing,score}).catch(()=>undefined);
    if(patch){patches.push(patch);drawn.push(...((patch as FabricObject&{drawn?:string[]}).drawn??[]));edits.push({region:item.region,text:item.text,layer:(patch as FabricObject&{id:string}).id,letters:true});continue;}
   }
   whole.push(item);
@@ -56,7 +58,7 @@ export async function planOcrReplacement(c:Canvas,page:Page,items:OcrEdit[],{set
    text.set({text:spacedText(item.region,item.text)});fitOneLine(text);
    if(right)text.set({left:text.left-(text.calcTextWidth()-before)});
   }texts.push(text);edits.push({region:item.region,text:item.text,layer:(text as Textbox&{id:string}).id,letters:false});}
- return {letters:patches.length,fonts:texts.length,borrowed,drawn,transparent,edits,
+ return {letters:patches.length,fonts:texts.length,borrowed,drawn,fit,transparent,edits,
   async apply(objects:unknown[],onProgress?:(fraction:number)=>void){
    if(whole.length)await coverOcrText(c,page,whole.map(f=>f.region),objects,{mode:settings.background,color:settings.color,padding:settings.padding,others,onProgress});
    objects.push(...patches.map(p=>p.toObject()),...texts.map(t=>t.toObject()));

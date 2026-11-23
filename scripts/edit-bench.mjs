@@ -93,7 +93,7 @@ try{
     // Mixed (own letters, missing ones drawn in the font) is what follows a refusal.
     if(mode==='mixed'&&rec.letters&&rec.letters.outcome!=='refused')continue;
     let res;try{res=await app.evaluate(async([id,r,text,mode])=>(await import('/tests/edit-bench/bench.ts')).edit(id,r,text,mode),[id,region.id,text,mode]);}catch(e){res={outcome:'error',reason:e.message.split('\n')[0]};}
-    const m=rec[mode]={outcome:res.outcome,reason:res.reason,ms:Math.round(res.ms??0),info:res.info,drawn:res.drawn,whole:res.whole};
+    const m=rec[mode]={outcome:res.outcome,reason:res.reason,ms:Math.round(res.ms??0),info:res.info,drawn:res.drawn,whole:res.whole,fit:res.fit===undefined?undefined:+res.fit.toFixed(3)};
     // Set in a font: the same family, the same weight, the same colour as the original?
     if(res.info){
      const real=realFace[field.face]??field.face,base=f=>String(f).replace(/ (ExtraLight|Light|Medium|SemiBold|ExtraBold|Black)$/,''),named=f=>({ExtraLight:200,Light:300,Medium:500,SemiBold:600,ExtraBold:800,Black:900})[String(f).split(' ').pop()];

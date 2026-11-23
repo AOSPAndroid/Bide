@@ -280,17 +280,30 @@ export function planGlyphEdit(text:string,cells:Cell[],next:string,library:Libra
   const before=real.filter(r=>r.i<p).at(-1),lead=before?cells.slice(before.i+1,p).filter(c=>c.space).length:0,startAt=p<cells.length?cells[p].x0:oldEnd;
   if(!items.length)return {startX:startAt,oldEnd,end:startAt,pieces:[] as Piece[]};
   const pieces:Piece[]=[];let prev:{ch:string;w:number;end:number;k?:number;r?:number}|undefined=before?{ch:before.c.ch,w:before.c.i1!-before.c.i0!,end:before.c.i1!,k:before.i}:undefined;
-  // The face's ruler, set on the last letter left in place (or on the line's
-  // first ink): each letter then starts where the face starts it.
+  // The face's ruler, set on the last letter left in place (or on where the
+  // line's ink began): each letter's ink is centred where the face puts it,
+  // so nothing adds up along the line. Letters the edit leaves side by side
+  // move as one block, by the middle of what the ruler asks of each: among
+  // themselves they keep the room they had, to the pixel.
   const ruled=ruler&&ruler.length===b.length&&items.every(it=>ruler[it.j])&&(!before||ruler[before.i])?(before?before.c.i1!-ruler[before.i]!.i1:real[0].c.i0!-(rulerFrom??ruler[items[0].j]!.i0)):undefined;
+  const set=new Map<number,number>();
+  if(ruled!==undefined){
+   const at=(it:Item)=>ruled+(ruler![it.j]!.i0+ruler![it.j]!.i1-(it.g.i1!-it.g.i0!))/2;
+   for(let n=0;n<items.length;){
+    let m=n+1;while(m<items.length&&items[m].kept!==undefined&&items[m-1].kept!==undefined&&items[m].kept!>items[m-1].kept!&&cells.slice(items[m-1].kept!+1,items[m].kept!).every(c=>c.space)&&items[m].kept!-items[m-1].kept!-1===items[m].spaces)m++;
+    if(m-n>1){const shift=median(items.slice(n,m).map(it=>at(it)-cells[it.kept!].i0!))!;for(const it of items.slice(n,m))set.set(it.j,cells[it.kept!].i0!+shift);}
+    else set.set(items[n].j,at(items[n]));
+    n=m;
+   }
+  }
   for(const [n,it] of items.entries()){
    const w=it.g.i1!-it.g.i0!,drawn='l' in it.g?it.g:undefined,me={ch:it.ch,w,l:drawn?.l,r:drawn?.r};
-   // A line laid from its start begins where its ink began.
    // An unread symbol (a star the recognizer has no character for) has no
    // letter to measure its room by: beside the neighbour it had, it keeps
    // the gap it had (the text after a star closed up against it).
    const beside=prev?.k!==undefined&&it.kept!==undefined&&(prev.ch===UNREAD||it.ch===UNREAD)&&it.kept>prev.k&&!cells.slice(prev.k+1,it.kept).some(c=>!c.space)&&cells[prev.k].i1!==undefined?cells[it.kept].i0!-cells[prev.k].i1!:undefined;
-   const ink=ruled!==undefined&&beside===undefined?ruled+(ruler![it.j]!.i0+ruler![it.j]!.i1-w)/2:prev?prev.end+(beside??room(prev,me,it.spaces+(n?0:lead))):real[0].c.i0!;
+   // A line laid from its start begins where its ink began.
+   const ink=set.get(it.j)??(prev?prev.end+(beside??room(prev,me,it.spaces+(n?0:lead))):real[0].c.i0!);
    const x0=Math.max(it.g.x0,it.g.i0!-3),x1=Math.min(it.g.x1,it.g.i1!+3);
    pieces.push({...piece(it.g),x0,x1,to:ink-(it.g.i0!-x0)});prev={...me,end:ink+w,k:it.kept};
   }

@@ -620,8 +620,20 @@ export async function glyphEditPatch(c:Canvas,p:Page,lineRegion:TextRegion,next:
  if(!plan&&face){
   const lacking=[...new Set(Array.from(wanted))].filter(ch=>/\S/.test(ch)&&ch!==UNREAD&&!cells.some(cell=>cell.ch===ch)&&!library.some(l=>l.ch===ch));
   const made=lacking.length?drawnLetters(lacking,face,k,paperOf(rctx,region),'font:'+region.id):undefined;
-  // A face that fits the line surely also rules where its letters go.
-  const ruler=(face.score??0)>=.9&&!wanted.includes(UNREAD)&&!f.angle?faceRuler(wanted,face,k):undefined,rulerFrom=ruler?faceRuler(read,face,k).find(Boolean)?.i0:undefined;
+  // The face also rules where the letters go, when its ruler describes the
+  // line as it is: set against the ink of the line's own letters (a straight
+  // fit of their middles), it is stretched to them (an approximate face, or
+  // a size a percent off, runs a few pixels long by the end of a line), and
+  // left aside when the letters stray from it by more than 6% of their size.
+  let ruler:ReturnType<typeof faceRuler>|undefined,rulerFrom:number|undefined;
+  if(!wanted.includes(UNREAD)&&!f.angle){
+   const old=faceRuler(read,face,k),pairs=cells.flatMap((cell,i)=>!cell.space&&cell.i0!==undefined&&cell.i1!==undefined&&old[i]?[{x:(old[i]!.i0+old[i]!.i1)/2,y:(cell.i0+cell.i1)/2}]:[]);
+   if(pairs.length>=4){
+    const n=pairs.length,mx=pairs.reduce((a,q)=>a+q.x,0)/n,my=pairs.reduce((a,q)=>a+q.y,0)/n,sxx=pairs.reduce((a,q)=>a+(q.x-mx)**2,0),slope=sxx>0?pairs.reduce((a,q)=>a+(q.x-mx)*(q.y-my),0)/sxx:1;
+    const off=Math.sqrt(pairs.reduce((a,q)=>a+(my+slope*(q.x-mx)-q.y)**2,0)/n);
+    if(slope>.85&&slope<1.15&&off<=face.size*k*.06){ruler=faceRuler(wanted,face,k).map(r=>r&&{i0:r.i0*slope,i1:r.i1*slope});rulerFrom=old.find(Boolean)!.i0*slope;}
+   }
+  }
   if(made){rasters.set('font:'+region.id,made.raster);plan=planGlyphEdit(read,cells,wanted,[...library,...made.glyphs],{...layout,ruler,rulerFrom});if(plan)drawn=lacking;}
   else if(!lacking.length&&ruler)plan=planGlyphEdit(read,cells,wanted,library,{...layout,ruler,rulerFrom});
  }
