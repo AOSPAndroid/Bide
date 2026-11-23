@@ -5,7 +5,7 @@ import {StaticCanvas} from 'fabric';
 import {imageFilePage,exportPayload} from '../../src/project-io';
 import {importDocument,exportInBrowser} from '../../src/browser/engine';
 import {blankPage,type Page,type Project} from '../../src/model';
-import {scanPageText} from '../../src/detected-text';
+import {scanPageText,pageShapeDistances} from '../../src/detected-text';
 import {planOcrReplacement,LetteringError} from '../../src/ocr-replace';
 import {sameKindImage} from '../../src/image-export';
 import {ensureDocumentFonts} from '../../src/fonts';
@@ -53,3 +53,5 @@ export async function edit(id:string,regionId:string,text:string,mode:'letters'|
  }finally{await (c as unknown as StaticCanvas).dispose();}
 }
 export const close=(id:string)=>{docs.delete(id);};
+// How unlike each pair of lines' letters are (BENCH_SHAPES=1).
+export async function shapes(id:string){const d=docs.get(id)!,c=await loaded(d.page);try{return await pageShapeDistances(c,d.page,d.all);}finally{await (c as unknown as StaticCanvas).dispose();}}

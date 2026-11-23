@@ -48,6 +48,11 @@ export function describeGlyph(cover:ArrayLike<number>,width:number,height:number
  }
  return {cells,aspect:w/h};
 }
+// Two descriptors of one character: 0 = the same shape, about 1 = nothing alike.
+export function descriptorDistance(a:Descriptor,b:Descriptor){
+ let sum=0;for(let i=0;i<64;i++)sum+=Math.abs(a.cells[i]-b.cells[i]);
+ return sum/(64*15)+Math.min(1,Math.abs(Math.log(a.aspect/b.aspect)))*.5;
+}
 // 0 = the same letter, about 1 = nothing alike.
 function distance(d:Descriptor,bin:Uint8Array,at:number){
  let sum=0;for(let i=0;i<32;i++){const v=bin[at+i];sum+=Math.abs(d.cells[2*i]-(v>>4))+Math.abs(d.cells[2*i+1]-(v&15));}

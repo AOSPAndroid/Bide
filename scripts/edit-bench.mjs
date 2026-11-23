@@ -75,6 +75,7 @@ try{
   const count=s=>read.filter(r=>r.status===s).length;
   if(process.env.BENCH_BOXES)for(const fd of original.fields){const st=read.find(r=>r.id===fd.id),rg=regions.find(x=>x.id===st?.region);console.log('   box',fd.id,'true',[fd.x,fd.y,fd.w,fd.h].map(v=>Math.round(v)).join(','),'read',rg?[rg.left,rg.top,rg.width,rg.height].map(v=>Math.round(v)).join(','):'-',rg?.color,rg?.background,rg?.blur?.toFixed?.(2));}
   console.log(`\n${id}: ${opened.regions.length} regions in ${opened.seconds.toFixed(1)} s, font ${opened.font} · fields ${count('exact')} exact, ${count('merged')} merged, ${read.length-count('exact')-count('merged')} other${read.filter(r=>!['exact','merged'].includes(r.status)).map(r=>` [${r.id}: ${r.status} ${JSON.stringify(r.read)}]`).join('')}`);
+  if(process.env.BENCH_SHAPES){const m=await app.evaluate(async id=>(await import('/tests/edit-bench/bench.ts')).shapes(id),id);const field=r=>read.find(x=>x.region===r.id)?.id??r.text.slice(0,8);console.log('   shapes',''.padEnd(8),m.map(r=>field(r).slice(0,5).padStart(6)).join(''));for(const r of m)console.log('   shapes',field(r).slice(0,8).padEnd(8),r.to.map(v=>v===undefined?'     -':v.toFixed(2).padStart(6)).join(''));}
   await mkdir(`${out}/${t}-${vn}`,{recursive:true});await writeFile(`${out}/${t}-${vn}/scan.png`,Buffer.from(original.pixels,'base64'));
   let n=0;
   for(const [fid,to,kind] of tpl.edits){
@@ -161,4 +162,10 @@ await writeFile(`${out}/results.json`,JSON.stringify({ocr,cells,records},null,1)
  console.log(`\n=== Set in a font, against the original (${f.length} edits): same family ${pct(f.filter(r=>r.font.same.family).length)} · same weight ${pct(f.filter(r=>r.font.same.weight).length)} · colour off by a median of ${col[col.length>>1]??'-'} levels (${col.filter(v=>v>24).length} over 24)`);
  const by={};for(const r of f){const k=r.doc;(by[k]??=[]).push(r);}
  for(const [k,v] of Object.entries(by))console.log(`${k.padEnd(18)} family ${v.filter(r=>r.font.same.family).length}/${v.length} · weight ${v.filter(r=>r.font.same.weight).length}/${v.length} · colour ${Math.max(...v.map(r=>r.font.same.colour??0))} at worst${v.some(r=>!r.font.same.family)?' · got '+[...new Set(v.filter(r=>!r.font.same.family).map(r=>r.font.same.got))].join(', ')+' for '+v[0].font.same.want:''}`);}}
+// One face, one substitute: the families each face of a document was set in
+// (its lines edited one at a time, each from the document as opened).
+{const faces={};for(const r of records.filter(r=>r.font?.same)){const k=`${r.doc} · ${r.font.same.want}`;(faces[k]??=new Set()).add(String(r.font.same.got).replace(/ \d+$/,''));}
+ const many=Object.entries(faces).filter(([,v])=>v.size>1);
+ console.log(`\n=== One face, one substitute: ${Object.keys(faces).length-many.length} of ${Object.keys(faces).length} faces set in a single family`);
+ for(const [k,v] of many)console.log(`${k.padEnd(40)} ${[...v].join(', ')}`);}
 console.log(`\nDetails: ${out}/results.json · crops of visible edits (original, edit, reference): ${out}/<document>/`);

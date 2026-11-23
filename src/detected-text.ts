@@ -235,6 +235,13 @@ export async function detectedTextbox(region:TextRegion,{ocrFont,ocrStyle,matchB
  return {text,embedded};
 }
 
+// (Benchmark) how unlike each pair of lines' letters are, on the page as opened.
+export async function pageShapeDistances(c:Canvas,p:Page,regions:TextRegion[]){
+ const {lineShapes,shapeDistance}=await import('./browser/ocr-appearance'),raster=await pageComposite(c,p),lines=regions.filter(r=>r.kind==='ocr'&&r.glyphs&&!r.angle);
+ const shapes=lines.map(r=>lineShapes(raster,r,regions));
+ return lines.map((r,i)=>({id:r.id,text:r.text,to:lines.map((o,j)=>j===i?undefined:shapeDistance(shapes[i],shapes[j])?.distance)}));
+}
+
 export async function matchedDetectedTextbox(region:TextRegion,c:Canvas,p:Page,regions:TextRegion[],options:{ocrFont:string;ocrStyle:string;matchBlur:boolean;autoFont:boolean;appearanceRegions?:TextRegion[]}){
  if(region.kind!=='ocr')return detectedTextbox(region,options);
  const all=regions.length?regions:[region],inkCache=new Map<string,Promise<PageInk|undefined>>();

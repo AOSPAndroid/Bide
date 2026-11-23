@@ -3,7 +3,7 @@ import {clampTextSoftness} from '../text-appearance';
 import {rankOcrFonts,fontCandidates,systemCandidates,type FontSample} from '../ocr-font';
 import {extendedFonts} from '../font-library';
 import {extraFonts} from '../extra-fonts';
-import {WEB_FONTS,fontIndex,describeGlyph,shortlist,loadWebFont,type Descriptor} from '../web-fonts';
+import {WEB_FONTS,fontIndex,describeGlyph,shortlist,loadWebFont,descriptorDistance,type Descriptor} from '../web-fonts';
 import {bundledFonts} from '../font-catalog';
 import {familyWeights,baseFamily} from '../font-weights';
 import type {TextRegion} from '../text-regions';
@@ -15,6 +15,18 @@ type Fit={family:string;score:number;softness:number;ratio:number;dx:number;dy:n
 // Widths tried for a face's letters (scaleX), and how much better a width must fit the line to be taken.
 // A fit below this is a face that is not the page's own (a substitute).
 export const SURE_FACE=.9;
+const textFaces=()=>[...new Set([...extraFonts('yours').map(f=>f.family),...fontCandidates,...extendedFonts.filter(f=>f.category==='sans'||f.category==='serif'||f.category==='mono').map(f=>f.family),...systemCandidates])];
+// Lines whose letters are at most this unlike (shapeDistance, size aside) are
+// taken to be set in one face. Measured on invented pages: lines of one face
+// 0.00-0.12 apart (a Verdana-like face's lines 0.08-0.12), a Helvetica-like
+// face's lines 0.14-0.21 from those, bold from regular about 0.3, serif from
+// sans 0.2-0.55. (On a soft scan the two sans came within 0.09: GROUP_MARGIN.)
+const SAME_SHAPE=.125;
+// A line takes its face's substitute, fitted on its own letters, unless that
+// fits them this much worse than the line's own pick. Scores of one line
+// against substitutes are noisy (its neighbours, in other faces, weigh in):
+// one family chosen on several lines of a face is the surer estimate.
+const GROUP_MARGIN=.25;
 const SCALES=[.88,.91,.94,.97,1.03,1.06,1.09,1.12],WIDTH_MARGIN=.01;
 const median=(values:number[])=>[...values].sort((a,b)=>a-b)[values.length>>1];
 
@@ -88,8 +100,12 @@ export async function matchOcrAppearance(raster:HTMLCanvasElement,region:TextReg
  // dozen: a face outside the list was approximated by whichever fitted least
  // badly (Manrope dates were set in Lora, a serif). Handwriting and
  // decorative display faces are left out: their shapes won near ties.
- const ranked=autoFont?await rankOcrFonts(samples.map(s=>s.font),[...new Set([...extraFonts('yours').map(f=>f.family),...fontCandidates,...extendedFonts.filter(f=>f.category==='sans'||f.category==='serif'||f.category==='mono').map(f=>f.family),...systemCandidates])]):[];
- const families=[...new Set([family,...(autoFont?[...pageFaces.keys()]:[]),...ranked.slice(0,3).map(r=>r.family)])];
+ const ranked=autoFont?await rankOcrFonts(samples.map(s=>s.font),textFaces()):[];
+ // Faces settled on the page's other lines are tried, and kept against a near
+ // tie, only for a line of their kind (serif, sans, mono): a sans that won the
+ // page's sans lines took a serif line whose few letters it fitted as well.
+ const lineKind=ranked[0]&&kindOf(ranked[0].family),sameKind=(f:string)=>(!lineKind||!kindOf(f)||kindOf(f)===lineKind)&&likeItsLines(raster,region,regions,f);
+ const families=[...new Set([family,...(autoFont?[...pageFaces.keys()].filter(sameKind):[]),...ranked.slice(0,3).map(r=>r.family)])];
  let best:Fit|undefined;
  for(const candidateFamily of families){
   const selectedText=await makeText(region,candidateFamily),selectedSize=selectedText.fontSize,selectedAscent=selectedText.top-region.top+selectedSize*.93;
@@ -180,7 +196,7 @@ export async function matchOcrAppearance(raster:HTMLCanvasElement,region:TextReg
   // A face that already won a line of this document is kept against a near
   // tie too: a page is set in one or two faces, and a short line (a seat
   // number, a date) ranked a look-alike first (Barlow for Manrope).
-  const settled=(f:string)=>f===family||pageFaces.has(baseFamily(f));
+  const settled=(f:string)=>f===family||pageFaces.has(baseFamily(f))&&sameKind(f);
   if(!best||score>best.score+(settled(best.family)&&!settled(candidateFamily)?FAMILY_MARGIN:0)-(settled(candidateFamily)&&!settled(best.family)?FAMILY_MARGIN:0))best=result;
  }
  // Low confidence or mismatched OCR should retain the existing estimate. On
@@ -255,10 +271,20 @@ export async function matchOcrAppearance(raster:HTMLCanvasElement,region:TextReg
  // No bundled face fits well: the page's letters pick open families from the
  // index (web-fonts.ts), which are downloaded and compared on the pixels.
  if(weights&&autoFont&&WEB_FONTS&&best.score<.97){
-  for(const family of await webCandidates(samples)){
+  for(const family of await webCandidates(samples,true,f=>likeItsLines(raster,region,regions,f))){
    const other=await matchOcrAppearance(raster,region,regions,family,{autoFont:false,matchBlur,makeText,onFit,weights:false,alike});
-   if(other&&other.score>best.score+.03){best=other;if(!webWinners.includes(family))webWinners.unshift(family);}
+   if(other&&other.score>best.score+.03){best=other;if(!webWinners.includes(family))webWinners.unshift(family);wonOn(family,region);}
   }
+ }
+ // A face the app cannot have is matched by a substitute, and each line of
+ // it took the one that fitted its own few letters best: one Verdana-like
+ // face came out in Work Sans, Carlito, Noto Sans and Lato on four lines of
+ // one page. The lines set in one face (by their letters' shapes) get one
+ // substitute, chosen on several of them; a line keeps its own only when it
+ // fits that line clearly better.
+ if(weights&&autoFont&&best.score<SURE_FACE){
+  const face=await groupFace(raster,region,regions,makeText,matchBlur);
+  if(face&&face!==best.family){const other=await matchOcrAppearance(raster,region,regions,face,{autoFont:false,matchBlur,makeText,onFit,weights:false,own:true,floor:0});if(other&&other.score>=best.score-GROUP_MARGIN)best=other;}
  }
  // A soft line's own colour is not sure (thin strokes blurred never reach
  // their ink): the colour of the page's other lines it may share is the reference.
@@ -267,19 +293,38 @@ export async function matchOcrAppearance(raster:HTMLCanvasElement,region:TextReg
  // (Only up to it: a line reads paler than it was printed, not stronger.)
  if(target&&chosen.gain<=target.gain&&target.gain-chosen.gain<=.08){chosen.gain=target.gain;chosen.ink=target.color;chosen.inkGain=target.gain;}
  // Remembered for the document's other lines when the match is a sure one.
- if(weights&&autoFont&&chosen.score>=.8)pageFaces.set(baseFamily(chosen.family),(pageFaces.get(baseFamily(chosen.family))??0)+1);
+ if(weights&&autoFont&&chosen.score>=.8){pageFaces.set(baseFamily(chosen.family),(pageFaces.get(baseFamily(chosen.family))??0)+1);wonOn(chosen.family,region);}
  return chosen;
 }
 
 // Open families whose letters look like the samples', downloaded and ready
 // to draw (at most four; none when the index or the network is not there).
 const webWinners:string[]=[];
+// Serif, sans or mono: of the app's faces, and of the open families fetched.
+const webKinds=new Map<string,string>();
+// The lines each face won (surely, or as an open family) on this document,
+// and the letters of lines measured (lineShapes), by line id.
+const facesWon=new Map<string,Set<string>>(),shapesOf=new Map<string,Map<string,Descriptor>>();
+function wonOn(family:string,region:TextRegion){const f=baseFamily(family);facesWon.set(f,new Set([...facesWon.get(f)??[],region.id]));}
+// Whether a face won on other lines may weigh on this one: not when this
+// line's letters are unlike theirs (median over those that can be compared
+// above SHAPE_APART): a sans that won a page's sans lines was taken for its
+// serif line, whose few blurred letters it fitted as well.
+const SHAPE_APART=.15;
+function likeItsLines(raster:HTMLCanvasElement,region:TextRegion,regions:TextRegion[],family:string){
+ const won=[...facesWon.get(baseFamily(family))??[]].filter(id=>id!==region.id);if(!won.length)return true;
+ const shape=(r:TextRegion)=>{let v=shapesOf.get(r.id);if(!v){v=lineShapes(raster,r,regions);shapesOf.set(r.id,v);}return v;};
+ const d=won.flatMap(id=>{const r=regions.find(x=>x.id===id);const v=r&&shapeDistance(shape(region),shape(r));return v?[v.distance]:[];});
+ return !d.length||median(d)<=SHAPE_APART;
+}
+let appKinds:Map<string,string>|undefined;
+function kindOf(family:string){appKinds??=new Map([...extendedFonts,...bundledFonts].map(f=>[f.family,f.category]));return appKinds.get(baseFamily(family))??webKinds.get(baseFamily(family));}
 // Faces matched surely on the document being edited (forgetPageFaces when another opens).
 const pageFaces=new Map<string,number>();
 // The weight taken surely for a family on that document (heaviness).
 const pageWeights=new Map<string,string>();
-export const forgetPageFaces=()=>{pageFaces.clear();pageWeights.clear();webWinners.length=0;};
-async function webCandidates(samples:Sample[]){
+export const forgetPageFaces=()=>{pageFaces.clear();pageWeights.clear();webWinners.length=0;pageGroups.clear();groupFaces.clear();facesWon.clear();shapesOf.clear();};
+async function webCandidates(samples:Sample[],winners=true,like:(family:string)=>boolean=()=>true){
  const index=await fontIndex();if(!index)return [];
  const glyphs:{ch:string;d:Descriptor}[]=[];
  for(const s of samples){
@@ -289,8 +334,11 @@ async function webCandidates(samples:Sample[]){
  }
  // Families that already won a line this session come first: a page is
  // mostly set in one or two faces, and a short line shortlists less surely.
- const bundled=new Set(bundledFonts.map(f=>f.family)),out:string[]=[...webWinners.slice(0,3)];
- for(const pick of shortlist(index,glyphs,6,f=>bundled.has(f)))if(!out.includes(pick.family.family)&&await loadWebFont(index,pick.family))out.push(pick.family.family);
+ // (Of the shortlist's kind only: a sans that won the page's other lines was
+ // tried first on a serif line, and fitted its few letters best.)
+ const bundled=new Set(bundledFonts.map(f=>f.family)),picks=shortlist(index,glyphs,6,f=>bundled.has(f)),kind=picks[0]?.family.category;
+ const out:string[]=winners?webWinners.filter(w=>index.families.find(f=>f.family===w)?.category===kind&&like(w)).slice(0,3):[];
+ for(const pick of picks)if(!out.includes(pick.family.family)&&await loadWebFont(index,pick.family)){out.push(pick.family.family);webKinds.set(pick.family.family,pick.family.category);}
  return out;
 }
 
@@ -440,4 +488,69 @@ export function applyOcrAppearance(text:Textbox,region:TextRegion,fit:Fit){
  text.set({fontSize:size*fit.ratio,left:region.left+fit.dx,top:region.top+ascent-size*fit.ratio*.93+fit.dy,
   fill:fit.ink&&fit.gain===fit.inkGain?fit.ink:matchedInkColor(region.color,region.background||'#ffffff',fit.gain)});
  text.set({scaleX:fit.sx??1});text.textSoftness=fit.softness;text.initDimensions();
+}
+
+// The letters of a line as the font index describes them: each character's
+// ink scaled to 8x8, whatever its size, so lines of one face in different
+// sizes describe alike.
+export function lineShapes(raster:HTMLCanvasElement,region:TextRegion,regions:TextRegion[]){
+ const out=new Map<string,Descriptor>(),s=region.glyphs&&region.kind==='ocr'?samplePixels(raster,region,regions):undefined;if(!s)return out;
+ let peak=0;for(const v of s.source.data)if(v>peak)peak=v;if(peak<=0)return out;
+ const cover=s.source.data.map(v=>v/peak);
+ for(const g of region.glyphs!){if(out.has(g.ch)||!/^[a-zA-Z0-9]$/.test(g.ch))continue;const d=describeGlyph(cover,s.source.width,s.source.height,Math.floor(g.x0-s.left),Math.ceil(g.x1-s.left));if(d)out.set(g.ch,d);}
+ return out;
+}
+// How unlike two lines' letters are (the median over the characters they
+// share), with the number shared; undefined under three.
+export function shapeDistance(a:Map<string,Descriptor>,b:Map<string,Descriptor>){
+ const d:number[]=[];for(const [ch,x] of a){const y=b.get(ch);if(y)d.push(descriptorDistance(x,y));}
+ return d.length>=3?{distance:median(d),shared:d.length}:undefined;
+}
+
+// The lines of the page set in one face: groups whose every two lines (that
+// share three characters) are at most SAME_SHAPE unlike, merged closest first,
+// once per page (by the lines' ids). Every pair, not a chain: on a soft scan a
+// Verdana-like and a Helvetica-like face each had a line 0.09 from one of the
+// other's, though most of their lines were 0.11-0.17 apart.
+const pageGroups=new Map<string,string[][]>();
+function faceGroups(raster:HTMLCanvasElement,lines:TextRegion[],regions:TextRegion[]){
+ const key=lines.map(r=>r.id).join('|'),known=pageGroups.get(key);if(known)return known;
+ const shapes=lines.map(r=>lineShapes(raster,r,regions)),d=lines.map((_,i)=>lines.map((_,j)=>i===j?undefined:shapeDistance(shapes[i],shapes[j])?.distance));
+ let groups=lines.map((_,i)=>[i]);
+ // The farthest two lines of two groups, undefined when no pair can be compared.
+ const far=(a:number[],b:number[])=>{let m:number|undefined;for(const i of a)for(const j of b){const v=d[i][j];if(v!==undefined)m=Math.max(m??0,v);}return m;};
+ for(;;){
+  let pick:[number,number,number]|undefined;
+  for(let a=0;a<groups.length;a++)for(let b=a+1;b<groups.length;b++){const v=far(groups[a],groups[b]);if(v!==undefined&&v<=SAME_SHAPE&&(!pick||v<pick[2]))pick=[a,b,v];}
+  if(!pick)break;
+  groups=[...groups.filter((_,n)=>n!==pick![0]&&n!==pick![1]),[...groups[pick[0]],...groups[pick[1]]]];
+ }
+ const out=groups.map(g=>g.map(i=>lines[i].id));pageGroups.set(key,out);return out;
+}
+// The substitute for the face of `region`'s line: the family that fits the
+// group's longest lines best on average (crisp fits of each line's own
+// letters), among the bundled faces ranked first for them and the open
+// families their letters shortlist. The same for every line of the group,
+// whichever is edited first.
+const groupFaces=new Map<string,Promise<string|undefined>>();
+function groupFace(raster:HTMLCanvasElement,region:TextRegion,regions:TextRegion[],makeText:(region:TextRegion,family:string)=>Promise<Textbox>,matchBlur:boolean){
+ const lines=regions.filter(r=>r.kind==='ocr'&&r.glyphs&&!r.angle===!region.angle);
+ const mine=lines.length>=2?faceGroups(raster,lines,regions).find(g=>g.includes(region.id)):undefined;if(!mine||mine.length<2)return Promise.resolve(undefined);
+ const key=mine.join('|');
+ if(!groupFaces.has(key))groupFaces.set(key,(async()=>{
+  const members=lines.filter(r=>mine.includes(r.id)&&(r.confidence??0)>=75&&r.text.replace(/[^\p{L}\p{N}]/gu,'').length>=4).sort((a,b)=>b.text.length-a.text.length||a.top-b.top).slice(0,3);
+  if(members.length<2)return undefined;
+  const samples=members.flatMap(r=>{const s=samplePixels(raster,r,regions);return s?[s]:[];});if(samples.length<2)return undefined;
+  // The faces ranked first for all of them and for each one (a line's own
+  // best must be among those tried, or the group's pick fits it far worse).
+  const faces=textFaces(),ranked=[...(await rankOcrFonts(samples.map(s=>s.font),faces)).slice(0,3),...(await Promise.all(samples.map(s=>rankOcrFonts([s.font],faces)))).flatMap(r=>r.slice(0,2))].map(r=>r.family);
+  const families=[...new Set([...ranked,...WEB_FONTS?await webCandidates(samples,false):[]])];
+  let best:{family:string;score:number}|undefined;
+  for(const family of families){
+   let sum=0;for(const m of members)sum+=(await matchOcrAppearance(raster,m,regions,family,{autoFont:false,matchBlur,makeText,weights:false,own:true,floor:0}))?.score??0;
+   if(!best||sum/members.length>best.score)best={family,score:sum/members.length};
+  }
+  return best?.family;
+ })());
+ return groupFaces.get(key)!;
 }
