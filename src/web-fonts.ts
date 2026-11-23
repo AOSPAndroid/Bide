@@ -5,12 +5,21 @@
 // height, 34 bytes a character) lets the letters of a page pick the few
 // families worth trying; only those are downloaded, checked against the
 // index's SHA-256, and compared on the page's pixels like bundled faces.
-// Hosted editions only: the downloadable edition stays offline.
 import {HOSTED_BUILD} from './build-flags';
 import {registerFont,isExtraFont,type FaceStyle} from './extra-fonts';
 import {digest} from './browser/crypto';
 
-export const WEB_FONTS=((import.meta.env as Record<string,string|undefined>).VITE_WEB_FONTS??(HOSTED_BUILD?'1':''))==='1';
+// On in the hosted editions, and on any copy served from a public https site
+// (however it was built): only a copy opened from this computer or the office
+// network (localhost, a private address, a file) stays offline.
+// VITE_WEB_FONTS=1 or 0 decides it at build time.
+export function publicSite(location:{protocol:string;hostname:string}|undefined=typeof window==='undefined'?undefined:window.location){
+ if(!location||location.protocol!=='https:')return false;
+ const h=location.hostname;
+ return !(h==='localhost'||h.endsWith('.localhost')||h.endsWith('.local')||h.endsWith('.lan')||h.endsWith('.internal')||!h.includes('.')||/^(127|10)\.|^192\.168\.|^169\.254\.|^172\.(1[6-9]|2\d|3[01])\./.test(h)||h.includes(':'));
+}
+const setting=(import.meta.env as Record<string,string|undefined>|undefined)?.VITE_WEB_FONTS;
+export const WEB_FONTS=setting==='1'||setting!=='0'&&(HOSTED_BUILD||publicSite());
 type Family={family:string;slug:string;licence:string;category:string;files:Record<string,{sha256:string;bytes:number;variable:boolean}>;faces:{style:FaceStyle;file:string;row:number}[]};
 type Index={revision:string;chars:string;cell:number;rows:number;families:Family[];bin:Uint8Array};
 let loading:Promise<Index|undefined>|undefined;

@@ -188,14 +188,15 @@ export function fixedPitch(cells:Cell[]):{pitch:number;origin:number}|undefined{
 //    1's cell is narrower than an 8's and chaining cells shifted the rest);
 //  - a line at one pitch whose length changes: every character from the change
 //    on sits on the line's grid.
-// Otherwise cells follow each other at their own widths. `right`: the line is
+// Otherwise cells follow each other at their own widths (`byInk` in the result:
+// the letters were laid by their ink, where a face's ruler has its say). `right`: the line is
 // right-aligned, so a change of width moves its start, not its end.
 // `ruler`: where the ink of each character of `next` starts and ends when the
 // line is set in its matched face (raster pixels from any origin; none for a
 // space). Letters laid by their ink then take the face's own spacing, pair by
 // pair, from the last letter the edit leaves in place (`rulerFrom`: where the
 // ink of the line as it was starts on that ruler, for an edit of its start).
-export function planGlyphEdit(text:string,cells:Cell[],next:string,library:LibraryGlyph[]=[],{right=false,ruler,rulerFrom}:{right?:boolean;ruler?:({i0:number;i1:number}|undefined)[];rulerFrom?:number}={}):{startX:number;oldEnd:number;end:number;pieces:Piece[]}|undefined{
+export function planGlyphEdit(text:string,cells:Cell[],next:string,library:LibraryGlyph[]=[],{right=false,ruler,rulerFrom}:{right?:boolean;ruler?:({i0:number;i1:number}|undefined)[];rulerFrom?:number}={}):{startX:number;oldEnd:number;end:number;pieces:Piece[];byInk?:boolean}|undefined{
  const a=Array.from(text),b=Array.from(next);if(a.join('')===b.join(''))return undefined;
  let first=0;while(first<a.length&&first<b.length&&a[first]===b[first])first++;
  const oldEnd=cells[cells.length-1].x1,digit=(ch:string)=>/^\p{Nd}$/u.test(ch),grid=fixedPitch(cells);
@@ -308,7 +309,7 @@ export function planGlyphEdit(text:string,cells:Cell[],next:string,library:Libra
    pieces.push({...piece(it.g),x0,x1,to:ink-(it.g.i0!-x0)});prev={...me,end:ink+w,k:it.kept};
   }
   const last=items.at(-1)!,tail=Math.max(0,last.g.x1-last.g.i1!);
-  return {startX:Math.min(startAt,...pieces.map(q=>q.to!)),oldEnd,end:prev!.end+Math.min(tail,3),pieces};
+  return {startX:Math.min(startAt,...pieces.map(q=>q.to!)),oldEnd,end:prev!.end+Math.min(tail,3),pieces,byInk:true};
  };
  const plan=(p:number)=>{
   const keep=align(a,b),pieces:Piece[]=[];

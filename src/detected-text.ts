@@ -14,6 +14,7 @@ import {darkenToInk,prepareOcrPixels,estimateLineHeight} from './ocr-image';
 import {ensureFont,ensureEmbeddedFont,ensureDocumentFonts} from './fonts';
 import {bundledFonts} from './font-catalog';
 import {matchedInkColor,alphaCoverage,blurCoverage} from './ocr-appearance';
+import {busyBackground,flattenInk,inpaint} from './ink-flatten';
 import {weightFamilies} from './font-weights';
 import {rasterSearchWords} from './searchable-text';
 import {fallbackFont,fallbackCharSpacing,fitOcrText,type TextRegion} from './text-regions';
@@ -249,8 +250,10 @@ export async function matchedDetectedTextbox(region:TextRegion,c:Canvas,p:Page,r
  // A tilted line is fitted level, on the page turned back about its centre.
  const pdf=!!p.source,f=frameOf(region),fill=region.background||'#ffffff',regionsAll=framed(f,options.appearanceRegions??all,true);
  const native=pdf?await pdfScanScale(p.source!,p.index):undefined,k=pdf?native!==undefined&&native<=letterRasterScale(p.width,p.height,true)?native:Math.max(1,Math.min(4,32/Math.max(1,region.height),Math.sqrt(16e6/(p.width*p.height)))):1;
- const raster=levelRaster(pdf?await previewCanvas(p.source!,p.index,k,Math.ceil(p.width*k),Math.ceil(p.height*k)):await pageComposite(c,p),f,k,fill);
+ const truth=levelRaster(pdf?await previewCanvas(p.source!,p.index,k,Math.ceil(p.width*k),Math.ceil(p.height*k)):await pageComposite(c,p),f,k,fill);
  const fine=(list:TextRegion[])=>k===1?list:scaleRegions(list,k,k),fineRegion=fine([region])[0],fineAll=fine(regionsAll);
+ // Over a drawing the faces are compared with the line as on plain paper.
+ const {raster}=measuredRaster(truth,fineRegion,fineAll);
  const fitted=await matchOcrAppearance(raster,fineRegion,fineAll,options.ocrFont,{autoFont:options.autoFont,matchBlur:options.matchBlur,makeText,alike:alikeLines(raster,fineAll,fineRegion)});
  if(!fitted)return detectedTextbox(region,{...options,pageInk:await ink(options.ocrFont)});
  const text=await makeText(region,fitted.family);applyOcrAppearance(text,region,{...fitted,dx:fitted.dx/k,dy:fitted.dy/k,softness:fitted.softness/k});
@@ -539,6 +542,25 @@ export function letterEditBlocker(region:TextRegion,next:string){
  if(missing.length)return `${missing.length===1?'':'the characters '}${missing.join(', ')} ${missing.length===1?'does':'do'} not appear in this line, nor in another line of the page verified to be in the same lettering.`;
  return 'this line could not be measured precisely enough to rebuild it.';
 }
+// The raster a line is measured on. Over a drawing (a ribbon, a photo:
+// ink-flatten.ts) a copy where each line stands on plain paper in its own
+// colours; the raster itself elsewhere. `band`: this line's box grown by
+// that many pixels, flattened across the page's width (an edit may lengthen it).
+const hexColour=/^#[0-9a-f]{6}$/i;
+function measuredRaster(truth:HTMLCanvasElement,region:TextRegion,others:TextRegion[],band=0):{raster:HTMLCanvasElement;busy:boolean}{
+ if(!hexColour.test(region.color)||!hexColour.test(region.background||'#ffffff'))return {raster:truth,busy:false};
+ const g=truth.getContext('2d',{willReadFrequently:true})!,W=truth.width,H=truth.height;
+ const box=(r:TextRegion,px:number,py:number)=>{const x=Math.max(0,Math.floor(r.left-px)),y=Math.max(0,Math.floor(r.top-py));return {x,y,w:Math.max(1,Math.min(W,Math.ceil(r.left+r.width+px))-x),h:Math.max(1,Math.min(H,Math.ceil(r.top+r.height+py))-y)};};
+ const own=box(region,2,2);if(!busyBackground(g.getImageData(own.x,own.y,own.w,own.h).data,own.w,own.h,hexRgb(region.color),hexRgb(region.background||'#ffffff')))return {raster:truth,busy:false};
+ const raster=document.createElement('canvas');raster.width=W;raster.height=H;const out=raster.getContext('2d',{willReadFrequently:true})!;out.drawImage(truth,0,0);
+ const flat=(r:TextRegion,b:{x:number;y:number;w:number;h:number})=>{if(!hexColour.test(r.color)||!hexColour.test(r.background||'#ffffff'))return;const f=flattenInk(g.getImageData(b.x,b.y,b.w,b.h).data,b.w,b.h,hexRgb(r.color),hexRgb(r.background||'#ffffff'),Math.max(2,Math.min(5,Math.round(r.height*.08))));out.putImageData(new ImageData(f.flat,b.w,b.h),b.x,b.y);};
+ if(band>0)flat(region,{x:0,y:Math.max(0,Math.floor(region.top-band)),w:W,h:Math.max(1,Math.min(H,Math.ceil(region.top+region.height+band))-Math.max(0,Math.floor(region.top-band)))});
+ const pad=(r:TextRegion)=>Math.max(3,Math.round(r.height*.3));
+ for(const r of others)if(r.id!==region.id&&r.kind==='ocr')flat(r,box(r,pad(r),band>0?2:pad(r)));
+ if(!band)flat(region,box(region,pad(region),pad(region)));
+ return {raster,busy:true};
+}
+
 // The face a line was matched with (matchedDetectedTextbox), to draw the
 // letters an edit needs and the page does not have. Sizes in page units.
 export type LetterFace={family:string;weight:string|number;style:string;size:number;fill:string;softness:number;charSpacing?:number;score?:number;draw?:boolean};
@@ -584,7 +606,7 @@ function drawnLetters(chars:string[],face:LetterFace,k:number,paper:number[],pag
 // `face`: the face matched with the line. It rules where letters laid by
 // their ink go; unless `face.draw` is false, letters the page cannot lend are
 // drawn in it (the caller chose a font for this edit), listed in `drawn`.
-export async function glyphEditPatch(c:Canvas,p:Page,lineRegion:TextRegion,next:string,pageRegions:TextRegion[]=[],sources:LetterSource[]=[],face?:LetterFace){
+export async function glyphEditPatch(c:Canvas,p:Page,lineRegion:TextRegion,next:string,pageRegions:TextRegion[]=[],sources:LetterSource[]=[],faceOf?:LetterFace|(()=>Promise<LetterFace|undefined>)){
  if(lineRegion.kind!=='ocr'||!lineRegion.glyphs)return undefined;
  // Everything below works in raster pixels, `k` per page unit.
  // A scanned PDF is cut at the scan's own resolution when the render budget
@@ -596,7 +618,11 @@ export async function glyphEditPatch(c:Canvas,p:Page,lineRegion:TextRegion,next:
  // characters of their own, kept where the edit leaves them alone.
  const cells=lineCells(region.text,region.glyphs!);if(!cells)return undefined;
  const read=cells.map(c=>c.ch).join(''),wanted=withUnread(region.text,cells,next);
- const raster=levelRaster(k===1?await pageComposite(c,p):await previewCanvas(p.source!,p.index,k,Math.ceil(p.width*k),Math.ceil(p.height*k)),f,k,fill),W=raster.width,H=raster.height;
+ // `truth`: the page's pixels. Over a drawing, letters are found, measured and
+ // cut on `raster`, the lines as on plain paper, and put back over the
+ // drawing carried on under them (ink-flatten.ts).
+ const truth=levelRaster(k===1?await pageComposite(c,p):await previewCanvas(p.source!,p.index,k,Math.ceil(p.width*k),Math.ceil(p.height*k)),f,k,fill),W=truth.width,H=truth.height;
+ const {raster,busy}=measuredRaster(truth,region,page,Math.ceil(10*k));
  const target=rowInk(raster,region),metrics=lineMetrics(target.rows);if(!metrics)return undefined;
  const rctx=raster.getContext('2d',{willReadFrequently:true})!,middles=inkMiddles(rctx,region,paperOf(rctx,region),cells);cells.forEach((cell,i)=>Object.assign(cell,middles[i]));
  const layout={right:rightAligned(region,page)};
@@ -612,6 +638,9 @@ export async function glyphEditPatch(c:Canvas,p:Page,lineRegion:TextRegion,next:
  // fit of their middles), it is stretched to them (an approximate face, or
  // a size a percent off, runs a few pixels long by the end of a line), and
  // left aside when the letters stray from it by more than 6% of their size.
+ // (The face is matched only for an edit it has a say in: letters laid by
+ // their ink, or letters to draw. A digit swapped in place needs none.)
+ const quick=planGlyphEdit(read,cells,wanted,library,layout),face=quick&&!quick.byInk?undefined:typeof faceOf==='function'?await faceOf():faceOf;
  let ruler:ReturnType<typeof faceRuler>|undefined,rulerFrom:number|undefined;
  if(face&&!wanted.includes(UNREAD)&&!f.angle){
   const old=faceRuler(read,face,k),pairs=cells.flatMap((cell,i)=>!cell.space&&cell.i0!==undefined&&cell.i1!==undefined&&old[i]?[{x:(old[i]!.i0+old[i]!.i1)/2,y:(cell.i0+cell.i1)/2}]:[]);
@@ -622,7 +651,7 @@ export async function glyphEditPatch(c:Canvas,p:Page,lineRegion:TextRegion,next:
   }
  }
  const ruled={...layout,ruler,rulerFrom};
- let plan=planGlyphEdit(read,cells,wanted,library,ruled);
+ let plan=ruler?planGlyphEdit(read,cells,wanted,library,ruled):quick;
  // A letter missing from this page: look for it on the other pages.
  for(const other of otherPages){
   if(plan||other.page.id===p.id)continue;
@@ -649,6 +678,8 @@ export async function glyphEditPatch(c:Canvas,p:Page,lineRegion:TextRegion,next:
  const ax0=Math.max(0,Math.floor(Math.min(region.left,startX))-sidePad),ax1=Math.min(W,Math.max(endX,Math.ceil(region.left+region.width)+sidePad)),ay0=Math.max(0,top-rowPad),ay1=Math.min(H,bottom+rowPad);
  const ctx=raster.getContext('2d',{willReadFrequently:true})!,area=ctx.getImageData(ax0,ay0,ax1-ax0,ay1-ay0),bg=paperOf(ctx,region);
  const own=ownInk(area.data,area.width,area.height,bg,top-ay0,bottom-ay0);
+ // Over a drawing: the page's own pixels there, and how strong the line's ink is on plain paper.
+ const real=busy?truth.getContext('2d',{willReadFrequently:true})!.getImageData(ax0,ay0,ax1-ax0,ay1-ay0):area,flatInk=hexRgb(region.color||'#000000'),inkStrength=Math.max(40,...[0,1,2].map(n=>Math.abs(flatInk[n]-bg[n])));
  // Soft letters fade below the ink threshold over a pixel or two. That fringe
  // (pixels within two of this line's ink, not ink themselves) goes with its
  // letter: left behind it outlines the old letters, left out it sharpens the
@@ -660,6 +691,14 @@ export async function glyphEditPatch(c:Canvas,p:Page,lineRegion:TextRegion,next:
  for(let y=0;y<ah;y++)for(let x=0;x<aw;x++){
   const i=y*aw+x;if(away(i)<=16)continue;
   for(let dy=-3;dy<=3;dy++)for(let dx=-3;dx<=3;dx++){const nx=x+dx,ny=y+dy;if(nx<0||ny<0||nx>=aw||ny>=ah)continue;const j=ny*aw+nx;nearInk[j]=1;if(own[i]&&Math.abs(dx)<=2&&Math.abs(dy)<=2&&away(j)<=16)fringe[j]=1;}
+ }
+ // The drawing carried on under this line's ink, and the ink's own colour on the page.
+ let under:Uint8ClampedArray|undefined,inkTrue=flatInk;
+ if(busy){
+  const hole=new Uint8Array(aw*ah);for(let y=0;y<ah;y++)for(let x=0;x<aw;x++){const i=y*aw+x;if(!own[i]&&!fringe[i])continue;for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){const nx=x+dx,ny=y+dy;if(nx>=0&&ny>=0&&nx<aw&&ny<ah)hole[ny*aw+nx]=1;}}
+  under=Uint8ClampedArray.from(real.data);inpaint(under,aw,ah,hole);
+  const full:number[][]=[[],[],[]];for(let i=0;i<aw*ah;i++)if(own[i]&&away(i)>=inkStrength*.92)for(let n=0;n<3;n++)full[n].push(real.data[i*4+n]);
+  if(full[0].length>=8)inkTrue=full.map(v=>v.sort((a,b)=>a-b)[v.length>>1]);
  }
  const grain:number[]=[];for(let y=Math.max(0,top-ay0);y<Math.min(ah,bottom-ay0);y++)for(let x=0;x<aw;x++){const i=y*aw+x;if(!nearInk[i]&&away(i)<=8)grain.push(i);}
  // The paper's own colour where a letter left, column by column: from the
@@ -682,7 +721,8 @@ export async function glyphEditPatch(c:Canvas,p:Page,lineRegion:TextRegion,next:
  for(let y=0;y<patchH;y++)for(let x=0;x<patchW;x++){
   const o=(y*patchW+x)*4;if(y+top>=ay1)continue;
   const ai=((y+top-ay0)*area.width+(x+startX-ax0));
-  if(own[ai]||fringe[ai])paperAt(x+startX,y+top,o);else out.data.set(area.data.subarray(ai*4,ai*4+4),o);
+  if(under){out.data.set((own[ai]||fringe[ai]?under:real.data).subarray(ai*4,ai*4+4),o);out.data[o+3]=255;}
+  else if(own[ai]||fringe[ai])paperAt(x+startX,y+top,o);else out.data.set(area.data.subarray(ai*4,ai*4+4),o);
  }
  let x=0;
  for(const q of pieces){
@@ -694,15 +734,18 @@ export async function glyphEditPatch(c:Canvas,p:Page,lineRegion:TextRegion,next:
    // Its paper may differ from this line's (banded table rows): the ink is kept, the paper exchanged.
    const lender=page.find(r=>r.id===q.source),paper=lender?paperOf(from.getContext('2d',{willReadFrequently:true})!,lender):bg,strength=Math.max(40,...[0,1,2].map(n=>Math.abs(hexRgb(region.color||'#000000')[n]-paper[n])));
    if(sh>0){const src=from.getContext('2d',{willReadFrequently:true})!.getImageData(q.x0,sy,w,sh),offset=sy-(top-dy);
-    for(let y=0;y<sh;y++)for(let dx=Math.max(0,-x);dx<w&&x+dx<patchW;dx++){const i=(y*w+dx)*4,dist=Math.max(...[0,1,2].map(n=>Math.abs(src.data[i+n]-paper[n])));if(dist>6&&y+offset<patchH){const o=((y+offset)*patchW+x+dx)*4,cover=Math.min(1,dist/strength);for(let n=0;n<3;n++)out.data[o+n]=overBackground(src.data[i+n],cover,paper[n],bg[n]);out.data[o+3]=255;}}}
+    for(let y=0;y<sh;y++)for(let dx=Math.max(0,-x);dx<w&&x+dx<patchW;dx++){const i=(y*w+dx)*4,dist=Math.max(...[0,1,2].map(n=>Math.abs(src.data[i+n]-paper[n])));if(dist>6&&y+offset<patchH){const o=((y+offset)*patchW+x+dx)*4,cover=Math.min(1,dist/strength);for(let n=0;n<3;n++)out.data[o+n]=under?Math.round(out.data[o+n]+(inkTrue[n]-out.data[o+n])*cover):overBackground(src.data[i+n],cover,paper[n],bg[n]);out.data[o+3]=255;}}}
   }else if(!q.blank)for(let y=0;y<patchH&&y+top<ay1;y++)for(let dx=Math.max(0,-x);dx<w&&x+dx<patchW;dx++){
-   const ai=((y+top-ay0)*area.width+(q.x0+dx-ax0));if(own[ai]||fringe[ai])out.data.set(area.data.subarray(ai*4,ai*4+4),(y*patchW+x+dx)*4);
+   const ai=((y+top-ay0)*area.width+(q.x0+dx-ax0));if(!own[ai]&&!fringe[ai])continue;const o=(y*patchW+x+dx)*4;
+   // Over a drawing a letter is laid as ink over what is there, not as a square of paper.
+   if(under){const cover=Math.min(1,away(ai)/inkStrength);for(let n=0;n<3;n++)out.data[o+n]=Math.round(out.data[o+n]+(inkTrue[n]-out.data[o+n])*cover);}
+   else out.data.set(area.data.subarray(ai*4,ai*4+4),o);
   }
   x+=w;
  }
  // A turned patch leaves the pixels it did not change to the page: turned
  // twice they would only come back softer.
- if(f.angle)for(let y=0;y<patchH&&y+top<ay1;y++)for(let u=0;u<patchW;u++){const o=(y*patchW+u)*4,ai=((y+top-ay0)*area.width+(u+startX-ax0))*4;if(out.data[o]===area.data[ai]&&out.data[o+1]===area.data[ai+1]&&out.data[o+2]===area.data[ai+2]&&out.data[o+3]===area.data[ai+3])out.data[o+3]=0;}
+ if(f.angle)for(let y=0;y<patchH&&y+top<ay1;y++)for(let u=0;u<patchW;u++){const o=(y*patchW+u)*4,ai=((y+top-ay0)*area.width+(u+startX-ax0))*4;if(out.data[o]===real.data[ai]&&out.data[o+1]===real.data[ai+1]&&out.data[o+2]===real.data[ai+2]&&out.data[o+3]===real.data[ai+3])out.data[o+3]=0;}
  const patch=document.createElement('canvas');patch.width=patchW;patch.height=patchH;patch.getContext('2d')!.putImageData(out,0,0);
  return Object.assign(turnLayer(new FabricImage(patch,{left:startX/k,top:top/k,scaleX:1/k,scaleY:1/k}),lineRegion),{id:uid(),name:`Edited text: ${next.slice(0,40)}`,editedText:next,ocrOriginalBounds:originalFieldBounds(lineRegion),borrowed:plan.pieces.some(q=>q.source!==undefined&&q.source!=='font'),drawn});
 }

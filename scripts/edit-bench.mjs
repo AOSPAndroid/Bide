@@ -73,6 +73,7 @@ try{
   for(const fid of pick('BENCH_DUMP')??[]){const fd=original.fields.find(x=>x.id===fid),st=read.find(r=>r.id===fid),rg=regions.find(x=>x.id===st?.region);if(!fd)continue;
    console.log(`  ${fid} ${JSON.stringify(fd.text)} read ${JSON.stringify(rg?.text)} box ${[rg?.left,rg?.width].map(v=>v?.toFixed(1))}\n    true  ${fd.chars.map(c=>`${c.ch}[${c.x0.toFixed(1)},${c.x1.toFixed(1)}]`).join(' ')}\n    cells ${rg?.glyphs?.map(g=>`${g.ch}[${g.x0.toFixed(1)},${g.x1.toFixed(1)}]`).join(' ')}`);}
   const count=s=>read.filter(r=>r.status===s).length;
+  if(process.env.BENCH_BOXES)for(const fd of original.fields){const st=read.find(r=>r.id===fd.id),rg=regions.find(x=>x.id===st?.region);console.log('   box',fd.id,'true',[fd.x,fd.y,fd.w,fd.h].map(v=>Math.round(v)).join(','),'read',rg?[rg.left,rg.top,rg.width,rg.height].map(v=>Math.round(v)).join(','):'-',rg?.color,rg?.background,rg?.blur?.toFixed?.(2));}
   console.log(`\n${id}: ${opened.regions.length} regions in ${opened.seconds.toFixed(1)} s, font ${opened.font} · fields ${count('exact')} exact, ${count('merged')} merged, ${read.length-count('exact')-count('merged')} other${read.filter(r=>!['exact','merged'].includes(r.status)).map(r=>` [${r.id}: ${r.status} ${JSON.stringify(r.read)}]`).join('')}`);
   await mkdir(`${out}/${t}-${vn}`,{recursive:true});await writeFile(`${out}/${t}-${vn}/scan.png`,Buffer.from(original.pixels,'base64'));
   let n=0;

@@ -108,6 +108,22 @@ export const templates={
    <div style="font-size:30px;font-weight:700">${f(v,'head')}</div><div style="font-size:16px;margin:8px 0 18px">${f(v,'l1')}</div>
    <div style="font-size:16px;font-weight:700">${f(v,'l2')}</div><div style="font-size:16px">${f(v,'l3')}</div></div>`,
   edits:[['head','Marché d’automne','new'],['head','Marché de Noël','new'],['l1','Producteurs et créateurs du canton','page'],['l2','Dimanche 13 avril, de 10 h à 18 h','new'],['l3','Place du Marché, entrée libre','page']]},
+ // A party flyer with a drawing behind its text: confetti, a ribbon and
+ // stripes that run under the lines. An edit must leave the drawing as it is
+ // (a flat patch in the paper's colour wipes it).
+ party:{width:460,height:240,fonts:async()=>[await face('CarlitoF','extra/Carlito-Regular.ttf'),await face('CarlitoF','extra/Carlito-Bold.ttf',700)].join(''),
+  fields:{head:'Fête du quartier',when:'Samedi 28 juin à 18 h',where:'Square des Tilleuls',note:'Buvette, jeux et concert'},
+  html:(v)=>`<div style="position:relative;width:460px;height:240px;background:#fff7e8;color:#27324e;box-sizing:border-box;font-family:CarlitoF;overflow:hidden">
+   <svg width="460" height="240" style="position:absolute;left:0;top:0">
+    <path d="M-10 70 C 80 20, 160 120, 250 60 S 420 30, 480 90" fill="none" stroke="#ffc9a8" stroke-width="14"/>
+    <path d="M-10 150 C 90 190, 180 110, 270 160 S 400 200, 480 140" fill="none" stroke="#bfe3d0" stroke-width="10"/>
+    ${[[40,40,9,'#f7a8b8'],[120,96,6,'#9ad0f5'],[205,36,7,'#ffd76a'],[300,112,8,'#f7a8b8'],[380,52,6,'#9ad0f5'],[95,178,7,'#ffd76a'],[230,200,9,'#9ad0f5'],[345,186,6,'#f7a8b8'],[420,150,8,'#ffd76a'],[170,140,5,'#f7a8b8']].map(([x,y,r,c])=>`<circle cx="${x}" cy="${y}" r="${r}" fill="${c}"/>`).join('')}
+    ${[0,1,2,3,4,5].map(i=>`<line x1="${250+i*14}" y1="118" x2="${236+i*14}" y2="158" stroke="#e7d9f7" stroke-width="5"/>`).join('')}
+   </svg>
+   <div style="position:relative;padding:30px 34px">
+    <div style="font-size:32px;font-weight:700">${f(v,'head')}</div><div style="font-size:18px;font-weight:700;margin:10px 0 14px">${f(v,'when')}</div>
+    <div style="font-size:17px">${f(v,'where')}</div><div style="font-size:17px;margin-top:6px">${f(v,'note')}</div></div></div>`,
+  edits:[['head','Fête du village','new'],['head','Fête des voisins','new'],['when','Samedi 5 juillet à 19 h','new'],['when','Samedi 28 juin à 16 h','page'],['where','Square des Platanes','new'],['where','Parc des Tilleuls','new'],['note','Buvette, jeux et bal','page'],['note','Buvette, jeux et tombola','new']]},
 };
 
 // The bundled family (and weight, when it is a family of its own) each face a
@@ -152,4 +168,5 @@ export const cases=[
  ['poster','clean'],['poster','soft'],
  ['readings','uneven'],['workshop','uneven'],
  ['workshop','viewsoft'],['flyer','viewsoft'],['letter','viewsoft'],
+ ['party','clean'],['party','soft'],['party','view'],
 ];

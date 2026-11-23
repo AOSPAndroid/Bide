@@ -3,6 +3,9 @@ import {runModel} from './ai';
 import type {ModelProgress} from './ai-models';
 import {segmentGlyphs,type Glyph} from '../glyph-edit';
 import {tilePlan,toPlanar,dbBoxes,ctcDecode,ctcWords,softCommas,lostSpaces,trimToInk,growToInk,inkBand,inpaintWindows,resizeBilinear,snapToGap,rtlReorder,separateLetters,ocrScripts,pickMask,mergeLineBoxes,type Rect,type OcrScript} from '../ai-image';
+import {busyBackground,flattenInk} from '../ink-flatten';
+import {sampleBackground,estimateTextColor} from '../ocr-image';
+const plainCopies=new WeakMap<object,Uint8ClampedArray>();
 
 type Progress=(fraction:number,label?:string)=>void;
 const canvas=(width:number,height:number)=>Object.assign(document.createElement('canvas'),{width,height});
@@ -147,22 +150,37 @@ export async function paddleOcr(source:HTMLCanvasElement,onProgress?:Progress,si
    // The detector pads its boxes; trim lines and words to inked rows/columns
    // (contrast with the box corner, which lies in the padding) so text sizing
    // and background patches follow the letters.
-   const corner=(y0*width+x0)*4,bg=[src.data[corner],src.data[corner+1],src.data[corner+2]],columns=new Float32Array(w),rows=new Float32Array(h);
-   for(let y=y0;y<y1;y++)for(let x=x0;x<x1;x++){const i=(y*width+x)*4,ink=Math.max(Math.abs(src.data[i]-bg[0]),Math.abs(src.data[i+1]-bg[1]),Math.abs(src.data[i+2]-bg[2]))>60?1:0;columns[x-x0]+=ink;rows[y-y0]+=ink;}
+   const corner=(y0*width+x0)*4,columns=new Float32Array(w),rows=new Float32Array(h);let bg=[src.data[corner],src.data[corner+1],src.data[corner+2]],inked:{data:ArrayLike<number>}=src;
+   // Over a drawing (a ribbon, confetti, a photo behind the line) the line is
+   // measured as on plain paper (ink-flatten.ts): the drawing is no ink, and
+   // the corner may lie on it.
+   if(w>=4&&h>=4){
+    const box={x0,y0,x1,y1},paper=sampleBackground(src,box),colour=estimateTextColor(src,box,paper);
+    if(colour){
+     const cut=new Uint8ClampedArray(w*h*4);for(let y=0;y<h;y++)cut.set(src.data.subarray(((y0+y)*width+x0)*4,((y0+y)*width+x1)*4),y*w*4);
+     if(busyBackground(cut,w,h,colour,paper)){
+      let plain=plainCopies.get(src);if(!plain){plain=new Uint8ClampedArray(src.data);plainCopies.set(src,plain);}
+      const made=flattenInk(cut,w,h,colour,paper,Math.max(2,Math.min(5,Math.round(h*.06))));
+      for(let y=0;y<h;y++)plain.set(made.flat.subarray(y*w*4,(y+1)*w*4),((y0+y)*width+x0)*4);
+      inked={data:plain};bg=[...paper];
+     }
+    }
+   }
+   for(let y=y0;y<y1;y++)for(let x=x0;x<x1;x++){const i=(y*width+x)*4,ink=Math.max(Math.abs(inked.data[i]-bg[0]),Math.abs(inked.data[i+1]-bg[1]),Math.abs(inked.data[i+2]-bg[2]))>60?1:0;columns[x-x0]+=ink;rows[y-y0]+=ink;}
    const vertical=inkBand(rows,((b.y0+b.y1)/2)*height/dh-y0),top=y0+vertical.x0,bottom=y0+vertical.x1;
    // Word edges: snap boundaries to the blank gap between words, trim to ink,
    // then give each word its own inked rows (a word without descenders must
    // not inherit the line's full height, or its replacement is sized too big).
    // Columns over the line's own rows only, so a neighbouring line inside the
    // padded box does not fill the blank columns between letters.
-   const bandColumns=new Float32Array(w);for(let y=top;y<bottom;y++)for(let x=x0;x<x1;x++){const p=(y*width+x)*4;bandColumns[x-x0]+=Math.max(Math.abs(src.data[p]-bg[0]),Math.abs(src.data[p+1]-bg[1]),Math.abs(src.data[p+2]-bg[2]))>60?1:0;}
+   const bandColumns=new Float32Array(w);for(let y=top;y<bottom;y++)for(let x=x0;x<x1;x++){const p=(y*width+x)*4;bandColumns[x-x0]+=Math.max(Math.abs(inked.data[p]-bg[0]),Math.abs(inked.data[p+1]-bg[1]),Math.abs(inked.data[p+2]-bg[2]))>60?1:0;}
    const lineHeight=bottom-top,gap=Math.max(2,Math.round(lineHeight*.15));
    const build=(read:typeof decoded.chars)=>{
     const raw=ctcWords(read,rw/steps,rw).map(w=>rtl?{...w,text:rtlReorder(w.text)}:w);
     const edges=raw.map((word,i)=>({x0:i?snapToGap(columns,word.x0*w/rw,gap,lineHeight):growToInk(columns,word.x0*w/rw,-1,lineHeight/2),x1:i<raw.length-1?snapToGap(columns,word.x1*w/rw,gap,lineHeight):growToInk(columns,word.x1*w/rw,1,lineHeight/2)}));
     return raw.map((word,i)=>{
      const t=trimToInk(columns,edges[i].x0,edges[i].x1),wordRows=new Float32Array(h);
-     for(let y=top;y<bottom;y++)for(let x=x0+t.x0;x<x0+t.x1;x++){const p=(y*width+x)*4;wordRows[y-y0]+=Math.max(Math.abs(src.data[p]-bg[0]),Math.abs(src.data[p+1]-bg[1]),Math.abs(src.data[p+2]-bg[2]))>60?1:0;}
+     for(let y=top;y<bottom;y++)for(let x=x0+t.x0;x<x0+t.x1;x++){const p=(y*width+x)*4;wordRows[y-y0]+=Math.max(Math.abs(inked.data[p]-bg[0]),Math.abs(inked.data[p+1]-bg[1]),Math.abs(inked.data[p+2]-bg[2]))>60?1:0;}
      const v=trimToInk(wordRows,top-y0,bottom-y0);
      // Character cells, for editing with the image's own letters (glyph-edit.ts).
      // Each letter keeps the recognizer's probability, to flag doubtful ones.

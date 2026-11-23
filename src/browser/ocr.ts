@@ -1,4 +1,5 @@
 import {inkDensity} from '../ocr-weight';
+import {busyBackground,flattenInk} from '../ink-flatten';
 import {segmentOcrLine,missingLines,splitAtBackgrounds,type OcrGrouping} from '../ocr-segmentation';
 import {sampleBackground,estimateTextColor,toHex,edgeWidth,blurFromEdgeWidth,inkMass,prepareOcrPixels,estimateLineHeight,growToInk} from '../ocr-image';
 import {prepareOcrImage} from './ocr-prepare';
@@ -179,8 +180,27 @@ async function recognizeLevel(image:HTMLCanvasElement,{signal,grouping='smart',l
   if(thorough){pass=1;lines.push(...missingLines(lines,await recognize(PSM.SPARSE_TEXT)));}
   sx=image.width/prepared.width;sy=image.height/prepared.height;
   }
-  const ctx=image.getContext('2d')!,original=ctx.getImageData(0,0,image.width,image.height),regions:TextRegion[]=[];
+  const regions:TextRegion[]=[];let ctx=image.getContext('2d')!,original=ctx.getImageData(0,0,image.width,image.height);
   const scaleBox=(bb:{x0:number;y0:number;x1:number;y1:number})=>({x0:Math.max(0,Math.floor(bb.x0*sx)),y0:Math.max(0,Math.floor(bb.y0*sy)),x1:Math.min(image.width,Math.ceil(bb.x1*sx)),y1:Math.min(image.height,Math.ceil(bb.y1*sy))});
+  let busy=new Set<unknown>();
+  // A line over a drawing (a ribbon, confetti, a photo) is measured as it
+  // would be on plain paper (ink-flatten.ts): its box, weight, blur and
+  // letter cells otherwise count the drawing as ink (a regular line read as
+  // bold and two pixels soft, its box a ribbon's width too tall).
+  {
+   const truth=original;let flat:ImageData|undefined;busy=new Set<unknown>();
+   for(const line of lines){
+    const lb=scaleBox(line.bbox),x0=Math.max(0,lb.x0-3),y0=Math.max(0,lb.y0-3),w=Math.min(image.width,lb.x1+3)-x0,h=Math.min(image.height,lb.y1+3)-y0;if(w<4||h<4)continue;
+    const paper=sampleBackground(truth,lb),ink=estimateTextColor(truth,lb,paper);if(!ink)continue;
+    const crop=new Uint8ClampedArray(w*h*4);for(let y=0;y<h;y++)crop.set(truth.data.subarray(((y0+y)*truth.width+x0)*4,((y0+y)*truth.width+x0+w)*4),y*w*4);
+    if(!busyBackground(crop,w,h,ink,paper))continue;
+    busy.add(line);
+    flat??=new ImageData(new Uint8ClampedArray(truth.data),truth.width,truth.height);
+    const made=flattenInk(crop,w,h,ink,paper,Math.max(2,Math.min(5,Math.round((lb.y1-lb.y0)*.08))));
+    for(let y=0;y<h;y++)flat.data.set(made.flat.subarray(y*w*4,(y+1)*w*4),((y0+y)*truth.width+x0)*4);
+   }
+   if(flat){const plain=document.createElement('canvas');plain.width=image.width;plain.height=image.height;ctx=plain.getContext('2d',{willReadFrequently:true})!;ctx.putImageData(flat,0,0);original=flat;}
+  }
   for(const line of lines){
    // Every word of the full line is measured once, so weights can be judged
    // against the rest of the line even when a region holds a single word.
@@ -191,7 +211,10 @@ async function recognizeLevel(image:HTMLCanvasElement,{signal,grouping='smart',l
    for(const part of parts){
     const start=part.words.length?lineWords.findIndex(g=>g.bbox.x0===part.words[0].bbox.x0&&g.bbox.y0===part.words[0].bbox.y0):-1;
     const lineContext=measured.length>1&&start>=0?{words:measured,start,count:part.words.length}:undefined;
-    const b={x0:Math.max(0,Math.floor(part.bbox.x0*sx)),y0:Math.max(0,Math.floor(part.bbox.y0*sy)),x1:Math.min(image.width,Math.ceil(part.bbox.x1*sx)),y1:Math.min(image.height,Math.ceil(part.bbox.y1*sy))},w=b.x1-b.x0,h=b.y1-b.y0;if(w<1||h<1)continue;
+    const b={x0:Math.max(0,Math.floor(part.bbox.x0*sx)),y0:Math.max(0,Math.floor(part.bbox.y0*sy)),x1:Math.min(image.width,Math.ceil(part.bbox.x1*sx)),y1:Math.min(image.height,Math.ceil(part.bbox.y1*sy))};
+    // Over a drawing the box was drawn round the drawing too: on plain paper it closes on the letters.
+    if(busy.has(line)){const paper=sampleBackground(original,b),at=(x:number,y:number)=>{const i=(y*original.width+x)*4;return Math.max(Math.abs(original.data[i]-paper[0]),Math.abs(original.data[i+1]-paper[1]),Math.abs(original.data[i+2]-paper[2]));};let peak=0;for(let y=b.y0;y<b.y1;y++)for(let x=b.x0;x<b.x1;x++)peak=Math.max(peak,at(x,y));const t=Math.max(24,peak*.3),row=(y:number)=>{for(let x=b.x0;x<b.x1;x++)if(at(x,y)>=t)return true;return false;},col=(x:number)=>{for(let y=b.y0;y<b.y1;y++)if(at(x,y)>=t)return true;return false;};while(b.y1-b.y0>2&&!row(b.y0))b.y0++;while(b.y1-b.y0>2&&!row(b.y1-1))b.y1--;while(b.x1-b.x0>2&&!col(b.x0))b.x0++;while(b.x1-b.x0>2&&!col(b.x1-1))b.x1--;}
+    const w=b.x1-b.x0,h=b.y1-b.y0;if(w<1||h<1)continue;
     const rgb=sampleBackground(original,b),light=rgb[0]+rgb[1]+rgb[2]>384,ink=estimateTextColor(original,b,rgb);
     const edge=edgeWidth(original,b,rgb),blur=edge===undefined?undefined:blurFromEdgeWidth(edge);
     // Per-word ink lets a bold label and regular value share one line (see ocr-weight.ts).
