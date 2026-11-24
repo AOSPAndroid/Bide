@@ -176,11 +176,11 @@ export function spacedText(region:TextRegion,text=region.text){
 // Editable text positioned so its first baseline matches the detected text.
 // matchBlur gives OCR text the measured softness of the original letters.
 // A tilted line's text is turned with it, unless `level` (for fitting in its frame).
-export async function detectedTextbox(region:TextRegion,{ocrFont,ocrStyle,matchBlur=false,pageInk,level=false}:{ocrFont:string;ocrStyle:string;matchBlur?:boolean;pageInk?:PageInk;level?:boolean}){
+export async function detectedTextbox(region:TextRegion,{ocrFont,ocrStyle,matchBlur=false,pageInk,level=false,slanted}:{ocrFont:string;ocrStyle:string;matchBlur?:boolean;pageInk?:PageInk;level?:boolean;slanted?:boolean}){
  let family=region.kind==='ocr'?ocrFont:fallbackFont(region.fontName,bundledFonts.map(f=>f.family)),embedded=false;
  if(region.fontData&&region.fontId){try{await ensureEmbeddedFont(region.fontId,region.fontData);family=region.fontId;embedded=true;}catch{}}
  await ensureFont(family);
- const italic=region.kind==='ocr'?ocrStyle.includes('italic'):region.italic,words=region.words;
+ const italic=region.kind==='ocr'?slanted??ocrStyle.includes('italic'):region.italic,words=region.words;
  // Auto weight is estimated per word so mixed bold/regular lines keep both.
  const auto=region.kind==='ocr'&&ocrStyle==='auto',measurable=(t:string)=>/[\p{L}\p{N}\p{Sc}%&@#]/u.test(t);
  const inks=new Map<object,ReturnType<typeof wordInk>|undefined>(),inkOf=(w:{text:string;inkMass?:number;width?:number})=>{if(!measurable(w.text)||!w.inkMass||!w.width)return undefined;if(!inks.has(w)){const regular=glyphInk(w.text,family,'normal'),heavy=glyphInk(w.text,family,'bold');inks.set(w,regular&&heavy?wordInk(w.text,w.inkMass,w.width,regular,heavy):undefined);}return inks.get(w);};
@@ -235,6 +235,25 @@ export async function detectedTextbox(region:TextRegion,{ocrFont,ocrStyle,matchB
  return {text,embedded};
 }
 
+// How far the strokes of a line lean: the horizontal shear per pixel of
+// height (0 upright, about 0.2 for an italic at 12 degrees) at which its
+// columns of ink are sharpest (stems stand up, the gaps between letters open).
+const SLANTED=.1;
+export function lineSlant(raster:HTMLCanvasElement,region:{left:number;top:number;width:number;height:number;background?:string}){
+ const x=Math.max(0,Math.floor(region.left)-2),y=Math.max(0,Math.floor(region.top)),w=Math.min(raster.width-x,Math.ceil(region.width)+4),h=Math.min(raster.height-y,Math.ceil(region.height));if(w<8||h<6)return 0;
+ const ctx=raster.getContext('2d',{willReadFrequently:true})!,cover=contrastCoverage(ctx.getImageData(x,y,w,h).data,w,h,paperOf(ctx,region)).data;
+ let best=0,top=-1,upright=0;
+ for(let n=-4;n<=14;n++){
+  const sh=n*.025,cols=new Float32Array(w+h+2);
+  // Sheared back by sh: a pixel `up` rows above the bottom moves left by sh*up.
+  for(let r=0;r<h;r++){const shift=-sh*(h-1-r)+h*.4;for(let c=0;c<w;c++){const v=cover[r*w+c];if(!v)continue;const at=c+shift,i=Math.floor(at),f=at-i;if(i>=0&&i+1<cols.length){cols[i]+=v*(1-f);cols[i+1]+=v*f;}}}
+  let sq=0;for(const v of cols)sq+=v*v;
+  if(n===0)upright=sq;if(sq>top){top=sq;best=sh;}
+ }
+ // (Upright unless leaning is clearly sharper.)
+ if(upright>=top*.97)return 0;
+ return best;
+}
 // (Benchmark) how unlike each pair of lines' letters are, on the page as opened.
 export async function pageShapeDistances(c:Canvas,p:Page,regions:TextRegion[]){
  const {lineShapes,shapeDistance}=await import('./browser/ocr-appearance'),raster=await pageComposite(c,p),lines=regions.filter(r=>r.kind==='ocr'&&r.glyphs&&!r.angle);
@@ -263,22 +282,32 @@ export async function matchedDetectedTextbox(region:TextRegion,c:Canvas,p:Page,r
  const {raster}=measuredRaster(truth,fineRegion,fineAll);
  const fitted=await matchOcrAppearance(raster,fineRegion,fineAll,options.ocrFont,{autoFont:options.autoFont,matchBlur:options.matchBlur,makeText,alike:alikeLines(raster,fineAll,fineRegion)});
  if(!fitted)return detectedTextbox(region,{...options,pageInk:await ink(options.ocrFont)});
- const text=await makeText(region,fitted.family);applyOcrAppearance(text,region,{...fitted,dx:fitted.dx/k,dy:fitted.dy/k,softness:fitted.softness/k});
+ // Italics. A line whose strokes lean (lineSlant) is fitted again in the
+ // face's italic (or the face slanted, when it has none) and set in it when
+ // that fits its letters better: an oblique line set upright misses every stem.
+ let made=fitted,makeMine=makeText;
+ if(options.ocrStyle==='auto'&&lineSlant(raster,fineRegion)>=SLANTED){
+  const makeItalic=async(r:TextRegion,family:string)=>(await detectedTextbox(r,{...options,ocrFont:family,matchBlur:false,pageInk:await ink(family),level:true,slanted:r.id===region.id})).text;
+  const leaning=await matchOcrAppearance(raster,fineRegion,fineAll,fitted.family,{autoFont:false,matchBlur:options.matchBlur,makeText:makeItalic,own:true,floor:0});
+  const upright=await matchOcrAppearance(raster,fineRegion,fineAll,fitted.family,{autoFont:false,matchBlur:options.matchBlur,makeText,own:true,floor:0,weights:false});
+  if(leaning&&leaning.score>(upright?.score??fitted.score)+.02){made=leaning;makeMine=makeItalic;}
+ }
+ const text=await makeMine(region,made.family);applyOcrAppearance(text,region,{...made,dx:made.dx/k,dy:made.dy/k,softness:made.softness/k});
  // A face that is not the page's own fits its shapes better blurred, and the
  // fit took that blur on crisp letters (a sharp Helvetica-like line set in
  // Liberation Sans at softness 0.6): there the softness is the one whose edges
  // are as wide as the line's own, never more than the fit's.
- if(!pdf&&options.matchBlur&&fitted.score<SURE_FACE&&(text.textSoftness??0)>0){text.textSoftness=Math.min(text.textSoftness??0,matchOcrSoftness(raster,region,regionsAll,text,k));text.initDimensions();}
+ if(!pdf&&options.matchBlur&&made.score<SURE_FACE&&(text.textSoftness??0)>0){text.textSoftness=Math.min(text.textSoftness??0,matchOcrSoftness(raster,region,regionsAll,text,k));text.initDimensions();}
  if(pdf){
   // The shape fit settles on a crisper softness than a soft scan has, and ink
   // measured against it came out pale (grey #555 lines set 18% too light):
   // softness by edge width, then the line's own ink at that softness.
   if(options.matchBlur){text.textSoftness=matchOcrSoftness(raster,region,regionsAll,text,k);text.initDimensions();}
-  const gain=matchOcrInk(raster,region,regionsAll,text,k);if(gain!==undefined)text.set({fill:fitted.ink&&fitted.inkGain!==undefined&&gain<=fitted.inkGain&&fitted.inkGain-gain<=.08?fitted.ink:matchedInkColor(region.color,region.background||'#ffffff',gain)});
+  const gain=matchOcrInk(raster,region,regionsAll,text,k);if(gain!==undefined)text.set({fill:made.ink&&made.inkGain!==undefined&&gain<=made.inkGain&&made.inkGain-gain<=.08?made.ink:matchedInkColor(region.color,region.background||'#ffffff',gain)});
   // Exported as it was fitted: pixels at this scale, not vector text over the scan.
   text.rasterScale=k;
  }
- return {text:turnLayer(text,region),embedded:false,score:fitted.score};
+ return {text:turnLayer(text,region),embedded:false,score:made.score};
 }
 
 // Hide the original OCR text by clearing, repairing or patching the area under

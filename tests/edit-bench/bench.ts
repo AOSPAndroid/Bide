@@ -5,7 +5,8 @@ import {StaticCanvas} from 'fabric';
 import {imageFilePage,exportPayload} from '../../src/project-io';
 import {importDocument,exportInBrowser} from '../../src/browser/engine';
 import {blankPage,type Page,type Project} from '../../src/model';
-import {scanPageText,pageShapeDistances} from '../../src/detected-text';
+import {scanPageText,pageShapeDistances,lineSlant} from '../../src/detected-text';
+import {pageComposite} from '../../src/detected-text';
 import {planOcrReplacement,LetteringError} from '../../src/ocr-replace';
 import {sameKindImage} from '../../src/image-export';
 import {ensureDocumentFonts} from '../../src/fonts';
@@ -55,3 +56,5 @@ export async function edit(id:string,regionId:string,text:string,mode:'letters'|
 export const close=(id:string)=>{docs.delete(id);};
 // How unlike each pair of lines' letters are (BENCH_SHAPES=1).
 export async function shapes(id:string){const d=docs.get(id)!,c=await loaded(d.page);try{return await pageShapeDistances(c,d.page,d.all);}finally{await (c as unknown as StaticCanvas).dispose();}}
+// How far each line's strokes lean (BENCH_SHAPES=1).
+export async function slants(id:string){const d=docs.get(id)!,c=await loaded(d.page);try{const raster=await pageComposite(c,d.page);return d.regions.map(r=>({text:r.text,slant:lineSlant(raster,r)}));}finally{await (c as unknown as StaticCanvas).dispose();}}

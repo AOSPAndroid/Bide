@@ -64,11 +64,16 @@ function distance(d:Descriptor,bin:Uint8Array,at:number){
 // page's on a few descriptors (Bakbak One, a heavy display face, was taken for
 // a plain Verdana-like sans), and set in it the whole line reads as another font.
 export const TEXT_KINDS=new Set(['sans','serif','mono']);
+// Families made for another script (Noto Sans Bassa Vah, BIZ UDPMincho, the
+// Korean and Chinese faces) carry plain Latin letters too, and were taken for
+// a Latin line they happened to resemble: their Latin is an afterthought.
+const OTHER_SCRIPT=/^Noto (Sans|Serif|Kufi|Naskh|Nastaliq|Rashi|Traditional|Znamenny|Music)( (?!Display$|Mono$)\S.*)?$|^(BIZ UD|Zen |M PLUS|Kosugi|Sawarabi|Shippori|Kiwi|Klee|Hina|Yuji|Zhi|ZCOOL|Ma Shan|Liu Jian|Long Cang|Hibur|LXGW|Chiron|Cactus Classical|Kaisei|Dela|Dot|Murecho|Yomogi|Yusei|Mochiy|Potta|Rampart|Reggae|Rock|Stick|Train|Gowun|Nanum|Gothic A1|Do Hyeon|Black Han|Hahmlet|Jua|Sunflower|Song Myung|Stylish|Yeon|Gaegu|Gamja|Gugi|Hi Melody|Poor Story|Single Day|East Sea|Cute|Dongle|Bagel|Orbit|Diphylleia|Grandiflora|Moon)| (JP|KR|SC|TC|HK|Thai|Arabic|Hebrew|Khmer|Lao|Myanmar|Tamil|Telugu|Bengali|Devanagari|Gujarati|Gurmukhi|Kannada|Malayalam|Sinhala|Oriya|Ethiopic|Georgian|Armenian)$/;
+export const otherScript=(family:string)=>family!=='Noto Sans'&&family!=='Noto Serif'&&OTHER_SCRIPT.test(family);
 export function shortlist(index:Index,glyphs:{ch:string;d:Descriptor}[],count=6,skip:(family:string)=>boolean=()=>false,kinds:Set<string>|undefined=TEXT_KINDS){
  const known=glyphs.map(g=>({at:index.chars.indexOf(g.ch),d:g.d})).filter(g=>g.at>=0);if(known.length<4)return [];
  const scored:{family:Family;score:number}[]=[];
  for(const family of index.families){
-  if(skip(family.family)||kinds&&!kinds.has(family.category))continue;let best=Infinity;
+  if(skip(family.family)||kinds&&!kinds.has(family.category)||otherScript(family.family))continue;let best=Infinity;
   for(const face of family.faces){
    let sum=0,n=0;for(const g of known){const at=face.row*index.cell*index.chars.length+g.at*index.cell;sum+=distance(g.d,index.bin,at);n++;}
    if(n&&sum/n<best)best=sum/n;
