@@ -246,14 +246,14 @@ export async function matchOcrAppearance(raster:HTMLCanvasElement,region:TextReg
   // better; the page's own face keeps its proportions.
   // (Only below a sure fit: a face that fits this well is the page's own, and
   // a stretch of a few percent then only greys its stems.)
-  if(best.score<SURE_FACE){
-   const probe=await makeText(region,best.family),size0=probe.fontSize,ascent=probe.top-region.top+size0*.93;
+  {
+   const sure=best.score>=SURE_FACE,probe=await makeText(region,best.family),size0=probe.fontSize,ascent=probe.top-region.top+size0*.93;
    probe.set({fill:'#000000',objectCaching:false});probe.textSoftness=best.softness;
    const at=(sx:number,r:number,dx:number)=>{probe.set({scaleX:sx,fontSize:size0*r,left:region.left+best!.dx+dx,top:region.top+ascent-size0*r*.93+best!.dy});probe.initDimensions();return coverageFit(selected.source,paintSelected(probe)).score;};
    const base=at(1,best.ratio,0);let pick={sx:1,r:best.ratio,dx:0,score:base};
    for(const sx of SCALES)for(const m of [.97,.985,1,1.015,1.03])for(const dx of [-.5,0,.5]){const v=at(sx,best.ratio*m,dx);if(v>pick.score)pick={sx,r:best.ratio*m,dx,score:v};}
    const edges=(sx:number,r:number,dx:number)=>{at(sx,r,dx);return coverageEdgeWidth(paintSelected(probe));},was=edges(1,best.ratio,0),now=pick.sx!==1?edges(pick.sx,pick.r,pick.dx):was;
-   if(pick.sx!==1&&pick.score>base+WIDTH_MARGIN&&!(was!==undefined&&now!==undefined&&now>was+.05)){best.sx=pick.sx;best.ratio=pick.r;best.dx+=pick.dx;best.score+=pick.score-base;applyOcrAppearance(text,region,best);text.set({fill:'#000000',objectCaching:false});}
+   if(pick.sx!==1&&pick.score>base+WIDTH_MARGIN&&!(was!==undefined&&now!==undefined&&now>was+(sure?0:.05)&&!(sure&&selectedEdges!==undefined&&now<=selectedEdges))){best.sx=pick.sx;best.ratio=pick.r;best.dx+=pick.dx;best.score+=pick.score-base;applyOcrAppearance(text,region,best);text.set({fill:'#000000',objectCaching:false});}
   }
   const painted=paintSelected(text);best.gain=coreGain(selected.source,painted);best.bold=text.fontWeight==='bold'||Number(text.fontWeight)>=600;
   // Ink of the original letters over the ink of the text as fitted: 1 when
@@ -394,7 +394,7 @@ async function heaviness(raster:HTMLCanvasElement,region:TextRegion,regions:Text
  // as close, the one already taken surely for this family on this document
  // (the e-mail line of a card whose other lines came out in Raleway Light).
  if(cost(fit)-cost(best)>=.08){pageWeights.set(base,best.family);return best;}
- if(known&&known!==fit.family){const k=await fitted(known);if(k?.mass&&k.score>=fit.score-.05&&cost(k)<=cost(fit)+.08)return k;}
+ if(known&&known!==fit.family){const k=await fitted(known);if(k?.mass&&k.score>=fit.score-.12&&cost(k)<=cost(fit)+.08)return k;}
  else if([...tried.values()].some(f=>f?.mass)&&[...tried.values()].every(f=>!f?.mass||cost(f)>=cost(fit)+.08))pageWeights.set(base,fit.family);
  return fit;
 }

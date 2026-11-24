@@ -297,7 +297,12 @@ export async function matchedDetectedTextbox(region:TextRegion,c:Canvas,p:Page,r
  // fit took that blur on crisp letters (a sharp Helvetica-like line set in
  // Liberation Sans at softness 0.6): there the softness is the one whose edges
  // are as wide as the line's own, never more than the fit's.
- if(!pdf&&options.matchBlur&&made.score<SURE_FACE&&(text.textSoftness??0)>0){text.textSoftness=Math.min(text.textSoftness??0,matchOcrSoftness(raster,region,regionsAll,text,k));text.initDimensions();}
+ if(!pdf&&options.matchBlur&&made.score<SURE_FACE&&(text.textSoftness??0)>0){
+  const fittedSoftness=text.textSoftness??0;text.textSoftness=Math.min(fittedSoftness,matchOcrSoftness(raster,region,regionsAll,text,k));text.initDimensions();
+  // The colour was measured at the fit's blur: crisper strokes reach more of
+  // their ink, and kept that colour too dark (#202124 letters set #101115).
+  if(text.textSoftness<fittedSoftness){const gain=matchOcrInk(raster,region,regionsAll,text,k);if(gain!==undefined)text.set({fill:made.ink&&made.inkGain!==undefined&&gain<=made.inkGain&&made.inkGain-gain<=.08?made.ink:matchedInkColor(region.color,region.background||'#ffffff',gain)});}
+ }
  if(pdf){
   // The shape fit settles on a crisper softness than a soft scan has, and ink
   // measured against it came out pale (grey #555 lines set 18% too light):
