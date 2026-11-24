@@ -223,15 +223,17 @@ test('a letter the line lacks comes from a verified line of the page; one found 
   const edited=async()=>(await canvasState()).objects.filter(o=>o.editedText===latest);
   await page.locator('.layer-name',{hasText:'Edited text: 289,07'}).first().click();
   const soft=page.getByLabel('Drawn letters softness');await soft.waitFor({timeout:30000});
-  await soft.focus();await page.keyboard.press('End');
+  await soft.fill('0.6');await soft.blur();
   await page.getByText('Drawn letters updated',{exact:false}).waitFor({timeout:120000});
-  let again;for(let i=0;i<100;i++){again=await edited();if(again.length===1&&again[0].drawnFace?.softness===3)break;await page.waitForTimeout(200);}
-  assert.equal(again.length,1,'still one edited layer');assert.equal(again[0].drawnFace.softness,3,'drawn again at the softness set');
+  let again;for(let i=0;i<100;i++){again=await edited();if(again.length===1&&again[0].drawnFace?.softness===.6)break;await page.waitForTimeout(200);}
+  assert.equal(again.length,1,'still one edited layer');assert.equal(again[0].drawnFace.softness,.6,'drawn again at the softness set');
   assert.notEqual(again[0].src,made.src,'its pixels changed');
   const inkSlider=page.getByLabel('Drawn letters ink');await inkSlider.waitFor({timeout:30000});
-  await inkSlider.focus();await page.keyboard.press('Home');
-  for(let i=0;i<100;i++){again=await edited();if(again.length===1&&again[0].drawnInk===.5)break;await page.waitForTimeout(200);}
-  assert.equal(again[0].drawnInk,.5,'drawn again at the ink set');assert.equal(again[0].drawnFace.softness,3,'the softness set is kept');
+  await inkSlider.fill('70');await inkSlider.blur();
+  for(let i=0;i<100;i++){again=await edited();if(again.length===1&&again[0].drawnInk===.7)break;await page.waitForTimeout(200);}
+  assert.equal(again[0].drawnInk,.7,'drawn again at the ink set');assert.equal(again[0].drawnFace.softness,.6,'the softness set is kept');
+  // (The edit stays selected for its sliders: back to the page for the next field.)
+  await page.keyboard.press('Escape');await page.mouse.click(640,150);await page.waitForTimeout(800);
   // Another field still refuses a missing letter instead of inheriting that font consent.
   const beforeLater=await canvasState(),next='1 947,80 $';
   await page.locator('button[aria-label^="Edit detected text: 1 947,80"]').first().click({timeout:60000});

@@ -48,7 +48,7 @@ export async function planOcrReplacement(c:Canvas,page:Page,items:OcrEdit[],{set
   // The same edit again with its drawn letters as the user set them (softness, ink): no matching, the face as stored.
   if(redraw&&single){
    const patch=await glyphEditPatch(c,page,item.region,item.text!,pageRegions,[],redraw.face,{tune:false,ink:redraw.ink});
-   if(!patch)throw new Error('This edit could not be drawn again.');
+   if(!patch)throw new Error('These letters cannot be drawn with that setting (too soft or too pale for their size). The edit is unchanged.');
    patches.push(patch);drawn.push(...((patch as FabricObject&{drawn?:string[]}).drawn??[]));edits.push({region:item.region,text:item.text,layer:(patch as FabricObject&{id:string}).id,letters:true});continue;
   }
   const made=single
