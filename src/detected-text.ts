@@ -13,7 +13,7 @@ import {estimateOcrBold,glyphInk,wordInk,classifyWordWeights,lineWeight} from '.
 import {darkenToInk,prepareOcrPixels,estimateLineHeight} from './ocr-image';
 import {ensureFont,ensureEmbeddedFont,ensureDocumentFonts} from './fonts';
 import {bundledFonts} from './font-catalog';
-import {matchedInkColor,alphaCoverage,blurCoverage} from './ocr-appearance';
+import {matchedInkColor,alphaCoverage,blurCoverage,contrastCoverage,coverageEdgeWidth} from './ocr-appearance';
 import {busyBackground,flattenInk,inpaint} from './ink-flatten';
 import {weightFamilies} from './font-weights';
 import {rasterSearchWords} from './searchable-text';
@@ -617,6 +617,30 @@ function drawnLetters(chars:string[],face:LetterFace,k:number,paper:number[],pag
  }
  return {raster,glyphs};
 }
+// The face tuned to the line it will lend letters to. The softness and ink a
+// face was matched with come from fitting whole shapes, and for a face that
+// is not the page's own they are off: digits drawn into a soft grey line
+// stood out darker and crisper than its own letters. The line's own letters
+// are drawn in the face and measured as the line is: the softness whose edges
+// are as wide as the line's, then the ink whose strongest pixels are as
+// strong as the line's.
+function tunedFace(face:LetterFace,ctx:CanvasRenderingContext2D,region:{left:number;top:number;width:number;height:number;text:string},paper:number[],k:number):LetterFace{
+ const own=[...new Set(Array.from(region.text))].filter(ch=>/[\p{L}\p{N}]/u.test(ch)).slice(0,14);if(own.length<4||!/^#[0-9a-f]{6}$/i.test(face.fill))return face;
+ const x=Math.max(0,Math.floor(region.left)),y=Math.max(0,Math.floor(region.top)),w=Math.min(ctx.canvas.width-x,Math.ceil(region.width)),h=Math.min(ctx.canvas.height-y,Math.ceil(region.height));if(w<3||h<3)return face;
+ const edgesOf=(c:CanvasRenderingContext2D,x:number,y:number,w:number,h:number)=>coverageEdgeWidth(contrastCoverage(c.getImageData(x,y,w,h).data,w,h,paper));
+ const target=edgesOf(ctx,x,y,w,h),core=inkOf(ctx,region,paper);if(target===undefined||!core)return face;
+ const strip=(f:LetterFace)=>{const made=drawnLetters(own,f,k,paper,'tune');return made&&{c:made.raster.getContext('2d',{willReadFrequently:true})!,w:made.raster.width,h:made.raster.height};};
+ // Softness in raster pixels, crisper unless a softer one is clearly closer.
+ let softness=face.softness,error=Infinity;
+ for(const px of [0,.3,.5,.7,.9,1.1,1.4,1.8,2.3,3]){const made=strip({...face,softness:px/k});if(!made)return face;const e=edgesOf(made.c,0,0,made.w,made.h);if(e===undefined)continue;const off=Math.abs(e-target);if(off<error-.03){error=off;softness=px/k;}}
+ const made=strip({...face,softness}),mine=made&&inkOf(made.c,{left:0,top:0,width:made.w,height:made.h},paper);if(!mine)return {...face,softness};
+ // Ink: strokes at this softness reach `mine` of the way from paper to the
+ // fill; the fill is moved so they reach the line's own (within limits).
+ const fill=hexRgb(face.fill),n=[0,1,2].reduce((a,b)=>Math.abs(fill[a]-paper[a])>=Math.abs(fill[b]-paper[b])?a:b),reach=(mine[n]-paper[n])/((fill[n]-paper[n])||1),want=(core[n]-paper[n])/((fill[n]-paper[n])||1);
+ if(!(reach>.2))return {...face,softness};
+ const t=Math.max(.6,Math.min(1.3,want/reach)),tuned=fill.map((v,c)=>Math.max(0,Math.min(255,Math.round(paper[c]+(v-paper[c])*t))));
+ return {...face,softness,fill:'#'+tuned.map(v=>v.toString(16).padStart(2,'0')).join('')};
+}
 // `face`: the face matched with the line. It rules where letters laid by
 // their ink go; unless `face.draw` is false, letters the page cannot lend are
 // drawn in it (the caller chose a font for this edit), listed in `drawn`.
@@ -680,7 +704,7 @@ export async function glyphEditPatch(c:Canvas,p:Page,lineRegion:TextRegion,next:
  let drawn:string[]=[];
  if(!plan&&face&&face.draw!==false){
   const lacking=[...new Set(Array.from(wanted))].filter(ch=>/\S/.test(ch)&&ch!==UNREAD&&!cells.some(cell=>cell.ch===ch)&&!library.some(l=>l.ch===ch));
-  const made=lacking.length?drawnLetters(lacking,face,k,paperOf(rctx,region),'font:'+region.id):undefined;
+  const paper=paperOf(rctx,region),made=lacking.length?drawnLetters(lacking,busy?face:tunedFace(face,rctx,region,paper,k),k,paper,'font:'+region.id):undefined;
   if(made){rasters.set('font:'+region.id,made.raster);plan=planGlyphEdit(read,cells,wanted,[...library,...made.glyphs],ruled);if(plan)drawn=lacking;}
  }
  if(!plan)return undefined;
