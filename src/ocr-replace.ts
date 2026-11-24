@@ -20,7 +20,7 @@ export class LetteringError extends Error{
 // `mix` (a single edit set in a font): the line keeps its own letters, and
 // only those the page cannot lend are drawn in the matched face; the whole
 // line is set in the font when that cannot be done.
-export async function planOcrReplacement(c:Canvas,page:Page,items:OcrEdit[],{settings,pageRegions,others,letters,autoFont,mix=true,rule=true}:{settings:OcrSettings;pageRegions:TextRegion[];others:TextRegion[];letters:boolean;autoFont:boolean;otherPages?:LetterSource[];mix?:boolean;rule?:boolean}){
+export async function planOcrReplacement(c:Canvas,page:Page,items:OcrEdit[],{settings,pageRegions,others,letters,autoFont,mix=true,rule=true,redraw}:{settings:OcrSettings;pageRegions:TextRegion[];others:TextRegion[];letters:boolean;autoFont:boolean;otherPages?:LetterSource[];mix?:boolean;rule?:boolean;redraw?:{face:LetterFace;ink:number}}){
  const patches:FabricObject[]=[],fonts:OcrEdit[]=[],edits:{region:TextRegion;text?:string;layer:string;letters:boolean}[]=[],drawn:string[]=[];let borrowed=0;
  for(const item of items){
   if(letters){
@@ -44,7 +44,14 @@ export async function planOcrReplacement(c:Canvas,page:Page,items:OcrEdit[],{set
  // uses the scan's suggested face without re-ranking every line on the page.
  const single=items.length===1&&items[0].text!==undefined,pageInk=!single&&settings.style==='auto'?await pageInkLevel(pageRegions,settings.font):undefined,texts:Textbox[]=[];
  const whole:OcrEdit[]=[];let fit:number|undefined;
- for(const item of fonts){const made=single
+ for(const item of fonts){
+  // The same edit again with its drawn letters as the user set them (softness, ink): no matching, the face as stored.
+  if(redraw&&single){
+   const patch=await glyphEditPatch(c,page,item.region,item.text!,pageRegions,[],redraw.face,{tune:false,ink:redraw.ink});
+   if(!patch)throw new Error('This edit could not be drawn again.');
+   patches.push(patch);drawn.push(...((patch as FabricObject&{drawn?:string[]}).drawn??[]));edits.push({region:item.region,text:item.text,layer:(patch as FabricObject&{id:string}).id,letters:true});continue;
+  }
+  const made=single
   ?await matchedDetectedTextbox(item.region,c,page,pageRegions,{ocrFont:settings.font,ocrStyle:settings.style,matchBlur:settings.matchBlur,autoFont,appearanceRegions:others})
   :await detectedTextbox(item.region,{ocrFont:settings.font,ocrStyle:settings.style,pageInk,matchBlur:false});
   const {text}=made,score='score' in made?made.score as number:undefined;

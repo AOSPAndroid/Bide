@@ -1,5 +1,5 @@
 // Small shared UI pieces: icon buttons, numeric fields and the modal shell.
-import {useEffect,useRef,type ReactNode} from 'react';
+import {useEffect,useRef,useState,type ReactNode} from 'react';
 import {X,type Type} from 'lucide-react';
 
 export function IconButton({ icon: Icon, label, onClick, disabled, active }: { icon: typeof Type; label: string; onClick: () => void; disabled?: boolean; active?: boolean }) {
@@ -26,4 +26,12 @@ export function ModalShell({ title, children, close, wide, focusField = true }: 
     return () => { document.removeEventListener('keydown', key); previous?.focus(); };
   }, []);
   return <div className="modal-backdrop" onMouseDown={e => { if (e.target === e.currentTarget) close(); }}><div ref={ref} className={`modal ${wide ? 'wide' : ''}`} role="dialog" aria-modal="true" aria-label={title}><div className="modal-header"><h2>{title}</h2><IconButton icon={X} label="Close dialog" onClick={close}/></div>{children}</div></div>;
+}
+
+// A slider that reports its value when released (pointer up, key up or blur),
+// for settings whose effect takes a moment to redraw.
+export function ReleaseSlider({label,value,min,max,step,disabled,format=String,onCommit}:{label:string;value:number;min:number;max:number;step:number;disabled?:boolean;format?:(v:number)=>string;onCommit:(v:number)=>void}){
+  const [shown,setShown]=useState(value);useEffect(()=>setShown(value),[value]);
+  const commit=()=>{if(shown!==value)onCommit(shown);};
+  return <label className="stacked-label">{label}: {format(shown)}<input aria-label={label} type="range" min={min} max={max} step={step} value={shown} disabled={disabled} onChange={e=>setShown(Number(e.target.value))} onPointerUp={commit} onKeyUp={commit} onBlur={commit}/></label>;
 }

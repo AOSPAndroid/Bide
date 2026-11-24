@@ -137,6 +137,24 @@ export const templates={
    <div style="font-family:FreeX;font-size:16px;font-weight:700;margin-top:14px">${f(v,'h2')}</div><div style="font-family:FreeX;font-size:13px">${f(v,'o1')}</div><div style="font-family:FreeX;font-size:13px">${f(v,'o2')}</div>
    <div style="font-family:DejaVuSerifX;font-size:13px;margin-top:12px">${f(v,'q')}</div></div>`,
   edits:[['head','Bibliothèque des Mimosas','new'],['sub','Avis de réservation n° 5892','new'],['t1','Le jardin des brumes','new'],['d1','À retirer avant le 27 mai','new'],['who','Lecteur 64-917, guichet 3','new'],['h2','Horaires d’hiver','new'],['o1','Mercredi au vendredi, 9 h - 17 h','new'],['o2','Fermé le jeudi et le vendredi','new'],['q','Un livre vaut un voyage.','new'],['q','Chaque page ouvre un chemin.','new']]},
+ // The hard page: faces the app cannot have, in the conditions that defeat a
+ // substitute. White condensed-looking bold capitals with letter spacing on a
+ // dark band, a monospaced code, an oblique sans and an italic serif, a bold
+ // serif in colour on a tint, and 8 px grey small print. The edits need many
+ // letters the page does not have: digits into lines without digits,
+ // capitals, accents, longer words.
+ hard:{width:480,height:330,fonts:async()=>[await sysFace('DejaVuX','/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf'),await sysFace('DejaVuX','/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf',700),await sysFace('DejaVuMonoX','/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf'),await sysFace('DejaVuSerifX','/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf',700),await sysFace('FreeObliqueX','/usr/share/fonts/truetype/freefont/FreeSansOblique.ttf'),await sysFace('FreeItalicX','/usr/share/fonts/truetype/freefont/FreeSerifItalic.ttf')].join(''),
+  fields:{band:'CARTE DE MEMBRE',name:'Odile Ferrand',code:'KX-4417-BRD',since:'Membre depuis octobre 2019',motto:'Le plaisir de lire ensemble',price:'Cotisation : 38 euros',small:'Valable sur présentation au guichet, non cessible.',small2:'Renouvellement avant le 30 septembre.'},
+  html:(v)=>`<div style="width:480px;height:330px;background:#f4f1ea;color:#23262b;box-sizing:border-box">
+   <div style="background:#17424a;color:#fff;padding:16px 30px;font-family:DejaVuX;font-weight:700;font-size:17px;letter-spacing:2.5px">${f(v,'band')}</div>
+   <div style="padding:18px 30px">
+    <div style="font-family:DejaVuX;font-size:22px">${f(v,'name')}</div>
+    <div style="font-family:DejaVuMonoX;font-size:14px;margin:6px 0 12px;color:#3b4046">${f(v,'code')}</div>
+    <div style="font-family:FreeObliqueX;font-size:15px">${f(v,'since')}</div>
+    <div style="font-family:FreeItalicX;font-size:17px;color:#5a4a3a;margin:6px 0 12px">${f(v,'motto')}</div>
+    <div style="background:#fbe7c6;padding:8px 12px;font-family:DejaVuSerifX;font-weight:700;font-size:15px;color:#a3470f">${f(v,'price')}</div>
+    <div style="font-family:DejaVuX;font-size:8px;color:#6b7078;margin-top:12px">${f(v,'small')}</div><div style="font-family:DejaVuX;font-size:8px;color:#6b7078;margin-top:3px">${f(v,'small2')}</div></div></div>`,
+  edits:[['band','CARTE DE VISITEUR','new'],['band','PASS ANNUEL 2027','new'],['name','Odile Ferrand-Bosq','new'],['name','Yvan Kowalczyk','new'],['code','KX-9052-BRD','new'],['code','QZ-4417-WFG','new'],['since','Membre depuis janvier 2024','new'],['since','Adhérente depuis octobre 2019','new'],['motto','Le bonheur de lire ensemble','new'],['motto','Lire, écouter, partager','new'],['price','Cotisation : 45 euros','new'],['price','Abonnement : 38 euros','new'],['small','Valable sur présentation au guichet, non remboursable.','new'],['small2','Renouvellement avant le 15 décembre.','new']]},
 };
 
 // The bundled family (and weight, when it is a family of its own) each face a
@@ -164,6 +182,8 @@ export const variants={
  uneven:{dpi:200,blurBelow:{from:.45,blur:1.3},noise:3,as:'png'},
  // The same inside a PDF: a low-resolution scan or a page saved as an image.
  viewpdf:{dpi:96,as:'scanpdf'},
+ // A page photographed with a phone: a little turned, out of focus, noisy, saved small.
+ phone:{dpi:150,rotate:.7,blur:.9,noise:6,jpeg:.6,as:'jpg'},
 };
 
 // The documents measured: every template clean and as a scanned PDF, and the
@@ -183,4 +203,5 @@ export const cases=[
  ['workshop','viewsoft'],['flyer','viewsoft'],['letter','viewsoft'],
  ['party','clean'],['party','soft'],['party','view'],
  ['notice','clean'],['notice','soft'],['notice','pdf'],
+ ['hard','clean'],['hard','soft'],['hard','viewsoft'],['hard','phone'],['notice','phone'],
 ];

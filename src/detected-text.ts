@@ -644,7 +644,7 @@ function tunedFace(face:LetterFace,ctx:CanvasRenderingContext2D,region:{left:num
 // `face`: the face matched with the line. It rules where letters laid by
 // their ink go; unless `face.draw` is false, letters the page cannot lend are
 // drawn in it (the caller chose a font for this edit), listed in `drawn`.
-export async function glyphEditPatch(c:Canvas,p:Page,lineRegion:TextRegion,next:string,pageRegions:TextRegion[]=[],sources:LetterSource[]=[],faceOf?:LetterFace|(()=>Promise<LetterFace|undefined>),{overDrawingOnly=false}:{overDrawingOnly?:boolean}={}){
+export async function glyphEditPatch(c:Canvas,p:Page,lineRegion:TextRegion,next:string,pageRegions:TextRegion[]=[],sources:LetterSource[]=[],faceOf?:LetterFace|(()=>Promise<LetterFace|undefined>),{overDrawingOnly=false,tune=true,ink=1}:{overDrawingOnly?:boolean;tune?:boolean;ink?:number}={}){
  if(lineRegion.kind!=='ocr'||!lineRegion.glyphs)return undefined;
  // Everything below works in raster pixels, `k` per page unit.
  // A scanned PDF is cut at the scan's own resolution when the render budget
@@ -701,10 +701,14 @@ export async function glyphEditPatch(c:Canvas,p:Page,lineRegion:TextRegion,next:
  }
  // Letters found nowhere, when a font was chosen: drawn in the matched face.
  // The line keeps every letter it has; only those are new.
- let drawn:string[]=[];
+ let drawn:string[]=[],drawnFace:LetterFace|undefined;
  if(!plan&&face&&face.draw!==false){
   const lacking=[...new Set(Array.from(wanted))].filter(ch=>/\S/.test(ch)&&ch!==UNREAD&&!cells.some(cell=>cell.ch===ch)&&!library.some(l=>l.ch===ch));
-  const paper=paperOf(rctx,region),made=lacking.length?drawnLetters(lacking,busy?face:tunedFace(face,rctx,region,paper,k),k,paper,'font:'+region.id):undefined;
+  const paper=paperOf(rctx,region);
+  // `tune` false: the face as given (the user set its softness); `ink`: its ink made that much stronger or weaker.
+  drawnFace=busy||!tune?face:tunedFace(face,rctx,region,paper,k);
+  const inked=ink===1||!/^#[0-9a-f]{6}$/i.test(drawnFace.fill)?drawnFace:{...drawnFace,fill:'#'+hexRgb(drawnFace.fill).map((v,n)=>Math.max(0,Math.min(255,Math.round(paper[n]+(v-paper[n])*ink))).toString(16).padStart(2,'0')).join('')};
+  const made=lacking.length?drawnLetters(lacking,inked,k,paper,'font:'+region.id):undefined;
   if(made){rasters.set('font:'+region.id,made.raster);plan=planGlyphEdit(read,cells,wanted,[...library,...made.glyphs],ruled);if(plan)drawn=lacking;}
  }
  if(!plan)return undefined;
@@ -787,6 +791,6 @@ export async function glyphEditPatch(c:Canvas,p:Page,lineRegion:TextRegion,next:
  // twice they would only come back softer.
  if(f.angle)for(let y=0;y<patchH&&y+top<ay1;y++)for(let u=0;u<patchW;u++){const o=(y*patchW+u)*4,ai=((y+top-ay0)*area.width+(u+startX-ax0))*4;if(out.data[o]===real.data[ai]&&out.data[o+1]===real.data[ai+1]&&out.data[o+2]===real.data[ai+2]&&out.data[o+3]===real.data[ai+3])out.data[o+3]=0;}
  const patch=document.createElement('canvas');patch.width=patchW;patch.height=patchH;patch.getContext('2d')!.putImageData(out,0,0);
- return Object.assign(turnLayer(new FabricImage(patch,{left:startX/k,top:top/k,scaleX:1/k,scaleY:1/k}),lineRegion),{id:uid(),name:`Edited text: ${next.slice(0,40)}`,editedText:next,ocrOriginalBounds:originalFieldBounds(lineRegion),borrowed:plan.pieces.some(q=>q.source!==undefined&&q.source!=='font'),drawn});
+ return Object.assign(turnLayer(new FabricImage(patch,{left:startX/k,top:top/k,scaleX:1/k,scaleY:1/k}),lineRegion),{id:uid(),name:`Edited text: ${next.slice(0,40)}`,editedText:next,ocrOriginalBounds:originalFieldBounds(lineRegion),borrowed:plan.pieces.some(q=>q.source!==undefined&&q.source!=='font'),drawn,...(drawn.length&&drawnFace?{drawnFace:{...drawnFace,score:undefined,draw:undefined},drawnInk:ink}:{})});
 }
 const hexRgb=(hex:string)=>[1,3,5].map(i=>parseInt(hex.slice(i,i+2),16)||0);
